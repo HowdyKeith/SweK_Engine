@@ -554,3 +554,25 @@ ASCEND_M is fixed here from the arrival rule: within 4 m of the goal's depth, a 
 **Expectations, written before any seed is flown.** E1 the ship collisions at most halve: about 55 percent. E2 SUPPORTED: about 30 percent. E3 some flight is lost to arriving deep or timing out on the climb (more timeouts than the reference): about 35 percent. E4 no crush: about 95 percent.
 
 **What a result would not say.** The ships' keels are known exactly from the start. A deeper transit costs energy, which is not counted here (`brain/NAV_MISSIONS_WIP.md` prices a metre, not a depth).
+
+## RESULT OF FOLLOW-UP 9 (2026-11-17; `node tools/ship/subDeepTransitStudy.mjs --set held82 --write`, HELD82 = hard-traffic seeds 7881 to 7940, read once; 120 flights in `brain/subDeepTransitHeld82.jsonl`): **NOT SUPPORTED** by the registered rule (one exit), with the largest gain any traffic arm has shown.
+
+The module, the study and the gate were committed and sabotaged first (a3387e92; 14 mutants, all red on the first run). DEV was the sanity run (27 of 30 against 23, one exit, not a result). All four checks passed.
+
+| arm | reached | collided (with a ship) | left | timeout | deepest (m) |
+|---|---|---|---|---|---|
+| sweep+dive (the reference, FOLLOW-UP 8's) | 43 / 60 | 16 (13) | 1 | 0 | 59.0 |
+| **sweep+dive+deep** | **52 / 60** | **7 (7)** | 1 | 0 | 60.5 |
+
+**Verdict.** Ship collisions at most half the reference's: MISSED by half a flight (7 against 13; half is 6.5). Net gain of 5 at p <= 0.10: MET (**9 gained, 0 lost, exact sign p 0.0039**). No exit: MISSED (1). The rule asks for no exit before anything else, so it is **NOT SUPPORTED**.
+
+**Said plainly.** The one exit is seed 7920, and **the reference leaves on the same seed**. The deep transit did not cause it; it did not fix it either. Every one of the deep arm's 7 collisions is a seed on which the reference also collided. The deep arm lost no flight the reference reached, and its 3 iceberg collisions are gone (bergs have keels of 6 to 36 m). By the rule as written the round is NOT SUPPORTED, and that verdict stands. A result that clears the bars it can affect is still not a result on the bar it cannot.
+
+**Against the expectations (written first).** E1 the ship collisions at most halve, about 55: no, narrowly (13 to 7). E2 SUPPORTED, about 30: no. E3 more timeouts than the reference, about 35: no (0 and 0). E4 no crush, about 95: held (deepest 60.5 m against 100).
+
+**What this says.** Flying beneath the traffic from the start is the strongest traffic result yet. 52 of 60 against FOLLOW-UP 8's 49 of 60 on its own set, and it never cost a flight. What is left is: ships whose keels are too deep to pass under (17 percent of ships, measured), the one exit the planner makes on 7920, and an energy cost a deeper transit was not charged.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).**
+* Why 7920 leaves in both arms: an exit the sweep did not catch.
+* The ships too deep to pass under.
+* The transit's price in energy (`brain/NAV_MISSIONS_WIP.md`'s meter can be pointed at it).
