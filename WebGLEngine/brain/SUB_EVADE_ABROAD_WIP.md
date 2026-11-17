@@ -104,3 +104,47 @@ DEV is free to read. **HELD (133001 to 133096) is NOT flown by this note's work 
 * **No mechanism is read** (a longer interval could be quieter against its own copy and find a target less often against the others: no event is read).
 
 **What this does to HELD: nothing is changed.** HELD scores the registered rules. **On DEV two of my 12 forecasts other than the two on R0 would have been wrong as the larger side** (at least 3 of the 14 helped at 40.0, 80; the step rising against some opponent, 55); they are scored on HELD only. **The forecast "HURTS SOMEWHERE" (55) was right and said nothing of 14 of 14; I did not forecast that.**
+
+## HELD RESULT (2026-11-17; `node tools/ship/takeEvadeAbroad.mjs held --write` flown ONCE on Keith's word "fly HELD now", geometries 133001 to 133096 (192 duels a matchup), exit 0; record `brain/subEvadeAbroadHeld.json`: 44 matchups, no check failed)
+
+**The rules are about HELD.** **R0 holds:** OWN(40.0), league7100 with pingEvery 40 against league7100, **+0.765 +- 0.111 (z 6.9, 66-109-17): PAYS** (OWN(25.0) is +0.185, z 2.2: NEUTRAL).
+
+* **RA1 THE REACH of 40.0: HELPS against 0 of 14 opponents, "NARROW"; the effect HURTS against ALL FOURTEEN** (league7000 -1.289, league7001 -0.366, league7101 -1.085, league7102 -0.511, league7103 -1.161, league7104 -1.486, league7105 -1.442, exploit7200 -0.910, exploit7201 -1.043, exploit7202 -1.115, exploit7203 -1.370, exploit7204 -1.063, exploit7205 -1.288, G -0.997; z of -3.1 to -12.0; **the median -1.100**). **On DEV the same: 14 of 14.**
+* **RA1 THE REACH of 25.0: HELPS against 0 of 14, "NARROW"; HURTS against 3** (league7104 -0.346, league7105 -0.297, exploit7205 -0.399; z of -3.1 to -3.3); the other eleven are NEUTRAL (-0.217 to +0.257). On DEV it HURT against four (league7104, exploit7202, exploit7203, exploit7205): **league7104 and exploit7205 on both sets.**
+* **RA2 THE COST: "HURTS SOMEWHERE". RA3 THE COMMON OPPONENTS: none. RA4 THE HEADLINE: "ABROAD: 40.00 NARROW, 25.00 NARROW, HURTS SOMEWHERE", the same on DEV and on HELD.**
+* **The step from 25.0 to 40.0 FALLS against all fourteen** (-0.39 to -1.31, z of -4.6 to -12.7) and RISES against none.
+* **The forecast quantities on HELD:** GENERAL at 40.0 no; COMMON no; NARROW yes; NARROW at 25.0 yes; hurts somewhere yes; league7001 and exploit7204 both helped at 40.0 no; G helped no; at least 3 helped no; the OWN effect above the median yes; the step rises against some opponent no; no common opponent yes.
+
+### The forecasts, scored (section 5, as the larger side; none was at exactly 50)
+
+| forecast | p | HELD | as the larger side |
+|---|---|---|---|
+| R0 holds on DEV | 95 | true | right |
+| R0 holds on HELD | 94 | true | right |
+| RA1 at 40.0 is "GENERAL" | 8 | false | right |
+| RA1 at 40.0 is "COMMON" | 30 | false | right |
+| RA1 at 40.0 is "NARROW" | 62 | true | right |
+| RA1 at 25.0 is "NARROW" | 80 | true | right |
+| RA2 is "HURTS SOMEWHERE" | 55 | true | right |
+| the effect of 40.0 HELPS against both league7001 and exploit7204 | 40 | false | right |
+| the effect of 40.0 HELPS against G | 12 | false | right |
+| the effect of 40.0 HELPS against at least 3 of the 14 | 80 | **false (none)** | **wrong** |
+| the OWN effect at 40.0 is larger than the median of the 14 effects | 70 | true | right |
+| the step from 25.0 to 40.0 RISES against some opponent | 55 | **false** | **wrong** |
+| RA3 is empty | 60 | true | right |
+
+**11 of the 13 forecasts are right as the larger side; the two misses are the two DEV showed.** **What the table does not show is the size of what I had in mind and did not forecast: the label NARROW and "HURTS SOMEWHERE" (62 and 55) were right, and the registered reading is 14 of 14 HURT at 40.0 on both sets; I had thought of NARROW as "helps a few" and the effect against the weaker boats as zero.**
+
+### What the two sets show together (POST-HOC, labelled; not a rule of this note)
+
+* **The two sets agree to the opponent.** The 14 effects at 40.0 of DEV and HELD correlate at **0.94**, those at 25.0 at **0.92**, the base edges at **0.996**; **the status of the effect at 40.0 is the same on both sets for all 14 opponents** (HURTS), and at 25.0 for 11 of 14 (the three that differ are within 0.1 of the bar). Pooled over the two sets (inverse-variance) the effect at 40.0 is **-0.32 against league7001 and -0.54 against league7102** (the two least negative) and **-1.44 against league7104 and league7105** (the two most).
+* **The cost at 40.0 is larger against the weaker boats**: the mean effect is **-1.16 against the ten with a base edge of 2.7 or more and -0.88 against the four hardest** (league7001, league7103, exploit7200 and exploit7204, whose base edges are +1.24, +1.66, +0.89 and +1.36); the arm's own edge against the four is **+0.87, +0.50, -0.02 and +0.30** and against the ten **+1.30 to +2.36**. The correlation of the effect with the base edge is -0.45 on HELD (-0.60 on DEV). **The effect at 25.0 follows the base edge more closely (-0.83 on HELD, -0.92 on DEV): +0.04 to +0.26 against the four hardest (mean +0.14, NEUTRAL) and -0.07 to -0.40 against the ten others (mean -0.19) on HELD; DEV had +0.13 and -0.23.**
+* **Four sets of the arm against its own copy** (the top note's two and this note's two; each arm's own standard error): pooled **+0.61 (se 0.056) at 40.0 and +0.17 (se 0.042) at 25.0.** **The arm that gains +0.6 against league7100 loses about 1.1 against the average other boat.**
+* **A reading of what this does to earlier notes (labelled; not tested here):** every pingEvery arm of the ping and top notes was flown **against its own base**, so the gains reported there (league7001 and exploit7204 with a longer interval, +0.4 to +0.9 at 16 to 30) are measured against a copy of themselves and **this note shows, for league7100, that such a gain can be a loss against every other boat.** Whether the comparators' gains survive against other boats is **not flown**. The same holds for the lesion of the move note (league7100 with the comparators' pingEvery of 4 against league7100: -0.035 and +0.065).
+* **No mechanism is read** (a longer interval could be quieter against its own copy and find a target less often against the others: no event is read).
+
+### What this result does and does not say
+
+* **It says, by this note's rules:** league7100 with pingEvery 40 does worse than league7100 against every one of the fourteen other boats on both sets, and with 25 against a few (league7104 and exploit7205 on both sets); it helps against none. **The gain of the top note is a gain against league7100's own copy and not a general one.**
+* **It does not say** that a longer interval costs a boat other than league7100 (the comparators' arms were not flown against other boats), that a shorter interval helps or costs (no value below league7100's own 8.30 was flown), that league7100's own interval of 8.30 is a best value against the other boats (it is only better than 25 and 40), or anything about a mechanism.
+* **The candidates this leaves, each its own registration and none decided:** league7100 with a shorter pingEvery (4 to 8: the other side of its own value) against the other boats; the same read for the comparators' longer-interval arms (league7001 and exploit7204 with 16 to 30 against the other boats: do their ping-round gains survive?); a pingEvery by opponent-type interaction (the effect at 25 follows the base edge: the arm helps a little against the hardest boats and costs against the weakest).
