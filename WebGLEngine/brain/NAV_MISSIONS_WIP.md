@@ -169,3 +169,30 @@ PART 1 found that speed matters more to energy than path. Over a mission, it is 
 **Expectations, written before any seed is flown.** E1 (1) holds: about 70 percent. E2 (2) holds: about 65 percent. E3 SUPPORTED: about 45 percent. E4 `budget` ends flat on at least one mission (its estimate is a straight line, not the route): about 35 percent.
 
 **What a result would not say.** The table is still water at 20 m (the current, the depth changes and the turns are not in it), and DETOUR is one number for every sea. An arm that learned its own detour as it went is not this one.
+
+## PART 3, RESULT (2026-11-17; `node tools/ship/navBudgetStudy.mjs --set held84 --write`, HELD84 = seeds 8001 to 8060, read once; 180 missions in `brain/navBudgetHeld84.jsonl`): **SUPPORTED**
+
+The arm, the study and the gate were committed and sabotaged first (04643b0f; 14 mutants, two of which first read 0 red and got rows). DEV was the sanity run (SUPPORTED on 30, not a result). All four checks passed: `eco` reproduces PART 2's stored missions, the table re-measures within 2 percent (to 0.03), all 60 seeds had a mission, and `budget` changes some.
+
+| arm | missions completed | legs | flat | collided | left | median time (completed) | median battery left |
+|---|---|---|---|---|---|---|---|
+| any+predict+edge+yield (the reference) | 6 / 60 | 96 | 39 | 11 | 4 | 392 s | 0% |
+| eco (2 m/s) | 40 / 60 | 120 | 0 | 18 | 2 | 608 s | 49% |
+| **budget** | **41 / 60** | 123 | **0** | 16 | 3 | **464 s** | 9% |
+
+**The registered test.**
+* (1) Not worse at finishing: budget 41 against eco's 40 (it needed 38). MET.
+* (2) Faster: on the 32 missions both complete, a median of **460 s against 609 s, 24 percent faster** (it needed 10). MET.
+
+**SUPPORTED.** Its decisions: 3 m/s 33 percent, 2.5 m/s 67 percent, slower never.
+
+**Against the expectations (written first).** E1 (1) holds, about 70: held. E2 (2) holds, about 65: held. E3 SUPPORTED, about 45: held. E4 budget ends flat at least once, about 35: no. The straight-line estimate times DETOUR was enough on every mission.
+
+**What it says.** An arm that knows its battery spends it: it finishes as many missions as the fixed-speed arm, a quarter faster, and comes home with 9 percent where `eco` comes home with half.
+
+On this set `eco` completed 40, against PART 2's 49 on its own set. The sets differ in their seas, and on this one both slow arms lose missions to ships (18 and 16 collisions). That is the traffic problem of `brain/SUB_FIELD_NAV_WIP.md`, not the battery's. Of the 49 missions either completed, 9 only budget completed and 8 only eco. The two arms reach the same count by different flights.
+
+**Not checked, said plainly.**
+* The table is still water at 20 m. DETOUR is one number fitted on DEV's eco missions.
+* There is no reserve: a sea that ran 1.4 times its straight lines would leave it short.
+* The traffic arcs (FOLLOW-UPs 8 and 9: the dive and the deep transit) are not under these missions. A mission arm with both is the obvious next step.
