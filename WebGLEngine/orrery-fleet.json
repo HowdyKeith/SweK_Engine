@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "e2af71abefe0d3fd051a7c8ede4e10e8ff14e9ff",
+ "head": "4575be6607990b52ef3b7c55ada0a9d22f689f07",
  "bodies": {
   "box3d": [
    {
@@ -462,12 +462,12 @@
    {
     "path": "rtx-viewer.html",
     "bytes": 17872,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
     "bytes": 158946,
-    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -920,8 +920,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3785289,
-    "sha": "ac9c232e8b2beee28634773274b7f756796ca72b"
+    "bytes": 3789445,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "mpm3d.html",
@@ -951,7 +951,7 @@
    {
     "path": "render/seaPicker-selfcheck.mjs",
     "bytes": 18881,
-    "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "render/seaThree-selfcheck.mjs",

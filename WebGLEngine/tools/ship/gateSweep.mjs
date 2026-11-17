@@ -16442,6 +16442,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/rtViewer-selfcheck grew from 99 rows to 137 (sections 1j and 4g and three rows of 6: instances, the tree over them and the any-hit cutout through makeRtSession and rtx-viewer.html; twenty-two sabotages, none 0 red, one of which first made the new rows throw and they fail by row now) and tools/ship/orreryPost-selfcheck names and times each capture and gives it pageShot's 120 s ceiling -- its cause on the rig is not known and that change is unverified there; render/seaPicker-selfcheck, which this round's rotation returned red on a fixed 900 ms wait (red on v4918's tree too), waits for the page to settle and its row is unchanged; no register widened",
     }),
+    since628: Object.freeze({
+        at: "v4920", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/orreryPost-selfcheck holds the page's frame loop to one frame per 100 ms in its page section and gained the row that holds the hold (44 rows to 45; three sabotages, none 0 red) -- the rig's timeout was a queue of frames a software GL could not present, reproduced here, and the change is unverified on the rig; tools/ship/gitEconomy-selfcheck, which this round's rotation returned red, aimed its pointer at a body behind the page's HUD panel and aims now at the largest one the pointer can reach (two sabotages, 1 red each); no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

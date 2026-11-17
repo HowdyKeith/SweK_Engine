@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-16T18:54:00.279Z",
+ "at": "2026-11-16T23:15:09.598Z",
  "poolAt": "2026-11-16T18:53:40.326Z",
  "poolHorizon": "2026-10-27T15:35:55.277Z",
  "budgetMs": 3000,
@@ -4476,10 +4476,10 @@
   },
   {
    "gate": "tools/ship/gitEconomy-selfcheck.mjs",
-   "ms": 9087,
+   "ms": 6254,
    "code": 0,
-   "priorMs": 9067,
-   "at": "2026-10-28T00:51:39.303Z"
+   "priorMs": 9087,
+   "at": "2026-11-16T23:15:02.103Z"
   },
   {
    "gate": "tools/ship/githubPanelLive-selfcheck.mjs",
@@ -5262,10 +5262,10 @@
   },
   {
    "gate": "tools/ship/orreryPost-selfcheck.mjs",
-   "ms": 13294,
+   "ms": 6933,
    "code": 0,
-   "priorMs": 12611,
-   "at": "2026-11-05T19:57:31.191Z"
+   "priorMs": 13294,
+   "at": "2026-11-16T23:15:09.598Z"
   },
   {
    "gate": "tools/ship/orreryPromotion-selfcheck.mjs",

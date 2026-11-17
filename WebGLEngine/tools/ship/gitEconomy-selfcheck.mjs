@@ -251,10 +251,27 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
         // -- it is a closed loop: re-read, re-aim, up to 25 times, which lands on the first pass in practice.
         // The claim is stronger than the one it replaces: the HUD must name THE BODY WE AIMED AT, not merely
         // something. If the page publishes no hook at all, aimed stays null and the row says so.
-        let named = null, aimed = null, aimTries = 0;
+        // *** v4920 -- AND IT AIMED AT THE LARGEST BODY WHEREVER IT WAS, INCLUDING UNDER THE HUD. *** v4920's rotation returned
+        // this row red, three runs of three alone: "aimed at three at (525, 537) 25 times and the HUD never named it".
+        // Nothing disagreed. #hud is 542 x 596 CSS pixels at (12, 10) in this section's 800 x 600 viewport -- measured --
+        // and takes pointer events, so a pointer at (525, 537) is over the panel and the canvas never hears it; the
+        // page's text stays "point at something", not even "nothing under the pointer". Which body is largest and where
+        // it stands is the orbit's business, so the row passed on the days that body stood right of the panel. v4534
+        // found this row measuring where the orbits happened to be and this is the same fault one layer in.
+        // It aims now at the largest labelled body THE POINTER CAN REACH: one whose centre, asked of the page itself
+        // with elementFromPoint, is the canvas. If the list is never empty and none is ever reachable, the row is red
+        // and says that, which is a different sentence from a pick that missed.
+        // NOT FIXED, because it is the product and not this gate: at 800 x 600 the panel covers 67% of the canvas and
+        // a body behind it cannot be pointed at. A person has a larger window; the row cannot assume one.
+        // SABOTAGES (v4920): the page's pointer offset by 60 px -> 1 red, this row, "aimed at fonts at (660, 250), on the
+        // canvas, 25 times"; the filter inverted, so only covered bodies are aimed at -> 1 red, this row.
+        let named = null, aimed = null, aimTries = 0, covered = 0, listed = 0;
         for (; aimTries < 25 && !named; aimTries++) {
-            const L = await pg.evaluate(() => window.__labelled || []);
-            if (!L.length) break;
+            const all = await pg.evaluate(() => (window.__labelled || []).map((b) => { const e = document.elementFromPoint(b.x, b.y); return { ...b, reach: !!e && e.tagName === "CANVAS" }; }));
+            if (!all.length) break;
+            listed += all.length; covered += all.filter((b) => !b.reach).length;
+            const L = all.filter((b) => b.reach);
+            if (!L.length) { await pg.waitForTimeout(400); continue; }      // every labelled body is behind the panel just now; they move
             const t = L.slice().sort((x, y) => y.rpx - x.rpx)[0]; aimed = t;
             await pg.mouse.move(Math.round(t.x), Math.round(t.y)); await pg.waitForTimeout(80);
             const txt = await pg.evaluate(() => document.getElementById("pick").textContent);
@@ -266,9 +283,11 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
         ok("*** THE POINTER, AIMED AT A NAMED BODY, NAMES THAT BODY AND ITS PRICES ***",
            !!named && !!aimed && named.startsWith(aimed.name + " -- "),
            named ? `aimed at ${aimed.name} (radius ${aimed.rpx.toFixed(1)} px) on try ${aimTries}, and the HUD ` +
-                   `reads: ${named}`
-                 : aimed ? `aimed at ${aimed.name} at (${Math.round(aimed.x)}, ${Math.round(aimed.y)}) 25 times ` +
+                   `reads: ${named} (${covered} of the ${listed} labelled bodies read were behind the HUD panel and passed over)`
+                 : aimed ? `aimed at ${aimed.name} at (${Math.round(aimed.x)}, ${Math.round(aimed.y)}), on the canvas, 25 times ` +
                            "and the HUD never named it -- the pick and the projection disagree about where it is"
+                 : listed ? `${covered} of ${listed} labelled bodies read over 25 tries were behind the HUD panel and none was ever on the ` +
+                            "canvas where a pointer reaches it -- nothing was aimed at, so nothing is claimed"
                          : "the page published no window.__labelled: no labelled body to aim at, so nothing " +
                            "here was pointed at. Not a pass and not a skip -- see #labelled on the HUD.");
         ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
