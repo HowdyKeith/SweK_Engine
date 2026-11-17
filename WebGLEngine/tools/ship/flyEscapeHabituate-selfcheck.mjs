@@ -10,6 +10,21 @@
 //   4  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand
 //   5  THE RECORDS              36 draws; P, T1, H; the flies that learn and never flee
 //   6  THE COMMAND              it is this round's; no training of the round's, no process
+// SABOTAGE LOG (2026-11-17) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
+// process) run whole for each; every one red by name (the number is the rows red over the two):
+//   THE LIFE (brain/rl/lifeEnv.mjs): L1 a decoy catches 2 | L2 the decoy's kind draw is skipped 1 | L3 an ordinary episode is a decoy one 3 | L4 every life is ordinary 2 | L5 three episodes a life 4
+//   L6 the clock is the episode's 1 | L7 being caught ends the life 1 | L8 a life's return is the sum of its episodes' 1 | L9 the hand floor's theta is 0.3 1 | L10 the hand floor never starts afresh 1
+//   L11 the told fly flees in decoy lives 2 | L12 the episodes' seeds are the life's 1
+//   THE CIRCUIT (brain/rl/habituatingCircuit.mjs): H1 the rule does not depress 1 | H2 the rule does not recover 1 | H3 g is not reset at a life's start 1 | H4 every connection habituates 1
+//   H5 the rates come last 3 | H6 the weights are not restored 1 | H7 negative rates are habituation 1 | H8 the depression uses the target's activity 1
+//   THE ROUND (tools/ship/flyEscapeHabituate.mjs): F1 HAB does not habituate 5 | F2 HSHUF is the real wiring 3 | F4 H against the reflex 1 | F5 the life's maxSteps is an episode's 1
+//   F6 the learn count asks nothing of ordinary lives 1 | F7 never fleeing at 0.5 1 | F8 the rank tests' BETTER and WORSE swapped 1 | F9 tests made with a failed check 1 | F10 the round writes
+//   round 8's file 1 | F12 the draws are 13 to 24 3
+//   TWO WENT 0 RED AT FIRST AND WERE FINDINGS: F3 P is against HSHUF (the fixture had both other arms below HAB, so which one P was against made no difference) and F11 the floors' untrained
+//   fly is not checked against the reflex (no fixture had an untrained fly that was not the reflex). A row was added for each and they were run again: 1 and 1.
+//   THE COMMAND: C1 the second training is of draw 2 1 | C2 exits 0 on a word it does not know 1 | C3 reads round 8's library 1
+//   Three rows of mine were wrong when written and were corrected: the hand floor stops fleeing at the seventh mover, not before (0.9 to the 6th is 0.53, above the line); a fixture's learning flies
+//   scored 0.74, not under the 0.74 I gave its hand floor; and the registration's cost of a training was 8 to 9 minutes where two iterations measure 12.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -134,6 +149,11 @@ section(() => {
     ok("!! THE FLIES THAT LEARN AND THE FLIES THAT NEVER FLEE ARE COUNTED AS REGISTERED: FROZEN never flees 12 of 12 (an ordinary-life score under 0.35) and learns 0; HAB learns 12 of 12 (an ordinary-life score above 0.5 and a decoy-life fourth episode above its first) with its signature, 0.25, in the lines",
         R.arms.FROZEN.neverFlee === 12 && R.arms.FROZEN.learn === 0 && R.arms.HAB.learn === 12 && R.arms.HAB.neverFlee === 0 && near(R.arms.HAB.signature, 0.25, 1e-9) && R.arms.FROZEN.a === null && near(R.arms.HAB.a, 0.1, 1e-12) && /never flee 12 of 12, learn 0 of 12/.test(lines) && /the 4th episode less the 1st 0\.2500/.test(lines) && V.NEVER_FLEES === 0.35 &&
         V.learns({ ordinary: 0.51, ep: { decoy: [0.5, 0, 0, 0.6] } }) && !V.learns({ ordinary: 0.49, ep: { decoy: [0.5, 0, 0, 0.6] } }) && !V.learns({ ordinary: 0.6, ep: { decoy: [0.6, 0, 0, 0.6] } }));
+    const split = V.reading(file((arm, s) => (arm === "FROZEN" ? rec(arm, s, 1, 0.29 + s / 1e4) : arm === "HAB" ? rec(arm, s, 0.85 + s / 1e4, 0.62, 0.7, 0.95) : rec(arm, s, 0.9 + s / 1e4, 0.66, 0.7, 0.97))));
+    ok("!! P IS AGAINST FROZEN AND T1 AGAINST HSHUF, NOT THE OTHER WAY (sabotage F3 first went 0 red, and this row is its answer): HAB above every FROZEN fly and below every HSHUF fly -> P BETTER (ranks 222) and T1 WORSE (ranks 78)",
+        split.P.sumA === 222 && split.P.word === V.WORDS.P[0] && split.T1.sumA === 78 && split.T1.word === V.WORDS.T1[1]);
+    const off = good.map((r) => (r.kind === "floors" ? { ...r, untrained: { ...r.untrained, HAB: 0.61 } } : r));
+    ok("!! AN UNTRAINED FLY THAT IS NOT THE REFLEX IS SAID BY NAME AND NOTHING IS WEIGHED (sabotage F11 first went 0 red, and this row is its answer): floors whose untrained HAB fly scores 0.61 against the reflex's 0.62", J(V.checkRecords(off)) === J(["the untrained HAB fly does not score the reflex's number: the start is not the reflex"]) && V.reading(off).P === null);
     const tie = V.reading(file((arm, s) => rec(arm, s, 1, 0.29 + ((s * 7 + arm.length) % 12) / 1e4)));
     ok("arms that all never flee cannot be told apart: P and T1 CANNOT BE TOLD APART", tie.P.word === V.WORDS.P[2] && tie.T1.word === V.WORDS.T1[2] && tie.arms.HAB.neverFlee === 12);
     const R2 = V.reading(good.filter((r) => r.kind !== "floors"));
