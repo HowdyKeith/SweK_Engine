@@ -2969,7 +2969,7 @@ export const NEXT_ROUNDS = [
         id: "brain-capability-map",
         blocker: "OPEN",
         what: "BUILT 2026-11-02: docs/BRAIN-CAPABILITY-MAP.md generated from brain/capabilityMap.mjs (15 tasks, a closed status vocabulary, every result cell with a source and a quote the gate finds in the cited file or changelog entry; tools/ship/takeCapabilityMap.mjs rewrites it, --check holds it equal).",
-        how: "node tools/ship/takeCapabilityMap.mjs (rewrite) or --check; the gate is brain/capabilityMap-selfcheck.mjs (36 mutants). A cell changes status only by citing a source that says so.",
+        how: "node tools/ship/takeCapabilityMap.mjs (rewrite) or --check; the gate is brain/capabilityMap-selfcheck.mjs (36 mutants). A cell changes status only by citing a source that says so. REFRESHED 2026-11-17: 16 tasks (sub-nav added: the planner on the PD autopilot, traffic not fixed), Round 7 stage 1 on the fly pilot, Rounds 33-37 on the needs seat. Next refresh owed when Round 7 stage 2 and Addendum 17 come back from the rig.",
         why: "Keith asked which brain can do what at each level; the answer had to be checkable, not remembered.",
     },
     // ---- 2026-11-01 -- THE BACKLOG OF THE NAVIGATION, FLY, FISH, GPU AND SPACE WORK, written up from brain/BACKLOG_2026-11-01.md (Keith: "write up the other items on the list to backlog, if they are not already there").
