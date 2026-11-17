@@ -8,7 +8,7 @@
 //   2  THE STUDY             against a stand-in: six arms, each once; sticky less shipped pair by pair; what ships (it must LEAD in both fleet fights and TRAIL in none); the file; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// SABOTAGE LOG: @@LOG@@
+// SABOTAGE LOG: 9 mutants of tools/ship/takeFlyWiredGunnerFix.mjs, each a copy of the study with this gate (and the command rows) pointed at it: 9 red by name the first time -- the fleet pairs another study's, one ship a side, the sticky arm the shipped policy, the plain side keeping its cannon, the gain's sign, the rule with one fleet fight or with no trailing allowed, the blob for the shipped policy, a second read allowed. And 5 of brain/seatTurretGunner.mjs's stickySight and `sticky` option, run against this gate's neighbours (brain/flyTracking-selfcheck.mjs, brain/seatTurretGunner-selfcheck.mjs): 1 red the first time; FOUR GAPS, CLOSED with rows -- the sight asked twice with one target, a target that could not be shot kept, the option ignored or always on -- after which all 5 are red.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -55,7 +55,10 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    /*@@FOUND@@*/
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (g, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${g}_${arm}.json`), "utf8")).leads, near = (s, v) => Math.abs(s.mean - v) < 5e-4, R = (g) => rd[g].reading;
+    const re = Object.fromEntries(G.REGIMES.map((g) => [g, G.fightReadings({ shipped: k(g, "shipped"), sticky: k(g, "sticky") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IN FLEETS THE STICKY SIGHT IS THE FIX: no cannon, sticky less shipped +0.660 (z 8.4), the sticky gunner then LEADING the plain fleet (+0.098) where the shipped one trails (-0.562); with the cannon +0.274 (z 5.6), though it still trails (-0.321)", near(R("fleetNoCannon").gain, 0.660) && rd.fleetNoCannon.words.gain === "LEADS" && near(R("fleetNoCannon").sticky, 0.098) && rd.fleetNoCannon.words.sticky === "LEADS" && near(R("fleetNoCannon").shipped, -0.562) && near(R("fleetCannon").gain, 0.274) && rd.fleetCannon.words.gain === "LEADS" && near(R("fleetCannon").sticky, -0.321) && rd.fleetCannon.words.sticky === "TRAILS" && G.REGIMES.every((g) => ["shipped", "sticky", "gain"].every((q) => Math.abs(re[g][q].mean - R(g)[q].mean) < 1e-12)) && fs.readdirSync(G.KEPT_DIR).length === 6);
+    ok("!! AND AGAINST FIGHTERS IT IS A LITTLE WORSE (sticky less shipped -0.029, z -2.9: TRAILS), so BY THE RULE REGISTERED BEFORE THE PAIRS IT DOES NOT SHIP -- no file, and the page keeps the shipped gunner. The forecast was right for the fleets' direction, under for the no-cannon fleet, and wrong for the fighters", near(R("fighters").gain, -0.029) && rd.fighters.words.gain === "TRAILS" && near(R("fighters").sticky, -0.182) && !rd.verdict.ok && /in fighters sticky less shipped TRAILS/.test(rd.verdict.reasons.join()) && !fs.existsSync(G.DEFAULT_OUT));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
