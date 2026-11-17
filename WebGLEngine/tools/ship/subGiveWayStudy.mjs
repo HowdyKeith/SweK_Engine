@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import * as H from "../../brain/subHardNav.mjs";
 import * as G from "../../brain/subGiveWay.mjs";
 import * as AP from "../../brain/autopilotSub.mjs";
+import { parseOrExit } from "./cliArgs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 export const KIND = "hard-traffic", OUT_FILE = "brain/subGiveWayHeld78.jsonl", BAR = 48, GAIN = 5, P_LEVEL = 0.10;
@@ -70,11 +71,11 @@ export function report(res, { same, n, set }) {
     return L;
 }
 export function command(argv) {
-    const i = argv.indexOf("--set"), set = i >= 0 ? argv[i + 1] : null;
+    const cli = parseOrExit("subGiveWayStudy", { values: { "--set": "string" }, flags: ["--write"] }, argv), set = cli.values["--set"] || null;   // 2026-11-17: through the front door (cliArgs-selfcheck section 7 found it reading --set the silent way)
     if (!SETS[set]) { console.error("usage: subGiveWayStudy.mjs --set dev|held78 [--write]"); return 2; }
     const res = flySet(SETS[set]), lines = report(res, { same: copySame(), n: SETS[set].length, set });
     for (const l of lines) console.log(l);
-    if (argv.includes("--write") && set === "held78") { fs.writeFileSync(path.join(ENG, OUT_FILE), G.ARMS.flatMap((a) => res[a]).map((r) => JSON.stringify(r)).join("\n") + "\n"); console.log(`wrote ${G.ARMS.length * SETS[set].length} flights to ${OUT_FILE}`); }
+    if (cli.flags.has("--write") && set === "held78") { fs.writeFileSync(path.join(ENG, OUT_FILE), G.ARMS.flatMap((a) => res[a]).map((r) => JSON.stringify(r)).join("\n") + "\n"); console.log(`wrote ${G.ARMS.length * SETS[set].length} flights to ${OUT_FILE}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));
