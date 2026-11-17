@@ -13,11 +13,12 @@ export const ASPECT = 74 / 53;   // the treadmill ellipse's final horizontal ove
 export function sidePx(rv, t, w, fovDeg) { return w * (rv / -t) / Math.tan((fovDeg / 2) * Math.PI / 180); }
 
 /**
- * A looming ellipse with optional stripes. Options: widths (an array of horizontal extents in pixels, one per frame, in place of the collision-course law: Round 9's exponential expansion; then rv is ignored, t runs from 0 and theta is the planar angle), rv (seconds, half-size to speed ratio), w x h (default 200 x 150), fovDeg (118), step (0.01 s), startPx and endPx (the HORIZONTAL extent in pixels at the first and last frame; defaults 6 and 105 as Zhao's square), wc (Weber contrast 1),
+ * A looming ellipse with optional stripes. Options: plain ("dark", the default of every round before Round 21, or "light": the colour of the ellipse WITHOUT stripes, a light ellipse at ib (1 + wc) as the striped stimuli's light stripes; Round 21 found that Santon's Methods give the contrast of the LIGHT stripe against the background and add the dark stripes at the opposite sign, so the plain gray ellipse is probably the light one), widths (an array of horizontal extents in pixels, one per frame, in place of the collision-course law: Round 9's exponential expansion; then rv is ignored, t runs from 0 and theta is the planar angle), rv (seconds, half-size to speed ratio), w x h (default 200 x 150), fovDeg (118), step (0.01 s), startPx and endPx (the HORIZONTAL extent in pixels at the first and last frame; defaults 6 and 105 as Zhao's square), wc (Weber contrast 1),
  * stripes "none" | "static" | "moving", stripeHz (4), cycles (3), darkFrac (1/6), cx and cy (the centre in pixels, default the frame's centre), aspect (ASPECT), receding (play backwards), ib (0.5).
  * Returns { frames, t (seconds to collision at each frame), theta (degrees, the horizontal angle), width (pixels, the ellipse's horizontal extent), height, step }. A frame is { w, h, data: Float32Array } of luminance 0..1.
  */
-export function loomingEllipse({ rv, w = 200, h = 150, fovDeg = 118, step = 0.01, startPx = 6, endPx = 105, wc = 1, stripes = "none", stripeHz = 4, cycles = 3, darkFrac = 1 / 6, cx = null, cy = null, aspect = ASPECT, receding = false, ib = 0.5, widths = null } = {}) {
+export function loomingEllipse({ rv, w = 200, h = 150, fovDeg = 118, step = 0.01, startPx = 6, endPx = 105, wc = 1, stripes = "none", stripeHz = 4, cycles = 3, darkFrac = 1 / 6, cx = null, cy = null, aspect = ASPECT, receding = false, ib = 0.5, widths = null, plain = "dark" } = {}) {
+    if (plain !== "dark" && plain !== "light") throw new Error(`stealthLoomStimuli.loomingEllipse: plain is dark or light, got ${JSON.stringify(plain)}`);
     if (widths === null && !(rv > 0)) throw new Error(`stealthLoomStimuli.loomingEllipse: r/v is a positive number of seconds, got ${rv}`);
     if (!["none", "static", "moving"].includes(stripes)) throw new Error(`stealthLoomStimuli.loomingEllipse: stripes is none, static or moving, got ${JSON.stringify(stripes)}`);
     if (!(wc >= 0 && wc <= 1) || !(endPx > startPx) || !(startPx > 0) || !(step > 0) || !(fovDeg > 0 && fovDeg < 180)) throw new Error("stealthLoomStimuli.loomingEllipse: 0 <= wc <= 1, 0 < startPx < endPx, step > 0, 0 < fovDeg < 180");
@@ -32,7 +33,7 @@ export function loomingEllipse({ rv, w = 200, h = 150, fovDeg = 118, step = 0.01
         for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
             const nx = (x - X) / aH, ny = (y - Y) / aV, rr = Math.sqrt(nx * nx + ny * ny), cover = Math.min(1, Math.max(0, (1 - rr) / edge + 0.5));
             if (cover <= 0) continue;
-            let inside = dark;
+            let inside = plain === "light" ? light : dark;
             if (stripes !== "none") { const u = (((y - Y) / aV / 2 + 0.5) * cycles - phase) % 1, frac = u < 0 ? u + 1 : u; inside = frac < darkFrac ? dark : light; }
             f.data[y * w + x] = ib * (1 - cover) + inside * cover;
         }
