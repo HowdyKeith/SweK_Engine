@@ -54,3 +54,55 @@ Also checked:
 One stayed green: "`create()` swallows the rejection". It got a row (a device whose validation scope reports a rejection must make `create()` throw), and then **23 of 23 were red**.
 
 **NOT DONE:** the readout and the autopilot's laws on the device (they stay on the CPU twin); a pilot kind for the tank that steps its subs through this kernel; the rig's timing.
+
+## 2026-11-17 (session `code-review-nr3a0i`): THE READOUT AND THE LAWS ON THE DEVICE, and the rig's number made committable
+
+Keith: "lets do the GPU reservoir kernel". The kernel above was already built on main. This picks up the first item of its NOT DONE list.
+
+**`brain/reservoirPilotGpu.mjs`, `GpuPilotBatch`.** The kernel's step, then a second dispatch on the same queue: one thread per (reservoir, output), `controls = clamp(law(x) + b2 + W2 . h[output cells], -1, 1)`. A tick now reads back **4 controls a reservoir (16 bytes) instead of 148 activities**.
+* The law is taken from the CPU pilot, not retyped. `lawMatrixOf` probes `pilotSubCircuitState`'s own step with every weight zero and one small feature at a time. The gate shows it is linear and term for term the PD autopilot's laws.
+* `resetSome(indices)` zeroes chosen reservoirs only, as the CPU pilot resets its activity when its target object changes.
+* `create()` builds both kernels inside a validation scope and throws on a rejection.
+
+**Its gate** `brain/reservoirPilotGpu-selfcheck.mjs` (about 3 s here, SwiftShader):
+
+| check | worst control error against the CPU pilot (the limit is 1e-4) |
+|---|---|
+| random features, batch 8, 100 ticks, with memory / no state | 5.3e-7 / 4.8e-7 |
+| the file's 1,729 weights on a real tank flight through the dropout, 4 reservoirs, 300 ticks | 2.4e-7 |
+| a saturating readout bias (exactly +1 / -1 every tick), the rest | 9.6e-9 |
+| one reservoir reset mid-run (a run that does not reset it misses by more than 1e-3) | 3.5e-7 |
+
+Also checked: a reservoir's controls do not depend on its batch-mates (bit for bit); `controls()` reads batch x 4 numbers; a reported rejection makes `create()` throw.
+
+**THE PRICE ON THIS SANDBOX (SwiftShader, a software adapter: nothing about a card).** A whole pilot tick with its controls read back: device 0.24 / 1.6 / 13 / 99 ms for batches of 1 / 16 / 128 / 1,024, against the CPU pilot's 0.03 / 0.55 / 3.3 / 22 ms. Slower everywhere, as the kernel alone was from batch 16 up.
+
+**`tools/ship/takeReservoirGpu.mjs`** now prints two tables:
+* the kernel's steps back to back with one read at the end (throughput, which no pilot gets);
+* **the whole pilot with its controls read back every tick**, which is what a pilot pays.
+
+`--write` puts both and the adapter in `brain/rig-results/reservoir-gpu-timing.json`, so the rig's number comes back as a file instead of a pasted log. **The number is still OWED.** It must come from the rig's card, not from here.
+
+**Still NOT DONE, said plainly.**
+* A pilot kind for the tank that flies its subs through this. The tank's step is synchronous and a device read-back is not, so it needs a one-tick-late design: the controls of tick t are applied at t + 1, which changes the flight. A design question for Keith, not a port.
+* Training on the device.
+
+**AN INDEPENDENT REVIEW, AND WHAT IT CHANGED (2026-11-17).** Three reviewers (the kernel, the gate's blind spots, the rig tool) read the new code without my reasoning, and a skeptic tried to refute each finding. 12 survived, 2 were refuted.
+
+Three were real defects in `reservoirPilotGpu.mjs`, all now fixed with a row:
+* A non-finite readout weight saturated a control on the device where the CPU's `fin()` zeroes it. Now a per-output keep mask.
+* A finite feature beyond float32's range turned every device control to -1. `step` now refuses it.
+* `resetSome` was not atomic.
+
+Five were gaps in the gate, now rows:
+* a wrong readout dispatch count survived, because no asserted batch was above 16;
+* a retyped law survived;
+* multi-index resets were untested;
+* most pitch and yaw values were saturated;
+* a proxy left an error scope open.
+
+Adding the `destroy()` row exposed one more defect, in my own test code: the proxies bound Dawn's `GPUBufferUsage` class, so every buffer usage was 0.
+
+The rig tool's CPU side was not warmed up, and its header still said it writes nothing. Both are fixed.
+
+The gate now runs 24 rows (about 4 s here). 15 sabotages of the fixed module all go red (logged in the gate's header).
