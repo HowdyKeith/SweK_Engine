@@ -18,6 +18,14 @@ export const LEGS = 3, LEG_S = H.SECONDS_HARD, ECO_SPEED = 2.0, WAYPOINT_TRIES =
 export const KIND = "hard-traffic", BASE_ARM = "any+predict+edge+yield";
 export const ARMS = Object.freeze({ "any+predict+edge+yield": Object.freeze({ arm: "any+predict+edge+yield", eco: false }), "any+predict": Object.freeze({ arm: "any+predict", eco: false }), eco: Object.freeze({ arm: "any+predict+edge+yield", eco: true }) });
 export const ARM_NAMES = Object.freeze(Object.keys(ARMS)), DESIGNATED = "eco", REFERENCE = "any+predict+edge+yield";
+// PART 3 (registered before this code): `budget`, the reference with its speed capped at the fastest the battery can afford for the distance to go. Kept OUT of ARMS so PART 2's study
+// and gate fly exactly the arms they were registered with; flyMission takes it by name.
+export const BUDGET_SPEEDS = Object.freeze([3.0, 2.5, 2.0, 1.5]), BUDGET_JPM = Object.freeze({ 3: 2675, 2.5: 1891, 2: 1259, 1.5: 785 }), DETOUR = 1.35;
+export const BUDGET_ARM = Object.freeze({ arm: "any+predict+edge+yield", eco: false, budget: true }), ALL_ARMS = Object.freeze({ ...ARMS, budget: BUDGET_ARM });
+/** The distance to go: the straight line from (x, y) to waypoint `leg`, then between the waypoints after it. */
+export function distanceToGo(x, y, wps, leg) { let d = Math.hypot(wps[leg].x - x, wps[leg].y - y); for (let k = leg + 1; k < wps.length; k++) d += Math.hypot(wps[k].x - wps[k - 1].x, wps[k].y - wps[k - 1].y); return d; }
+/** The budget speed: the fastest of BUDGET_SPEEDS whose energy per metre x the distance to go x DETOUR fits in the energy left; else the slowest. */
+export const budgetSpeed = (energyLeft, toGo) => BUDGET_SPEEDS.find((v) => BUDGET_JPM[v] * toGo * DETOUR <= energyLeft) ?? BUDGET_SPEEDS[BUDGET_SPEEDS.length - 1];
 export const HELD83 = Object.freeze(N.range(7941, 8000)), DEV = Object.freeze(N.range(1, 30));
 
 /** A waypoint stands if it is r + CLEAR_M from every static obstacle and CLEAR_M from the previous waypoint (the scenario generator's rule for its goal). */
@@ -31,7 +39,7 @@ export function missionOf(seed) {
     return Object.freeze({ seed, sc, waypoints: Object.freeze([w1, w2, w3].map((p) => Object.freeze(p))) });
 }
 /** AMENDMENT 1 (brain/NAV_MISSIONS_WIP.md): an arm's leg cap is LEG_S x CRUISE / its cruise -- the same distance budget a leg; eco's is 390 s. */
-export const legSecondsOf = (armName) => (ARMS[armName] && ARMS[armName].eco ? (LEG_S * MT.CRUISE) / ECO_SPEED : LEG_S);
+export const legSecondsOf = (armName) => (armName === "budget" ? (LEG_S * MT.CRUISE) / BUDGET_SPEEDS[BUDGET_SPEEDS.length - 1] : ARMS[armName] && ARMS[armName].eco ? (LEG_S * MT.CRUISE) / ECO_SPEED : LEG_S);   // budget: 520 s, the distance budget at its slowest speed (PART 3)
 /** The eco pilot: the commanded speed capped at ECO_SPEED (only down), then `base`. */
 export const ecoPilot = (base) => (s, target, cv) => base(s, target.speed > ECO_SPEED ? { ...target, speed: ECO_SPEED } : target, cv);
 /**
@@ -39,7 +47,7 @@ export const ecoPilot = (base) => (s, target, cv) => base(s, target.speed > ECO_
  * legTimes, t, path, energy (J), battery (left, as a share of one), ticks }. `o` is { waypoints (override, the gate's one-waypoint mission), legSeconds, battery, base }.
  */
 export function flyMission(mission, armName, o = {}) {
-    const A = ARMS[armName]; if (!A) throw new Error(`navMission.flyMission: unknown arm "${armName}" (${ARM_NAMES.join(", ")})`);
+    const A = ALL_ARMS[armName]; if (!A) throw new Error(`navMission.flyMission: unknown arm "${armName}" (${Object.keys(ALL_ARMS).join(", ")})`);
     const sc = mission.sc, wps = o.waypoints || mission.waypoints, arm = A.arm, spec = H.ARM_SPEC[arm], dt = S.DT, model = E.navModel(), legTicks = Math.round((o.legSeconds ?? legSecondsOf(armName)) / dt), every = Math.max(1, Math.round(H.REPLAN_S / dt));
     const mode = spec.replan === "predict" ? "predict" : "now", capacity = o.battery ?? E.BATTERY_J, base = o.base || ((s, t, c) => AP.decide(s, t, c));
     const meter = E.meteredPilot(A.eco ? ecoPilot(base) : base, { model, dt });
@@ -48,11 +56,15 @@ export function flyMission(mission, armName, o = {}) {
     let legMin = Math.min(st.depth, wps[0].depth);
     const plan = (goal, i, at) => H.buildLadderField(H.planShapes({ ...sc, minDepth: legMin }, i * dt, { mode, blind: spec.blind, horizon: H.HORIZON_S }), goal, at, i === 0 ? { ladder: H.MARGIN_LADDER, edgeExtra: spec.edge } : { ladder: H.MARGIN_LADDER, own: at, edgeExtra: spec.edge });
     let leg = 0, legStart = 0, field = spec.field ? plan(wps[0], 0, st) : null, status = "timeout", path = 0, ticks = 0, t = null; const legTimes = [];
+    let cap = null; const chosen = [];   // budget: the speed chosen at each decision (every replan and at each leg's start)
+    const decide = () => { cap = budgetSpeed(capacity - meter.meter.joules, distanceToGo(s.pos[0], s.pos[1], wps, leg)); chosen.push(cap); };
+    if (A.budget) decide();
     for (let i = 0; ; i++) {
         if (i - legStart >= legTicks) { status = "timeout"; break; }
-        if (spec.field && spec.replan !== "none" && i > legStart && (i - legStart) % every === 0) field = plan(wps[leg], i, { x: s.pos[0], y: s.pos[1] });
+        if (spec.field && spec.replan !== "none" && i > legStart && (i - legStart) % every === 0) { field = plan(wps[leg], i, { x: s.pos[0], y: s.pos[1] }); if (A.budget) decide(); }
         const target = H.hardTarget(arm, s, field, wps[leg], { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: legMin, yieldSpeed: H.YIELD_SPEED });
-        const cv = ST.currentAt(sc.current, i * dt), cmd = meter.pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
+        const tgt = A.budget && target.speed > cap ? { ...target, speed: cap } : target;
+        const cv = ST.currentAt(sc.current, i * dt), cmd = meter.pilot(s, tgt, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
         const px = s.pos[0], py = s.pos[1]; s = res.state; ticks++;
         if (res.status !== "submerged") { status = res.status; break; }
         const x = s.pos[0], y = s.pos[1], now = (i + 1) * dt;
@@ -63,8 +75,8 @@ export function flyMission(mission, armName, o = {}) {
         if (MT.reached(s, wps[leg])) {
             legTimes.push(now - legStart * dt); leg++;
             if (leg === wps.length) { status = "completed"; t = now; break; }
-            legStart = i + 1; legMin = Math.min(-s.pos[2], wps[leg].depth); if (spec.field) field = plan(wps[leg], i + 1, { x: s.pos[0], y: s.pos[1] });
+            legStart = i + 1; legMin = Math.min(-s.pos[2], wps[leg].depth); if (spec.field) field = plan(wps[leg], i + 1, { x: s.pos[0], y: s.pos[1] }); if (A.budget) decide();
         }
     }
-    return { arm: armName, seed: mission.seed, kind: KIND, status, completed: status === "completed", legs: leg, legTimes, t, path, energy: meter.meter.joules, battery: Math.max(0, 1 - meter.meter.joules / capacity), ticks };
+    return { arm: armName, seed: mission.seed, kind: KIND, status, completed: status === "completed", legs: leg, legTimes, t, path, energy: meter.meter.joules, battery: Math.max(0, 1 - meter.meter.joules / capacity), ticks, ...(A.budget ? { speeds: chosen } : {}) };
 }
