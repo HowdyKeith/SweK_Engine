@@ -9,6 +9,7 @@
 //   3  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its score with the rates at 0 is the reflex's
 //   4  THE RECORDS              24 draws; the rates-at-0 check; P, T1, H; ACROSS and never fleeing counted
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at c43b6fb9, read from the file: the checks, P, T1, H, the arms, ACROSS, re-audits, the expectations, the note's result
 // SABOTAGE LOG (2026-11-17) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
 // process) run whole for each; every one red by name (the number is the rows red over the two):
 //   THE FLY (brain/rl/fibreOnlyReflex.mjs): K1 the network's output is added again 4 | K2 firing turns the fly to food 5 | K3 the action is the reflex, not the firing 1
@@ -18,9 +19,13 @@
 //   K3 WENT 0 RED AT FIRST AND WAS A FINDING: in the lives the rows used the efficacies never fell under the line, so the fibres' firing was the reflex and no row could tell them apart. A row with the
 //   efficacies set under and over the line, and a life with a strong rate, was added, and K3 was run again: 1.
 //   One row of mine was wrong when written: its never-fleeing fixture scored 0.63475, not 0.6348, so its flies were not ties; it now sits on 0.6348 exactly (decoy 1, ordinary 0.2696).
+// THE VERDICT'S SABOTAGES (2026-11-17, after the reading, the same runner, this gate alone): V1 a record's caught count changed by one 1 | V2 P against the reflex 3 | V3 ACROSS needs 0.5 5 | V4 the fly
+//   is round 10's 5 | V5 the note's P says CANNOT 1 | V6 the note's expectation of P is 60 1 | V7 the note names another commit 1 | V8 the note leaves out the recovery rate 1 | V9 the note drops what it
+//   does not mean 1 | V10 rates at 0 keeps the depression rate 2. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as V from "./flyEscapeFibreOnly.mjs";
 import * as R10 from "./flyEscapeCoact.mjs";
@@ -153,6 +158,36 @@ section(() => {
     const me = src("tools/ship/flyEscapeFibreOnly-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations with 4 flies tried on draw 901; it starts no process; the file's size and time are what they were before this section",
         calls.length === 1 && calls.every((c) => /^"FIBRE", 901, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} training, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at c43b6fb9 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, F = R.floors, draws = lines.filter((r) => r.kind === "draw");
+    const of = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), rec = (a, s) => draws.find((r) => r.arm === a && r.s === s);
+    ok("!! the results file is the one the run wrote: 26 records, sha256 acfd88b01a717358... (one start, 79.6 minutes, no restart)", lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "acfd88b01a717358071ef48f706c4c115aff5a5ac81232d46fbf459957f6afed");
+    ok("!! THE CHECKS HOLD: 24 draws each once, the registered recipe, each arm's weights and wiring, FIBRE draw 25 the same twice, the floors, every untrained fly the reflex -- AND EVERY FLY, WITH ITS RATES AT 0, IS THE REFLEX TO THE BIT (0.6057): nothing downstream overrules the fibres",
+        R.checks.length === 0 && draws.length === 24 && draws.every((r) => r.ratesOff === F.reflex.score) && near(F.reflex.score, 0.6057) && V.ARMS.every((a) => F.untrained[a] === F.reflex.score));
+    ok("!! *** P: A FLY WHOSE NETWORK CANNOT OVERRULE ITS HABITUATING FIBRES DOES BETTER THAN A FLY THAT NEVER FLEES *** -- 12 of 12 above never fleeing's 0.6348, none below, exact two-sided p 2^-11 (0.00049)",
+        R.P.word === V.WORDS.P[0] && R.P.above === 12 && R.P.below === 0 && R.P.ties === 0 && R.P.p === 2 ** -11 && near(R.P.ref, 0.6348) && Math.min(...sc("FIBRE")) > F.freeze.score);
+    ok("!! T1: THE REAL WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (ranks 159 on a middle of 150, no ties, p 0.63). H: THE FLY DOES WORSE THAN THE HAND HABITUATING REFLEX (0 of 12 above its 0.7276, p 0.00049)",
+        R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 159 && R.T1.ties === 0 && near(R.T1.p, 0.6297, 1e-4) && R.H.word === V.WORDS.H[1] && R.H.above === 0 && R.H.below === 12 && R.H.p === 2 ** -11 && near(R.H.ref, 0.7276));
+    ok("!! the arms (mean, sd, least, most, decoy lives, ordinary lives): FIBRE 0.6864 0.0028 0.6813 0.6906 0.8454 0.5275 | FSHUF 0.6817 0.0096 0.6613 0.6930 0.8595 0.5038",
+        near(A.FIBRE.mean, 0.6864) && near(A.FIBRE.sd, 0.0028) && near(A.FIBRE.min, 0.6813) && near(A.FIBRE.max, 0.6906) && near(A.FIBRE.decoy, 0.8454) && near(A.FIBRE.ordinary, 0.5275) && near(A.FSHUF.mean, 0.6817) && near(A.FSHUF.sd, 0.0096) && near(A.FSHUF.min, 0.6613) && near(A.FSHUF.max, 0.6930) && near(A.FSHUF.decoy, 0.8595) && near(A.FSHUF.ordinary, 0.5038));
+    ok("!! *** EVERY FLY OF BOTH ARMS LEARNS WITHIN ITS LIFE AND NONE NEVER FLEES ***: ACROSS 12 of 12 in each; never flee 0 and 0; FIBRE's decoy lives rise 0.4220 from the first episode to the fourth (the hand reflex's 0.4192), FSHUF's 0.4117; every FIBRE fly's first decoy episode is 0.58 and its fourth 1.00 to two places",
+        A.FIBRE.across === 12 && A.FSHUF.across === 12 && A.FIBRE.neverFlee === 0 && A.FSHUF.neverFlee === 0 && near(A.FIBRE.signature, 0.4220) && near(A.FSHUF.signature, 0.4117) && of("FIBRE").every((r) => r.ep.decoy[0].toFixed(2) === "0.58" && r.ep.decoy[3].toFixed(2) === "1.00"));
+    ok("!! THE RECOVERY RATE WENT TO 0 IN ALL 24 FLIES: what the fibres lose in a life they do not get back until the next life; the depression rate a 0.11 to 0.29, FIBRE's mean 0.2046, FSHUF's 0.1844",
+        draws.every((r) => r.rates.b === 0) && of("FIBRE").every((r) => r.rates.a > 0.11 && r.rates.a < 0.27) && near(A.FIBRE.a, 0.2046) && near(A.FSHUF.a, 0.1844) && Math.min(...draws.map((r) => r.rates.a)) > 0.105 && Math.max(...draws.map((r) => r.rates.a)) < 0.29);
+    const again = (a, s, zero) => { const r = rec(a, s), w = PF.unpackWeights(r.weights), p = zero ? V.ratesOff(a, s, w) : V.policyOf(a, s).setParams(w); return V.auditScore(() => (o) => p.act(o)).score; };
+    ok("!! RE-AUDITED AFTER THE READING: FIBRE draw 25 and FSHUF draw 33 (the arm's least) give their scores again on the 200 lives to the bit, and the reflex's with their rates at 0",
+        again("FIBRE", 25) === rec("FIBRE", 25).score && again("FIBRE", 25, true) === F.reflex.score && again("FSHUF", 33) === rec("FSHUF", 33).score && again("FSHUF", 33, true) === F.reflex.score && rec("FSHUF", 33).score === A.FSHUF.min);
+    ok("WHAT THE TRAINER SAW: on its own lives FIBRE starts at 0.690 and ends at 0.704; FSHUF starts at 0.676 and ends at 0.687 -- both already above never fleeing at iteration 0, where round 10's COACT started at 0.632",
+        near(A.FIBRE.history[0].ret, 0.6897) && near(A.FIBRE.history[6].ret, 0.7040) && near(A.FSHUF.history[0].ret, 0.6764) && near(A.FSHUF.history[6].ret, 0.6872));
+    const note = src("brain/FLY_ESCAPE_FIBRE_ONLY_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 11. The result"));
+    ok("the expectations, written before the code, against what came: all seven came -- P BETTER (85); at least 11 of 12 ACROSS (80), with 12; FIBRE's mean between 0.67 and 0.70 (65), 0.6864; at most 1 of 12 never flee (80), with 0; T1 CANNOT (70); H WORSE (90)",
+        /P: \*\*BETTER about 85 percent, CANNOT about 15\.\*\* FIBRE at least 11 of 12 ACROSS, about 80; FIBRE's mean between 0\.67 and 0\.70, about 65; at most 1 of 12 FIBRE flies never flee, about 80\. T1: CANNOT about 70\. H: WORSE about 90\./.test(flat) &&
+        R.P.word === V.WORDS.P[0] && A.FIBRE.across >= 11 && A.FIBRE.mean >= 0.67 && A.FIBRE.mean <= 0.70 && A.FIBRE.neverFlee <= 1 && R.T1.word === V.WORDS.T1[2] && R.H.word === V.WORDS.H[1]);
+    ok("the registration's RESULT SECTION (section 11) carries the three readings' words, the commit the file was read at, that every fly learns and none never flees, that the recovery rate went to 0, and what it does not mean",
+        /## 11\. The result/.test(note) && [["P", R.P.word], ["T1", R.T1.word], ["H", R.H.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)) && /c43b6fb9/.test(res) && /All 24 flies of both arms learn within their lives/.test(res) && /recovery rate went to 0 in all 24/.test(res) && /What it does not mean/.test(res));
 });
 
 console.log(`\nflyEscapeFibreOnly-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

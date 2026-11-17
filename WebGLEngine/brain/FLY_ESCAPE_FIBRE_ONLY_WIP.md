@@ -89,3 +89,39 @@ iterations. 24 trainings and the recheck, four at a time: about 85 minutes. Resu
 ## 10. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeFibreOnly.mjs run` -> `brain/flyEscapeFibreOnlyRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyEscapeFibreOnly.mjs read` prints the checks and the reading.
+
+## 11. The result (the run: one start, 79.6 minutes, no restart; the whole file committed unread at c43b6fb9, then read once)
+The checks hold: every untrained fly scored the reflex's 0.6057, and **every trained fly, with its rates at 0, is the reflex
+to the bit** -- nothing downstream overrules the fibres.
+
+**P: A FLY WHOSE NETWORK CANNOT OVERRULE ITS HABITUATING FIBRES DOES BETTER THAN A FLY THAT NEVER FLEES** (12 of 12 above
+0.6348, exact two-sided p 0.00049).
+
+**T1: THE REAL WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (ranks 159 on a middle of 150, p 0.63).
+
+**H: A FLY WHOSE NETWORK CANNOT OVERRULE ITS HABITUATING FIBRES DOES WORSE THAN THE HABITUATING REFLEX WRITTEN BY HAND**
+(0 of 12 above 0.7276, p 0.00049).
+
+| arm | mean | sd | least | most | decoy lives | ordinary lives | decoy, 4th episode less 1st | never flee | ACROSS | a |
+|---|---|---|---|---|---|---|---|---|---|---|
+| FIBRE | 0.6864 | 0.0028 | 0.6813 | 0.6906 | 0.8454 | 0.5275 | 0.4220 | 0 | 12 | 0.2046 |
+| FSHUF | 0.6817 | 0.0096 | 0.6613 | 0.6930 | 0.8595 | 0.5038 | 0.4117 | 0 | 12 | 0.1844 |
+
+**All 24 flies of both arms learn within their lives**: in decoy lives every FIBRE fly scores 0.58 in its first episode,
+fleeing the decoys, and 1.00 by its fourth, ignoring them; none stops fleeing for good. The rise across a life (0.42)
+is the hand habituating reflex's (0.42); what the hand reflex has that these flies lack is in ordinary lives (0.59 against
+0.53). **The recovery rate went to 0 in all 24**: what a fly's fibres lose in a life stays lost until the next life. The
+trainer's own mean return started above never fleeing at iteration 0 (FIBRE 0.690, FSHUF 0.676; round 10's COACT 0.632),
+which I read as the hill being close to the start once the veto is gone; that is not measured here.
+
+**Expectations against what came: all seven came.** P BETTER (85); at least 11 of 12 ACROSS (80), with 12; FIBRE's mean
+between 0.67 and 0.70 (65), 0.6864; at most 1 of 12 never flee (80), with 0; T1 CANNOT (70); H WORSE (90).
+
+**What it means.** Across rounds 9, 10 and 11 the trainer, given a fly that could stop fleeing, made it stop: 24 of 24 frozen
+flies and 3 of 12 round-10 flies. Given a fly whose only way to stop fleeing is connections that weaken with co-activity,
+it used them, 24 of 24, and every one beat never fleeing. **This is the first fly in this tree that learns while it lives,
+by a reading registered before it was run.**
+
+**What it does not mean.** The real wiring is no better at it than a shuffle (T1), so this says nothing yet about the fly's
+own connections onto its Giant Fibers; the rule was chosen by scoping in round 10 and the door closed after round 10's
+result; P is against a fixed floor, not against flies trained alongside; and the flies are still below the hand-written rule.
