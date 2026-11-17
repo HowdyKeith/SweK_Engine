@@ -8,7 +8,7 @@
 //   2  THE STUDY             the gain 0 is never flown and reads exactly 0; each wiring's best gain; the shipped gain flown beside the chosen one on the audit pairs (once, if they are the same); R1-R3 and S1; what ships and the file it writes
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// SABOTAGE LOG: @@LOG@@
+// SABOTAGE LOG: 12 mutants of tools/ship/takeFlyWiredHelmFix.mjs, each a copy of the study with this gate (and the command rows) pointed at it: 12 red by name the first time -- the train pairs another study's, the cannon left on either side, no gain 0 among the gains, the gain 0 flown, the shipped gain not flown, R3's sign, either half of the verdict, the blob's gains in the wrong order or for the second helm's policy, a second read allowed.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -65,7 +65,9 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(H.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    /*@@FOUND@@*/
+    const rd = JSON.parse(fs.readFileSync(H.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (w, g, set) => JSON.parse(fs.readFileSync(path.join(H.KEPT_DIR, H.keptName(w, g, set)), "utf8")).leads, re = H.readings({ fly: k("fly2~odd", 0.25, "audit"), shipped: k("fly2~odd", -2, "audit"), sine: k("sine", 0.25, "audit") }).reading, near = (s, v) => Math.abs(s.mean - v) < 5e-4, blob = JSON.parse(fs.readFileSync(H.DEFAULT_OUT, "utf8"));
+    ok("!! AS KEPT AND RE-DERIVED: WITHOUT THE CANNON THE BEST GAIN IS SMALL AND POSITIVE -- +0.25 for the fly's circuit and for the sine alike (every negative gain trails, and so does +0.5 or more for the fly) -- and at it the fly's helm LEADS the rule by 0.146 (R1, z 3.7) where the shipped gain TRAILS by 0.655 (R2, the together study's -0.692 again): the chosen gain is worth 0.801 (R3, z 13.8). The sine does a little better (+0.244)", rd.chosen["fly2~odd"].gain === 0.25 && rd.chosen.sine.gain === 0.25 && rd.chosen["fly2~odd"].rows.filter((r) => r.gain < 0 || r.gain >= 0.5).every((r) => r.stat.mean < -0.2) && near(rd.reading.R1, 0.146) && rd.words.R1 === "LEADS" && near(rd.reading.R2, -0.655) && rd.words.R2 === "TRAILS" && near(rd.reading.R3, 0.801) && rd.words.R3 === "LEADS" && near(rd.reading.S1, 0.244) && rd.verdict.ok && ["R1", "R2", "R3", "S1"].every((q) => Math.abs(re[q].mean - rd.reading[q].mean) < 1e-12));
+    ok("!! and it shipped: brain/helmFlyWired3WeightsDefault.json is a helmFlyWired3 brain of [-2, -2, 0.25, 0.25] -- the second helm with a cannon, a weak turn the OTHER way without one", PB.importBrain(PB.describePolicy(FS.POLICY_ID3, FS.third), blob).ok && Array.from(blob.weights).join() === "-2,-2,0.25,0.25" && /WITHOUT ONE 0\.25, the best of 9/.test(blob.by));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

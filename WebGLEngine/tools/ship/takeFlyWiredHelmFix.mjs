@@ -14,6 +14,8 @@
 // FORECAST, for the record: the fly's best no-cannon gain is 0 or a small positive one (turning a little AWAY lets more turrets bear); R1 CANNOT BE TOLD; R2 TRAILS (about -0.7); R3 LEADS; S1 CANNOT BE TOLD.
 // WHAT SHIPS: brain/helmFlyWired3WeightsDefault.json (policy helmFlyWired3: [-2, -2, g, g], g the fly's chosen no-cannon gain) if R3 LEADS and R1 does not TRAIL. With the cannon it is the second helm to the bit (brain/flySteering-selfcheck.mjs), so what is read here is all that changes.
 //
+// READ 2026-11-17 (brain/helmFlyWired3WeightsDefault.reading.json): the best no-cannon gain is +0.25 for the fly and for the sine; R1 +0.146 (z 3.7) LEADS; R2 -0.655 TRAILS; R3 +0.801 LEADS; S1 +0.244 LEADS. IT SHIPS: [-2, -2, 0.25, 0.25]. The forecast was right but for R1 (`cannot be told`: it leads).
+//   WHAT IT SAYS: without the cannon a helm should turn a little LESS onto the enemy than the bow-on rule does, not more -- the gain's sign reverses -- and only a little: at +0.5 the fly's helm trails by 0.76.
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmFix/); the reading file is the mark that the audit was read, and a second read is refused.
 // WHAT IS NOT HERE: gains that differ between the axes, the broadside rule, a fleet, fighters, the gain with the cannon re-chosen (it is the shipped -2, read three times).
 "use strict";
