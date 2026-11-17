@@ -106,3 +106,37 @@ W2 and W3 take y in -80 to 80 and depth 15 to 40, from a generator seeded by the
 **The registered leg cap of 260 s scores speed, not energy.** It was `flyHard`'s cap for a vessel at 3 m/s. On DEV seeds 2 and 5, `eco` (2 m/s) timed out on its FIRST leg with 77 percent of its battery left: chords of 376 and 394 m, paths of about 510 m, more than 260 s at 2 m/s. With 390 s it completed all three legs on both. A cap that ends a slower arm for being slower answers a question the round did not ask.
 
 **Amended:** each arm's leg cap is 260 s x CRUISE (3 m/s) / the arm's cruise, which is the same distance budget per leg (780 m at cruise speed). The reference and `any+predict` keep 260 s; `eco` gets 390 s. The mission cap is three legs of each arm's cap. The arms, the set, the battery, the test, the bars and the checks are unchanged. Check (1) uses 260 s, the cap of the arms it copies.
+
+## PART 2, RESULT (2026-11-17; `node tools/ship/navMissionStudy.mjs --set held83 --write`, HELD83 = seeds 7941 to 8000, read once; 180 missions in `brain/navMissionHeld83.jsonl`): **SUPPORTED**
+
+The module, the study and the gate were committed and sabotaged first (81896596; 16 mutants, four of which first read 0 red and got rows). DEV was the sanity run (eco 22 of 30, the reference 4; not a result). All four checks passed:
+* a one-waypoint mission is `flyHard`'s flight tick for tick;
+* its energy is PART 1's to the joule;
+* every arm flies the same 60 missions;
+* eco changes some.
+
+All 60 seeds had a mission.
+
+| arm | missions completed | legs reached (of 180) | flat | collided | left | median energy of a completed mission | median battery left |
+|---|---|---|---|---|---|---|---|
+| any+predict+edge+yield (the reference) | 5 / 60 | 98 | **41** | 12 | 2 | 2,910 kJ | 0% |
+| any+predict | 0 / 60 | 92 | 46 | 9 | 5 | n/a | 0% |
+| **eco** (the reference at 2 m/s) | **49 / 60** | **148** | **0** | 9 | 2 | 1,570 kJ | 48% |
+
+**The registered test.** Eco against the reference, missions completed, paired: **44 gained, 0 lost, net 44, exact sign p < 0.0001: SUPPORTED.** `any+predict` against the reference (reported): 0 gained, 5 lost.
+
+**Against the expectations (written first).** E1 the reference ends flat on at least a third, about 60: held (41 of 60, over two thirds). E2 SUPPORTED, about 55: held. E3 eco ends flat on none, about 75: held (0). E4 eco collides with ships more than the reference, about 40: no (9 against 12).
+
+**What it says.** On one 3 MJ battery with no recharge:
+* **A vessel at cruise cannot fly three traffic legs.** The reference spent the whole battery on 41 of 60 missions, and its 5 completions used 2.9 of the 3 MJ.
+* **The same plan at 2 m/s completes four in five and comes home with half its battery.** It also hits fewer ships, not more.
+* **`any+predict`, which never slows, completed none.**
+
+PART 1 found that speed matters more to energy than path. Over a mission, it is the whole result: the battery, not the traffic, decides how many missions end. Collisions and exits end 11 of eco's 60; nothing ends any of them flat.
+
+**Not checked, said plainly.**
+* One hull, one battery class, no recharge.
+* A fixed three-leg layout.
+* Ships that hold course and may sail out of the region late in a long mission. Eco's missions are longer, so it may meet fewer ships late. That is not separated here.
+* No arm KNEW its battery. The next question is an arm that chooses its speed from the battery left and the distance to go.
+* Eco's leg cap was widened to 390 s by Amendment 1, on DEV and before HELD83, so that a slower arm is not ended for being slower.
