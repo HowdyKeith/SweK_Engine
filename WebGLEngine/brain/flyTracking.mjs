@@ -76,7 +76,7 @@ function scrambledPlaces(seed) {
 }
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
-function libraryOf(name, raw, cells = null, { sticky = false } = {}) {
+function libraryOf(name, raw, cells = null, { sticky = false, handOn = null } = {}) {
     const GRID = 720, table = new Float64Array(GRID + 1); let peak = 0;
     for (let k = 0; k <= GRID; k++) { const e = Math.PI * k / GRID; table[k] = (raw(e) - raw(-e)) / 2; peak = Math.max(peak, Math.abs(table[k])); }
     const amplitude = peak || 1;
@@ -85,7 +85,7 @@ function libraryOf(name, raw, cells = null, { sticky = false } = {}) {
     const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
     /** The seat's five outputs from its eleven features: the two rates from the circuit, the trigger the sight's own. */
     const forward = (w, x) => [Math.tanh(w[0] * S(x[1] * Math.PI)), Math.tanh(w[1] * S(x[2] * Math.PI / 2)), x[8] > 0 ? 1 : -1, 0, 0];
-    const gunnerFor = (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, sticky, forward, layersOf: () => [], post: (y) => y });
+    const gunnerFor = (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, sticky, handOn, forward, layersOf: () => [], post: (y) => y });
     const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
     return Object.freeze({ name, amplitude, sticky, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
 }
@@ -110,6 +110,8 @@ export const S = MAIN.S, raw = MAIN.raw, cells = MAIN.cells, forward = MAIN.forw
 export const POLICY_ID2 = "seatFlyWired2", sticky = libraryOf("fly:medial, sticky", FLY_M.raw, FLY_M.cells, { sticky: true });
 /** THE GUNNER WHOSE SIGHT STICKS TO SHIPS ONLY (`seatFlyWired3`): the sticky gunner trailed the shipped one against fighters (tools/ship/takeFlyWiredGunnerFix.mjs); this one sticks to a capital ship and re-picks among fighters every tick. See tools/ship/takeFlyWiredGunnerShips.mjs. */
 export const POLICY_ID3 = "seatFlyWired3", stickyShips = libraryOf("fly:medial, sticky to ships", FLY_M.raw, FLY_M.cells, { sticky: "ships" });
+/** THE MIXED GUNNER (`seatFlyWired4`): the ships-sticky gunner for a SHIP, and the hand gunner's own laying and trigger for a FIGHTER (brain/seatTurretGunner.mjs's `handOn`). Against fighters alone it is the hand gunner to the bit (with no target its gun goes back to rest, as the hand's does); against ships it is the ships-sticky gunner but for that. See tools/ship/takeFlyWiredGunnerMixed.mjs. */
+export const POLICY_ID4 = "seatFlyWired4", mixed = libraryOf("fly:medial for ships, the hand for fighters", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q) });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });

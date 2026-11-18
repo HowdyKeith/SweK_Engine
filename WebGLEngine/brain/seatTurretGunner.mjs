@@ -73,19 +73,22 @@ export function stickySight(sight, { only: may = null } = {}) {
         const r = sight(seat, st, body, targets, t); cur = r.target; return r;
     };
 }
-export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, handOn = null, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+    // `handOn` (default null): a predicate on the target the sight chose; where it holds -- and whenever the sight has no target -- the seat does what the HAND GUNNER does (the sight's own command, its aim and its trigger) and the network is not asked (2026-11-18: the fly-wired gunner lays the gun by rates, which costs it against fighters)
     const sight = sticky === "ships" ? stickySight(sight0, { only: SHIPS_ONLY }) : sticky ? stickySight(sight0) : sight0;   // `sticky` (default false; true, or "ships" for a sight that sticks to capital ships only): see stickySight
     if (idle !== "hold" && idle !== "rest") throw new Error(`seatTurretGunner.gunnerFor: idle is "hold" or "rest" (got ${idle})`);
     let laid = null;   // where the hand MEANS the gun to be: the seat's own angles are this plus the hand's error of the tick, and the error is not carried from one tick into the next (a gunner's hand shakes about where it holds the gun; it does not wander)
     function prepare(seat, st, body, targets, t = 0) {
         const rule = sight(seat, st, body, targets, t);
-        if (rule.target == null) { decide.last = null; laid = null; return { rule, x: null, st, seat, t }; }
+        if (rule.target == null) { decide.last = null; laid = null; return { rule, x: null, st, seat, t, ...(handOn !== null ? { hand: true } : {}) }; }   // with `handOn`, no target is the hand's too: its gun goes back to rest as the hand gunner's does
         const tg = targets.find((q) => q.id === rule.target); if (!tg) { decide.last = null; laid = null; return { rule, x: null, st, seat, t }; }
+        if (handOn !== null && handOn(tg)) { decide.last = null; laid = null; return { rule, x: null, st, seat, t, hand: true }; }   // the hand's own laying: and the network's laid gun forgotten, so that it starts from where the seat is when it is next asked
         if (!laid || !sigma) laid = { yaw: st.yaw, pitch: st.pitch };
         const spent = ammoSense && st.gun && seat.gun && seat.gun.magazine > 0 ? 1 - st.gun.ammo / seat.gun.magazine : 0;   // THE ROUNDS-LEFT SENSE (see the header): off unless asked for
         return { rule, x: features(seat, laid, body, rule, tg, reach, spent), st, seat, t };
     }
     function finish(prep, y) {
+        if (prep.hand) { decide.shake = [0, 0]; return prep.rule; }
         if (prep.x === null) return idle === "rest" ? { yaw: 0, pitch: 0, fire: false, target: null } : { yaw: prep.st.yaw, pitch: prep.st.pitch, fire: false, target: null };   // nothing to shoot at: the gun stays where it is, or with `idle: "rest"` goes back to its rest as the hand gunner's seat does
         decide.last = { x: prep.x, y };
         let ey = 0, ep = 0;
