@@ -1,37 +1,12 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-18T14:23:41.881Z",
+ "at": "2026-11-18T15:04:49.675Z",
  "poolAt": "2026-11-18T14:23:41.881Z",
  "poolHorizon": "2026-11-05T19:57:31.191Z",
  "budgetMs": 3000,
- "lastRun": 28,
- "heldOutliers": {
-  "tools/ship/deciderAudit-selfcheck.mjs": {
-   "ms": 31979,
-   "at": "2026-11-18T14:23:41.881Z",
-   "side": "slow",
-   "since": "2026-11-18T14:23:41.881Z",
-   "count": 1,
-   "median": 12776.5
-  },
-  "tools/ship/plannerDescend-selfcheck.mjs": {
-   "ms": 32218,
-   "at": "2026-11-18T14:23:41.881Z",
-   "side": "slow",
-   "since": "2026-11-18T14:23:41.881Z",
-   "count": 1,
-   "median": 12787
-  },
-  "tools/ship/advisorLlmAudit-selfcheck.mjs": {
-   "ms": 28913,
-   "at": "2026-11-18T14:23:41.881Z",
-   "side": "slow",
-   "since": "2026-11-18T14:23:41.881Z",
-   "count": 1,
-   "median": 13504.5
-  }
- },
+ "lastRun": 1,
+ "heldOutliers": {},
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -252,6 +227,13 @@
    "code": 0,
    "priorMs": 3511,
    "at": "2026-11-15T19:21:22.624Z"
+  },
+  {
+   "gate": "brain/navMission-selfcheck.mjs",
+   "ms": 26686,
+   "code": 0,
+   "priorMs": 20018,
+   "at": "2026-11-18T15:04:03.573Z"
   },
   {
    "gate": "brain/needsTask-selfcheck.mjs",
@@ -2180,6 +2162,13 @@
    "at": "2026-11-09T04:13:46.617Z"
   },
   {
+   "gate": "render/subAquariumFleet-selfcheck.mjs",
+   "ms": 25864,
+   "code": 0,
+   "priorMs": 20031,
+   "at": "2026-11-18T15:04:49.675Z"
+  },
+  {
    "gate": "render/subAquariumPlain14-selfcheck.mjs",
    "ms": 999,
    "code": 0,
@@ -3434,6 +3423,13 @@
    "at": "2026-11-18T14:23:41.881Z"
   },
   {
+   "gate": "tools/ship/advisorLlmAudit-selfcheck.mjs",
+   "ms": 22431,
+   "code": 0,
+   "priorMs": 13745,
+   "at": "2026-11-18T15:01:26.891Z"
+  },
+  {
    "gate": "tools/ship/affected-selfcheck.mjs",
    "ms": 1207,
    "code": 0,
@@ -3958,6 +3954,13 @@
    "code": 0,
    "priorMs": 11671,
    "at": "2026-11-05T19:57:31.191Z"
+  },
+  {
+   "gate": "tools/ship/deciderAudit-selfcheck.mjs",
+   "ms": 23932,
+   "code": 0,
+   "priorMs": 12552,
+   "at": "2026-11-18T15:02:11.069Z"
   },
   {
    "gate": "tools/ship/declaredCost-selfcheck.mjs",
@@ -5654,6 +5657,13 @@
    "code": 0,
    "priorMs": 9070,
    "at": "2026-11-18T14:23:41.881Z"
+  },
+  {
+   "gate": "tools/ship/plannerDescend-selfcheck.mjs",
+   "ms": 20949,
+   "code": 0,
+   "priorMs": 12778,
+   "at": "2026-11-18T15:02:52.235Z"
   },
   {
    "gate": "tools/ship/plannerEasy-selfcheck.mjs",

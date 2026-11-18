@@ -64,6 +64,17 @@ sec("2. THE CHECKS");
     ok("!! check 2 also needs the chains: identical still-water flights with a chain that differs fail it; with none, pass", Y.stillIsShared(same, () => ({ inS: true })) === false && Y.stillIsShared(same, () => ({ inS: false })) === true && Y.stillIsShared((sc, arm) => ({ ...same(), ticks: arm === "any+crab" ? 100 : 101 }), () => ({ inS: false })) === false);
 }
 
+{
+    const scs = [{ seed: 1001 }, { seed: 1002 }, { seed: 1003 }], S = Y.sOf(scs, (sc) => ({ inS: sc.seed !== 1002 }));
+    const real = R.streamScenario(1001);
+    ok("!! sOf is the set of seeds whose chains differ (stub chains); by default it reads R.planChains (seed 1001, in no set)", S instanceof Set && J([...S]) === J([1001, 1003]) && Y.sOf([real]).has(1001) === R.planChains(real).inS && Y.sOf([]).size === 0);
+    const seen = [];
+    Y.stillIsShared((sc, arm) => { seen.push(sc.seed); return { status: "reached", ticks: 1, path: 1, minClearance: 1 }; }, () => ({ inS: false }));
+    ok("!! STILL_SEEDS is 3: check 2 reads DEV3's first three seeds (901 to 903), each under both arms", Y.STILL_SEEDS === 3 && J(seen) === J([901, 901, 902, 902, 903, 903]));
+    const tj = Y.judge(runsOf([["reached", 150, "reached", 150 * (1 + 5e-10)], ["reached", 150, "reached", 150 * (1 - 5e-10)], ["reached", 150, "reached", 150 * (1 + 3e-9)]]), sFirst(3));
+    ok("!! TIE is 1e-9: ratios within it of 1 are ties; 1 + 3e-9 is slower", Y.TIE === 1e-9 && tj.t.ties === 2 && tj.t.slower === 1 && tj.t.faster === 0);
+}
+
 sec("3. THE COMMAND");
 {
     const run = (argv, fl = {}) => {
@@ -84,6 +95,7 @@ sec("3. THE COMMAND");
     const tw = run(["--set", "held87", "--write"], { extras: () => { throw new Error("boom"); } });
     ok("!! the flights are written before anything after them can throw", tw.files.length === 1 && tw.files[0][1].trim().split("\n").length === 400, tw.err.slice(0, 80));
     ok("!! check 1 holds the flown seeds to the literal HELD87 list", Y.checksOf(runsOf(rep(200, ["reached", 150, "reached", 140])), { still: true, old: true, bite: { met: true, n: 30, inS: 9, share: 0.3 }, S: sFirst(30), seeds: R.ROUTE_SETS.held87 }).every((c) => c.ok) && !Y.checksOf(runsOf(rep(199, ["reached", 150, "reached", 140])), { still: true, old: true, bite: { met: true, n: 30, inS: 9, share: 0.3 }, S: sFirst(30), seeds: R.ROUTE_SETS.held87 })[0].ok);
+    ok("!! OUT_FILE is brain/subNavRouteHeld87.jsonl, the file HELD87 is written to; AIM_DEG (5) is the start-heading bar printed with the extras", Y.OUT_FILE === "brain/subNavRouteHeld87.jsonl" && w.files[0][0].endsWith(Y.OUT_FILE) && Y.AIM_DEG === 5 && w.out.includes(`start headings more than ${Y.AIM_DEG} degrees apart`));
     ok("  the reported extras are printed (start-heading bite, start or waypoint in the band)", /7 of 200 scenarios have t = 0 start headings/.test(w.out) && /3 have the start or the waypoint inside the stream's band/.test(w.out));
 }
 

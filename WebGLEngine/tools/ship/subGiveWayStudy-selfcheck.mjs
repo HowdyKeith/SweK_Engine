@@ -103,6 +103,19 @@ sec("5. THE RULE");
         J(names(mk(ref, good, { free: ref }))) === J(["EACH OPTION BITES"]) && X.report(mk(ref, good, { free: ref }), { same: true, n, set: "held78" }).slice(-1)[0] === "VERDICT: NOT WEIGHED");
 }
 
+sec("6. THE STUDY'S OWN PIECES");
+{
+    ok("!! OUT_FILE: HELD78's flights go to brain/subGiveWayHeld78.jsonl", X.OUT_FILE === "brain/subGiveWayHeld78.jsonl");
+    const seen = [], res = X.flySet([1, 2], { fly: (sc, a) => { seen.push([sc.seed, a]); return { seed: sc.seed, arm: a, kind: sc.kind }; } });
+    ok("!! flySet flies every arm on every seed in seed order on the hard-traffic scenario (the fly replaced: nothing flown)", J(Object.keys(res)) === J(G.ARMS) && G.ARMS.every((a) => J(res[a]) === J([{ seed: 1, arm: a, kind: "hard-traffic" }, { seed: 2, arm: a, kind: "hard-traffic" }])) && seen.length === 8 &&
+        J(Object.keys(X.flySet([3], { fly: () => 0, arms: ["ref"] }))) === J(["ref"]));
+    const rs = [{ status: "reached", reached: true }, { status: "collided", reached: false, hit: "ship" }, { status: "collided", reached: false, hit: "berg" }, { status: "left", reached: false }, { status: "timeout", reached: false }, { status: "reached", reached: true }];
+    ok("!! statsOf counts reached, left, collided, ship collisions and timeouts", J(X.statsOf(rs)) === J({ n: 6, reached: 2, left: 1, collided: 2, ships: 1, timeout: 1 }) && J(X.statsOf([])) === J({ n: 0, reached: 0, left: 0, collided: 0, ships: 0, timeout: 0 }));
+    const errs = [], ce = console.error; console.error = (m) => errs.push(String(m));
+    let c1, c2; try { c1 = X.command([]); c2 = X.command(["--set", "held77"]); } finally { console.error = ce; }
+    ok("!! command refuses no set and an unknown set with exit 2 and the usage line, flying nothing", c1 === 2 && c2 === 2 && errs.length === 2 && errs.every((e) => /usage: subGiveWayStudy\.mjs --set dev\|held78/.test(e)));
+}
+
 finished = true;
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)\nnot checked here: what the options do on HELD78 (that is the experiment).`);
 process.exitCode = fails ? 1 : 0;

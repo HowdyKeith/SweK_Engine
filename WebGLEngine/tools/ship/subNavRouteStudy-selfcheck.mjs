@@ -19,6 +19,9 @@
 import fs from "node:fs";
 import * as Y from "./subNavRouteStudy.mjs";
 import * as R from "../../brain/subNavRoute.mjs";
+import * as P from "../../brain/subNavPlus.mjs";
+import * as AP from "../../brain/autopilotSub.mjs";
+import { CURRENT_KINDS } from "./subNavPlusStudy.mjs";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
@@ -76,6 +79,24 @@ sec("3. THE BITE");
     const pa = Y.partAScenarios(), m = Y.meanCurrent(pa[0])(123, -45);
     ok("!! PART A's fields: DEV seeds 1 to 30 of hard-current then hard-current-gap (60), each planned in its MEAN current, the same everywhere", pa.length === 60 && pa[0].kind === "hard-current" && pa[59].kind === "hard-current-gap" && pa[0].seed === 1 && pa[29].seed === 30 && m[0] === pa[0].current.mean[0] && m[1] === pa[0].current.mean[1] && J(Y.meanCurrent(pa[0])(0, 0)) === J(m));
     ok("!! the bar is 15 percent: 4 of 30 is below it, 5 of 30 meets it", Y.BITE_BAR === 0.15 && 4 / 30 < Y.BITE_BAR && 5 / 30 >= Y.BITE_BAR);
+}
+
+sec("3b. THE FLIGHT HELPERS (stub flights, or hard-stream seed 501, in no set)");
+{
+    let calls = 0, same = 0;
+    const via = (s, t, c) => { calls++; const a = Y.pilot(s, t, c); if (J(a) === J(AP.decide(s, t, c))) same++; return a; };
+    const rr = Y.routeRuns([R.streamScenario(501)], { pilot: via });
+    ok("!! routeRuns flies each scenario under each arm in R.ROUTE_ARMS order with o.pilot; pilot is AP.decide at every tick", J(rr.map((r) => [r.arm, r.seed, r.kind])) === J([["any+crab", 501, "hard-stream"], ["any+crab+route", 501, "hard-stream"]]) && calls > 0 && same === calls && J(Y.routeRuns([])) === J([]), `seed 501: ${calls} pilot calls`);
+    const seen = [], fine = (sc, arm) => { seen.push([sc.seed, arm, R.streamAt(sc.stream, sc.start.x, sc.start.y).every((v) => v === 0)]); return { status: "reached", ticks: 100, path: 300, minClearance: 5 }; };
+    ok("!! stillIsShared flies DEV seeds 1 to STILL_SEEDS (3) in still water under both arms; identical flights pass, one tick apart fails", Y.STILL_SEEDS === 3 && Y.stillIsShared(fine) === true && J(seen.map((x) => x[0])) === J([1, 1, 2, 2, 3, 3]) && seen.every((x) => x[2]) && J(seen.slice(0, 2).map((x) => x[1])) === J([R.ROUTE_REFERENCE, R.ROUTE_DESIGNATED]) && Y.stillIsShared((sc, arm) => ({ ...fine(sc, arm), ticks: arm === R.ROUTE_DESIGNATED ? 101 : 100 })) === false);
+    const keys = CURRENT_KINDS.flatMap((k) => P.PLUS_SETS.held73.slice(0, Y.REPRO_SEEDS).map((s) => [k, s])), g = (sc) => ({ status: "reached", ticks: sc.seed, path: 7 });
+    const stored = keys.map(([kind, seed]) => ({ arm: "any+crab", kind, seed, status: "reached", ticks: seed, path: 7 }));
+    let n = 0; const counted = (sc) => { n++; return g(sc); };
+    ok("!! oldFlightsStand (stub flights) checks REPRO_SEEDS (5) seeds of each kind against the stored any+crab rows: all match passes, one ticks off or one missing fails", Y.REPRO_SEEDS === 5 && Y.oldFlightsStand(stored, counted) === true && n === 2 * Y.REPRO_SEEDS && Y.oldFlightsStand(stored.map((r, i) => (i === 3 ? { ...r, ticks: r.ticks + 1 } : r)), g) === false && Y.oldFlightsStand(stored.slice(1), g) === false && Y.oldFlightsStand(stored.map((r) => ({ ...r, arm: "any" })), g) === false);
+    const st73 = fs.readFileSync(new URL("../../" + Y.STORED_73, import.meta.url), "utf8").trim().split("\n").map((l) => JSON.parse(l)), have = new Set(st73.filter((r) => r.arm === "any+crab").map((r) => `${r.kind}|${r.seed}`));
+    ok("!! STORED_73 is brain/subNavPlusCrabHeld73.jsonl and holds an any+crab row for every key oldFlightsStand reads; OUT_FILE is brain/subNavRouteHeld86.jsonl, the path --write uses", Y.STORED_73 === "brain/subNavPlusCrabHeld73.jsonl" && keys.every(([k, s]) => have.has(`${k}|${s}`)) && Y.OUT_FILE === "brain/subNavRouteHeld86.jsonl" && Y.checksOf([], { still: true, old: true, bite: null })[2].text.includes(Y.STORED_73));
+    const tj = Y.judge(runsOf([["reached", 150, "reached", 150 * (1 + 5e-10)], ["reached", 150, "reached", 150 * (1 - 5e-10)], ["reached", 150, "reached", 150 * (1 + 3e-9)]]));
+    ok("!! TIE is 1e-9: ratios within it of 1 are neither faster nor slower; 1 + 3e-9 is slower", Y.TIE === 1e-9 && tj.faster === 0 && tj.slower === 1 && tj.n === 3);
 }
 
 sec("4. THE COMMAND");

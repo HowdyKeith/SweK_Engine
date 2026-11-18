@@ -328,5 +328,7 @@ console.log("\nBIG TANK");
 
 // 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
 ok("!! the pitch kick of the righting task is the frozen { at: 3 } (KICK)", JSON.stringify(A.KICK) === '{"at":3}' && Object.isFrozen(A.KICK));
+{ const tc = A.createTank(), thrown = (f) => { try { f(); return false; } catch (e) { return /more than 1\.5 m\/s/.test(e.message); } };
+  ok("!! the strongest current a tank takes is CURRENT_MAX = 1.5 m/s: exactly that is accepted, 1.51 throws and leaves the current as it was", A.CURRENT_MAX === 1.5 && (tc.setCurrent([A.CURRENT_MAX, 0]), JSON.stringify(tc.current) === "[1.5,0]") && thrown(() => tc.setCurrent([0, A.CURRENT_MAX + 0.01])) && JSON.stringify(tc.current) === "[1.5,0]"); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

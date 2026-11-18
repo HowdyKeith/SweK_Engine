@@ -33,6 +33,7 @@ ok("!! a refused kind says the autopilot flies it and why (the circuit and the f
 ok("!! a sub waiting for its kind says so, with its circuit", L.pilotLabel({ kind: null, circuit: "flycx", waiting: true, pilot: "stateful" }) === "PD autopilot, waiting for its kind (flycx)");
 ok("!! a gfc network reads 'network'; the autopilot, and a non-gfc sub neither seated nor waiting, read 'PD autopilot' as before", L.pilotLabel({ kind: null, pilot: "network", circuit: "gfc" }) === "network" && L.pilotLabel({ kind: null, pilot: "network" }) === "network" &&
     L.pilotLabel({ kind: null, pilot: "autopilot", circuit: "gfc" }) === "PD autopilot" && L.pilotLabel({ kind: null, pilot: "network", circuit: "fish" }) === "PD autopilot");
+ok("!! KIND_NAMES is the frozen { flycx: 'stateful', fish: 'zebrafish' }, and pilotLabel reads every seated kind's label from it", JSON.stringify(L.KIND_NAMES) === JSON.stringify({ flycx: "stateful", fish: "zebrafish" }) && Object.isFrozen(L.KIND_NAMES) && Object.keys(L.KIND_NAMES).every((k) => L.pilotLabel({ kind: k }) === L.KIND_NAMES[k]));
 
 sec("2. THE TANK");
 {

@@ -78,5 +78,15 @@ sec("4. THE SOURCE");
     ok("!! no clock and no Math.random; the registered numbers (net 5 at 0.10, HARMFUL -5, 5 copy seeds, the 60.8 m bite, 80 m damage, keels over 53 m, HELD88 10201 to 10400)", !/Math\.random|Date\.now|new Date|performance\.now/.test(code) && Y.GAIN === 5 && Y.P_LEVEL === 0.10 && Y.HARMFUL === -5 && Y.COPY_SEEDS === 5 && Y.BITE_DEPTH === 60.8 && Y.DAMAGE_DEPTH === 80 && Y.DEEP_KEEL === 53 && Y.SETS.held88[0] === 10201 && Y.SETS.held88.at(-1) === 10400);
 }
 
+sec("5. THE STUDY'S OWN PIECES");
+{
+    ok("!! OUT_FILE and STORED_82: HELD88's flights go to brain/subTrafficUnderHeld88.jsonl; check 1 reads FOLLOW-UP 9's brain/subDeepTransitHeld82.jsonl, which exists", Y.OUT_FILE === "brain/subTrafficUnderHeld88.jsonl" && Y.STORED_82 === "brain/subDeepTransitHeld82.jsonl" && fs.existsSync(new URL("../../" + Y.STORED_82, import.meta.url)));
+    const stored = fs.readFileSync(new URL("../../" + Y.STORED_82, import.meta.url), "utf8").trim().split("\n").map((l) => JSON.parse(l)), want = new Map(stored.filter((r) => r.arm === R).map((r) => [r.seed, r]));
+    const echo = (sc) => want.get(sc.seed), nudged = (sc) => ({ ...want.get(sc.seed), path: want.get(sc.seed).path + (sc.seed === P.HELD82[2] ? 0.001 : 0) });
+    ok("!! copySame (the fly replaced, nothing flown): the stored R flights echoed back are the copy; one path 1 mm longer on the third seed is not; R's flights missing from the store is not", Y.copySame(stored, echo) === true && Y.copySame(stored, nudged) === false && Y.copySame(stored.filter((r) => r.arm !== R), echo) === false);
+    const sc = P.scenarioOf(P.DEV[0]), f = Y.flyOne(sc, U), q = P.flyDeep(sc, U, { measure: true });
+    ok("  flyOne on spent DEV seed 1 (designated arm): flyDeep's measured record field for field, plus a positive energy in J and deepKeel = a ship keel over 53 m", J({ ...f, energy: undefined, deepKeel: undefined }) === J(q) && f.seed === P.DEV[0] && Number.isFinite(f.energy) && f.energy > 0 && f.deepKeel === sc.obstacles.some((o) => o.type === "ship" && o.keel > 53), `${f.status} ${f.ticks} ${(f.energy / 1000).toFixed(0)} kJ`);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;

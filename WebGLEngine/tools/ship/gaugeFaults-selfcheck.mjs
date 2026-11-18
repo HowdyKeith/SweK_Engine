@@ -100,6 +100,7 @@ sec("3. VERDICTS");
     ok("!! each arm's hull is tested against its OWN REF dives: the seat at 5 under BIAS and 5 under REF holds, though R8 has none under REF", own.bad === 5 && own.ref === 5 && own.ok === true);
     const h2 = X.faultOf(base({ R8: { REF: { crashed: 26, stranded: 0 }, DROP: { crashed: 30, stranded: 8 } } }), "DROP").hull.R8;
     ok("  an arm's hull row: its count, its own REF count, the test (38 against 26 holds, 2 sqrt(64) = 16)", h2.bad === 38 && h2.ref === 26 && h2.ok === true);
+    ok("!! badOf is a result's crushed plus stranded boats (3 + 2 = 5, 0 + 0 = 0), the count every hull row tests", X.badOf({ crashed: 3, stranded: 2 }) === 5 && X.badOf({ crashed: 0, stranded: 0 }) === 0 && X.faultOf(base({ R8: { REF: { crashed: 26, stranded: 0 }, DROP: { crashed: 30, stranded: 8 } } }), "DROP").hull.R8.bad === X.badOf({ crashed: 30, stranded: 8 }));
 }
 
 sec("4. CHECKS");

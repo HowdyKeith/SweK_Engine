@@ -108,5 +108,12 @@ sec("7. THE SOURCE");
     ok("!! no clock and no Math.random", !/Math\.random|Date\.now|new Date|performance\.now/.test(code));
 }
 
+sec("8. THE NAMED CONSTANTS");
+{
+    ok("  ARM_NAMES is the four arms in registration order (sweep, sweep+leastbad, sweep+dive, sweep+leastbad+dive), frozen, holding REFERENCE and DESIGNATED", J(D.ARM_NAMES) === J(["sweep", "sweep+leastbad", "sweep+dive", "sweep+leastbad+dive"]) && J(D.ARM_NAMES) === J(Object.keys(D.ARMS)) && Object.isFrozen(D.ARM_NAMES) && D.ARM_NAMES.includes(D.REFERENCE) && D.ARM_NAMES.includes(D.DESIGNATED));
+    ok("  HELD79 is subTurnSweep's HELD79 (the same frozen object): 60 seeds 7601-7660", D.HELD79 === W.HELD79 && D.HELD79.length === 60 && D.HELD79[0] === 7601 && D.HELD79[59] === 7660 && Object.isFrozen(D.HELD79));
+    ok("  KIND is subTurnSweep's KIND, hard-traffic, and scenarioOf is that kind's scenario (DEV seed 1 identical to subTurnSweep's)", D.KIND === W.KIND && D.KIND === "hard-traffic" && J(D.scenarioOf(1)) === J(W.scenarioOf(1)));
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;

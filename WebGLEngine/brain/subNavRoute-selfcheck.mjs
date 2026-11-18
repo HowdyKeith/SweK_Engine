@@ -132,5 +132,18 @@ sec("5. THE CHAIN (ITEM 2 PART 3)");
     ok("  the sets of Part 3: DEV 901 to 930, HELD87 9501 to 9700", R.ROUTE_SETS.dev3[0] === 901 && R.ROUTE_SETS.dev3.length === 30 && R.ROUTE_SETS.held87[0] === 9501 && R.ROUTE_SETS.held87.length === 200);
 }
 
+sec("6. THE NAMED CONSTANTS");
+{
+    const sc = R.streamScenario(503), at = (x, y) => R.streamAt(sc.stream, x, y);
+    ok("  STREAM_KIND is \"hard-stream\" and is the kind every stream scenario carries", R.STREAM_KIND === "hard-stream" && sc.kind === R.STREAM_KIND && R.streamScenario(504, { speedScale: 0 }).kind === R.STREAM_KIND);
+    const p = [sc.stream.px - 20 * Math.cos(sc.stream.theta), sc.stream.py - 20 * Math.sin(sc.stream.theta), sc.stream.px + 20 * Math.cos(sc.stream.theta), sc.stream.py + 20 * Math.sin(sc.stream.theta)];
+    ok("!! V_PLAN is the cruise speed (N.CRUISE) and is the default V of segmentTime and buildRouteField (the same time as V_PLAN given, another at twice it)", R.V_PLAN === N.CRUISE && R.segmentTime(...p, at) === R.segmentTime(...p, at, R.V_PLAN) && R.segmentTime(...p, at) !== R.segmentTime(...p, at, 2 * R.V_PLAN) && R.buildRouteField(H.planShapes(sc, 0), sc.goal, { margin: 12, currentAt: at }).V === R.V_PLAN);
+    const oRef = R.routeOptions(sc, R.ROUTE_REFERENCE), oDes = R.routeOptions(sc, R.ROUTE_DESIGNATED);
+    ok("!! ROUTE_REFERENCE is \"any+crab\" (ROUTE_ARMS[0]): its options carry no plan and no aim of their own, only the stream felt at the vessel", R.ROUTE_REFERENCE === "any+crab" && R.ROUTE_ARMS[0] === R.ROUTE_REFERENCE && oRef.planField === undefined && oRef.aimOf === undefined && typeof oRef.currentAt === "function");
+    ok("!! ROUTE_DESIGNATED is \"any+crab+route\" (ROUTE_ARMS[1]): its options carry the route plan and the time-aware aim (timedAimOf)", R.ROUTE_DESIGNATED === "any+crab+route" && R.ROUTE_ARMS[1] === R.ROUTE_DESIGNATED && typeof oDes.planField === "function" && oDes.aimOf === R.timedAimOf);
+    const A = [[0, 0], [10, 0]];
+    ok("!! CHAIN_EPS is 1e-6 m and is chainsDiffer's threshold (a point 2 CHAIN_EPS away differs, half CHAIN_EPS does not)", R.CHAIN_EPS === 1e-6 && R.chainsDiffer(A, [[0, 0], [10, 2 * R.CHAIN_EPS]]) && !R.chainsDiffer(A, [[0, 0], [10, 0.5 * R.CHAIN_EPS]]));
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;

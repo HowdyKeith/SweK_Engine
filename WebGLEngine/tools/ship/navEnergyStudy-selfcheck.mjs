@@ -55,6 +55,11 @@ sec("3. THE CHECKS");
     ok("  a flight with no energy fails SAME SCENARIOS (every flight must carry one)", J(bad({}, nan)) === J(["SAME SCENARIOS"]));
     ok("!! a failed check prints NOT WEIGHED and no table", /READING: NOT WEIGHED/.test(T.report(res, { meter: false, n: 21, set: "held80" }).join("\n")) && !/median path/.test(T.report(res, { meter: false, n: 21, set: "held80" }).join("\n")));
 }
+{
+    const m = T.meterMatchesNeeds(), off = T.meterMatchesNeeds(900, { bias: 1.001 });
+    ok("!! meterMatchesNeeds: on the scripted run the metered pilot's trajectory is stepNeeds's and the meter equals the energy drop to 1e-6; a meter 0.1 percent high fails", m.ok && m.same && m.drop > 0 && Math.abs(m.joules - m.drop) / m.drop < 1e-6 && !off.ok && off.same, J([m.joules, m.drop]));
+    ok("!! meterLeavesFlight: on DEV seed 1 every arm's metered flight has the unmetered flight's status, ticks and path", T.meterLeavesFlight() === true);
+}
 
 sec("4. THE COMMAND");
 {

@@ -116,5 +116,11 @@ sec("FOLLOW-UP 10: UNDER EVERY KEEL");
     ok("  an unknown arm is still refused by name; HELD88 is 10201 to 10400", /unknown arm "deep70"/.test((() => { try { P10.flyDeep(sc, "deep70"); return ""; } catch (e) { return e.message; } })()) && P10.HELD88[0] === 10201 && P10.HELD88.length === 200);
 }
 
+sec("8. THE NAMED CONSTANTS");
+{
+    ok("  ARMS10 is FOLLOW-UP 10's three arms: deep (the reference), deep+under+beneath (designated), deep+under (attribution); frozen", J(P.ARMS10) === J({ "sweep+dive+deep": { deep: true }, "sweep+dive+deep+under+beneath": { deep: true, under: true, beneath: true }, "sweep+dive+deep+under": { deep: true, under: true } }) && Object.isFrozen(P.ARMS10) && Object.isFrozen(P.ARMS10["sweep+dive+deep+under"]));
+    ok("  ARM10_NAMES is ARMS10's keys in order, frozen, and is exactly REFERENCE10, DESIGNATED10, ATTRIBUTION10", J(P.ARM10_NAMES) === J(Object.keys(P.ARMS10)) && J(P.ARM10_NAMES) === J([P.REFERENCE10, P.DESIGNATED10, P.ATTRIBUTION10]) && Object.isFrozen(P.ARM10_NAMES));
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;

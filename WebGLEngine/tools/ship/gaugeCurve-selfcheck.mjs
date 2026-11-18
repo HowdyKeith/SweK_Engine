@@ -61,6 +61,7 @@ sec("2. VERDICTS");
         near(X.breakEvenOf(0.02, 0, 5, 0.05), 22.8, 1e-9) && near(X.breakEvenOf(0.02, 0, 5, 0.25), 3.6, 1e-9) && near(X.breakEvenOf(0.02, 0, 5, 1), 0, 1e-12) && X.breakEvenOf(0.02, 0, 0, 0.25) === null &&
         J(X.rowsOf(curve).find((r) => r.arm === "L-0.06").breakEven.map((v) => +v.toFixed(6))) === J([0.05, 0.25, 1].map((f) => +(((1 - f) * X.rowsOf(curve)[3].gain.mean) * 300 / (f * 9)).toFixed(6))));
 }
+{ ok("!! nameOf names a shift: 0 -> 'L0', any other to two decimals ('L-0.02', 'L-0.06'); ARMS is SHIFTS through it", X.nameOf(0) === "L0" && X.nameOf(-0.02) === "L-0.02" && X.nameOf(-0.06) === "L-0.06" && J(X.ARMS) === J(X.SHIFTS.map(X.nameOf)) && X.ARMS.every((a) => X.nameOf(X.shiftOf(a)) === a)); }
 
 sec("3. CHECKS");
 {

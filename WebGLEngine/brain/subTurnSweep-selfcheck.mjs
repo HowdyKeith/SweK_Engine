@@ -120,5 +120,12 @@ sec("7. THE SOURCE");
     ok("!! no Math.random and no clock", !/Math\.random|Date\.now|new Date|performance\.now/.test(code));
 }
 
+sec("8. THE NAMED CONSTANTS");
+{
+    ok("  ARM_NAMES is the four arms in registration order (ref, ref+sweep, ref+free+giveway, ref+free+giveway+sweep), frozen, and holds DESIGNATED", J(W.ARM_NAMES) === J(["ref", "ref+sweep", "ref+free+giveway", "ref+free+giveway+sweep"]) && J(W.ARM_NAMES) === J(Object.keys(W.ARMS)) && Object.isFrozen(W.ARM_NAMES) && W.ARM_NAMES.includes(W.DESIGNATED));
+    ok("  KIND is hard-traffic, and scenarioOf flies that kind: DEV seed 1 is a scenario of KIND, with ships in it", W.KIND === "hard-traffic" && W.DEV[0] === 1 && W.scenarioOf(1).obstacles.some((o) => o.type === "ship") && W.scenarioOf(1).kind === W.KIND);
+    ok("  TABLE_MAX_S is 200 s, more than the 30 s settle, and the measured table reached 180 degrees inside it (turnTable did not throw; 37 entries)", W.TABLE_MAX_S === 200 && W.TABLE_MAX_S > W.SETTLE_S && tb.length === 37 && tb[36].deg === 180);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;
