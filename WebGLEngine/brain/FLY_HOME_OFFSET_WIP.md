@@ -66,3 +66,31 @@ heading, like the real wiring's pull toward one heading, is neither of these err
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeOffset.mjs run` -> `brain/flyHomeOffsetRound.jsonl`, committed byte for byte, whole, before
 it is read; `node tools/ship/takeFlyHomeOffset.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at 1b43f9ea, then read once)
+One start, 2.6 minutes on two processes, 4 records (the three arms and OFFSET flown a second time; sha256
+f2ef4ddc62469ee7...). **The checks hold.**
+* **O: AN OFFSET COSTS HOLDING A COURSE MORE THAN FINDING HOME** -- on all 200 lives (p 1.2e-60).
+* **W: A WOBBLE COSTS FINDING HOME MORE THAN HOLDING A COURSE** -- on 169 of 200, 31 the other way (p 3.4e-24).
+* **X: WITH AN OFFSET THE FLY FINDS HOME BETTER THAN WITH A WOBBLE OF THE SAME SIZE** -- on 197 of 200 (p 1.7e-54).
+* **Y: WITH AN OFFSET THE FLY CANNOT BE TOLD APART FROM ONE WITH A WOBBLE OF THE SAME SIZE AT HOLDING A COURSE** -- 82
+  above, 118 below (p 0.013, the offset leaning lower).
+
+| arm | course | home |
+|---|---|---|
+| TOLD | 0.9046 | 0.9958 |
+| OFFSET (20 degrees) | 0.8506 | 0.9962 |
+| WOBBLE (20 degrees, 50 ticks) | 0.8531 | 0.7356 |
+
+**Every expectation came.** So, as section 4 put it, **finding home with a home vector kept in the fly's own heading
+forgives an offset and not a wobble**. This is the explanation the homing round offered after its reading, now tested.
+Matched in size, the two errors cost holding a course alike (Y CANNOT), so the difference is in what homing forgives.
+
+Measured after the reading (not registered; the gate recomputes it): the offset **costs the course 0.0539 and homing
+nothing**: TOLD less OFFSET at home is -0.0004, so the offset fly came home a hair better. The wobble costs the course
+0.0514 and homing 0.2602.
+
+**What it does not mean.** Section 6 holds. The home vector is a perfect sum followed in the same frame, and that it
+forgives a constant rotation follows from the arithmetic; what the round adds is the size of the effect beside the
+course. It does not test that the real wiring's extra 3 degrees of offset explain the homing round's result, only that
+offsets are the kind of error homing forgives.

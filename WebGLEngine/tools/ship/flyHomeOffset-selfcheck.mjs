@@ -9,6 +9,8 @@
 //   3  THE ROUND'S NUMBERS      the arms, the size, the correlation time, the audit; the registration says the same
 //   4  THE RECORDS              three arms; O, W, X, Y
 //   5  THE COMMAND              it is this round's; no life of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at 1b43f9ea, read from the file: the checks, O, W, X, Y, the arms, lives flown again, the costs measured
+//                               after the reading (said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 18, this gate,
 // tools/ship/flyMushroomRecover-selfcheck.mjs and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the commands' 6; every one red by name, NONE 0 red:
 //   THE ROUND: O1 the offset is 10 degrees 2 | O2 the wobble's correlation time 200 2 | O3 the error from the life's own seed 2 | O4 the offset always + 1 | O5 the wobble starts at 0 1 |
@@ -18,10 +20,16 @@
 //   THE COMMAND: C1 offset's second flight is of TOLD 1 | C2 exits 0 on a word it does not know 1 | C3 reads the homing round's library 1 (and the recovery round's command's three, below)
 //   ONE ROW OF MINE WAS TOO TIGHT WHEN FIRST RUN: the wobble's correlation 50 ticks apart came out 0.301 on 40,000 ticks against a window from 0.30; the stream is now 200,000 ticks, the
 //   one-tick correlation (exp(-1/50) = 0.9802) is checked to 0.002, and the 50-tick window is three standard errors (0.32 to 0.42).
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a WOBBLE life's home score changed in a digit the double holds 2 | V2 X compares the course 4 |
+//   V3 BETTER and WORSE swapped 7 | V4 O's costs the other way round 5 | V5 the note's O says the other way 1 | V6 the note's expectation of Y is BETTER 1 | V7 the note names another commit 1 |
+//   V8 the note says homing forgives a wobble 1 | V9 the note drops what it does not mean 1 | V10 the note's homing cost 0.1602 1 | V11 a TOLD life's course score changed in a digit the
+//   double holds 1 (the file's hash: the lives flown again are WOBBLE's and OFFSET's). V10 WENT 0 RED FIRST, A FINDING: the result row read the offset's costs and not the wobble's; it
+//   reads both now, and V10 was run again (1 red). TWO NUMBERS OF MINE WERE WRONG WHEN FIRST RUN: the course costs are 0.0539 and 0.0514, not the 0.0540 and 0.0515 that rounded means give.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import * as P from "./flyHomeOffset.mjs";
 import * as V from "./flyCompass.mjs";
 import * as CE from "../../brain/rl/compassEnv.mjs";
@@ -105,6 +113,31 @@ section(() => {
     const me = src("tools/ship/flyHomeOffset-selfcheck.mjs"), calls = [...me.matchAll(/P\.armRecord\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE FLIES NO LIFE OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one arm record is of 2 lives that are not the round's; it starts no process; the file's size and time are what they were",
         calls.length === 1 && /^"OFFSET", seeds$/.test(calls[0]) && !P.AUDIT.includes(880001) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at 1b43f9ea before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, P.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = P.reading(lines), A = R.arms, rec = (a) => lines.find((r) => r.kind === "arm" && r.arm === a);
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length, cost = (a, k) => mean(rec("TOLD")[k].map((x, i) => x - rec(a)[k][i]));
+    ok("!! the results file is the one the run wrote: 4 records, sha256 f2ef4ddc62469ee7... (one start, 2.6 minutes on two processes)", lines.length === 4 && createHash("sha256").update(bytes).digest("hex") === "f2ef4ddc62469ee713dcb2055479071282658dbe651b738a39ec8803cce1b052");
+    ok("!! THE CHECKS HOLD: each arm once with 200 lives of each kind, every score in range, OFFSET flown a second time the same", R.checks.length === 0 && lines.find((r) => r.kind === "recheck").hash === P.recheckOf(rec("OFFSET")).hash);
+    ok("!! *** O: AN OFFSET COSTS HOLDING A COURSE MORE THAN FINDING HOME *** -- on all 200 lives (p 1.2e-60)", R.O.word === P.WORDS.O[0] && R.O.above === 200 && R.O.below === 0 && R.O.p < 1e-59);
+    ok("!! *** W: A WOBBLE COSTS FINDING HOME MORE THAN HOLDING A COURSE *** -- on 169 of the 200 lives, 31 the other way (p 3.4e-24)", R.W.word === P.WORDS.W[0] && R.W.above === 169 && R.W.below === 31 && near(R.W.p, 3.413e-24, 1e-27));
+    ok("!! *** X: WITH AN OFFSET THE FLY FINDS HOME BETTER THAN WITH A WOBBLE OF THE SAME SIZE *** -- on 197 of 200 lives (p 1.7e-54); Y: AT HOLDING A COURSE THEY CANNOT BE TOLD APART (82 above, 118 below, p 0.013)",
+        R.X.word === P.WORDS.X[0] && R.X.above === 197 && R.X.below === 3 && R.Y.word === P.WORDS.Y[2] && R.Y.above === 82 && R.Y.below === 118 && near(R.Y.p, 0.01313, 5e-5));
+    ok("!! the arms (course | home, the mean of 200 lives): TOLD 0.9046 | 0.9958, OFFSET 0.8506 | 0.9962, WOBBLE 0.8531 | 0.7356",
+        near(A.TOLD.course, 0.9046) && near(A.TOLD.home, 0.9958) && near(A.OFFSET.course, 0.8506) && near(A.OFFSET.home, 0.9962) && near(A.WOBBLE.course, 0.8531) && near(A.WOBBLE.home, 0.7356));
+    const again = [0, 99, 199].map((i) => P.lifeScores("WOBBLE", P.AUDIT[i])), againO = P.lifeScores("OFFSET", P.AUDIT[42]);
+    ok("!! FLOWN AGAIN AFTER THE READING: WOBBLE's lives 1, 100 and 200 and OFFSET's life 43 give their course and home scores again to the bit",
+        again.every((s, j) => s.course === rec("WOBBLE").course[[0, 99, 199][j]] && s.home === rec("WOBBLE").home[[0, 99, 199][j]]) && againO.course === rec("OFFSET").course[42] && againO.home === rec("OFFSET").home[42]);
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- THE COSTS: the offset costs the course 0.0539 and homing nothing (TOLD less OFFSET at home is -0.0004: the offset fly came home a hair better); the wobble costs the course 0.0514 and homing 0.2602",
+        near(cost("OFFSET", "course"), 0.0539) && near(cost("OFFSET", "home"), -0.0004) && near(cost("WOBBLE", "course"), 0.0514) && near(cost("WOBBLE", "home"), 0.2602), `${cost("OFFSET", "course").toFixed(4)} ${cost("OFFSET", "home").toFixed(4)} ${cost("WOBBLE", "course").toFixed(4)} ${cost("WOBBLE", "home").toFixed(4)}`);
+    const note = src("brain/FLY_HOME_OFFSET_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 9. The result"));
+    ok("the expectations, written before the code, against what came -- every one: O BETTER (95), W BETTER (95), X BETTER (97), Y CANNOT (55)",
+        /O \*\*BETTER about 95 percent\*\*\. W \*\*BETTER about 95\*\*\. X \*\*BETTER about 97\*\*\. Y CANNOT about 55, WORSE 25, BETTER 20/.test(flat) && R.O.word === P.WORDS.O[0] && R.W.word === P.WORDS.W[0] && R.X.word === P.WORDS.X[0] && R.Y.word === P.WORDS.Y[2]);
+    ok("the registration's RESULT SECTION (section 9) carries the four readings' words, the commit the file was read at, that every expectation came, what section 4 said such a reading would say, the measurement after the reading said as such, and what it does not mean",
+        /## 9\. The result/.test(note) && ["O", "W", "X", "Y"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /1b43f9ea/.test(res) && /Every expectation came/.test(res) && /finding home with a home vector kept in the fly's own heading forgives an offset and not a wobble/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /costs the course 0\.0539 and homing nothing/.test(res) && /The wobble costs the course 0\.0514 and homing 0\.2602/.test(res) && /What it does not mean/.test(res) && /only that offsets are the kind of error homing forgives/.test(res));
 });
 
 console.log(`\nflyHomeOffset-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
