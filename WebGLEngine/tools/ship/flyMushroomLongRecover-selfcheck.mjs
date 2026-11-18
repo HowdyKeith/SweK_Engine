@@ -10,6 +10,8 @@
 //                               iteration kept; its scores again
 //   3  THE RECORDS              24 draws; G, L and H on each task; USES and b at 0
 //   4  THE COMMAND              it is this round's; no training of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at 32c77504, read from the file: the checks, G, L and H on each task, USES and b at 0, the arms, the
+//                               description after the reading, the hand rule with other recoveries (measured after the reading), re-audits, the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the
 // command as a process) for all 30; every one red by name but ONE, a finding (the number is the rows red):
 //   THE FLY: E1 brain/rl/mushroomRecoverFly.mjs edited (a comment) 1
@@ -23,6 +25,11 @@
 //   THE FINDING: the records made in section 3 put REV's RLONG above every RECOV and LONG fly, so L came out the same against either, and ONE's L was never asked; ONE's RLONG copies RECOV,
 //   so L there is now pinned (ranks 87 and no ties against LONG; against RECOV it would be 150 and 12 ties), and F8 was run again: 1 red. AND ONE NUMBER OF MINE WAS WRONG WHEN FIRST RUN:
 //   the made REV scores (0.45 + s/1000) were not above RECOV's best (0.4777), nor ONE's 0.9 + s/10^4 above LONG's (0.9103); they are 0.48 and 0.92 now.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score (REV draw 3) changed in a digit the double holds 1 (the file's hash alone:
+//   a change of 1e-12 in a fly that is no arm's least or most is under the arms row's 5e-5) | V2 G against LONG 6 | V3 the rank sum's BETTER and WORSE swapped 5 | V4 H on REV against the
+//   plain hand rule 5 | V5 USES needs 0.3 3 | V6 the note's REV H says BETTER 1 | V7 the note's expectation of REV H is WORSE 55 1 | V8 the note names another commit 1 | V9 the note drops
+//   that the best hand rule is above every fly 1 | V10 the floors' recovery hand rule on REV changed in a digit the double holds 3 | V11 the note's best hand rule 0.5207 1 | V12 the
+//   note's Spearman 0.69 (over all 12, where two flies tie at b 0 and the rank depends on how the tie is broken; the note gives the 10 that found recovery) 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -47,7 +54,7 @@ const TINY = Object.freeze({ iters: 2, pop: 4, sigma: 0.14, lr: 0.05, trainEps: 
 const F = Object.fromEntries(Object.entries(LR.FILES).map(([k, f]) => [k, LR.fileOf(fs.readFileSync(path.join(ENG, f)))]));
 const recov = (t, s) => F.recover.lines.find((r) => r.kind === "draw" && r.task === t && r.arm === "RECOV" && r.s === s), long = (t, s) => F.trainer.lines.find((r) => r.kind === "draw" && r.task === t && r.arm === "LONG" && r.s === s);
 
-console.log("flyMushroomLongRecover-selfcheck -- the long recovery round (the recovering fly trained 240 iterations, against the recovery round's RECOV and the trainer round's LONG): the numbers, one training, the records, the command\n");
+console.log("flyMushroomLongRecover-selfcheck -- the long recovery round (the recovering fly trained 240 iterations, against the recovery round's RECOV and the trainer round's LONG): the numbers, one training, the records, the command, the verdict\n");
 
 console.log("1. THE ROUND'S NUMBERS");
 section(() => {
@@ -132,6 +139,47 @@ section(() => {
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its trainings through the round's code are tiny and on draw 901 (two refused); it starts no process; the file's size and time are what they were",
         J(calls) === J(['"TWO", 1', '"REV", 0', '"REV", 901, TINY, TINY_AUDIT', '"REV", 901, TINY4, TINY_AUDIT']) && !LR.SEEDS.includes(901) && !TINY_AUDIT.some((x) => LR.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at 32c77504 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, LR.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = LR.reading(lines, F), Fl = R.floors, V = R.tasks.REV, O = R.tasks.ONE;
+    const of = (t) => lines.filter((r) => r.kind === "draw" && r.task === t).sort((a, b) => a.s - b.s), rec = (t, s) => of(t).find((r) => r.s === s);
+    const rank = (v) => { const o = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]), r = []; o.forEach((p, k) => { r[p[1]] = k + 1; }); return r; };
+    const spearman = (x, y) => { const a = rank(x), b = rank(y), m = (x.length + 1) / 2; let s = 0, sa = 0, sb = 0; for (let i = 0; i < x.length; i++) { s += (a[i] - m) * (b[i] - m); sa += (a[i] - m) ** 2; sb += (b[i] - m) ** 2; } return new Set(x).size === x.length && new Set(y).size === y.length ? s / Math.sqrt(sa * sb) : NaN; };
+    ok("!! the results file is the one the run wrote: 26 records, sha256 e63f7b724387733b... (one start, 14.9 minutes on two processes)", lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "e63f7b724387733b6febff438afcf50d74e06693dbcd3dcabb6cef054f0287b1");
+    ok("!! THE CHECKS HOLD: both committed files as committed and passing their own checks, 24 draws each once, every walk starting as its draw's RECOV walk, REV's draw 1 the same twice; the floors the recovery round's -- the start -0.0253 and 0.0080, the hand rule 0.8943 and 0.2220, with a recovery of 0.1 0.7627 and 0.5000 (ONE, REV)",
+        R.checks.length === 0 && near(Fl.start.ONE, -0.0253) && near(Fl.start.REV, 0.0080) && near(Fl.hand.ONE, 0.8943) && near(Fl.hand.REV, 0.2220) && near(Fl.handB.ONE, 0.7627) && Fl.handB.REV === 0.5 && lines.find((r) => r.kind === "recheck").weightsHash === rec("REV", 1).weightsHash);
+    ok("!! *** REV: G -- BETTER THAN THE RECOVERY ROUND'S FLY (12 of 12 above, p 2/4096); L -- BETTER THAN THE MUSHROOM FLY TRAINED AS LONG WITHOUT RECOVERY (ranks 209, p 0.00027); H -- CANNOT BE TOLD APART FROM THE RULE SET BY HAND (5 above 0.5000, 7 below, p 0.77) ***",
+        V.G.word === LR.WORDS.G[0] && V.G.above === 12 && V.G.p === 2 / 4096 && V.L.word === LR.WORDS.L[0] && V.L.sumA === 209 && V.L.ties === 0 && near(V.L.p, 2.744e-4, 5e-7) && V.H.word === LR.WORDS.H[2] && V.H.above === 5 && V.H.below === 7 && V.H.ref === 0.5 && near(V.H.p, 0.7744, 5e-5));
+    ok("!! *** ONE: G -- BETTER (12 of 12 above); L -- CANNOT BE TOLD APART FROM LONG (ranks 153, p 0.89); H -- WORSE THAN THE RULE SET BY HAND (1 of 12 above 0.8943, p 26/4096) *** -- USES 10 of 12 on REV with b at 0 in 2, 0 of 12 on ONE with b at 0 in all 12",
+        O.G.word === LR.WORDS.G[0] && O.G.above === 12 && O.L.word === LR.WORDS.L[2] && O.L.sumA === 153 && near(O.L.p, 0.8874, 5e-5) && O.H.word === LR.WORDS.H[1] && O.H.above === 1 && O.H.below === 11 && O.H.p === 26 / 4096 && O.H.ref === Fl.hand.ONE &&
+        V.arms.RLONG.uses === 10 && V.arms.RLONG.bZero === 2 && O.arms.RLONG.uses === 0 && O.arms.RLONG.bZero === 12);
+    const A = V.arms, B = O.arms;
+    ok("!! the arms (mean, sd, least, most; with b at 0; b; a): REV RLONG 0.4630 0.0798 0.2747 0.5297, 0.2949, 0.1260, 1.5792 (RECOV 0.3785, LONG 0.2936) | ONE RLONG 0.8638 0.0283 0.7863 0.9000, 0.8638, 0, 1.6646 (RECOV 0.7692, LONG 0.8582)",
+        near(A.RLONG.mean, 0.4630) && near(A.RLONG.sd, 0.0798) && near(A.RLONG.min, 0.2747) && near(A.RLONG.max, 0.5297) && near(A.RLONG.ratesOff, 0.2949) && near(A.RLONG.recovery, 0.1260) && near(A.RLONG.rate, 1.5792) && near(A.RECOV.mean, 0.3785) && near(A.LONG.mean, 0.2936) &&
+        near(B.RLONG.mean, 0.8638) && near(B.RLONG.sd, 0.0283) && near(B.RLONG.min, 0.7863) && near(B.RLONG.max, 0.9000) && near(B.RLONG.ratesOff, 0.8638) && B.RLONG.recovery === 0 && near(B.RLONG.rate, 1.6646) && near(B.RECOV.mean, 0.7692) && near(B.LONG.mean, 0.8582));
+    const rv = of("REV"), nz = rv.filter((r) => r.recovery > 0), z = rv.filter((r) => r.recovery === 0), rcb = F.recover.lines.filter((r) => r.kind === "draw" && r.task === "REV" && r.recovery > 0).map((r) => r.recovery), med = (v) => { const w = [...v].sort((a, b) => a - b); return (w[5] + w[6]) / 2; };
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: on REV the 10 that found recovery score 0.4460 to 0.5297, 5 above 0.5000; draws 1 and 6 never found it (0.3057, 0.2747); b where not 0 from 0.0788 to 0.1945 (mean 0.1513) against RECOV's 0.062 to 0.108; among the 10 Spearman 0.47; kept at iteration 200 or later on REV 8 of 12 (median 220.5), on ONE 4 (median 183)",
+        nz.length === 10 && near(Math.min(...nz.map((r) => r.score)), 0.4460) && near(Math.max(...nz.map((r) => r.score)), 0.5297) && nz.filter((r) => r.score > 0.5).length === 5 && J(z.map((r) => r.s)) === J([1, 6]) && near(z[0].score, 0.3057) && near(z[1].score, 0.2747) &&
+        near(Math.min(...nz.map((r) => r.recovery)), 0.0788) && near(Math.max(...nz.map((r) => r.recovery)), 0.1945) && near(nz.reduce((n, r) => n + r.recovery, 0) / 10, 0.1513) && Math.min(...rcb).toFixed(3) === "0.062" && Math.max(...rcb).toFixed(3) === "0.108" &&
+        spearman(nz.map((r) => r.recovery), nz.map((r) => r.score)).toFixed(2) === "0.47" && rv.filter((r) => r.keptAt >= 200).length === 8 && med(rv.map((r) => r.keptAt)) === 220.5 && of("ONE").filter((r) => r.keptAt >= 200).length === 4 && med(of("ONE").map((r) => r.keptAt)) === 183);
+    const handAt = (b, t) => M.auditScore(RC.policyOf(1).setParams([...M.HAND, b / RC.B_SCALE]), t), hs = [0.05, 0.1, 0.15, 0.2, 0.3].map((b) => handAt(b, "REV"));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED: the hand rule on the audit with a recovery of 0.05, 0.1, 0.15, 0.2, 0.3 scores 0.4320, 0.5000 (the committed floor, to the bit), 0.5223, 0.5307, 0.5110 on REV, and 0.8200 on ONE at 0.05 -- the best, 0.5307, above every trained fly by 0.0010, and 0 of 12 above it",
+        near(hs[0], 0.4320) && hs[1] === Fl.handB.REV && near(hs[2], 0.5223) && near(hs[3], 0.5307) && near(hs[4], 0.5110) && near(handAt(0.05, "ONE"), 0.8200) && Math.max(...hs) === hs[3] && near(hs[3] - A.RLONG.max, 0.0010) && rv.every((r) => r.score < hs[3]), hs.map((x) => x.toFixed(4)).join(" "));
+    const d12 = rec("REV", 12), d6 = rec("REV", 6), w12 = PF.unpackWeights(d12.weights);
+    ok("!! RE-AUDITED AFTER THE READING: REV's draw 12 (the arm's most) gives its score and its score with b at 0 again to the bit, and REV's draw 6 (the least) its score",
+        d12.score === A.RLONG.max && M.auditScore(RC.policyOf(12).setParams(w12), "REV") === d12.score && M.auditScore(RC.recoveryOff(12, w12), "REV") === d12.ratesOff && d6.score === A.RLONG.min && M.auditScore(RC.policyOf(6).setParams(PF.unpackWeights(d6.weights)), "REV") === d6.score);
+    const note = src("brain/FLY_MUSHROOM_LONG_RECOVER_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came -- every one: REV G BETTER (55), L BETTER (75), H CANNOT (55), USES at least 8 (65) with 10; ONE G BETTER (75), L CANNOT (80), H WORSE (80), b at 0 in at least 10 (85) with 12",
+        /REV: G \*\*BETTER about 55\*\*, CANNOT 45\. L \*\*BETTER about 75\*\*, CANNOT 25\. H CANNOT about 55, WORSE 40, BETTER 5\. USES at least 8 of 12, about 65\. ONE: G \*\*BETTER about 75\*\*, CANNOT 25\. L \*\*CANNOT about 80\*\*\. H \*\*WORSE about 80\*\*, CANNOT 20\. b at 0 in at least 10 of 12, about 85\./.test(flat) &&
+        V.G.word === LR.WORDS.G[0] && V.L.word === LR.WORDS.L[0] && V.H.word === LR.WORDS.H[2] && V.arms.RLONG.uses >= 8 && O.G.word === LR.WORDS.G[0] && O.L.word === LR.WORDS.L[2] && O.H.word === LR.WORDS.H[1] && O.arms.RLONG.bZero >= 10);
+    ok("the registration's RESULT SECTION (section 10) carries the six readings' words, USES, the commit the file was read at, that every expectation came, what section 5 said such a reading would say, the description and the measurement after the reading said as such with the gate's numbers, that the best hand rule is above every fly, and what it does not mean",
+        /## 10\. The result/.test(note) && ["REV", "ONE"].every((t) => ["G", "L", "H"].every((k) => res.includes(`**${t} ${k}: ${R.tasks[t][k].word}**`))) && /\*\*USES: 10 of 12 on REV, b at 0 in 2; 0 of 12 on ONE, b at 0 in all 12\.\*\*/.test(res) && /32c77504/.test(res) &&
+        /\*\*Every expectation came\*\*/.test(res) && /\*\*with a long enough walk the trainer finds about the recovery the hand rule has, and the recovery round's shortfall was the walk's length\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /\*\*Measured after the reading, not registered \(the gate recomputes it\):\*\*/.test(res) && /\*\*0\.5307 \(0\.2\)\*\*/.test(res) &&
+        /\*\*So H is CANNOT against the committed rule, and the best of these hand rules is above every trained fly\*\*, by 0\.0010 over the best \(0\.5297\); against it, 0 of 12 are above/.test(res) && /\| REV \| 0\.4630 \(0\.2747, 0\.5297\) \| 0\.2949 \| 0\.1260 \| 0\.3785 \| 0\.2936 \|/.test(res) &&
+        /Spearman 0\.47/.test(res) && /8 of 12 kept a point at iteration 200 or later \(the median 220\.5\)/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyMushroomLongRecover-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
