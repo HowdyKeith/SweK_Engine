@@ -147,14 +147,17 @@ export function flyPlus(pilot, sc, armName, o = {}) {
     const shapes = (t) => (custom ? H.planShapes(world(t, shipsMode), 0, { mode, blind: spec.blind, horizon }) : H.planShapes(scV, t, { mode, blind: spec.blind, horizon }));
     let cEst = null, cEst60 = null;
     const cNow = () => cEst || [0, 0];
-    let field = spec.field ? H.buildLadderField(shapes(0), sc.goal, st, { ladder, edgeExtra: spec.edge }) : null, nReplans = 0, reacted = 0, hit = null;
+    // brain/subNavRoute.mjs (NAV_PLUS ITEM 2 PART 2), all off by default: `planField` builds the plans in place of subHardNav.buildLadderField; `aimOf(field, goal)` gives an any-angle arm's aim points in place of subFieldNav.aimOf; `currentAt(x, y, t)` is the current the vessel feels at its position in place of the scenario's
+    const planField = o.planField || H.buildLadderField;
+    let field = spec.field ? planField(shapes(0), sc.goal, st, { ladder, edgeExtra: spec.edge }) : null, nReplans = 0, reacted = 0, hit = null;
     const field0 = field, sc0 = field ? N.cellOf(field, st.x, st.y) : null, noRoute = field ? !(sc0 && field.dist[sc0.i] < N.BIG) : false;
     let s = S.createState({ pos: [st.x, st.y, -st.depth], speed: st.speed, heading: st.heading, pitch: st.pitch, bank: st.bank, gamma: 0, w: [0, 0, 0], model });
     let status = "timeout", path = 0, minClear = clearOf(sc.obstacles, st.x, st.y, st.depth, 0, atNow), ticks = 0, t = null;
     for (let i = 0; i < total; i++) {
-        if (replans && i > 0 && i % every === 0) { field = H.buildLadderField(shapes(i * dt), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder: ladderFor(ladder, curK, cNow()), own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); nReplans++; }
-        const cv = ST.currentAt(sc.current, i * dt), ctx = custom ? { obstacles: world(i * dt, shipsMode).obstacles, t: 0, at: H.posAt, minDepth: scV.minDepth, yieldSpeed } : { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: scV.minDepth, yieldSpeed };
+        if (replans && i > 0 && i % every === 0) { field = planField(shapes(i * dt), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder: ladderFor(ladder, curK, cNow()), own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); nReplans++; }
+        const cv = o.currentAt ? o.currentAt(s.pos[0], s.pos[1], i * dt) : ST.currentAt(sc.current, i * dt), ctx = custom ? { obstacles: world(i * dt, shipsMode).obstacles, t: 0, at: H.posAt, minDepth: scV.minDepth, yieldSpeed } : { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: scV.minDepth, yieldSpeed };
         let target = H.hardTarget(pa.base, s, field, sc.goal, ctx);
+        if (o.aimOf && field && spec.head === "any") { const h = N.aimHeading(field, o.aimOf(field, sc.goal), s.pos[0], s.pos[1]) ?? N.fieldHeading(field, s.pos[0], s.pos[1], "cell"); if (h !== null) target = { ...target, heading: h }; }
         if (o.depthOf) { const dTarget = o.depthOf(s, i); if (Number.isFinite(dTarget)) target = { ...target, depth: dTarget }; }   // a depth schedule (brain/subNav3d.mjs): the depth the vessel is asked for, in place of the waypoint's
         if (crab !== "none") target = { ...target, heading: crabHeading(target.heading, crab === "mean" ? meanC : cNow(), S.attitude(s, cv).speed) };
         const cmd = pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
