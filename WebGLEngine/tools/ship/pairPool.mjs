@@ -42,12 +42,14 @@ export function sideOf(spec) {
 /** A fight against fighters in numbers: the share of the raiders destroyed, less the share of the ship side's hit points lost. In [-1, 1]; a ship that downs all eight and takes nothing scores 1. */
 export const fighterScore = (t, fighters = BF.FIGHTERS) => t.killed / fighters - t.damageOnShips / (1500 * t.ships.length);
 /**
- * A FIGHTER JOB ({ vsFighters: { network, helm, seed, kind, opts } }): the same attack (battleshipFight.build's seed and kind, its other options as given) flown twice -- once against a ship with `network` in its seats and `helm` at its helm (each { policy, weights } or null, the module looked up in
+ * A FIGHTER JOB ({ vsFighters: { network, helm, seed, kind, opts } }; `opts.pilotNet` ({ policy, weights }) gives the raiders a pilot brain by name): the same attack (battleshipFight.build's seed and kind, its other options as given) flown twice -- once against a ship with `network` in its seats and `helm` at its helm (each { policy, weights } or null, the module looked up in
  * battleshipDuel.PEER_POLICIES as a side's is), once against the plain ship (the hand gunner, the rule) -- and the first's fighterScore less the second's. Paired by construction: the raiders, their seeds and the sights' seeds are the same.
  */
 export function fighterLead({ network = null, helm = null, seed, kind, opts = {} }) {
     const mod = (n, role) => { if (!n) return null; const k = D.PEER_POLICIES[n.policy]; if (!k || k.role !== role) throw new Error(`pairPool.fighterLead: "${n.policy}" is not a ${role} policy`); return { module: k.mod, weights: Float32Array.from(n.weights) }; };
-    const x = BF.fight(seed, kind, { ...opts, network: mod(network, "seat"), helm: mod(helm, "helm") }), y = BF.fight(seed, kind, opts);
+    let o = opts;
+    if (opts.pilotNet) { const k = D.PEER_POLICIES[opts.pilotNet.policy]; if (!k || k.role !== "pilot" || typeof k.mod.pilotFor !== "function") throw new Error(`pairPool.fighterLead: "${opts.pilotNet.policy}" is not a pilot policy`); const { pilotNet, ...rest } = opts; o = { ...rest, pilot: k.mod.pilotFor(Float32Array.from(pilotNet.weights)) }; }   // `pilotNet` ({ policy, weights }): the RAIDERS' pilot, the same brain in both fights
+    const x = BF.fight(seed, kind, { ...o, network: mod(network, "seat"), helm: mod(helm, "helm") }), y = BF.fight(seed, kind, o);
     return fighterScore(x) - fighterScore(y);
 }
 /** One pair, flown here: the lead of side x over side y -- or, for a fighter job, fighterLead. */
