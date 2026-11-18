@@ -200,3 +200,82 @@ The study, its checks and its gates were committed and sabotaged first (9ed89170
 **What it says.** Pointing the nose into a current the vessel estimates from its own logs helps this planner reach its goals on a fresh set of both current kinds, mostly by not colliding (5 against 13). The track is straighter on both kinds (path / chord 1.035 and 1.015 against 1.087 and 1.069). Two draws of 200 now agree on the pooled gain (10, then 9). They disagree on WHICH kind it comes from, so the per-kind split should not be read as a property of the kinds.
 
 **Not checked, said plainly.** The estimate reads perfect logs. The current is uniform in space and steady per scenario. The vessel is the PD autopilot's. The crab is not yet an option of the tank's couriers or of `subHardNav`'s default arms. Making it the default is a separate decision, not taken here.
+
+# ITEM 2, PART 2: THE CURRENT IN THE COST -- A DIRECTIONAL ROUTE SOLVER (backlog nav-current-in-field; Keith 2026-11-18, "do the directional route solver round next"; REGISTERED 2026-11-18, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**What is open.** The plan does not know the current: brain/flowfieldCpu.js (the shared solver, a drop-in for the GPU Brain fleet's FlowFieldSolver) costs entering a cell the same from every side. This round builds a SEPARATE directional solver; the shared one is NOT edited.
+
+**WHY THE FIRST DRAFT WAS DROPPED, said before anything was built.** The first draft flew the directional solver in the hard-current kinds' UNIFORM current. A review of the draft (three independent lenses, each finding checked by a skeptic; nothing flown on any held seed) showed it tests close to nothing, and I accept the argument: in a uniform current c at water speed V the time to cross a vector v is [-(c.v) + sqrt((c.v)^2 + (V^2 - |c|^2)|v|^2)] / (V^2 - |c|^2). The first term sums to the same value along every route between two points, so what a uniform current does to ROUTE CHOICE is only the second term, an elliptic stretch of V / sqrt(V^2 - |c|^2) along its axis (1.04 at 0.8 m/s, 1.09 at 1.2), the same for +c and -c. On a 4-neighbour grid a route monotone in x is ranked exactly as in still water. The reviewers measured it on DEV (seeds 1 to 30, the mean current, field only): the start cell's aim point was the same in 60 of 60 fields, and no aim point at all moved on any of the 30 hard-current-gap fields. The draft also had a solver that would not terminate (a float64 test against float32 distances re-expands cells without end once costs are not whole numbers) and checks that could not see a reversed sign. Both are fixed below. **A directional cost matters where the current VARIES IN SPACE.** That is what this round tests.
+
+## PART A: THE UNIFORM CURRENT, RECORDED (no flight)
+
+On DEV seeds 1 to 30 of hard-current and hard-current-gap (60 fields, spent as DEV by item 2), build the t = 0 plan (the ladder) with the shared solver and with the directional solver in the scenario's mean current. BITE = the share of the 60 whose start-cell aim heading differs by more than 5 degrees. **Bar: 15 percent.** Below it the uniform-current route arm is NOT FLOWN, and the "current in the cost" residue of nav-current-in-field closes as nothing to gain in a uniform current, by the stretch argument and by this measurement. **SAID PLAINLY: this is a record, not a test.** The reviewers already measured the equivalent figure on these fields before this registration (0 of 60).
+
+## PART B: A STREAM THE PLAN KNOWS
+
+**The kind (NEW: `hard-stream`).** For seed s: the start, the waypoint, the islands and icebergs and the weight error of `hard-current` for s; its uniform current is DROPPED. In its place, a steady STREAM drawn from a stream of its own (mulberry(s x 7919 + 90001)), in this order:
+* direction theta ~ U(0, 2 pi);
+* a point on its centre line P = (U(120, 280), U(-60, 60));
+* half-width w ~ U(25, 45) m;
+* peak speed S ~ U(1.2, 2.2) m/s.
+
+The current at (x, y) is S cos^2(pi d / (2w)) (cos theta, sin theta) for |d| < w, where d is the signed distance from the centre line, and 0 outside. It is horizontal, uniform in depth and constant in time. The vessel cruises at 3 m/s, so against the core of a 2.2 m/s stream it makes 0.8 m/s good.
+
+**What the vessel knows, said plainly.** The route arm's plan KNOWS THE STREAM'S MAP (an atlas), as every arm knows the static map exactly. Both arms crab on the vessel's OWN estimate from its logs (item 2's: tau 15 s), which lags as it crosses the stream.
+
+**The solver (NEW: brain/flowfieldDirectional.mjs).**
+* **Graph.** The nav grid. A backward multi-source exact Dijkstra from the waypoint's cell over the 4 neighbours. An edge between two cells is passable iff both are free or both are blocked (the nav field's two heights and impassDh).
+* **Direction, fixed here.** When neighbour v is relaxed from the settled cell u, the vessel travels v -> u. The step is d = unit(u - v) in world (x, y), with gx along +x and gy along +y. The current is the one at the midpoint of the two cell centres.
+* **Cost.** c_par = c.d; c_perp = |c - c_par d|. The step is impassable if c_perp >= V, or if g = c_par + sqrt(V^2 - c_perp^2) <= 0.05 m/s. Otherwise cost = round(cell x V / g x 1024) / 1024, in still-water metres. The costs are whole multiples of 1/1024, so tied routes stay exactly tied. With c = 0 every step costs exactly `cell`.
+* **Relax.** dist is float32, and the relax compares in float32: nd = fround(d + cost); if nd < dist[v], store it and push nd. A cell is expanded once (a settled flag).
+* **Flow.** The shared solver's rule (the 8-neighbour of lowest dist).
+* **V** = N.CRUISE (3 m/s).
+* **WITH c = 0 EVERYWHERE THE FIELD IS THE SHARED SOLVER'S BIT FOR BIT** (dist, fx, fz); the gate holds that on every DEV field. The gate also holds known answers on an empty grid: k cells up-current of the goal cost k x 5 x 3 / (3 + |c|), k cells down-current k x 5 x 3 / (3 - |c|), across the current k x 5 x 3 / sqrt(9 - |c|^2), each to the 1/1024 quantum. It bounds the pops by the cell count, and a sabotage that flips d must go red.
+
+**The aim points of the route arm (NEW, in brain/subNavRoute.mjs).** buildAim's rule, with one more condition for taking the next cell's aim point. The straight segment from the cell's centre to that point must be clear (as before), AND its TIME must be no more than the plan's time from the cell to that point plus one cell (5 still-water metres). The segment's time is sampled every AIM_STEP at the current there, and is infinite if any sample is impassable. Otherwise the aim is the next cell's centre, as buildAim does. With c = 0 a straight segment is never longer than the staircase plus the waypoint's offset in its cell, so the aim points are buildAim's bit for bit (the gate holds that).
+
+**Not edited:** brain/flowfieldCpu.js and brain/subHardNav.mjs. brain/subNavPlus.mjs gains options that are all off by default:
+* `currentAt(x, y, t)`: the current the vessel feels, at its position;
+* `planField`: the builder of the t = 0 plan;
+* `aim`: the aim-point rule.
+
+With them off, every flight is the flight it was (its gate's rows, and check 3 below).
+
+**The arms (two; both build the plan ONCE at t = 0 with the margin ladder, and fly the crab on the estimate):**
+* `any+crab` (the REFERENCE): the shared solver and buildAim, the plan blind to the stream.
+* `any+crab+route` (**DESIGNATED**): the directional solver in the stream's map, and the time-aware aim points.
+
+They differ ONLY in the plan.
+
+**The set.** HELD86 = seeds 9301 to 9500 of `hard-stream`: 200 scenarios, 400 flights, flown ONCE. No navigation set names these seeds (9310 and 9400 appear in the tree only as sub-pilot training seeds, a different generator). DEV = seeds 1 to 30 of `hard-stream`, the sanity run and check 4. Nothing is chosen on DEV.
+
+**The registered readings (paired by scenario).**
+* **R1, TIME.** Over the scenarios both arms reach, r = t(route) / t(reference). **FASTER** iff the median r is at most 0.95 AND the exact two-sided sign test on r < 1 against r > 1 gives p <= 0.05. Ties, |r - 1| < 1e-9, are dropped.
+* **R2, REACH.** gain = (only the route reached) - (only the reference reached); p is the exact two-sided sign test on the discordant scenarios.
+* **THE VERDICT.**
+  * **SUPPORTED** iff FASTER AND gain >= 0 AND the route has no more collisions than the reference.
+  * **PARTLY SUPPORTED** iff not SUPPORTED and one of these holds:
+    * FASTER (but a safety condition failed);
+    * the median r is at most 0.98 with sign p <= 0.05;
+    * gain >= 5 with p <= 0.10.
+  * **NOT SUPPORTED** otherwise.
+  * **HARMFUL** is printed beside the verdict iff gain <= -5.
+* **Reported, moving nothing.** The status counts of each arm; median times; median path / chord; the share of scenarios whose start aim heading differs by more than 5 degrees; and the readings split by whether the stream lies along the track (|cos(theta - track bearing)| >= 0.7) or across it.
+
+**Checks (a failure: NOT WEIGHED).**
+1. **SAME SCENARIOS.** Both arms fly the same 200 scenarios in the same order.
+2. **STILL WATER IS THE SHARED PLAN.** On DEV seeds 1 to 3 with the stream's speed set to 0, the two arms fly the same flight to the digit.
+3. **THE OLD FLIGHTS STAND.** With the new options off, `any+crab` reproduces the flights stored in brain/subNavPlusCrabHeld73.jsonl on HELD73's first five seeds of each kind (status, ticks, path).
+4. **THE ROUTE BITES (go or no-go, on DEV, BEFORE HELD86 is flown).** At least 15 percent of the 30 DEV scenarios have t = 0 start-cell aim headings differing by more than 5 degrees between the two plans. If not, HELD86 is NOT flown, and the round reads NOT FLOWN: THE STREAM DOES NOT MOVE THE PLAN.
+
+**Expectations, written before any code or seed.**
+* G1: check 4's bar is met, about 80 percent.
+* G2: PART A's bar is met, about 3 percent (see the record above).
+* G3: SUPPORTED about 40 percent; PARTLY about 25.
+* G4: the median r is at most 0.95, about 50 percent.
+* G5: the reach gain is at least 0, about 70 percent. An adverse stream along the track may run the reference out of time (260 s).
+* G6: the route has no more collisions, about 55 percent. A route that rides a stream past islands, with a crab that lags, could hit more.
+* G7: the reference times out at least 5 times on HELD86, about 45 percent.
+* G8: the time gain is larger on along-track streams than on across-track ones, about 80 percent.
+
+**What a result would not say.** Anything about a stream the vessel must sense rather than read from a map; a stream that varies in time or with depth; a vessel at another speed (V is the cruise); or the shared solver and the GPU fleet's (not edited). Nothing about the corner-angle margin (still open). `hard-stream` is a family I made with these parameters, and the stream is drawn independently of the islands.
