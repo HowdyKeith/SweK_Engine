@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyHome-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyHome-selfcheck.mjs      (about a minute; IT NEVER RUNS THE ROUND -- its audits are of 2 lives, and it starts no process)
+// Run: node tools/ship/flyHome-selfcheck.mjs      (about three minutes; IT NEVER RUNS THE ROUND -- its audits are of 2 lives, and it starts no process)
 //
 // THE GATE OF THE HOMING ROUND (registered in brain/FLY_FINDS_HOME_WIP.md before brain/rl/homeEnv.mjs, brain/rl/homingFly.mjs, tools/ship/flyHome.mjs and tools/ship/takeFlyHome.mjs
 // existed): does the compass the fly learned to hold a course carry it back to its door? Nothing is trained.
@@ -10,6 +10,8 @@
 //   4  ONE AUDIT                a record's score is a homing life flown here by hand, from the committed weights
 //   5  THE RECORDS              60 flies; V, P2, T1, A, B, H
 //   6  THE COMMAND              it is this round's; no audit of the round's, no process
+//   7  THE VERDICT              the results file as committed unread at 6ac4494f, read from the file: the checks, the six readings, the arms, the course against home, re-audits,
+//                               the measurement after the reading (each arm's heading error split into offset and wobble, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 25, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 4; every one red by name, NONE 0 red (the number is the rows red):
 //   THE TASK (brain/rl/homeEnv.mjs): E1 home from tick 900 5 | E2 the fly moves along its goal 4 | E3 the score not held at 0 4 | E4 the closest from the life's start 3
@@ -22,6 +24,12 @@
 //   THE NOTE: N1 its home from tick 900 1 | N2 its audit from 60000001 1 | N3 its T1 against FROZEN 1 | N4 it says a fly is trained 1
 //   ONE ROW WAS ADDED BEFORE THE SABOTAGES, A FINDING OF tools/ship/definitionGates-selfcheck.mjs: the library's flyOf and homeScore were named by no gate (the tree-wide count went from 405
 //   to 407); the row now tests them against a homing life flown by hand.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score at home changed in a digit the double holds 2 | V2 T1 against FROZEN 5 |
+//   V3 the rank sums' BETTER and WORSE swapped 4 | V4 V against the start 2 | V5 the note's T1 says WORSE 1 | V6 the note's expectation of T1 is CANNOT 70 1 | V7 the note names another
+//   commit 1 | V8 the note drops that the handicap does not carry over 1 | V9 the note drops what it does not mean 1 | V10 the note's offset 21.4 1 | V11 the hand rule's floor changed in a
+//   digit the double holds 2 | V12 told is not told 2. None went 0 red.
+//   TWO ROWS OF MINE WERE WRONG WHEN FIRST RUN: two of the within-arm Spearman values were written from memory (0.937 and 0.573; they are 0.944 and 0.566), and the re-audit named PSHUF draw
+//   6 as the arm's most (it is draw 7).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -149,6 +157,43 @@ section(() => {
     const me = src("tools/ship/flyHome-selfcheck.mjs"), calls = [...me.matchAll(/H\.auditOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE AUDITS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one audit through the round's code is of 2 lives that are not the round's; it starts no process; the file's size and time are what they were",
         calls.length === 1 && /^"PSUM", 7, compass, balanced, TWO$/.test(calls[0]) && !TWO.some((x) => H.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n7. THE VERDICT (the whole results file was committed at 6ac4494f before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, H.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = H.reading(lines, compass, balanced), A = R.arms, F = R.floors;
+    const of = (a) => lines.filter((r) => r.kind === "fly" && r.arm === a).sort((x, y) => x.s - y.s), home = (a) => of(a).map((r) => r.home), rec = (a, s) => of(a).find((r) => r.s === s);
+    ok("!! the results file is the one the run wrote: 62 records, sha256 e04f2c0b519d9c76... (one start, 36.2 minutes on one process)", lines.length === 62 && createHash("sha256").update(bytes).digest("hex") === "e04f2c0b519d9c76cba1d466b93cc1a909e0bc43dde01b5612c77ceec64de0a3");
+    ok("!! THE CHECKS HOLD: both committed files as committed and passing their own checks, 60 flies each once with their committed weights and course scores, PLASTIC draw 1 audited twice the same; the floors -- vision off 0.4559, the start 0.4568, the hand rule 0.5551, the start told the true heading 0.9948",
+        R.checks.length === 0 && near(F.off, 0.4559) && near(F.start, 0.4568) && near(F.hand, 0.5551) && near(F.told, 0.9948) && lines.find((r) => r.kind === "recheck").home === rec("PLASTIC", 1).home);
+    ok("!! *** V: THE PLASTIC FLY ON THE REAL WIRING FINDS HOME BETTER THAN PATH INTEGRATION ALONE *** -- 12 of 12 above vision off's 0.4559 (p 0.00049); P2 BETTER THAN THE FLY WHOSE MAP DOES NOT LEARN -- ranks 222, every one above every one (p 7.4e-7)",
+        R.V.word === H.WORDS.V[0] && R.V.above === 12 && R.V.p === 2 ** -11 && R.V.ref === F.off && R.P2.word === H.WORDS.P2[0] && R.P2.sumA === 222 && Math.min(...home("PLASTIC")) > Math.max(...home("FROZEN")));
+    ok("!! *** T1: THE REAL WIRING'S HANDICAP AT HOLDING A COURSE DOES NOT CARRY OVER TO FINDING HOME *** -- PLASTIC against PSHUF ranks 145 (p 0.80); A, PSUM against PLASTIC, ranks 148 (p 0.93); B, PEVEN against PLASTIC, ranks 112 (p 0.028, PEVEN the lower) -- all three CANNOT",
+        R.T1.word === H.WORDS.T1[2] && R.T1.sumA === 145 && near(R.T1.p, 0.7987, 5e-5) && R.A.word === H.WORDS.A[2] && R.A.sumA === 148 && near(R.A.p, 0.9323, 5e-5) && R.B.word === H.WORDS.B[2] && R.B.sumA === 112 && near(R.B.p, 0.0284, 5e-5));
+    ok("!! H: THE PLASTIC FLY FINDS HOME WORSE THAN THE RULE SET BY HAND -- 0 of 12 above its 0.5551 (p 0.00049)", R.H.word === H.WORDS.H[1] && R.H.above === 0 && R.H.below === 12 && R.H.p === 2 ** -11 && R.H.ref === F.hand);
+    ok("!! the arms at home (mean, sd, least, most; their course scores): PLASTIC 0.5493 0.0033 0.5438 0.5544 (0.6464) | FROZEN 0.4520 (0.4948) | PSHUF 0.5507 0.0073 0.5388 0.5658 (0.6765) | PSUM 0.5491 0.0027 (0.6434) | PEVEN 0.5457 0.0035 (0.6719): course differences of 0.03 shrink to 0.005 at home",
+        near(A.PLASTIC.mean, 0.5493) && near(A.PLASTIC.sd, 0.0033) && near(A.PLASTIC.min, 0.5438) && near(A.PLASTIC.max, 0.5544) && near(A.FROZEN.mean, 0.4520) && near(A.PSHUF.mean, 0.5507) && near(A.PSHUF.sd, 0.0073) && near(A.PSHUF.min, 0.5388) && near(A.PSHUF.max, 0.5658) && near(A.PSUM.mean, 0.5491) && near(A.PSUM.sd, 0.0027) && near(A.PEVEN.mean, 0.5457) && near(A.PEVEN.sd, 0.0035) &&
+        near(A.PLASTIC.course, 0.6464) && near(A.PSHUF.course, 0.6765) && near(A.PSUM.course, 0.6434) && near(A.PEVEN.course, 0.6719) && Math.max(...["PLASTIC", "PSHUF", "PSUM", "PEVEN"].map((a) => A[a].mean)) - Math.min(...["PLASTIC", "PSHUF", "PSUM", "PEVEN"].map((a) => A[a].mean)) < 0.0051);
+    ok("described, not registered: WITHIN EACH ARM THE FLIES THAT HOLD A COURSE BEST HOME BEST -- Spearman of course against home PLASTIC 0.94, FROZEN 0.57, PSHUF 0.84, PSUM 0.69, PEVEN 0.98",
+        near(A.PLASTIC.spearman, 0.944, 5e-3) && near(A.FROZEN.spearman, 0.566, 5e-3) && near(A.PSHUF.spearman, 0.839, 5e-3) && near(A.PSUM.spearman, 0.692, 5e-3) && near(A.PEVEN.spearman, 0.979, 5e-3), ["PLASTIC", "FROZEN", "PSHUF", "PSUM", "PEVEN"].map((a) => A[a].spearman.toFixed(3)).join(" "));
+    const again = (a, s) => { const c = H.committed(a, s, compass, balanced); return H.homeScore(H.flyOf(a, s, PF.unpackWeights(c.weights))); };
+    ok("!! RE-AUDITED AFTER THE READING: PSHUF draw 7 (the arm's most) gives its score again on the 200 lives to the bit, and so does the hand rule's floor", rec("PSHUF", 7).home === A.PSHUF.max && again("PSHUF", 7) === rec("PSHUF", 7).home && H.homeScore(V.policyOf("PLASTIC", 1).setParams(V.HAND)) === F.hand);
+    const errs = (a, s) => { const fly = H.flyOf(a, s, PF.unpackWeights(H.committed(a, s, compass, balanced).weights)), env = new HE.HomeEnv(), h = new HF.HomingFly(fly); let off = 0, wob = 0;
+        for (const L of H.AUDIT.slice(0, 40)) { let o = env.reset(L), done = false, sx = 0, sy = 0, n = 0; while (!done) { const r = env.step(h.act(o)); if (env.t > 500) { const e = CE.wrap(fly.phi - env.th); sx += Math.cos(e); sy += Math.sin(e); n++; } o = r.obs; done = r.done; }
+            off += Math.abs(Math.atan2(sy, sx)); wob += Math.sqrt(-2 * Math.log(Math.hypot(sx, sy) / n)); }
+        return [off / 40 * 180 / Math.PI, wob / 40 * 180 / Math.PI]; };
+    const E = Object.fromEntries(["PLASTIC", "PSUM", "PSHUF", "PEVEN"].map((a) => [a, [1, 2].map((s) => errs(a, s))])), offs = (as) => as.flatMap((a) => E[a].map((e) => e[0])), wobs = (as) => as.flatMap((a) => E[a].map((e) => e[1]));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- WHY: the fly's heading error after tick 500, split into each life's mean (its offset) and its spread about that mean (its wobble), on 40 audit lives, draws 1 and 2: the real sums' arms (PLASTIC, PSUM) carry 22.4 to 23.4 degrees of offset, the even and shuffled ones (PSHUF, PEVEN) 19.6 to 20.9; the wobble 24.1 to 24.2 against 23.4 to 23.7",
+        Math.min(...offs(["PLASTIC", "PSUM"])) > Math.max(...offs(["PSHUF", "PEVEN"])) && near(Math.min(...offs(["PLASTIC", "PSUM"])), 22.4, 0.06) && near(Math.max(...offs(["PLASTIC", "PSUM"])), 23.4, 0.06) && near(Math.min(...offs(["PSHUF", "PEVEN"])), 19.6, 0.06) && near(Math.max(...offs(["PSHUF", "PEVEN"])), 20.9, 0.06) &&
+        near(Math.min(...wobs(["PLASTIC", "PSUM"])), 24.1, 0.06) && near(Math.max(...wobs(["PLASTIC", "PSUM"])), 24.2, 0.06) && near(Math.min(...wobs(["PSHUF", "PEVEN"])), 23.4, 0.06) && near(Math.max(...wobs(["PSHUF", "PEVEN"])), 23.7, 0.06),
+        Object.entries(E).map(([a, v]) => `${a} ${v.map((e) => e.map((x) => x.toFixed(2)).join("/")).join(" ")}`).join(" | "));
+    const note = src("brain/FLY_FINDS_HOME_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 11. The result"));
+    ok("the expectations, written before the code, against what came: V BETTER (95), P2 BETTER (95), A and B CANNOT (45 each) came; T1 came CANNOT (30; WORSE was 70), H came WORSE (the 5 left), and PLASTIC's mean 0.5493 fell just under the 0.55 to 0.58 given",
+        /V: \*\*BETTER about 95 percent\*\*\. P2: \*\*BETTER about 95\*\*\. T1: \*\*WORSE about 70\*\*, CANNOT 30\. A: BETTER about 55, CANNOT 45\. B: BETTER about 55, CANNOT 45\. H: BETTER about 55, CANNOT 40\. PLASTIC's mean between 0\.55 and 0\.58, about 70\./.test(flat) &&
+        R.V.word === H.WORDS.V[0] && R.P2.word === H.WORDS.P2[0] && R.A.word === H.WORDS.A[2] && R.B.word === H.WORDS.B[2] && R.T1.word === H.WORDS.T1[2] && R.H.word === H.WORDS.H[1] && A.PLASTIC.mean < 0.55);
+    ok("the registration's RESULT SECTION (section 11) carries the six readings' words, the commit the file was read at, the expectations that did not come, what section 6 said such a reading would say, the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 11\. The result/.test(note) && ["V", "P2", "T1", "A", "B", "H"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /6ac4494f/.test(res) && /T1, H and PLASTIC's mean did not/.test(res) && /the handicap at holding a course does not carry over to finding home/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /22\.4 to 23\.4 degrees/.test(res) && /19\.6 to 20\.9/.test(res) && /What it does not mean/.test(res) && /not what training for homing would give/.test(res));
 });
 
 console.log(`\nflyHome-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

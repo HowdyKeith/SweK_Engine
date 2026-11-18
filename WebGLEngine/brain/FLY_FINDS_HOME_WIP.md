@@ -91,3 +91,47 @@ four.
 ## 10. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHome.mjs run` -> `brain/flyHomeRound.jsonl`, committed byte for byte, whole, before it is
 read; `node tools/ship/takeFlyHome.mjs read` prints the checks and the reading.
+
+## 11. The result (the whole results file committed unread at 6ac4494f, then read once)
+One start, 36.2 minutes on one process, 62 records (60 flies, PLASTIC draw 1 audited a second time, the floors;
+sha256 e04f2c0b519d9c76...). **The checks hold.** Vision off scores 0.4559, the start 0.4568, the hand rule 0.5551,
+and the start told the true heading 0.9948.
+* **V: THE PLASTIC FLY ON THE REAL WIRING FINDS HOME BETTER THAN PATH INTEGRATION ALONE** (12 of 12 above 0.4559,
+  p 0.00049).
+* **P2: THE PLASTIC FLY ON THE REAL WIRING FINDS HOME BETTER THAN THE FLY WHOSE MAP DOES NOT LEARN** (ranks 222, every
+  one above every one).
+* **T1: THE PLASTIC FLY ON THE REAL WIRING CANNOT BE TOLD APART FROM ONE ON A SHUFFLE OF IT AT FINDING HOME** (ranks
+  145, p 0.80).
+* **A: A FLY ON RANDOM PARTNERS GIVEN THE REAL SUMS CANNOT BE TOLD APART FROM THE PLASTIC FLY ON THE REAL WIRING AT
+  FINDING HOME** (ranks 148, p 0.93).
+* **B: A FLY ON THE REAL PARTNERS GIVEN EVEN SUMS CANNOT BE TOLD APART FROM THE PLASTIC FLY ON THE REAL WIRING AT FINDING
+  HOME** (ranks 112, p 0.028: PEVEN the lower, not significantly).
+* **H: THE PLASTIC FLY ON THE REAL WIRING FINDS HOME WORSE THAN THE RULE SET BY HAND** (0 of 12 above 0.5551, p 0.00049).
+
+| arm | home: mean (sd) | its course score | Spearman, course against home within the arm |
+|---|---|---|---|
+| PLASTIC | 0.5493 (0.0033) | 0.6464 | 0.94 |
+| FROZEN | 0.4520 (0.0021) | 0.4948 | 0.57 |
+| PSHUF | 0.5507 (0.0073) | 0.6765 | 0.84 |
+| PSUM | 0.5491 (0.0027) | 0.6434 | 0.69 |
+| PEVEN | 0.5457 (0.0035) | 0.6719 | 0.98 |
+
+V, P2, A and B came as given. **T1, H and PLASTIC's mean did not.** T1 came CANNOT (given 30; WORSE was given 70). H came
+WORSE: the 5 percent left over, where BETTER was given 55. PLASTIC's mean of 0.5493 fell just under the 0.55 to 0.58
+given. The audit lives scored lower than the scoping lives for every arm, and the scoping lives' gaps between the arms
+did not hold on the audit. So, as section 6 put it, **the handicap at holding a course does not carry over to finding
+home.** The arms' course scores differ by 0.03 and their home scores by under 0.005. The compass the flies learned does
+carry them home far better than path integration alone. Within each arm, the flies that hold a course best home best.
+
+Measured after the reading (not registered; the gate recomputes it): **the heading error that differs between the arms
+is the kind that homing cancels.** The fly's heading error after tick 500, on 40 audit lives, draws 1 and 2, splits into
+each life's mean (its offset) and its spread about that mean (its wobble). The two arms with the real wiring's summed
+inputs (PLASTIC, PSUM) carry 22.4 to 23.4 degrees of offset; the even and shuffled ones (PSHUF, PEVEN) 19.6 to 20.9. Their
+wobble is 24.1 to 24.2 against 23.4 to 23.7. Holding a course pays for an offset; a home vector kept and followed in the
+fly's own frame cancels most of it. Whether the wobble differs is not clear: on 20 lives its order turned over. And an
+offset that changes with the heading, as a pull toward one heading does, is not cancelled exactly. This is a reading of
+the numbers, not a test.
+
+**What it does not mean.** Section 8 holds. The home vector is kept perfectly, by a sum and not by neurons. The flies
+were trained to hold a course and were asked to find home, so a result says what that training gave, not what training
+for homing would give. The landmarks are distant: they give heading, not position.
