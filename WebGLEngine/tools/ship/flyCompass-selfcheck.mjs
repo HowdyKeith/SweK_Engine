@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyCompass-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyCompass-selfcheck.mjs      (about a minute; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
+// Run: node tools/ship/flyCompass-selfcheck.mjs      (about a minute and a half; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
 //
 // THE GATE OF THE COMPASS ROUND (registered in brain/FLY_COMPASS_LEARNS_WIP.md before brain/compassRingTopology.mjs, brain/rl/compassEnv.mjs, brain/rl/compassFly.mjs, tools/ship/flyCompass.mjs and
 // tools/ship/takeFlyCompass.mjs existed): does a fly whose ring-to-compass connections weaken with co-activity hold its course in the wind better than one that steers by its turns alone?
@@ -10,6 +10,8 @@
 //   4  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its scores again
 //   5  THE RECORDS              36 draws; P, P2, T1, H; USES
 //   6  THE COMMAND              it is this round's; no training of the round's, no process
+//   7  THE VERDICT              the results file as committed unread at 47e46680, read from the file: the checks, P, P2, T1, H, the arms, USES, re-audits, the trainer, the measurement after the
+//                               reading (the real wiring's fixed pull, recomputed here and said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-17) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
 // process) run whole for each; every one red by name, NONE 0 red (the number is the rows red over the two):
 //   THE TASK (brain/rl/compassEnv.mjs): E1 gusts in the calm 1 | E2 the goal every 40 ticks 2 | E3 the reward from the first tick 1 | E4 the ring neurons' tuning 2 1 | E5 the preferred azimuths from
@@ -25,6 +27,11 @@
 //   in doubles; and THE UNTRAINED PSHUF FLY IS NOT THE START -- with vision on, its map is the shuffle's -- so the records' check that every untrained fly scores the start's number would have failed
 //   the run. The start the registration names is the real anatomy's; the check is now of FROZEN's and PLASTIC's untrained flies, and PSHUF's own start is recorded and printed.
 //   One more row was added before the sabotages so that tools/ship/definitionGates-selfcheck.mjs sees every new export named: the module's other numbers.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in its last digit 2 | V2 P against the start 3 | V3 USES needs 0.3 5 |
+//   V4 the rank sums' BETTER and WORSE swapped 5 | V5 the note's P says WORSE 1 | V6 the note's expectation of H is WORSE 1 | V7 the note names another commit 1 | V8 the note says the pull is what T1
+//   measured 1 | V9 the note drops what it does not mean 1 | V10 rates at 0 keeps the depression rate 2 | V11 the note's pull is 436 1. None went 0 red. The first attempt was lost to a container
+//   restart before its baseline finished; every file was found as committed (the note and this gate with only their additions) and the whole set was run again.
+//   One row was widened before the sabotages: the note's result section is also held to the numbers this gate recomputes (536, 0.153, 258 against 57, Spearman -0.90), so V11 had a row to hit.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -169,6 +176,58 @@ section(() => {
     const me = src("tools/ship/flyCompass-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations with 4 flies tried on draw 901; it starts no process; the file's size and time are what they were",
         calls.length === 1 && /^"PLASTIC", 901, TINY, TINY_AUDIT$/.test(calls[0]) && TINY.iters === 2 && TINY.pop === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} training, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n7. THE VERDICT (the whole results file was committed at 47e46680 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, F = R.floors, draws = lines.filter((r) => r.kind === "draw");
+    const of = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), rec = (a, s) => draws.find((r) => r.arm === a && r.s === s), lost = (a) => of(a).map((r) => r.score - r.ratesOff);
+    const rank = (v) => { const o = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]), r = new Array(v.length); o.forEach(([, i], k) => (r[i] = k + 1)); return r; };
+    const spear = (x, y) => { const a = rank(x), b = rank(y), n = x.length; return 1 - 6 * a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0) / (n * (n * n - 1)); };
+    ok("!! the results file is the one the run wrote: 38 records, sha256 363cdbf5147d4137... (two starts: the first stopped at the 2-hour limit with 35 whole lines, the second trained the draw missing, the recheck and the floors)",
+        lines.length === 38 && createHash("sha256").update(bytes).digest("hex") === "363cdbf5147d4137ad2b6d3de26e0e14ca7709a75e77aaad9317c15cad6c0527");
+    ok("!! THE CHECKS HOLD: 36 draws each once, the registered recipe, each arm's weights and wiring, PLASTIC draw 1 the same twice, the floors (told 0.9085, hand 0.6674, vision off 0.5041, the start 0.4430), the untrained FROZEN and PLASTIC flies the start and PSHUF's own 0.5029",
+        R.checks.length === 0 && draws.length === 36 && near(F.told, 0.9085) && near(F.hand, 0.6674) && near(F.off, 0.5041) && near(F.start, 0.4430) && F.untrained.FROZEN === F.start && F.untrained.PLASTIC === F.start && near(F.untrained.PSHUF, 0.5029));
+    ok("!! *** P: A FLY WHOSE RING-TO-COMPASS CONNECTIONS WEAKEN WITH CO-ACTIVITY DOES BETTER THAN A FLY THAT STEERS BY ITS TURNS ALONE *** -- 12 of 12 above vision off's 0.5041, none below, exact two-sided p 2^-11 (0.00049)",
+        R.P.word === V.WORDS.P[0] && R.P.above === 12 && R.P.below === 0 && R.P.ties === 0 && R.P.p === 2 ** -11 && R.P.ref === F.off && Math.min(...sc("PLASTIC")) > F.off);
+    ok("!! P2: BETTER THAN FLIES TRAINED THE SAME WAY WITHOUT THE PLASTICITY -- ranks 222, the most there can be (every PLASTIC fly above every FROZEN one), p 7.4e-7",
+        R.P2.word === V.WORDS.P2[0] && R.P2.sumA === 222 && R.P2.ties === 0 && near(R.P2.p, 2 / 2704156, 1e-12) && Math.min(...sc("PLASTIC")) > Math.max(...sc("FROZEN")));
+    ok("!! T1: THE REAL WIRING DOES WORSE THAN A SHUFFLE OF IT -- ranks 78, the fewest there can be (every PLASTIC fly below every PSHUF one), p 7.4e-7. H: WORSE THAN THE SAME RULE SET BY HAND -- 0 of 12 above its 0.6674, p 0.00049",
+        R.T1.word === V.WORDS.T1[1] && R.T1.sumA === 78 && R.T1.ties === 0 && near(R.T1.p, 2 / 2704156, 1e-12) && Math.max(...sc("PLASTIC")) < Math.min(...sc("PSHUF")) && R.H.word === V.WORDS.H[1] && R.H.above === 0 && R.H.below === 12 && R.H.p === 2 ** -11 && R.H.ref === F.hand);
+    ok("!! the arms (mean, sd, least, most; a and c; with a and b at 0; USES): FROZEN 0.4948 0.0020 0.4912 0.4989, c 3.2e-6 | PLASTIC 0.6464 0.0095 0.6275 0.6630, a 0.0160 c 1.6e-5, 0.3688, 12 | PSHUF 0.6765 0.0075 0.6664 0.6908, a 0.0114 c 2.0e-5, 0.4866, 12",
+        near(A.FROZEN.mean, 0.4948) && near(A.FROZEN.sd, 0.0020) && near(A.FROZEN.min, 0.4912) && near(A.FROZEN.max, 0.4989) && A.FROZEN.a === 0 && near(A.FROZEN.c, 3.16e-6, 5e-9) &&
+        near(A.PLASTIC.mean, 0.6464) && near(A.PLASTIC.sd, 0.0095) && near(A.PLASTIC.min, 0.6275) && near(A.PLASTIC.max, 0.6630) && near(A.PLASTIC.a, 0.0160) && near(A.PLASTIC.c, 1.63e-5, 5e-8) && near(A.PLASTIC.ratesOff, 0.3688) && A.PLASTIC.uses === 12 &&
+        near(A.PSHUF.mean, 0.6765) && near(A.PSHUF.sd, 0.0075) && near(A.PSHUF.min, 0.6664) && near(A.PSHUF.max, 0.6908) && near(A.PSHUF.a, 0.0114) && near(A.PSHUF.c, 1.97e-5, 5e-8) && near(A.PSHUF.ratesOff, 0.4866) && A.PSHUF.uses === 12);
+    ok("!! *** EVERY PLASTIC FLY LEARNS ITS MAP IN ITS LIFE AND LEANS ON IT ***: with a and b at 0 PLASTIC loses 0.26 to 0.29 and PSHUF 0.17 to 0.21; every PLASTIC fly with them at 0 is under the start (its vision gain is the start's or more); THE RECOVERY RATE WENT TO 0 IN ALL 24; FROZEN's c 2.2 to 3.9e-6, every FROZEN fly under vision off",
+        lost("PLASTIC").every((d) => d > 0.258 && d < 0.287) && lost("PSHUF").every((d) => d > 0.169 && d < 0.211) && of("PLASTIC").every((r) => r.ratesOff < F.start && r.rates.c > CF.C_SCALE) && [...of("PLASTIC"), ...of("PSHUF")].every((r) => r.rates.b === 0) &&
+        of("FROZEN").every((r) => r.rates.c > 2.18e-6 && r.rates.c < 3.93e-6 && r.score < F.off));
+    const pa = of("PLASTIC");
+    ok("!! H: THE TRAINER WENT PAST THE HAND POINT -- every PLASTIC fly's a 0.0136 to 0.0195 (the hand's 0.01) and c 1.34 to 1.76e-5 (the hand's 1e-5), and the further on c the lower the score: Spearman -0.90 over the 12 (on a -0.81; PSHUF's on c 0.22) -- described after the reading, not registered",
+        pa.every((r) => r.rates.a > 0.0136 && r.rates.a < 0.0196 && r.rates.c > 1.34e-5 && r.rates.c < 1.77e-5) && near(spear(pa.map((r) => r.rates.c), sc("PLASTIC")), -0.902, 5e-4) && near(spear(pa.map((r) => r.rates.a), sc("PLASTIC")), -0.811, 5e-4) &&
+        near(spear(of("PSHUF").map((r) => r.rates.c), sc("PSHUF")), 0.224, 5e-4));
+    const again = (a, s, zero) => { const r = rec(a, s), w = PF.unpackWeights(r.weights); return V.auditScore(zero ? V.ratesOff(a, s, w) : V.policyOf(a, s).setParams(w)); };
+    ok("!! RE-AUDITED AFTER THE READING: PLASTIC draw 4 (the arm's least) gives its score and its score with a and b at 0 again on the 200 lives to the bit, and PSHUF draw 7 (the arm's most) its score",
+        rec("PLASTIC", 4).score === A.PLASTIC.min && rec("PSHUF", 7).score === A.PSHUF.max && again("PLASTIC", 4) === rec("PLASTIC", 4).score && again("PLASTIC", 4, true) === rec("PLASTIC", 4).ratesOff && again("PSHUF", 7) === rec("PSHUF", 7).score);
+    const H = (a) => A[a].history.map((h) => h.ret);
+    ok("WHAT THE TRAINER SAW (its own battery, the mean of 12): FROZEN 0.4366 at iteration 0 and 0.4733 from 20 on, flat; PLASTIC 0.5906 to 0.6513; PSHUF 0.6084 to 0.6740",
+        J(A.FROZEN.history.map((h) => h.it)) === J([0, 10, 20, 30, 40, 50, 59]) && near(H("FROZEN")[0], 0.4366) && H("FROZEN").slice(2).every((x) => near(x, 0.4733, 2e-4)) && near(H("PLASTIC")[0], 0.5906) && near(H("PLASTIC")[6], 0.6513) && near(H("PSHUF")[0], 0.6084) && near(H("PSHUF")[6], 0.6740));
+    const pull = (edges) => { const mean = edges.reduce((s, e) => s + e[2], 0) / edges.length, S = new Float64Array(46); for (const [j, k, n] of edges) S[k] += n / mean; const m = S.reduce((a, b) => a + b, 0) / 46; let x = 0, y = 0;
+        for (let k = 0; k < 46; k++) { x += (S[k] - m) * Math.cos(CF.ANGLE[k]); y += (S[k] - m) * Math.sin(CF.ANGLE[k]); } return { mag: Math.hypot(x, y), dir: Math.atan2(y, x) * 180 / Math.PI, cv: Math.sqrt(S.reduce((a, b) => a + (b - m) ** 2, 0) / 46) / m }; };
+    const firstTick = (edges) => { const mean = edges.reduce((s, e) => s + e[2], 0) / edges.length, env = new CE.CompassEnv(), P = [];
+        for (const L of V.AUDIT) { const o = env.reset(L), v = new Float64Array(46); for (const [j, k, n] of edges) v[k] -= (n / mean) * o[j]; const m = v.reduce((a, b) => a + b, 0) / 46; let x = 0, y = 0; for (let k = 0; k < 46; k++) { x += (v[k] - m) * Math.cos(CF.ANGLE[k]); y += (v[k] - m) * Math.sin(CF.ANGLE[k]); } P.push([x, y]); }
+        const mx = P.reduce((a, p) => a + p[0], 0) / P.length, my = P.reduce((a, p) => a + p[1], 0) / P.length; return { fixed: Math.hypot(mx, my), spread: Math.sqrt(P.reduce((a, p) => a + (p[0] - mx) ** 2 + (p[1] - my) ** 2, 0) / P.length) }; };
+    const real = pull(CF.REAL), sh = V.SEEDS.map((s) => pull(V.edgesOf("PSHUF", s))), shMag = sh.map((p) => p.mag), ftR = firstTick(CF.REAL), ftS = firstTick(V.edgesOf("PSHUF", 1));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- WHY THE REAL WIRING'S MAP MISLEADS: its compass neurons' summed ring input is uneven (cv 0.153; the shuffles' mean 0.061) and pulls phi toward 65 degrees at 536 whatever the scene (the shuffles 21 to 127, mean 62); on the first tick of the 200 audit lives 258 fixed against 57 from the scene (shuffle 1: 36 against 39); across the 12 shuffles the pull does not go with the score (Spearman 0.27)",
+        near(real.cv, 0.153, 5e-4) && near(real.dir, 65.2, 0.05) && near(real.mag, 536.31, 0.005) && near(sh.reduce((a, p) => a + p.cv, 0) / 12, 0.061, 5e-4) && near(Math.min(...shMag), 20.74, 0.005) && near(Math.max(...shMag), 127.06, 0.005) && near(shMag.reduce((a, b) => a + b, 0) / 12, 62.00, 0.005) &&
+        near(ftR.fixed, 258.32, 0.005) && near(ftR.spread, 57.25, 0.005) && near(ftS.fixed, 36.13, 0.005) && near(ftS.spread, 39.41, 0.005) && near(spear(shMag, sc("PSHUF")), 0.266, 5e-4) && Math.max(...shMag) < real.mag / 4);
+    const note = src("brain/FLY_COMPASS_LEARNS_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 11. The result"));
+    ok("the expectations, written before the code, against what came: P BETTER (85), P2 BETTER (85), at least 10 of 12 USES (85) with 12, PLASTIC's mean between 0.64 and 0.72 (65) at 0.6464, FROZEN under 0.5041 (70) -- and T1 came WORSE (40, not CANNOT's 50), H WORSE (the 15 left by CANNOT 50 and BETTER 35)",
+        /P: \*\*BETTER about 85 percent\.\*\* P2: BETTER about 85\. PLASTIC at least 10 of 12 USES, about 85; PLASTIC's mean between 0\.64 and 0\.72, about 65\. FROZEN's mean under path integration's 0\.5041, about 70 \(its vision gain still falling at 60 iterations\)\. T1: CANNOT about 50, WORSE about 40\. H: CANNOT about 50, BETTER about 35\./.test(flat) &&
+        R.P.word === V.WORDS.P[0] && R.P2.word === V.WORDS.P2[0] && A.PLASTIC.uses >= 10 && A.PLASTIC.mean >= 0.64 && A.PLASTIC.mean <= 0.72 && A.FROZEN.mean < F.off && R.T1.word === V.WORDS.T1[1] && R.H.word === V.WORDS.H[1]);
+    ok("the registration's RESULT SECTION (section 11) carries the four readings' words, the commit the file was read at, the expectations that did not come, that the recovery rate went to 0, the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 11\. The result/.test(note) && [["P", R.P.word], ["P2", R.P2.word], ["T1", R.T1.word], ["H", R.H.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)) && /47e46680/.test(res) && /T1 and H did not/.test(res) && /recovery rate went to 0 in all 24/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /Whether this is what T1 measured is not tested/.test(res) && /What it does not mean/.test(res) &&
+        /coefficient of variation 0\.153; the shuffles' 0\.061/.test(res) && /toward about 65 degrees with a strength of 536/.test(res) && /21 to 127, mean 62/.test(res) && /258 on the real wiring against a spread of 57 from the scene; on shuffle draw 1, 36 against 39/.test(res) && /Spearman -0\.90 over the 12 \(on a, -0\.81\)/.test(res));
 });
 
 console.log(`\nflyCompass-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

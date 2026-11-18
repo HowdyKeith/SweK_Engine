@@ -102,3 +102,63 @@ Resumable.
 ## 10. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyCompass.mjs run` -> `brain/flyCompassRound.jsonl`, committed byte for byte, whole, before it is
 read; `node tools/ship/takeFlyCompass.mjs read` prints the checks and the reading.
+
+## 11. The result (the run: two starts -- the first stopped at the session's 2-hour limit with 35 whole lines, the second trained only the draw missing, the recheck and the floors, in 32.6 minutes; the whole file committed unread at 47e46680, then read once)
+The checks hold: 36 draws, each once, the registered recipe, each arm's wiring, PLASTIC draw 1 the same twice, and the
+untrained FROZEN and PLASTIC flies the start (0.4430).
+
+**P: A FLY WHOSE RING-TO-COMPASS CONNECTIONS WEAKEN WITH CO-ACTIVITY DOES BETTER THAN A FLY THAT STEERS BY ITS TURNS ALONE**
+(12 of 12 above 0.5041, exact two-sided p 0.00049).
+
+**P2: A FLY WHOSE RING-TO-COMPASS CONNECTIONS WEAKEN WITH CO-ACTIVITY DOES BETTER THAN ONE WHOSE CANNOT** (ranks 222, the
+most there can be: every PLASTIC fly above every FROZEN one; p 7.4 x 10^-7).
+
+**T1: THE REAL WIRING DOES WORSE THAN A SHUFFLE OF IT** (ranks 78, the fewest there can be: every PLASTIC fly below every
+PSHUF one; p 7.4 x 10^-7).
+
+**H: A FLY WHOSE RING-TO-COMPASS CONNECTIONS WEAKEN WITH CO-ACTIVITY DOES WORSE THAN THE SAME RULE SET BY HAND** (0 of 12
+above 0.6674, p 0.00049).
+
+| arm | mean | sd | least | most | a | c | with a and b at 0 | USES |
+|---|---|---|---|---|---|---|---|---|
+| FROZEN | 0.4948 | 0.0020 | 0.4912 | 0.4989 | 0 | 3.2 x 10^-6 | -- | -- |
+| PLASTIC | 0.6464 | 0.0095 | 0.6275 | 0.6630 | 0.0160 | 1.6 x 10^-5 | 0.3688 | 12 of 12 |
+| PSHUF | 0.6765 | 0.0075 | 0.6664 | 0.6908 | 0.0114 | 2.0 x 10^-5 | 0.4866 | 12 of 12 |
+The floors: told the true heading 0.9085, the rule by hand 0.6674, vision off 0.5041, the start 0.4430, and PSHUF's own
+start (draw 1, vision on, the shuffle's map) 0.5029.
+
+**Every plastic fly learns its map in its life and leans on it**: set a and b to 0 and PLASTIC loses 0.26 to 0.29, PSHUF
+0.17 to 0.21. With them at 0 the trained flies score under the start (PLASTIC 0.3688 against 0.4430): their trained vision
+gain is above the start's, so the anatomy's map, unlearned, misleads them more. **The recovery rate went to 0 in all 24
+plastic flies**, as in escape round 11. **FROZEN turned its vision down and stayed under not looking**: c from 1 x 10^-5 to
+2.2 to 3.9 x 10^-6, every one of the 12 under vision off (most 0.4989), its trainer's battery flat from iteration 20.
+
+**H: the trainer went past the hand point.** Every PLASTIC fly ended with both rates above the hand's (a 0.0136 to 0.0195
+against 0.01; c 1.34 to 1.76 x 10^-5 against 1.0), and the further on c, the lower the score: Spearman -0.90 over the 12
+(on a, -0.81) -- described after the reading, not registered. Why the trainer goes past is not measured here.
+
+**T1: the real wiring's map starts out pulling the heading.** Untrained, a fly on the shuffle scores 0.5029, level with
+vision off; one on the real wiring 0.4430. Measured after the reading (not registered; the gate recomputes it): each compass
+neuron's summed ring input is uneven on the real wiring (coefficient of variation 0.153; the shuffles' 0.061), and unevenly
+enough round the ring that, whatever the scene, the drive pulls phi toward about 65 degrees with a strength of 536 in the
+drive's units -- the twelve shuffles' 21 to 127, mean 62. On the first tick of the 200 audit lives that fixed pull is 258
+on the real wiring against a spread of 57 from the scene; on shuffle draw 1, 36 against 39. **Whether this is what T1
+measured is not tested**: across the 12 shuffles the pull does not go with the score (Spearman 0.27), but every shuffle's
+pull is far below the real wiring's. The test is a shuffle that keeps each compass neuron's summed input (backlog).
+
+**Expectations against what came: five came as the outcome I weighted most; T1 and H did not.** P BETTER (85), P2 BETTER
+(85), 12 of 12 USES (at least 10, 85), PLASTIC's mean 0.6464 (between 0.64 and 0.72, 65), FROZEN's mean 0.4948 under
+0.5041 (70). T1 came WORSE, the outcome I put second (40, CANNOT 50); H came WORSE, the outcome section 7 left about 15
+(CANNOT 50, BETTER 35).
+
+**What it means.** A fly that can only know where it faces by what it sees, in a scene new in every life, learns the scene
+in the calm first third of its life with a rule the animal's ring-to-compass synapses are known to follow, and then holds
+its course in the wind better than a fly that steers by its turns alone -- 12 of 12, by a reading registered before it was
+run. Flies trained the same way without the plasticity cannot: they learn to look less (P2). It is the second fly in this
+tree that learns while it lives, after escape round 11, and the first on a navigation circuit.
+
+**What it does not mean.** The real wiring does worse than a shuffle of it (T1), so this says nothing in favour of the fly's
+own ring-to-compass connections; the measurement above suggests their uneven inputs are a handicap in this model. The bump
+here is an angle, not the compass neurons' own ring attractor, which in the animal may hold the bump against such a pull
+(not modelled, not tested). The ring neurons' receptive fields are drawn, not measured; the task was shaped by scoping; and
+the trained flies are below the rule set by hand.
