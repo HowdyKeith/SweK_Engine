@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyCompassTrainer-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyCompassTrainer-selfcheck.mjs      (about a minute; IT NEVER RUNS THE ROUND -- its trainings are tiny, on a draw the round does not use, and it starts no process)
+// Run: node tools/ship/flyCompassTrainer-selfcheck.mjs      (about a minute and a half; IT NEVER RUNS THE ROUND -- its trainings are tiny, on a draw the round does not use, and it starts no process)
 //
 // THE GATE OF THE COMPASS TRAINER ROUND (registered in brain/FLY_COMPASS_TRAINER_WIP.md before brain/rl/dockPolicy.js's two new options, tools/ship/flyCompassTrainer.mjs and
 // tools/ship/takeFlyCompassTrainer.mjs existed): is the compass round's shortfall below the hand rule the trainer's choice of point?
@@ -10,6 +10,8 @@
 //   3  ONE TRAINING EACH        a LAST record's weights are the trainer's from a call made here by hand; a BAT64 record's are the walk's point at the iteration it says it kept
 //   4  THE RECORDS              24 draws; the compass round's file; K, L, H64, HL, draw for draw and against the hand rule
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at bc153e21, read from the file: the checks, K, L, H64, HL, the arms, the walk the same, the rates, a
+//                               re-audit, the measurement after the reading (the scoping saw the run's choice coming, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 25, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 4; every one red by name, NONE 0 red (the number is the rows red):
 //   THE TRAINER (brain/rl/dockPolicy.js): O1 the battery's first seed is ignored 1 | O2 keep last hands back the best 3 | O3 the battery steers the walk 2 | O4 any keep is last 2
@@ -24,6 +26,11 @@
 //   each draw's battery starts on the last one's eleventh life) were added and reach it.
 //   TWO ROWS OF MINE WERE WRONG WHEN FIRST RUN: the source row counted `opts.batteryBase` and `opts.keep` twice each (the comment names them without `opts.`), and BAT64's tiny battery on
 //   draw 901 starts at 49016307, not 49009007 (10007 x 901 is 9,016,307).
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in a digit the double holds 2 | V2 K against the hand rule 4 |
+//   V3 BETTER and WORSE swapped 6 | V4 KEEP16 is the compass round's PSHUF 8 | V5 the note's K says CANNOT 1 | V6 the note's expectation of H64 is WORSE 1 | V7 the note names another
+//   commit 1 | V8 the note says the shortfall was the walk's 1 | V9 the note drops what it does not mean 1 | V10 a LAST record's history changed in a digit the double holds 2 | V11 BAT64
+//   draw 7 says it kept iteration 38 3 | V12 the hand rule's floor changed in a digit the double holds 3 (the third the verdict section throwing on a reading that was not weighed).
+//   None went 0 red. ONE ERROR OF MINE WHEN FIRST RUN: the verdict used near() and this gate had none; the section threw by name, and near() is now defined as in the other gates.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,7 +48,7 @@ let fails = 0;
 function ok(name, cond, detail = "") { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "  -- " + detail : ""}`); if (!cond) fails++; }
 function section(fn) { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n").slice(1, 3).join(" | ")); } }
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
-const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), H = (p) => PF.hashWeights(p);
+const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), H = (p) => PF.hashWeights(p), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
 const TINY = Object.freeze({ iters: 2, pop: 4, sigma: 0.14, lr: 0.05, trainEps: 1, fresh: true, battery: 2 }), TINY_AUDIT = [880001, 880002];
 
 console.log("flyCompassTrainer-selfcheck -- the compass trainer round (the same walk, a different point kept: the best on 64 lives of the draw's own, the walk's last point): the options, the numbers, the trainings, the records, the command\n");
@@ -135,6 +142,38 @@ section(() => {
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its two trainings through the round's code are of 2 iterations with 4 flies tried on draw 901 (and one refused); it starts no process; the file's size and time are what they were",
         calls.length === 3 && /^"LAST", 901, TINY, TINY_AUDIT$/.test(calls[1]) && /^"BAT64", 901, TINY, TINY_AUDIT$/.test(calls[2]) && /^"PLASTIC", 1$/.test(calls[0]) && TINY.iters === 2 && TINY.pop === 4 && !T.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before,
         `${calls.length - 1} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at bc153e21 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, T.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), compass = T.compassOf(fs.readFileSync(path.join(ENG, T.COMPASS))), R = T.reading(lines, compass), A = R.arms, F = R.floors;
+    const of = (a) => lines.filter((r) => r.kind === "draw" && r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), rec = (a, s) => of(a).find((r) => r.s === s), keep = (s) => compass.lines.find((r) => r.kind === "draw" && r.arm === "PLASTIC" && r.s === s);
+    const range = (a, f) => [Math.min(...of(a).map(f)), Math.max(...of(a).map(f))], within = ([lo, hi], L, H) => lo > L && hi < H, cfl = compass.lines.find((r) => r.kind === "floors");
+    ok("!! the results file is the one the run wrote: 26 records, sha256 dd6b4646158c4d0e... (two starts: the first stopped at the 2-hour limit with 16 whole lines, the second trained the 8 missing, the recheck and the floors)",
+        lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "dd6b4646158c4d0e33a7398bfeba6e465b3f2f088abb24be8687a51606da7efe");
+    ok("!! THE CHECKS HOLD: the compass round's file as committed, 24 draws each once with their arm's lives, LAST draw 1 the same twice; vision off 0.5041, the start 0.4430 and the hand rule 0.6674 the compass round's to the bit",
+        R.checks.length === 0 && F.off === cfl.off && F.start === cfl.start && F.hand === cfl.hand && near(F.hand, 0.6674) && lines.find((r) => r.kind === "recheck").weightsHash === rec("LAST", 1).weightsHash);
+    ok("!! *** K: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN DOES BETTER THAN KEEPING THE BEST ON THE FIXED 16 *** -- on every one of the 12 draws (p 0.00049), by 0.0071 to 0.0429",
+        R.K.word === T.WORDS.K[0] && R.K.above === 12 && R.K.p === 2 ** -11 && near(Math.min(...R.K.diffs), 0.0071) && near(Math.max(...R.K.diffs), 0.0429));
+    ok("!! *** H64: THE BEST ON 64 LIVES CANNOT BE TOLD APART FROM THE RULE SET BY HAND *** -- 9 above its 0.6674 and 3 below (p 0.146)", R.H64.word === T.WORDS.H64[2] && R.H64.above === 9 && R.H64.below === 3 && near(R.H64.p, 0.1460, 5e-5) && R.H64.ref === F.hand);
+    ok("!! L: KEEPING THE WALK'S LAST POINT CANNOT BE TOLD APART FROM KEEPING THE BEST ON THE FIXED 16 (10 above, 2 below, p 0.039); HL: THE LAST POINT DOES WORSE THAN THE HAND RULE (0 of 12 above, p 0.00049)",
+        R.L.word === T.WORDS.L[2] && R.L.above === 10 && R.L.below === 2 && near(R.L.p, 0.0386, 5e-5) && R.HL.word === T.WORDS.HL[1] && R.HL.above === 0 && R.HL.p === 2 ** -11);
+    ok("!! the arms (mean, sd, least, most): BAT64 0.6688 0.0027 0.6627 0.6713 | LAST 0.6575 0.0087 0.6343 0.6666 | KEEP16 0.6464 0.0095 0.6275 0.6630 (the compass round's PLASTIC as committed)",
+        near(A.BAT64.mean, 0.6688) && near(A.BAT64.sd, 0.0027) && near(A.BAT64.min, 0.6627) && near(A.BAT64.max, 0.6713) && near(A.LAST.mean, 0.6575) && near(A.LAST.sd, 0.0087) && near(A.LAST.min, 0.6343) && near(A.LAST.max, 0.6666) && near(A.KEEP16.mean, 0.6464) && near(A.KEEP16.min, 0.6275));
+    ok("!! THE WALK WAS THE SAME: every LAST record's history on the fixed 16 lives is its draw's committed PLASTIC record's to the bit (12 of 12); BAT64 kept iterations 4 4 5 4 5 36 39 33 7 23 20 3 (7 of 12 in the first 10) and LAST always 59",
+        of("LAST").every((r) => J(r.history) === J(keep(r.s).history)) && J(A.BAT64.keptAt) === J([4, 4, 5, 4, 5, 36, 39, 33, 7, 23, 20, 3]) && A.LAST.keptAt.every((k) => k === 59));
+    ok("described, not registered: THE BEST ON 64 LIVES LANDS ON THE HAND RULE'S RATES -- BAT64's a 0.0067 to 0.0113 (mean 0.0090; the hand's 0.01) and c 0.88 to 1.44e-5 (mean 1.18e-5; the hand's 1e-5); LAST's a 0.0073 to 0.0152 and c 1.31 to 1.90e-5; KEEP16's a 0.0136 to 0.0195",
+        within(range("BAT64", (r) => r.rates.a), 0.00666, 0.01133) && within(range("BAT64", (r) => r.rates.c), 8.80e-6, 1.441e-5) && near(A.BAT64.a, 0.0090) && near(A.BAT64.c, 1.18e-5, 5e-8) && within(range("LAST", (r) => r.rates.a), 0.00732, 0.01525) && within(range("LAST", (r) => r.rates.c), 1.30e-5, 1.90e-5) && near(A.KEEP16.a, 0.0160));
+    ok("!! RE-AUDITED AFTER THE READING: BAT64 draw 6 (the arm's least) gives its score again on the 200 audit lives to the bit", rec("BAT64", 6).score === A.BAT64.min && V.auditScore(V.policyOf("PLASTIC", 6).setParams(PF.unpackWeights(rec("BAT64", 6).weights))) === rec("BAT64", 6).score);
+    const note = src("brain/FLY_COMPASS_TRAINER_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 9. The result"));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- THE SCOPING SAW IT COMING: for draws 1, 4 and 7 the run's BAT64 kept iterations 4, 4 and 39, the iterations the registration's scoping table names for the best on 64 lives",
+        rec("BAT64", 1).keptAt === 4 && rec("BAT64", 4).keptAt === 4 && rec("BAT64", 7).keptAt === 39 && /\| 1 \| 0\.6580 \(iteration 27\) \| \*\*0\.6808\*\* \(iteration 4\)/.test(flat) && /\| 4 \| 0\.6456 \(iteration 55\) \| \*\*0\.6813\*\* \(iteration 4\)/.test(flat) && /\| 7 \| 0\.6743 \(iteration 26\) \| \*\*0\.6816\*\* \(iteration 39\)/.test(flat));
+    ok("the expectations, written before the code, against what came -- every one: K BETTER (65), L CANNOT (60), H64 CANNOT (75), HL WORSE (50), BAT64's mean between 0.660 and 0.672 (65) at 0.6688",
+        /K: \*\*BETTER about 65 percent\*\*, CANNOT about 35/.test(flat) && /L: CANNOT about 60, BETTER about 35\. H64: \*\*CANNOT about 75\*\*, WORSE about 20\. HL: WORSE about 50, CANNOT about 50\./.test(flat) && /BAT64's mean between 0\.660 and 0\.672, about 65/.test(flat) &&
+        R.K.word === T.WORDS.K[0] && R.L.word === T.WORDS.L[2] && R.H64.word === T.WORDS.H64[2] && R.HL.word === T.WORDS.HL[1] && A.BAT64.mean >= 0.660 && A.BAT64.mean <= 0.672);
+    ok("the registration's RESULT SECTION (section 9) carries the four readings' words, the commit the file was read at, that every expectation came, what section 4 said such a reading would say, the measurement after the reading said as such, and what it does not mean",
+        /## 9\. The result/.test(note) && ["K", "L", "H64", "HL"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /bc153e21/.test(res) && /Every expectation came/.test(res) && /the compass round's shortfall below the hand rule was the trainer's choice of point/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /iterations 4, 4 and 39/.test(res) && /What it does not mean/.test(res) && /A better choice of point is not a better walk/.test(res));
 });
 
 console.log(`\nflyCompassTrainer-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

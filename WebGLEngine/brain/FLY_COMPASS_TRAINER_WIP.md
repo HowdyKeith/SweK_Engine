@@ -96,3 +96,40 @@ about 2 hours 10. Resumable, so the 2-hour limit only means a second start.
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyCompassTrainer.mjs run` -> `brain/flyCompassTrainerRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyCompassTrainer.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at bc153e21, then read once)
+The run started twice: the first start stopped at the 2-hour limit with 16 whole lines, and the second trained the 8
+missing, LAST draw 1 a second time and the floors (26 records; sha256 dd6b4646158c4d0e...). **The checks hold**:
+vision off, the start and the hand rule (0.6674) are the compass round's to the bit, and LAST draw 1 came out the same
+twice.
+* **K: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN DOES BETTER THAN KEEPING THE BEST ON THE FIXED 16 LIVES** -- on
+  every one of the 12 draws, by 0.0071 to 0.0429 (p 0.00049).
+* **L: KEEPING THE WALK'S LAST POINT CANNOT BE TOLD APART FROM KEEPING THE BEST ON THE FIXED 16 LIVES** -- 10 above,
+  2 below (p 0.039).
+* **H64: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN CANNOT BE TOLD APART FROM THE RULE SET BY HAND** -- 9 above
+  0.6674, 3 below (p 0.146).
+* **HL: KEEPING THE WALK'S LAST POINT DOES WORSE THAN THE RULE SET BY HAND** -- 0 of 12 above (p 0.00049).
+
+| arm | mean | sd | least | most | a (mean) | c (mean) | the iteration kept |
+|---|---|---|---|---|---|---|---|
+| BAT64 | 0.6688 | 0.0027 | 0.6627 | 0.6713 | 0.0090 | 1.18e-5 | 4 4 5 4 5 36 39 33 7 23 20 3 |
+| LAST | 0.6575 | 0.0087 | 0.6343 | 0.6666 | 0.0123 | 1.62e-5 | 59 |
+| KEEP16 (the compass round's PLASTIC) | 0.6464 | 0.0095 | 0.6275 | 0.6630 | 0.0160 | 1.63e-5 | -- |
+
+**Every expectation came**: K BETTER (about 65), L CANNOT (60), H64 CANNOT (75), HL WORSE (50), and BAT64's mean in
+0.660 to 0.672 (65). So, as section 4 put it, **the compass round's shortfall below the hand rule was the trainer's choice
+of point**. Its walk reaches the hand rule's level; the 16 fixed lives pick a wander that luck favoured, and 64 lives of
+the draw's own pick a point at the hand rule's level. **The walk was the same in every arm**: each LAST record's history
+on the fixed 16 lives is its draw's committed PLASTIC record's, to the bit. Described, not registered: BAT64's rates sit
+round the hand rule's (a 0.0067 to 0.0113 against its 0.01, c 0.88 to 1.44e-5 against its 1e-5), where KEEP16's went
+past it (a 0.0136 to 0.0195). Seven of the twelve BAT64 flies kept a point from the first 10 iterations.
+
+Measured after the reading (not registered; the gate recomputes it): **the scoping saw it coming.** For draws 1, 4 and 7,
+the run's BAT64 kept iterations 4, 4 and 39, the iterations section 1's table names for the best on 64 lives.
+
+**What it does not mean.** Section 6 holds. A better choice of point is not a better walk: BAT64 found what the hand rule
+already gave, not a rule better than it (H64 CANNOT). Every other round in this tree that kept the best on the fixed
+battery may share the bias, but this round tested only the compass fly. The bias is the trainer's, so a round that
+weighed arms trained alike compared them fairly. But a round that weighed a trained fly against a fixed one was weighed
+against a trainer that leaves points on the table. That applies to the H readings of the compass, balanced, mushroom body
+and homing rounds.
