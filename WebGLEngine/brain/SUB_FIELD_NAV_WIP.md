@@ -644,3 +644,32 @@ U had 0 exits, and its deepest point was 68.1 m. A limit of 80 was identical to 
 * K6: U's median minimum ship clearance is below R's, about 95 percent (it passes beneath).
 
 **What a result would not say.** Anything about drafts deeper than the vessel can go, or keels the vessel must sense: keels are known exactly. Nor anything about a hull with a shallower damage depth: 67 m is safe only for this hull.
+
+## RESULT OF FOLLOW-UP 10 (2026-11-18; `node tools/ship/subTrafficUnderStudy.mjs --set dev`, then `--set held88 --write`; HELD88 = hard-traffic seeds 10201 to 10400, flown ONCE; 600 flights in brain/subTrafficUnderHeld88.jsonl): **SUPPORTED**
+
+Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference reproduces FOLLOW-UP 9's stored HELD82 flights; the limit bites on DEV; the same 200 seeds in order; the deepest point of any arm is 68.0 m, under 80. Before the registered flights, the three arms were checked against the prototype on all 270 HELD82 and DEV flights, and matched every one. DEV was a sanity run with no verdict (U 30 of 30 against R 27).
+
+| arm | reached | ship collisions | exits | timeouts | deepest (m) | median min ship clearance (m) | median energy (kJ) |
+|---|---|---|---|---|---|---|---|
+| R sweep+dive+deep (reference) | 181/200 | 17 | 2 | 0 | 61.0 | 19.22 | 1292 |
+| **U +under+beneath (designated)** | **197/200** | **3** | **0** | 0 | 67.9 | 6.96 | 1112 |
+| L +under (attribution) | 194/200 | 4 | 2 | 0 | 68.0 | 20.41 | 1279 |
+
+* **U against R: gained 16, lost 0, net 16, exact sign p < 0.0001.**
+* (a) ship collisions 3, at most half of 17: HOLDS. (b) net 16 >= 5 at p <= 0.10: HOLDS. (c) no exit, against R's 2: HOLDS.
+* **VERDICT: SUPPORTED.**
+* **Reported:**
+  * L against R: +13 -0, p 0.0002; ships 4 against 17; exits 2. **The limit carries 13 of the 16 gains; the beneath filter removes the exits** (L keeps R's 2, U has none).
+  * R's ship collisions were 15 in scenarios with a keel over 53 m and 2 in the others; U's were 2 and 1.
+  * **The minimum ship clearance is SMALLER under U in 138 scenarios and larger in 57 (p < 0.0001), median 6.96 m against 19.22 m.** U passes beneath ships it used to keep away from.
+  * U used less energy (median 1112 kJ against 1292).
+
+**Against the expectations (written first).** K1 SUPPORTED (about 60): HELD. K2 (a) (about 75): HELD. K3 (b) (about 70): HELD. K4 at most 1 exit (about 85): HELD (0). K5 L gains at least 5 (about 60): HELD (13). K6 U's clearance below R's (about 95): HELD.
+
+**What it says.** With the dive allowed to the depth the deepest keel needs, and the plan no longer routing around ships the vessel is already beneath, this vessel reaches 197 of 200 fresh traffic scenarios. The remaining 3 are ship collisions. The prototype's leftovers were contact while still descending, which is the autopilot's 1 m/s climb-rate limit, not the navigation. The gain was bought partly with vertical margin: the vessel now passes closer beneath ships, by design, and with keels known exactly.
+
+**nav-traffic-avoid-not-slow CLOSES on this result, as registered.** The residue is named, not opened:
+* contact while descending (an autopilot property);
+* keels the vessel must sense rather than know;
+* drafts deeper than the hull may go (here every keel was at most 60 m, against a damage depth of 80);
+* the smaller vertical clearance, if a real vessel wanted a larger one.
