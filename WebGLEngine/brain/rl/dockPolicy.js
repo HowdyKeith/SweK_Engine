@@ -103,6 +103,10 @@ function trainDockES(opts = {}) {
         // chooses which point of the walk is handed back, and every training of every round chose on the same 16 or 24 lives. `batteryBase` is the battery's first seed (5000 unless given:
         // `seedBase: undefined` is evaluate()'s own default); `keep: "last"` hands back the walk's last point instead of the best (brain/FLY_COMPASS_TRAINER_WIP.md). The gate
         // tools/ship/flyCompassTrainer-selfcheck.mjs pins that without them the answers are the same to the bit, and tools/ship/paintingFly-selfcheck.mjs pins them as before.
+        // 2026-11-18 (unnumbered) -- ONE MORE OPTION, AND WITHOUT IT NOTHING CHANGES. `onPoint` is handed a copy of the walk's point after each update, with the iteration, before the battery
+        // scores it, so a round can choose the point another way (brain/FLY_HOME_CHOOSER_WIP.md). It draws no random number and its return value is ignored; tools/ship/flyHomeChooser-selfcheck.mjs
+        // pins that with it the walk and the point handed back are the same to the bit.
+        if (opts.onPoint) opts.onPoint(theta.slice(), it);
         const ev = evaluate(theta, { ...evOpts, episodes: opts.batteryEps || 24, seedBase: opts.batteryBase });
         const score = ev.dockRate * 1000 - ev.avgDist - (ev.avgCrashes || 0) * 200;   // docks, then closeness, penalize crashes
         if (score > best.score) best = { params: theta.slice(), score, ev };
