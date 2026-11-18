@@ -106,3 +106,34 @@ Adding the `destroy()` row exposed one more defect, in my own test code: the pro
 The rig tool's CPU side was not warmed up, and its header still said it writes nothing. Both are fixed.
 
 The gate now runs 24 rows (about 4 s here). 15 sabotages of the fixed module all go red (logged in the gate's header).
+
+## 2026-11-18: A TANK PILOT TYPE ON THE DEVICE, ONE TICK LATE (Keith: "do the one-tick-late GPU pilot type next"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS DIVES IS FLOWN)
+
+**The constraint.** The tank's tick is synchronous: `step()` flies every sub tick after tick, and a pilot must return its controls at once. A device read-back is not synchronous. So a pilot on the device can only hand back controls computed from an EARLIER tick's state. In a gate that awaits every read, that is exactly one tick. In the page, the reads land between frames: at 4x speed and 60 frames a second, about 2 ticks a frame, so 2 to 3 ticks late. **What lateness costs is the decision, and it can be measured exactly on the CPU**, by delaying the CPU pilot's own controls.
+
+### PART A, THE COST OF LATENESS (a registered measurement)
+
+**The pilot.** The fly heading-loop pilot (the 1,729 weights of `brain/pilotSubFlyCxWip.json`), as the tank flies it. `delayed(k)`: the CPU pilot run every tick on that tick's features, so its memory integrates as on time, but the controls it RETURNS at tick n are the ones it computed at tick n - k. For n < k it returns the PD autopilot's controls for that tick, which is what the device type flies before its first read lands.
+
+**The dives.** `auditSets(90000).safety` (`tools/auditSubChampion.mjs`): 500 dives (100 nominal, 300 recovery, 100 current), 60 s each, base 90000. No note or code names that base, and nothing is chosen on these dives.
+
+**The arms.** k = 0 (on time, the reference), **k = 1 (designated: the gate's lateness)**, k = 2 and **k = 4 (designated too: the page's lateness, with a margin)**.
+
+**The registered readings, each against k = 0, paired by dive, on the mean score (the sub task's score: higher is better).**
+* **ONE TICK COSTS NOTHING THAT MATTERS** iff the mean paired difference (k = 1 minus k = 0) has a 95 percent interval (2 se) inside -0.01 to +0.01. The tree's own margin for a sub pilot is `subTask.versus`'s 0.01.
+* **IT COSTS** iff the whole interval is below -0.01.
+* **UNDECIDED** otherwise.
+
+The same rule gives a second reading for k = 4: **FOUR TICKS COST NOTHING THAT MATTERS / COST / UNDECIDED**. Reported beside them: k = 2; the dives that ended early in each arm; each kind's mean.
+
+**Checks (a failure: NOT WEIGHED).** (1) ON TIME IS THE PILOT: `delayed(0)` flies bit for bit as the tank's own type. (2) THE DELAY IS EXACT: on a recorded run, the controls of `delayed(k)` at tick n equal `delayed(0)`'s at tick n - k. (3) SAME DIVES for every arm.
+
+**Expectations, written before any dive is flown.** E1 ONE TICK COSTS NOTHING THAT MATTERS: about 80 percent (a tick is 1/30 s; the hull's time constants are seconds). E2 FOUR TICKS COST NOTHING THAT MATTERS: about 50 percent. E3 the cost grows with k: about 75 percent.
+
+### PART B, THE TYPE (built after PART A is read, whatever it says)
+
+`render/subAquariumFlyCxGpu.mjs`: a tank pilot type for the fly circuit that runs it on a WebGPU device through `brain/reservoirPilotGpu.mjs`. Every tick it submits the step and returns the newest controls that have come back, flying the PD autopilot until the first lands. It resets the device's memory when the sub's dive changes, as the CPU type does.
+
+**Its gate.** In a harness that awaits every read, the type's controls equal `delayed(1)`'s to 1e-4 over a flight. A device that cannot be had leaves the CPU type in place, and the page says so. How late each sub is is exposed, so the page can show it.
+
+The page gets a switch to fly the fly-circuit subs on the GPU, OFF by default, and the CPU type stays the default. **Whether it is worth turning on is PART A's answer, and the rig's timing.**
