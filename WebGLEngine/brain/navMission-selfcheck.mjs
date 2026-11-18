@@ -129,5 +129,21 @@ sec("9. THE SOURCE");
     ok("!! no clock and no Math.random; the registered numbers (gain 5, partly 3, harmful -5, p 0.10, the file)", !/Math\.random|Date\.now|new Date|performance\.now/.test(code) && T.GAIN === 5 && T.PARTLY === 3 && T.HARMFUL === -5 && T.P_LEVEL === 0.10 && T.OUT_FILE === "brain/navMissionHeld83.jsonl" && E.BATTERY_J === 3e6);
 }
 
+sec("10. THE GENERATOR'S RULE AND PART 3'S BUDGET ARM (the remaining constants and pure functions, each by value or behaviour)");
+{
+    ok("  the waypoint draw: WAYPOINT_TRIES 200 tries a waypoint, CLEAR_M 40 m clearance (the 40 section 2 measures)", M.WAYPOINT_TRIES === 200 && M.CLEAR_M === 40);
+    ok("  BASE_ARM is the reference arm, an arm of ARMS flown without eco", M.BASE_ARM === "any+predict+edge+yield" && M.BASE_ARM === M.REFERENCE && M.ARMS[M.BASE_ARM].eco === false);
+    ok("!! PART 3's registered numbers: BUDGET_SPEEDS 3/2.5/2/1.5 fastest first, BUDGET_JPM 2675/1891/1259/785 J per metre, DETOUR 1.35, all frozen",
+        J(M.BUDGET_SPEEDS) === J([3, 2.5, 2, 1.5]) && J(M.BUDGET_JPM) === J({ 3: 2675, 2.5: 1891, 2: 1259, 1.5: 785 }) && M.DETOUR === 1.35 && Object.isFrozen(M.BUDGET_SPEEDS) && Object.isFrozen(M.BUDGET_JPM) && M.BUDGET_SPEEDS.every((v) => M.BUDGET_JPM[v] > 0));
+    ok("!! BUDGET_ARM is the reference with budget on and eco off; ALL_ARMS is ARMS plus budget (kept OUT of ARMS and ARM_NAMES), and budget's leg cap is 520 s",
+        J(M.BUDGET_ARM) === J({ arm: "any+predict+edge+yield", eco: false, budget: true }) && M.ALL_ARMS.budget === M.BUDGET_ARM && J(Object.keys(M.ALL_ARMS)) === J([...M.ARM_NAMES, "budget"]) && M.ARM_NAMES.every((a) => M.ALL_ARMS[a] === M.ARMS[a]) && !("budget" in M.ARMS) && M.legSecondsOf("budget") === 520);
+    const wps = [{ x: 0, y: 0 }, { x: 3, y: 4 }, { x: 3, y: 10 }];
+    ok("!! distanceToGo is the line to waypoint `leg` then between the waypoints after it: 0+5+6, 5+6 from the start, 6 from W2, 0 at the last",
+        M.distanceToGo(0, 0, wps, 0) === 11 && M.distanceToGo(0, 0, wps, 1) === 11 && M.distanceToGo(3, 4, wps, 2) === 6 && M.distanceToGo(3, 10, wps, 2) === 0);
+    const need = (v, toGo) => M.BUDGET_JPM[v] * toGo * M.DETOUR;
+    ok("!! budgetSpeed picks the fastest speed whose J/m x distance x DETOUR fits the energy left, else the slowest: 1 km at 3.62 MJ -> 3, just under -> 2.5, 1.7 MJ -> 2, 1.2 MJ -> 1.5, nothing left -> 1.5",
+        M.budgetSpeed(need(3, 1000) + 1, 1000) === 3 && M.budgetSpeed(need(3, 1000) - 1, 1000) === 2.5 && M.budgetSpeed(1.7e6, 1000) === 2 && M.budgetSpeed(1.2e6, 1000) === 1.5 && M.budgetSpeed(0, 1000) === 1.5 && M.budgetSpeed(1, 0) === 3);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exitCode = fails ? 1 : 0;

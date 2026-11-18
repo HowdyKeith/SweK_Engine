@@ -31,6 +31,7 @@ sec("1. THE STEP");
     ok("!! still water costs exactly the cell, whatever the direction", D.stepCost(5, 1, 0, 0, 0, 3) === 5 && D.stepCost(5, 0, -1, 0, 0, 3) === 5);
     ok("!! with a 1.2 m/s current along the step: 5 x 3 / 4.2; against it: 5 x 3 / 1.8; across it: 5 x 3 / sqrt(9 - 1.44), each to the 1/1024 quantum", D.stepCost(5, 1, 0, 1.2, 0, 3) === q(15 / 4.2) && D.stepCost(5, -1, 0, 1.2, 0, 3) === q(15 / 1.8) && D.stepCost(5, 0, 1, 1.2, 0, 3) === q(15 / Math.sqrt(9 - 1.44)));
     ok("!! impassable when the cross component reaches V (3 m/s across a 3 m/s vessel) or the ground speed is at most 0.05 m/s (2.96 m/s against)", D.stepCost(5, 0, 1, 3, 0, 3) === Infinity && D.stepCost(5, -1, 0, 2.96, 0, 3) === Infinity && D.stepCost(5, -1, 0, 2.9, 0, 3) < Infinity);
+    ok("  QUANTUM is 1024 and a current-bearing cost is round(cell x V / g x QUANTUM) / QUANTUM (with the current: 15 / 4.2 on that grid)", D.QUANTUM === 1024 && D.stepCost(5, 1, 0, 1.2, 0, 3) === Math.round((15 / 4.2) * D.QUANTUM) / D.QUANTUM && Number.isInteger(D.stepCost(5, 1, 0, 1.2, 0, 3) * D.QUANTUM));
     ok("  every cost is a whole number of 1/1024", [[1, 0, 0.37, -0.21], [0, 1, -1.1, 0.4], [-1, 0, 0.9, 0.9]].every(([dx, dy, cx, cy]) => { const k = D.stepCost(5, dx, dy, cx, cy, 3); return Number.isInteger(k * 1024); }));
 }
 

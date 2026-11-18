@@ -39,6 +39,7 @@ sec("1. REFUSALS");
     ok("!! no device is refused by name", /needs a GPUDevice/.test(thr(() => G.flyCxGpuKind(C, null))) && /needs a GPUDevice/.test(thr(() => G.flyCxGpuKind(C, {}))));
     const k = G.flyCxGpuKind(C, { createBuffer() {} });
     ok("!! a wrong weight count is refused before the device is touched; the kind says it is on the device and takes the CPU type's 1729 weights", /takes exactly 1729 weights, got 963/.test(thr(() => k.build(new Float32Array(963)))) && k.weightCount === 1729 && k.onDevice === true && k.circuit === "flycx");
+    ok("  CIRCUIT is \"flycx\" and LABEL names the 148-cell circuit on the GPU, one tick late; the kind carries both as circuit and label", G.CIRCUIT === "flycx" && k.circuit === G.CIRCUIT && k.label === G.LABEL && /148 cells/.test(G.LABEL) && /on the GPU/.test(G.LABEL) && /one tick late/.test(G.LABEL));
 }
 
 // ---- the device ----
