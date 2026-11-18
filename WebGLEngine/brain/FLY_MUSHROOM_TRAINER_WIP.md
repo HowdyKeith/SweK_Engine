@@ -78,3 +78,43 @@ process, under 10 at four.
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyMushroomTrainer.mjs run` -> `brain/flyMushroomTrainerRound.jsonl`, committed byte for byte,
 whole, before it is read; `node tools/ship/takeFlyMushroomTrainer.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at ae156348, then read once)
+One start, 13.1 minutes on two processes, 50 records (48 draws, ONE's LONG draw 1 trained a second time, the floors;
+sha256 b463b5117a486cfc...). **The checks hold**: every LONG walk starts as its draw's committed one, and the start and
+the hand rule are the mushroom round's to the bit.
+* **ONE G: A WALK FOUR TIMES LONGER DOES BETTER THAN THE MUSHROOM ROUND'S WALK** (11 of 12 above, p 0.0063).
+* **ONE K: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN CANNOT BE TOLD APART FROM KEEPING THE BEST ON THE FIXED 16
+  LIVES** (9 above, 3 below, p 0.146).
+* **ONE HG: A WALK FOUR TIMES LONGER DOES WORSE THAN THE RULE SET BY HAND** (1 of 12 above 0.8943, p 0.0063).
+* **ONE HK: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN DOES WORSE THAN THE RULE SET BY HAND** (0 of 12 above).
+* **REV G: A WALK FOUR TIMES LONGER CANNOT BE TOLD APART FROM THE MUSHROOM ROUND'S WALK** (9 above, 2 below, 1 tie,
+  p 0.146).
+* **REV K: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN CANNOT BE TOLD APART FROM KEEPING THE BEST ON THE FIXED 16
+  LIVES** (6, 5, 1 tie, p 1).
+* **REV HG: A WALK FOUR TIMES LONGER DOES BETTER THAN THE RULE SET BY HAND** (12 of 12 above 0.2220).
+* **REV HK: KEEPING THE BEST ON 64 LIVES OF THE DRAW'S OWN CANNOT BE TOLD APART FROM THE RULE SET BY HAND** (10 above,
+  2 below, p 0.039).
+
+| arm | ONE: mean (least, most) | REV: mean (least, most) |
+|---|---|---|
+| LONG (240 iterations) | 0.8582 (0.7717, 0.9103) | 0.2936 (0.2250, 0.3383) |
+| BAT64 (the best on 64 lives) | 0.7899 (0.6953, 0.8707) | 0.2602 (0.2057, 0.3020) |
+| KEEP16 (the mushroom round's) | 0.7757 (0.6480, 0.8320) | 0.2524 (0.1937, 0.3020) |
+| the hand rule | 0.8943 | 0.2220 |
+
+**ONE's HG and REV's G did not come as given**: HG came WORSE (given 30; CANNOT was given 55), and REV's G came CANNOT
+(given 30; BETTER was given 70). The rest came. So, as section 4 put it, **the mushroom fly's shortfall was its walk's
+length, not the choice of point** -- the other way round from the compass fly. But even four times the walk leaves it
+below the rule set by hand on ONE. On REV, a fly trained for 240 iterations beat the hand rule on every draw, though it
+could not be told from the 60-iteration flies. Described, not registered: the long walks kept late points (median
+iteration 205 on ONE, 202 on REV). On ONE the trainer's own battery was still rising at the end (0.8622 at iteration 200,
+0.8778 at 239), so a longer walk still might close more.
+
+Measured after the reading (not registered; the gate recomputes it): of the mushroom round's gap of 0.1186 between its
+flies and the hand rule on ONE, **the longer walk closes 0.0825 of it (70 percent)**, and the choice of point 0.014
+(12 percent, not significant).
+
+**What it does not mean.** Section 6 holds. A longer walk is not a better rule: on ONE the trainer has not yet found
+what the known valence pairing gives, and on REV it found more. Two flies falling short for different reasons is about
+this trainer on these weights: 93 of them, 91 a readout that starts at 0, against the compass fly's 3.

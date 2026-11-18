@@ -9,6 +9,8 @@
 //   2  ONE TRAINING EACH        a LONG record's weights are the trainer's from a call made here by hand, and its walk starts as the shorter one; a BAT64 record's are the walk's point it names
 //   3  THE RECORDS              48 draws; the mushroom round's file; G, K, HG, HK on each task
 //   4  THE COMMAND              it is this round's; no training of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at ae156348, read from the file: the checks, the eight readings, the arms, where the walks kept their points,
+//                               re-audits, the measurement after the reading (how much of the gap each arm closes, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 19, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 4; every one red by name (the number is the rows red):
 //   THE ROUND: F1 LONG is 60 iterations 3 | F2 LONG keeps its point on 64 lives 2 | F3 BAT64 on 16 lives 2 | F4 BAT64's battery on the audit lives 3 | F5 the draws' batteries share lives 3 |
@@ -20,6 +22,11 @@
 //   F6 WENT 0 RED FIRST, A FINDING: the tiny BAT64 training kept iteration 0, so a library that always says it kept the first was right by luck. The row now scores the walk's points on
 //   the 64 lives by hand and takes the first best (iteration 3 of 4 on draw 901); F6 was run again (1 red, as above). N2 was first skipped (its text is in the note twice) and run again on
 //   the arms table's.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in a digit the double holds 2 | V2 G against the hand rule 5 |
+//   V3 BETTER and WORSE swapped 6 | V4 KEEP16 is the mushroom round's PFAM 8 | V5 the note's ONE G says CANNOT 1 | V6 the note's expectation of ONE HG is WORSE 1 | V7 the note names another
+//   commit 1 | V8 the note says the shortfall was the choice 1 | V9 the note drops what it does not mean 1 | V10 the note's 70 percent is 80 1 | V11 the hand rule's floor changed in a digit
+//   the double holds 3 | V12 a LONG walk's start changed in a digit the double holds 3. None went 0 red. ONE ROW OF MINE WAS WRONG WHEN FIRST RUN: the choice of point's gain is 0.01425,
+//   written 0.0142; the row now checks it to 1e-6 and the note says 0.014.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -114,6 +121,39 @@ section(() => {
     const me = src("tools/ship/flyMushroomTrainer-selfcheck.mjs"), calls = [...me.matchAll(/T\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its two trainings through the round's code are tiny and on draw 901 (and one refused); it starts no process; the file's size and time are what they were",
         calls.length === 3 && /^"LONG", "TWO", 1$/.test(calls[0]) && /^"LONG", "REV", 901, \{ \.\.\.TINY, iters: 4 \}, TINY_AUDIT$/.test(calls[1]) && /^"BAT64", "REV", 901, \{ \.\.\.TINY, iters: 4 \}, TINY_AUDIT$/.test(calls[2]) && !T.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at ae156348 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, T.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = T.reading(lines, mushroom), O = R.tasks.ONE, V = R.tasks.REV, mfl = mushroom.lines.find((r) => r.kind === "floors");
+    const of = (t, a) => lines.filter((r) => r.kind === "draw" && r.task === t && r.arm === a).sort((x, y) => x.s - y.s), rec = (t, a, s) => of(t, a).find((r) => r.s === s), med = (v) => [...v].sort((a, b) => a - b)[6];
+    ok("!! the results file is the one the run wrote: 50 records, sha256 b463b5117a486cfc... (one start, 13.1 minutes on two processes)", lines.length === 50 && createHash("sha256").update(bytes).digest("hex") === "b463b5117a486cfca539fd824e0a211c67f937b6a4d91e7ec7b23705fe79b293");
+    ok("!! THE CHECKS HOLD: the mushroom round's file as committed, 48 draws each once with their recipes and lives, every LONG walk starting as its draw's committed one, ONE's LONG draw 1 the same twice; the start and the hand rule the mushroom round's to the bit",
+        R.checks.length === 0 && J(R.floors.start) === J(mfl.start) && J(R.floors.hand) === J(mfl.hand) && lines.find((r) => r.kind === "recheck").weightsHash === rec("ONE", "LONG", 1).weightsHash);
+    ok("!! *** ONE: G -- A WALK FOUR TIMES LONGER DOES BETTER THAN THE MUSHROOM ROUND'S WALK (11 of 12 above, p 0.0063, by -0.019 to +0.155); K -- THE BEST ON 64 LIVES CANNOT BE TOLD APART (9 above, 3 below, p 0.146) ***",
+        O.G.word === T.WORDS.G[0] && O.G.above === 11 && O.G.below === 1 && near(O.G.p, 0.0063, 5e-5) && near(Math.min(...O.G.diffs), -0.0190) && near(Math.max(...O.G.diffs), 0.1553) && O.K.word === T.WORDS.K[2] && O.K.above === 9 && O.K.below === 3);
+    ok("!! ONE: HG -- THE LONG WALK STILL DOES WORSE THAN THE RULE SET BY HAND (1 of 12 above 0.8943, p 0.0063); HK -- THE BEST ON 64 LIVES DOES WORSE (0 of 12 above)",
+        O.HG.word === T.WORDS.HG[1] && O.HG.above === 1 && O.HG.below === 11 && O.HK.word === T.WORDS.HK[1] && O.HK.above === 0);
+    ok("!! REV: G CANNOT (9 above, 2 below, 1 tie, p 0.146); K CANNOT (6, 5, 1 tie, p 1); HG -- THE LONG WALK DOES BETTER THAN THE RULE SET BY HAND (12 of 12 above 0.2220); HK CANNOT (10 above, 2 below, p 0.039)",
+        V.G.word === T.WORDS.G[2] && V.G.above === 9 && V.G.below === 2 && V.G.ties === 1 && V.K.word === T.WORDS.K[2] && V.K.above === 6 && V.K.below === 5 && V.K.p === 1 && V.HG.word === T.WORDS.HG[0] && V.HG.above === 12 && V.HK.word === T.WORDS.HK[2] && V.HK.above === 10 && V.HK.below === 2);
+    ok("!! the arms (mean, sd, least, most): ONE -- LONG 0.8582 0.0369 0.7717 0.9103, BAT64 0.7899 0.0460 0.6953 0.8707, KEEP16 0.7757 | REV -- LONG 0.2936 0.0302 0.2250 0.3383, BAT64 0.2602 0.0284 0.2057 0.3020, KEEP16 0.2524",
+        near(O.arms.LONG.mean, 0.8582) && near(O.arms.LONG.sd, 0.0369) && near(O.arms.LONG.min, 0.7717) && near(O.arms.LONG.max, 0.9103) && near(O.arms.BAT64.mean, 0.7899) && near(O.arms.BAT64.sd, 0.0460) && near(O.arms.BAT64.min, 0.6953) && near(O.arms.BAT64.max, 0.8707) && near(O.arms.KEEP16.mean, 0.7757) &&
+        near(V.arms.LONG.mean, 0.2936) && near(V.arms.LONG.sd, 0.0302) && near(V.arms.LONG.min, 0.2250) && near(V.arms.LONG.max, 0.3383) && near(V.arms.BAT64.mean, 0.2602) && near(V.arms.BAT64.sd, 0.0284) && near(V.arms.BAT64.min, 0.2057) && near(V.arms.BAT64.max, 0.3020) && near(V.arms.KEEP16.mean, 0.2524));
+    ok("described, not registered: THE LONG WALKS KEPT LATE POINTS (median iteration 205 on ONE and 202 on REV, against BAT64's 46 and 44 of 60), AND ON ONE THE TRAINER'S OWN BATTERY WAS STILL RISING AT THE END (0.8622 at iteration 200, 0.8778 at 239)",
+        med(of("ONE", "LONG").map((r) => r.keptAt)) === 205 && med(of("REV", "LONG").map((r) => r.keptAt)) === 202 && med(of("ONE", "BAT64").map((r) => r.keptAt)) === 46 && med(of("REV", "BAT64").map((r) => r.keptAt)) === 44 && near(O.arms.LONG.history[5].ret, 0.8622) && near(O.arms.LONG.history[6].ret, 0.8778) && O.arms.LONG.history[6].it === 239);
+    const again = (t, a, s) => M.auditScore(M.policyOf("PLASTIC", s).setParams(PF.unpackWeights(rec(t, a, s).weights)), t);
+    ok("!! RE-AUDITED AFTER THE READING: ONE's LONG draw 3 (the arm's least) and REV's LONG draw 9 (the arm's most) give their scores again on the 200 audit lives to the bit",
+        rec("ONE", "LONG", 3).score === O.arms.LONG.min && rec("REV", "LONG", 9).score === V.arms.LONG.max && again("ONE", "LONG", 3) === rec("ONE", "LONG", 3).score && again("REV", "LONG", 9) === rec("REV", "LONG", 9).score);
+    const gap = mfl.hand.ONE - O.arms.KEEP16.mean, closed = (O.arms.LONG.mean - O.arms.KEEP16.mean) / gap;
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- HOW MUCH OF THE GAP: of the mushroom round's 0.1186 between its flies and the hand rule on ONE, the longer walk closes 0.0825 (70 percent) and the choice of point 0.014 (12 percent, not significant)",
+        near(gap, 0.1186) && near(O.arms.LONG.mean - O.arms.KEEP16.mean, 0.0825) && near(closed, 0.696, 5e-3) && near(O.arms.BAT64.mean - O.arms.KEEP16.mean, 0.01425, 1e-6) && near((O.arms.BAT64.mean - O.arms.KEEP16.mean) / gap, 0.120, 5e-3), `${(100 * closed).toFixed(1)} percent`);
+    const note = src("brain/FLY_MUSHROOM_TRAINER_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 9. The result"));
+    ok("the expectations, written before the code, against what came: ONE G BETTER (85), K CANNOT (75), HK WORSE (85); REV K CANNOT (70), HG BETTER (75), HK CANNOT (50); LONG's mean on ONE 0.8582 in 0.80 to 0.88 -- and ONE's HG came WORSE (30; CANNOT was 55), REV's G CANNOT (30; BETTER was 70)",
+        /ONE: G \*\*BETTER about 85 percent\*\*; K \*\*CANNOT about 75\*\*; HG CANNOT about 55, WORSE 30, BETTER 15; HK \*\*WORSE about 85\*\*\./.test(flat) && /REV: G BETTER about 70, CANNOT 30; K CANNOT about 70; HG \*\*BETTER about 75\*\*; HK CANNOT about 50, BETTER 45\./.test(flat) &&
+        O.G.word === T.WORDS.G[0] && O.K.word === T.WORDS.K[2] && O.HK.word === T.WORDS.HK[1] && V.K.word === T.WORDS.K[2] && V.HG.word === T.WORDS.HG[0] && V.HK.word === T.WORDS.HK[2] && O.arms.LONG.mean >= 0.80 && O.arms.LONG.mean <= 0.88 && O.HG.word === T.WORDS.HG[1] && V.G.word === T.WORDS.G[2]);
+    ok("the registration's RESULT SECTION (section 9) carries the eight readings' words, the commit the file was read at, the two expectations that did not come, what section 4 said such a reading would say, the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 9\. The result/.test(note) && ["ONE", "REV"].every((t) => ["G", "K", "HG", "HK"].every((n) => res.includes(`**${t} ${n}: ${R.tasks[t][n].word}**`))) && /ae156348/.test(res) && /ONE's HG and REV's G did not/.test(res) && /the mushroom fly's shortfall was its walk's length, not the choice of point/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /closes 0\.0825 of it \(70 percent\)/.test(res) && /What it does not mean/.test(res) && /A longer walk is not a better rule/.test(res));
 });
 
 console.log(`\nflyMushroomTrainer-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
