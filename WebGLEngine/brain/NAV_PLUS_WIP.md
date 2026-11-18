@@ -304,3 +304,45 @@ Nothing below is chosen to change what that predicts.
 **Said plainly, not changed:** check 4 measures only the t = 0 start-cell heading, so a stream met later on the route (seeds 532 and 540 of the surrogate gained 7 and 10 percent with 0 degrees at the start) does not count toward it. PART A uses the route arm's time-aware aim points on the directional field. The lowest-dist flow is not the time-optimal successor under a directional cost, a limitation of the registered solver that a later round could fix with a successor rule that is the shared flow at c = 0.
 
 **What I now expect (the registered expectations stand; this is added, and moves nothing).** Check 4 is about a coin flip. If HELD86 is flown, NOT SUPPORTED is the likely verdict under the reading as coded, because most scenarios tie.
+
+## ITEM 2 PART 2, RESULT (2026-11-18; PART A: `node tools/ship/subNavRouteStudy.mjs --part a`; PART B: `--set dev`, then `--set held86 --write`, HELD86 = seeds 9301 to 9500 of hard-stream, flown ONCE; 400 flights in brain/subNavRouteHeld86.jsonl): **PART A: THE UNIFORM CURRENT DOES NOT MOVE THE PLAN. PART B: NOT SUPPORTED.**
+
+**PART A (a record).** 0 of 60 DEV fields of hard-current and hard-current-gap, each planned in its mean current, have start headings more than 5 degrees apart. The uniform-current route arm is NOT FLOWN. Together with the stretch argument above, this closes the "current in the cost" residue of nav-current-in-field for a UNIFORM current: there is nothing for the cost to change.
+
+**PART B.** On DEV, check 4 moved 7 of 30 (23.3 percent, bar 15), so HELD86 was flown. DEV itself read NOT SUPPORTED and is not a result. All four checks passed on HELD86: the same 200 scenarios; still water is the shared plan to the digit; the old HELD73 flights stand; the route bites.
+
+| arm | reached | collided | timeout | median t (s) | median path / chord |
+|---|---|---|---|---|---|
+| any+crab (reference) | 195/200 | 3 | 2 | 135.3 | 1.043 |
+| any+crab+route (designated) | 196/200 | 4 | 0 | 135.3 | 1.048 |
+
+* **R1 TIME** (194 both reached): faster on 32, slower on 18, exact sign p 0.0649; median ratio 1.0000. **Not FASTER.**
+* **R2 REACH**: 2 only the route (seeds 9419 and 9494, where the reference ran out of time), 1 only the reference (9473, where the route collided); gain 1, p 1.0; collisions 4 against 3.
+* **Reported:**
+  * Stream along the track: 97 both reached, faster 27 and slower 11 (p 0.0139), median 1.0000; collisions 2 against 1.
+  * Stream across it: faster 5 and slower 7 (p 0.77); collisions 2 against 2.
+  * 27 of the 200 HELD86 scenarios (13.5 percent) have start headings more than 5 degrees apart.
+* **VERDICT: NOT SUPPORTED.** Not HARMFUL.
+
+**Post hoc, read once from the file, moving nothing.**
+* 144 of the 194 are exact ties: the stream never touches the path either arm flies.
+* Over the 50 that differ, the median ratio is 0.9905. **So the tie reading Amendment 1 kept does not decide this round:** with ties dropped from the median too, 0.9905 is above the partial bar of 0.98, and the verdict is NOT SUPPORTED either way. The surrogate seeds 501 to 700 had suggested about 0.973 there, which would have read PARTLY; the held set did not repeat that.
+* The time change summed over all 194 is -354.5 s, -1.8 s a scenario.
+* The best ratios are 0.738, 0.741, 0.785, 0.801 and 0.824, four of the five with the stream along the track. The worst are 1.046 to 1.110.
+
+**Against the expectations (written first).**
+* G1, check 4's bar met (about 80): HELD.
+* G2, PART A's bar met (about 3): not met, as expected.
+* G3, SUPPORTED (about 40) or PARTLY (about 25): MISSED.
+* G4, median at most 0.95 (about 50): MISSED.
+* G5, reach gain at least 0 (about 70): HELD (gain 1).
+* G6, no more collisions (about 55): MISSED (4 against 3).
+* G7, the reference times out at least 5 times (about 45): MISSED (2).
+* G8, the time gain larger along the track than across (about 80): HELD on the counts (27 to 11 against 5 to 7), not on the medians (1.0000 each).
+
+**What it says.** A plan that knows the stream's map and costs its steps in time helps where the stream lies along the track and on the way. There it is faster on 27 scenarios against 11, by up to a quarter, and it rescued the two scenarios the reference ran out of time on. But in this family the stream touches the path in only about a quarter of scenarios, so most flights are identical and the registered median cannot move. It did not make the vessel safer (one more collision). **The directional solver works and is gated** (bit for bit the shared field in still water, the closed-form answers in a current, terminating). What it buys in this family is too rare to clear the bar.
+
+**Not checked, said plainly.**
+* The vessel reads the stream from a perfect map. The stream is steady and uniform in depth. The vessel is the PD autopilot's at the cruise speed.
+* The lowest-dist flow is not the time-optimal successor under a directional cost (Amendment 1).
+* A family where the stream crosses the track more often, or a verdict on the scenarios the stream touches, would be a new registration, not a re-reading of this one.
