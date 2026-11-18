@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyMushroom-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyMushroom-selfcheck.mjs      (under a minute; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
+// Run: node tools/ship/flyMushroom-selfcheck.mjs      (about ten seconds; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
 //
 // THE GATE OF THE MUSHROOM BODY ROUND (registered in brain/FLY_MUSHROOM_BODY_WIP.md before brain/rl/odorEnv.mjs, brain/rl/mushroomFly.mjs, tools/ship/flyMushroom.mjs and
 // tools/ship/takeFlyMushroom.mjs existed): does each output neuron's own dopamine teacher matter?
@@ -11,6 +11,8 @@
 //   5  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its scores again
 //   6  THE RECORDS              96 draws; P, T1, T2, H on each task; USES
 //   7  THE COMMAND              it is this round's; no training of the round's, no process
+//   8  THE VERDICT              the results file as committed unread at 5f64c614, read from the file: the checks, the eight readings, the arms, USES, the rates, re-audits, the trainer,
+//                               the measurement after the reading (how mixed the shuffles' teachers are, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 32, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 4; every one red by name, NONE 0 red (the number is the rows red):
 //   THE TASK (brain/rl/odorEnv.mjs): E1 the swap after 14 3 | E2 odours of 0.1 3 | E3 the bad odour scores +1 1 | E4 the outcome is never told 1 | E5 REV never swaps 2 | E6 the background 0.02 3
@@ -24,10 +26,18 @@
 //   TWO ROWS OF MINE WERE WEAK, AND THE SABOTAGES FOUND ONE: the row that says REV swaps compared my hand-made life with itself, not with the env, so E5 (REV never swaps) reached only the
 //   trial-by-trial row; it now reads the env's own trials, and E1 and E5 were run again (3 and 2 red, as above). Before the sabotages, the row on the fed teaching compared two expressions
 //   that are the same number; it now checks the trial after, where the cells taught must be the last trial's.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in a digit the double holds 2 | V2 T1 against PFAM 6 |
+//   V3 USES needs 0.3 5 | V4 the rank sums' BETTER and WORSE swapped 5 | V5 the note's ONE T1 says WORSE 1 | V6 the note's expectation of REV's H is CANNOT 1 | V7 the note names another
+//   commit 1 | V8 the note drops what pays 1 | V9 the note drops what it does not mean 1 | V10 rates at 0 zeroes the bias 2 | V11 the note's shuffles 29 to 45 1 | V12 the hand rule's
+//   floor on ONE changed in a digit the double holds 2. None went 0 red. V12 WAS A FINDING: it first went red only on the file's hash (nothing recomputed the floors, and the arms row reads
+//   them to 5e-5); the re-audit row now flies the floors again to the bit, and V12 was run again (2 red, as above).
+//   ONE ROW OF MINE WAS WRONG WHEN FIRST RUN: PFAM's purity is the real map's shares in another order, so their mean differs in the last bit; it is now compared to 1e-12, and the note
+//   says "the same shares, moved" where it said "exactly".
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import * as M from "./flyMushroom.mjs";
 import * as PF from "./paintingFly.mjs";
 import * as OE from "../../brain/rl/odorEnv.mjs";
@@ -173,6 +183,46 @@ section(() => {
     const me = src("tools/ship/flyMushroom-selfcheck.mjs"), calls = [...me.matchAll(/M\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations with 4 flies tried on draw 901 (and one refused); it starts no process; the file's size and time are what they were",
         calls.length === 2 && /^"PLASTIC", "TWO", 1$/.test(calls[0]) && /^"PSHUF", "REV", 901, TINY, TINY_AUDIT$/.test(calls[1]) && TINY.iters === 2 && !M.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `1 training, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n8. THE VERDICT (the whole results file was committed at 5f64c614 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, M.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = M.reading(lines), O = R.tasks.ONE, V = R.tasks.REV, F = R.floors;
+    const of = (t, a) => lines.filter((r) => r.kind === "draw" && r.task === t && r.arm === a).sort((x, y) => x.s - y.s), sc = (t, a) => of(t, a).map((r) => r.score), rec = (t, a, s) => of(t, a).find((r) => r.s === s);
+    const range = (t, a, f) => [Math.min(...of(t, a).map(f)), Math.max(...of(t, a).map(f))], within = ([lo, hi], L, H) => lo > L && hi < H;
+    ok("!! the results file is the one the run wrote: 98 records, sha256 b4d8db8d81395987... (one start, 18.1 minutes on one process)", lines.length === 98 && createHash("sha256").update(bytes).digest("hex") === "b4d8db8d8139598765767921a7e43d97ec3e183889a929f4df60653f75e9cc31");
+    ok("!! THE CHECKS HOLD: 96 draws each once, the registered recipe, each arm's teachers and weights, ONE's PLASTIC draw 1 the same twice; the floors -- the start -0.0253 on ONE and 0.0080 on REV, the hand rule 0.8943 and 0.2220",
+        R.checks.length === 0 && near(F.start.ONE, -0.0253) && near(F.start.REV, 0.0080) && near(F.hand.ONE, 0.8943) && near(F.hand.REV, 0.2220) && lines.find((r) => r.kind === "recheck").weightsHash === rec("ONE", "PLASTIC", 1).weightsHash);
+    ok("!! *** ONE: P BETTER (ranks 222, p 7.4e-7) -- T1 BETTER: THE REAL TEACHERS DO BETTER THAN MIXED ONES (ranks 215, p 3.3e-5) -- T2 CANNOT (ranks 141, p 0.63) -- H WORSE: 0 of 12 above the hand rule's 0.8943 (p 0.00049) ***",
+        O.P.word === M.WORDS.P[0] && O.P.sumA === 222 && O.T1.word === M.WORDS.T1[0] && O.T1.sumA === 215 && near(O.T1.p, 3.328e-5, 5e-9) && O.T2.word === M.WORDS.T2[2] && O.T2.sumA === 141 && near(O.T2.p, 0.6297, 5e-5) && O.H.word === M.WORDS.H[1] && O.H.above === 0 && O.H.below === 12 && O.H.p === 2 ** -11);
+    ok("!! *** REV: P BETTER (222) -- T1 BETTER: EVERY PLASTIC FLY ABOVE EVERY PSHUF ONE (ranks 222, p 7.4e-7) -- T2 CANNOT (ranks 163.5, 1 tie, p 0.48) -- H CANNOT: 10 above the hand rule's 0.2220 and 2 below (p 0.039) ***",
+        V.P.word === M.WORDS.P[0] && V.P.sumA === 222 && V.T1.word === M.WORDS.T1[0] && V.T1.sumA === 222 && Math.min(...sc("REV", "PLASTIC")) > Math.max(...sc("REV", "PSHUF")) && V.T2.word === M.WORDS.T2[2] && V.T2.sumA === 163.5 && V.T2.ties === 1 && near(V.T2.p, 0.4776, 5e-5) && V.H.word === M.WORDS.H[2] && V.H.above === 10 && V.H.below === 2 && near(V.H.p, 0.0386, 5e-5));
+    const A1 = O.arms, A2 = V.arms;
+    ok("!! the arms (mean, sd, least, most): ONE -- FROZEN -0.0157, PLASTIC 0.7757 0.0468 0.6480 0.8320, PFAM 0.7844 0.0483 0.6680 0.8720, PSHUF 0.6235 0.0919 0.4113 0.7567 | REV -- FROZEN 0.0034, PLASTIC 0.2524 0.0296 0.1937 0.3020, PFAM 0.2390 0.0413 0.1520 0.2953, PSHUF 0.0396 0.0232 0.0027 0.0733",
+        near(A1.FROZEN.mean, -0.0157) && near(A1.PLASTIC.mean, 0.7757) && near(A1.PLASTIC.sd, 0.0468) && near(A1.PLASTIC.min, 0.6480) && near(A1.PLASTIC.max, 0.8320) && near(A1.PFAM.mean, 0.7844) && near(A1.PFAM.sd, 0.0483) && near(A1.PFAM.min, 0.6680) && near(A1.PFAM.max, 0.8720) && near(A1.PSHUF.mean, 0.6235) && near(A1.PSHUF.sd, 0.0919) && near(A1.PSHUF.min, 0.4113) && near(A1.PSHUF.max, 0.7567) &&
+        near(A2.FROZEN.mean, 0.0034) && near(A2.PLASTIC.mean, 0.2524) && near(A2.PLASTIC.sd, 0.0296) && near(A2.PLASTIC.min, 0.1937) && near(A2.PLASTIC.max, 0.3020) && near(A2.PFAM.mean, 0.2390) && near(A2.PFAM.sd, 0.0413) && near(A2.PFAM.min, 0.1520) && near(A2.PFAM.max, 0.2953) && near(A2.PSHUF.mean, 0.0396) && near(A2.PSHUF.sd, 0.0232) && near(A2.PSHUF.min, 0.0027) && near(A2.PSHUF.max, 0.0733));
+    ok("!! USES: PLASTIC and PFAM 12 of 12 on both tasks, PSHUF 12 of 12 on ONE and 8 of 12 on REV; WITH THE RATE AT 0 EVERY PLASTIC ARM'S MEAN IS WITHIN 0.02 OF 0 -- all of a fly's score is what it learns in its life, none its readout alone",
+        A1.PLASTIC.uses === 12 && A1.PFAM.uses === 12 && A1.PSHUF.uses === 12 && A2.PLASTIC.uses === 12 && A2.PFAM.uses === 12 && A2.PSHUF.uses === 8 && ["PLASTIC", "PFAM", "PSHUF"].every((a) => Math.abs(A1[a].ratesOff) < 0.02 && Math.abs(A2[a].ratesOff) < 0.02));
+    ok("described, not registered: the rates the trainer found -- ONE: PLASTIC 0.51 to 1.48, PFAM 0.85 to 1.36, PSHUF 0.73 to 1.47; REV: PLASTIC 0.85 to 1.54, PFAM 0.59 to 1.50, PSHUF 0.31 to 1.26 (at 1 or more a fully taught connection is removed outright)",
+        within(range("ONE", "PLASTIC", (r) => r.rate), 0.51, 1.49) && within(range("ONE", "PFAM", (r) => r.rate), 0.84, 1.36) && within(range("ONE", "PSHUF", (r) => r.rate), 0.73, 1.48) && within(range("REV", "PLASTIC", (r) => r.rate), 0.85, 1.55) && within(range("REV", "PFAM", (r) => r.rate), 0.58, 1.51) && within(range("REV", "PSHUF", (r) => r.rate), 0.31, 1.26) && of("ONE", "FROZEN").every((r) => r.rate === 0));
+    const again = (t, a, s, zero) => { const w = PF.unpackWeights(rec(t, a, s).weights); return M.auditScore(zero ? M.ratesOff(a, s, w) : M.policyOf(a, s).setParams(w), t); };
+    ok("!! RE-AUDITED AFTER THE READING: ONE's PLASTIC draw 3 (the arm's least) gives its score and its score with the rate at 0 again on the 200 lives to the bit, REV's PSHUF draw 8 (the arm's most) its score, and the floors (the start and the hand rule on each task) theirs",
+        rec("ONE", "PLASTIC", 3).score === A1.PLASTIC.min && rec("REV", "PSHUF", 8).score === A2.PSHUF.max && again("ONE", "PLASTIC", 3) === rec("ONE", "PLASTIC", 3).score && again("ONE", "PLASTIC", 3, true) === rec("ONE", "PLASTIC", 3).ratesOff && again("REV", "PSHUF", 8) === rec("REV", "PSHUF", 8).score &&
+        J(M.floors()) === J(lines.find((r) => r.kind === "floors")));
+    const Hs = (T, a) => T.arms[a].history.map((h) => h.ret);
+    ok("WHAT THE TRAINER SAW (its own battery, the mean of 12): ONE -- PLASTIC 0.4361 at iteration 0 to 0.7753 at 59, PSHUF 0.1934 to 0.5750; REV -- PLASTIC 0.0274 to 0.2653, PSHUF 0.0549 to 0.0517 (it never found much)",
+        near(Hs(O, "PLASTIC")[0], 0.4361) && near(Hs(O, "PLASTIC")[6], 0.7753) && near(Hs(O, "PSHUF")[0], 0.1934) && near(Hs(O, "PSHUF")[6], 0.5750) && near(Hs(V, "PLASTIC")[0], 0.0274) && near(Hs(V, "PLASTIC")[6], 0.2653) && near(Hs(V, "PSHUF")[0], 0.0549) && near(Hs(V, "PSHUF")[6], 0.0517));
+    const both = (T) => T.filter(([p, f]) => p > 0.2 && f > 0.2).length, pur = (T) => { const v = T.filter(([p, f]) => p + f > 0).map(([p, f]) => Math.max(p, f) / (p + f)); return v.reduce((a, b) => a + b, 0) / v.length; };
+    const mixed = M.SEEDS.map((s) => both(M.teachFor("PSHUF", s))), purs = M.SEEDS.map((s) => pur(M.teachFor("PSHUF", s)));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- WHAT THE SHUFFLE BREAKS: 2 of the real map's 91 output neurons are taught more than a fifth by both families, against 39 to 45 in each of the 12 shuffles; between the two families the real map's dominant share averages 0.986, the shuffles' 0.785 to 0.815, and PFAM's is the real map's (the same shares, moved)",
+        both(M.teachFor("PLASTIC", 1)) === 2 && Math.min(...mixed) === 39 && Math.max(...mixed) === 45 && near(pur(M.teachFor("PLASTIC", 1)), 0.9856, 5e-5) && Math.min(...purs) > 0.784 && Math.max(...purs) < 0.816 && M.SEEDS.every((s) => near(pur(M.teachFor("PFAM", s)), pur(M.teachFor("PLASTIC", 1)), 1e-12)), `${mixed.join(" ")}`);
+    const note = src("brain/FLY_MUSHROOM_BODY_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 11. The result"));
+    ok("the expectations, written before the code, against what came: every one but REV's H -- ONE P BETTER (95), T1 BETTER (60), T2 CANNOT (80), H WORSE (50); REV P BETTER (90), T1 BETTER (90), T2 CANNOT (75), H came CANNOT (40; BETTER was 55); USES 12 of 12 for PLASTIC and PFAM and on ONE for PSHUF, at least 8 on REV, with 8",
+        /ONE: P \*\*BETTER about 95 percent\*\*; T1 BETTER about 60, CANNOT 40; T2 \*\*CANNOT about 80\*\*; H WORSE about 50, CANNOT 40\. REV: P \*\*BETTER about 90\*\*; T1 \*\*BETTER about 90\*\*; T2 \*\*CANNOT about 75\*\*; H BETTER about 55, CANNOT 40\./.test(flat) &&
+        O.P.word === M.WORDS.P[0] && O.T1.word === M.WORDS.T1[0] && O.T2.word === M.WORDS.T2[2] && O.H.word === M.WORDS.H[1] && V.P.word === M.WORDS.P[0] && V.T1.word === M.WORDS.T1[0] && V.T2.word === M.WORDS.T2[2] && V.H.word === M.WORDS.H[2] && A2.PSHUF.uses >= 8);
+    ok("the registration's RESULT SECTION (section 11) carries the eight readings' words, the commit the file was read at, the expectation that did not come, what section 6 said such a reading would say, the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 11\. The result/.test(note) && ["ONE", "REV"].every((t) => ["P", "T1", "T2", "H"].every((n) => res.includes(`**${t} ${n}: ${R.tasks[t][n].word}**`))) && /5f64c614/.test(res) && /REV's H did not/.test(res) && /the pure compartment map pays, and in this model what pays is the purity/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /2 of the real map's 91 output neurons/.test(res) && /39 to 45/.test(res) && /What it does not mean/.test(res) && /not how the animal does it/.test(res));
 });
 
 console.log(`\nflyMushroom-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

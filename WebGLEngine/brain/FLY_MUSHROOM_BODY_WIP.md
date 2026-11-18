@@ -95,3 +95,51 @@ one process, under 15 at four.
 ## 10. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyMushroom.mjs run` -> `brain/flyMushroomRound.jsonl`, committed byte for byte, whole, before it
 is read; `node tools/ship/takeFlyMushroom.mjs read` prints the checks and the reading.
+
+## 11. The result (the whole results file committed unread at 5f64c614, then read once)
+One start, 18.1 minutes on one process, 98 records (96 draws, ONE's PLASTIC draw 1 trained a second time, the floors;
+sha256 b4d8db8d81395987...). **The checks hold.** The start scores -0.0253 on ONE and 0.0080 on REV; the hand rule
+0.8943 and 0.2220.
+* **ONE P: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS DOES BETTER THAN THE SAME FLY WITHOUT THE TEACHING** (ranks
+  222, p 7.4e-7).
+* **ONE T1: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS DOES BETTER THAN ONE TAUGHT BY MIXED TEACHERS** (ranks 215,
+  p 3.3e-5).
+* **ONE T2: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS CANNOT BE TOLD APART FROM ONE WHOSE PURE TEACHERS ARE OTHER
+  NEURONS'** (ranks 141, p 0.63).
+* **ONE H: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS DOES WORSE THAN THE RULE SET BY HAND** (0 of 12 above
+  0.8943, p 0.00049).
+* **REV P: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS DOES BETTER THAN THE SAME FLY WITHOUT THE TEACHING** (ranks
+  222).
+* **REV T1: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS DOES BETTER THAN ONE TAUGHT BY MIXED TEACHERS** (ranks 222,
+  every PLASTIC fly above every PSHUF one, p 7.4e-7).
+* **REV T2: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS CANNOT BE TOLD APART FROM ONE WHOSE PURE TEACHERS ARE OTHER
+  NEURONS'** (ranks 163.5 with 1 tie, p 0.48).
+* **REV H: THE FLY TAUGHT BY ITS REAL DOPAMINE CONNECTIONS CANNOT BE TOLD APART FROM THE RULE SET BY HAND** (10 of 12
+  above 0.2220 and 2 below, p 0.039).
+
+| arm | ONE: mean (least, most) | REV: mean (least, most) | USES (ONE, REV) |
+|---|---|---|---|
+| FROZEN | -0.0157 | 0.0034 | -- |
+| PLASTIC (the real teachers) | 0.7757 (0.6480, 0.8320) | 0.2524 (0.1937, 0.3020) | 12, 12 |
+| PFAM (pure teachers, other neurons') | 0.7844 (0.6680, 0.8720) | 0.2390 (0.1520, 0.2953) | 12, 12 |
+| PSHUF (mixed teachers) | 0.6235 (0.4113, 0.7567) | 0.0396 (0.0027, 0.0733) | 12, 8 |
+
+**Every expectation came but one.** REV's H did not: it came CANNOT (given 40) where BETTER was given 55. So, as
+section 6 put it, **the pure compartment map pays, and in this model what pays is the purity**: each output neuron
+learning from one family lets punishment and reward move different neurons. Which neuron is taught by which pure
+teacher is not shown to matter (T2 CANNOT on both tasks). The purity pays on both tasks, and most when what was learned
+must be undone: on REV the mixed teachers left the fly almost nothing (0.0396 against 0.2524). With the rate at 0, every
+plastic arm's mean is within 0.02 of 0. All of a fly's score is what it learns in its life: the readout it learned
+offline does nothing by itself. The trained flies fall below the rule set by hand on ONE (0.7757 against 0.8943) and
+cannot be told from it on REV. That is the same pattern as in the compass rounds, and the trainer round asks why.
+
+Measured after the reading (not registered; the gate recomputes it): **what the shuffle breaks is the purity.** 2 of
+the real map's 91 output neurons are taught more than a fifth by both families, against 39 to 45 in each of the 12
+shuffles. Between the two families, the real map's dominant share averages 0.986 and the shuffles' 0.785 to 0.815.
+PFAM's is the real map's: the same shares, moved.
+
+**What it does not mean.** Section 8 holds. An odour here is a random 5 percent of the Kenyon cells, with no projection
+neurons, no APL and no Kenyon-cell-to-Kenyon-cell connections. A dopamine family fires whole on an outcome. A synapse
+count is taken as a strength. The readout is learned offline. A result says what this fly needs, not how the animal
+does it. CANNOT for T2 is not "the same": with random odours there was no reason for the pairing to matter, and 12
+draws cannot tell a small difference.
