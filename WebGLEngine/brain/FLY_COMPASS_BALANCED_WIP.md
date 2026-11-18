@@ -78,3 +78,48 @@ The short trainings took 7.4 to 8.9 minutes four at a time; at 60 iterations wit
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyCompassBalanced.mjs run` -> `brain/flyCompassBalancedRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyCompassBalanced.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at e8245294, then read once)
+The run started twice: the first start was lost to a container restart before it wrote a line, and the second wrote all 26
+records (24 draws, PSUM draw 1 trained a second time, the floors; sha256 24a6bb78dfd9a39d...). **The checks hold**: the
+compass round's file is the committed one and passes its own checks, PSUM draw 1 came out the same twice, and vision off
+(0.5041) and the start (0.4430) are the compass round's to the bit.
+* **A: A SHUFFLE GIVEN THE REAL WIRING'S SUMMED INPUTS DOES WORSE THAN A PLAIN SHUFFLE** -- ranks 78, the fewest there can
+  be: every PSUM fly below every PSHUF one, p 7.4e-7.
+* **B: THE REAL WIRING WITH ITS SUMMED INPUTS EVENED DOES BETTER THAN THE REAL WIRING** -- ranks 222, the most there can
+  be: every PEVEN fly above every PLASTIC one, p 7.4e-7.
+* **C: A SHUFFLE GIVEN THE REAL WIRING'S SUMMED INPUTS CANNOT BE TOLD APART FROM THE REAL WIRING** -- ranks 135, p 0.41.
+* **D: THE REAL WIRING WITH ITS SUMMED INPUTS EVENED CANNOT BE TOLD APART FROM A PLAIN SHUFFLE** -- ranks 125, p 0.16.
+* USES 12 of 12 in each new arm.
+
+| arm | mean | sd | least | most | a | c | with a and b at 0 |
+|---|---|---|---|---|---|---|---|
+| PSUM (random partners, the real sums) | 0.6434 | 0.0061 | 0.6331 | 0.6553 | 0.0165 | 1.62e-5 | 0.3645 |
+| PLASTIC (the compass round's) | 0.6464 | 0.0095 | 0.6275 | 0.6630 | 0.0160 | 1.63e-5 | 0.3688 |
+| PEVEN (the real partners, even sums) | 0.6719 | 0.0061 | 0.6642 | 0.6836 | 0.0115 | 2.10e-5 | 0.4963 |
+| PSHUF (the compass round's) | 0.6765 | 0.0075 | 0.6664 | 0.6908 | 0.0114 | 1.97e-5 | 0.4866 |
+
+**Every expectation came**: A WORSE and B BETTER (each about 85), C and D CANNOT (each about 55), USES 12 of 12 in both
+arms (about 85), PSUM's mean in 0.62 to 0.66 and PEVEN's in 0.65 to 0.70 (each about 65). So, as section 4 put it, **the
+real wiring's uneven summed inputs onto the compass neurons are a handicap in this model, shown from both sides**: given
+to random partners they cost, and taken from the real partners they pay. With the pull matched, the real partners can be
+told neither better nor worse than random ones: the pull is all of T1, as far as 12 draws can tell.
+
+Described, not registered: **the trained rates follow the sums, not the partners.** PSUM's a and c (means 0.0165 and
+1.62e-5) are PLASTIC's (0.0160 and 1.63e-5); PEVEN's (0.0115 and 2.10e-5) are near PSHUF's (0.0114 and 1.97e-5). With a and
+b at 0, PSUM falls to PLASTIC's level and PEVEN to PSHUF's. The recovery rate went to 0 in all 24, as it did in all 24
+plastic flies of the compass round. Within each arm, the further the trainer took c the lower the score (Spearman -0.40 in
+PSUM, -0.72 in PEVEN; PLASTIC's was -0.90): the trainer's overshoot shows here too. It is the next round's question.
+
+Measured after the reading (not registered; the gate recomputes it): **every PEVEN fly is above every PSUM fly** (the
+least PEVEN fly 0.6642, the most PSUM fly 0.6553). Of the compass round's gap of PSHUF over PLASTIC (0.0301), evening the
+real wiring's sums closes 0.0255 of it (85 percent), and giving the real sums to random partners opens 0.0332 (110 percent).
+All 12 PSUM wirings carry the real wiring's pull (536.31) to within 1e-9; PEVEN's pull is under 1e-9. Whether PEVEN's
+shortfall of 0.0046 under PSHUF (D, p 0.16) is the real partners or noise is not tested; 12 draws cannot tell a difference
+of a few thousandths.
+
+**What it does not mean.** Section 6 holds: the bump here is an angle, not the compass neurons' own ring attractor (with the
+P-EN and Delta7 neurons the animal has, which may hold the bump against such a pull); the ring neurons' receptive fields are
+drawn; a synapse count is taken as a strength. The uneven inputs cost **this** fly, not that they cost the animal. CANNOT
+is not "the same": C and D say only that no difference was found at this size. And the uneven sums may be real anatomy
+for a reason this task does not ask about: a heading the fly prefers, or an input this model leaves out.

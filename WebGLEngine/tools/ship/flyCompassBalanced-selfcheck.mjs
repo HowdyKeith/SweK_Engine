@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyCompassBalanced-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyCompassBalanced-selfcheck.mjs      (under a minute; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
+// Run: node tools/ship/flyCompassBalanced-selfcheck.mjs      (about a minute; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
 //
 // THE GATE OF THE BALANCED COMPASS ROUND (registered in brain/FLY_COMPASS_BALANCED_WIP.md before tools/ship/flyCompassBalanced.mjs and tools/ship/takeFlyCompassBalanced.mjs existed):
 // is the real wiring's handicap in the compass round its uneven summed inputs onto the compass neurons?
@@ -9,6 +9,8 @@
 //   3  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its scores again
 //   4  THE RECORDS              24 draws; the compass round's file; A, B, C, D; USES
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at e8245294, read from the file: the checks, A, B, C, D, the arms, USES, the rates, re-audits, the trainer, the
+//                               measurement after the reading (how much of the compass round's gap each arm accounts for, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 22, this gate and tools/ship/voxelHome-selfcheck.mjs
 // (which probes the command as a process) for the command's 4; every one red by name, NONE 0 red (the number is the rows red):
 //   THE WIRINGS: W1 PSUM over all 282 ring neurons 5 | W2 the fit leaves the outputs 2 | W3 300 sweeps 1 | W4 PSUM on PSHUF's seeds 4 | W5 PEVEN evens to 1, not the mean 1 | W6 PEVEN is the real
@@ -19,6 +21,12 @@
 //   THE COMMAND: C1 the second training is of draw 2 1 | C2 exits 0 on a word it does not know 1 | C3 reads the compass round's library 1 | C4 reads without the compass round's file 1.  THE NOTE: N1 its
 //   draws are 13 to 24 1 | N2 its seed is 9100 1 | N3 its B is against PSHUF 1 | N4 its fit is 300 sweeps 1
 //   ONE FINDING BEFORE THE SABOTAGES, OF MINE: the library's `uses` was the compass round's, so its own USES_BY was a number nothing read and F2 could not have reached a reading; it now reads its own.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in its last digit 2 | V2 B against PSHUF 4 | V3 USES needs 0.3 5 |
+//   V4 the rank sums' BETTER and WORSE swapped 5 | V5 the note's A says BETTER 1 | V6 the note's expectation of C is WORSE 1 | V7 the note names another commit 1 | V8 the note drops 'as far as 12
+//   draws can tell' 1 | V9 the note drops what it does not mean 1 | V10 rates at 0 keeps the depression rate 2 | V11 the note's 85 percent is 75 1 | V12 PEVEN evens to 1, not the mean 3 (the
+//   third the verdict section throwing on a reading that was not weighed) | V13 the floors' start one digit off 1. None went 0 red. V13 WAS A FINDING ABOUT THE SABOTAGE, NOT THE GATE: its
+//   last digit (0.44295126588010525 to ...26) parses to the same double, so only the file's hash saw it and the checks row was never reached; V13b, the start changed in a digit the double
+//   holds (...10625), went 3 red, the checks row among them.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -132,6 +140,54 @@ section(() => {
     const me = src("tools/ship/flyCompassBalanced-selfcheck.mjs"), calls = [...me.matchAll(/B\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations with 4 flies tried on draw 901; it starts no process; the file's size and time are what they were",
         calls.length === 1 && /^"PSUM", 901, TINY, TINY_AUDIT$/.test(calls[0]) && TINY.iters === 2 && TINY.pop === 4 && !B.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} training, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at e8245294 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, B.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), compass = B.compassOf(fs.readFileSync(path.join(ENG, B.COMPASS)));
+    const R = B.reading(lines, compass), A = R.arms, F = R.floors, cfl = compass.lines.find((r) => r.kind === "floors");
+    const all = [...lines.filter((r) => r.kind === "draw"), ...compass.lines.filter((r) => r.kind === "draw" && (r.arm === "PLASTIC" || r.arm === "PSHUF"))];
+    const of = (a) => all.filter((r) => r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), rec = (a, s) => lines.find((r) => r.kind === "draw" && r.arm === a && r.s === s), lost = (a) => of(a).map((r) => r.score - r.ratesOff);
+    const rank = (v) => { const o = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]), r = new Array(v.length); o.forEach(([, i], k) => (r[i] = k + 1)); return r; };
+    const spear = (x, y) => { const a = rank(x), b = rank(y), n = x.length; return 1 - 6 * a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0) / (n * (n * n - 1)); };
+    const range = (a, f) => [Math.min(...of(a).map(f)), Math.max(...of(a).map(f))], within = ([lo, hi], L, H) => lo > L && hi < H;
+    ok("!! the results file is the one the run wrote: 26 records, sha256 24a6bb78dfd9a39d... (two starts: the first was lost to a container restart before it wrote a line, the second wrote all 26)",
+        lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "24a6bb78dfd9a39dd5db6189cd9f87d7434a043611ac05bf3782beed8eab4dd4");
+    ok("!! THE CHECKS HOLD: the compass round's file as committed and passing its own checks; 24 draws each once; PSUM draw 1 the same twice; vision off 0.5041 and the start 0.4430 the compass round's to the bit; untrained PSUM (draw 1) 0.4357, PEVEN 0.5019",
+        R.checks.length === 0 && lines.filter((r) => r.kind === "draw").length === 24 && F.off === cfl.off && F.start === cfl.start && near(F.off, 0.5041) && near(F.start, 0.4430) && near(F.untrained.PSUM, 0.4357) && near(F.untrained.PEVEN, 0.5019) &&
+        lines.find((r) => r.kind === "recheck").weightsHash === rec("PSUM", 1).weightsHash);
+    ok("!! *** A: A SHUFFLE GIVEN THE REAL WIRING'S SUMMED INPUTS DOES WORSE THAN A PLAIN SHUFFLE *** -- ranks 78, the fewest there can be (every PSUM fly below every PSHUF one), p 7.4e-7",
+        R.A.word === B.WORDS.A[1] && R.A.a === "PSUM" && R.A.b === "PSHUF" && R.A.sumA === 78 && R.A.ties === 0 && near(R.A.p, 2 / 2704156, 1e-12) && Math.max(...sc("PSUM")) < Math.min(...sc("PSHUF")));
+    ok("!! *** B: THE REAL WIRING WITH ITS SUMMED INPUTS EVENED DOES BETTER THAN THE REAL WIRING *** -- ranks 222, the most there can be (every PEVEN fly above every PLASTIC one), p 7.4e-7",
+        R.B.word === B.WORDS.B[0] && R.B.a === "PEVEN" && R.B.b === "PLASTIC" && R.B.sumA === 222 && R.B.ties === 0 && near(R.B.p, 2 / 2704156, 1e-12) && Math.min(...sc("PEVEN")) > Math.max(...sc("PLASTIC")));
+    ok("!! C: PSUM CANNOT BE TOLD APART FROM THE REAL WIRING -- ranks 135, p 0.41. D: PEVEN CANNOT BE TOLD APART FROM A PLAIN SHUFFLE -- ranks 125, p 0.16. With the pull matched, the partners are told neither better nor worse",
+        R.C.word === B.WORDS.C[2] && R.C.a === "PSUM" && R.C.b === "PLASTIC" && R.C.sumA === 135 && R.C.ties === 0 && near(R.C.p, 0.4095, 5e-5) && R.D.word === B.WORDS.D[2] && R.D.a === "PEVEN" && R.D.b === "PSHUF" && R.D.sumA === 125 && R.D.ties === 0 && near(R.D.p, 0.1600, 5e-5));
+    ok("!! the arms (mean, sd, least, most; with a and b at 0): PSUM 0.6434 0.0061 0.6331 0.6553, 0.3645 | PEVEN 0.6719 0.0061 0.6642 0.6836, 0.4963 | PLASTIC 0.6464 and PSHUF 0.6765 as the compass round committed them",
+        near(A.PSUM.mean, 0.6434) && near(A.PSUM.sd, 0.0061) && near(A.PSUM.min, 0.6331) && near(A.PSUM.max, 0.6553) && near(A.PSUM.ratesOff, 0.3645) && near(A.PEVEN.mean, 0.6719) && near(A.PEVEN.sd, 0.0061) && near(A.PEVEN.min, 0.6642) && near(A.PEVEN.max, 0.6836) && near(A.PEVEN.ratesOff, 0.4963) &&
+        near(A.PLASTIC.mean, 0.6464) && near(A.PSHUF.mean, 0.6765) && A.PSUM.n === 12 && A.PEVEN.n === 12);
+    ok("!! USES 12 OF 12 IN EACH NEW ARM: with a and b at 0 PSUM loses 0.236 to 0.303 and PEVEN 0.168 to 0.186 (PLASTIC 0.259 to 0.286, PSHUF 0.170 to 0.210); THE RECOVERY RATE WENT TO 0 IN ALL 24",
+        A.PSUM.uses === 12 && A.PEVEN.uses === 12 && within([Math.min(...lost("PSUM")), Math.max(...lost("PSUM"))], 0.235, 0.304) && within([Math.min(...lost("PEVEN")), Math.max(...lost("PEVEN"))], 0.168, 0.187) && [...of("PSUM"), ...of("PEVEN")].every((r) => r.rates.b === 0));
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED -- THE TRAINED RATES FOLLOW THE SUMS, NOT THE PARTNERS: PSUM a 0.0138 to 0.0193, c 1.22 to 1.78e-5, means 0.0165 and 1.62e-5 (PLASTIC's 0.0160, 1.63e-5); PEVEN a 0.0101 to 0.0135, c 1.92 to 2.27e-5, means 0.0115 and 2.10e-5 (PSHUF's 0.0114, 1.97e-5); the further on c the lower the score, Spearman -0.40 in PSUM and -0.72 in PEVEN",
+        within(range("PSUM", (r) => r.rates.a), 0.0137, 0.0193) && within(range("PSUM", (r) => r.rates.c), 1.22e-5, 1.78e-5) && within(range("PEVEN", (r) => r.rates.a), 0.0101, 0.0135) && within(range("PEVEN", (r) => r.rates.c), 1.92e-5, 2.27e-5) &&
+        near(A.PSUM.a, 0.0165) && near(A.PSUM.c, 1.62e-5, 5e-8) && near(A.PEVEN.a, 0.0115) && near(A.PEVEN.c, 2.10e-5, 5e-8) && near(A.PLASTIC.a, 0.0160) && near(A.PSHUF.a, 0.0114) &&
+        near(spear(of("PSUM").map((r) => r.rates.c), sc("PSUM")), -0.399, 5e-4) && near(spear(of("PEVEN").map((r) => r.rates.c), sc("PEVEN")), -0.720, 5e-4));
+    const again = (a, s, zero) => { const r = rec(a, s), w = PF.unpackWeights(r.weights); return V.auditScore(zero ? B.ratesOff(a, s, w) : B.policyOf(a, s).setParams(w)); };
+    ok("!! RE-AUDITED AFTER THE READING: PSUM draw 2 (the arm's least) gives its score and its score with a and b at 0 again on the 200 lives to the bit, and PEVEN draw 5 (the arm's most) its score",
+        rec("PSUM", 2).score === A.PSUM.min && rec("PEVEN", 5).score === A.PEVEN.max && again("PSUM", 2) === rec("PSUM", 2).score && again("PSUM", 2, true) === rec("PSUM", 2).ratesOff && again("PEVEN", 5) === rec("PEVEN", 5).score);
+    const H = (a) => A[a].history.map((h) => h.ret);
+    ok("WHAT THE TRAINER SAW (its own battery, the mean of 12): PSUM 0.5852 at iteration 0 to 0.6472 at 59; PEVEN 0.6138 to 0.6867 (PLASTIC 0.5906 to 0.6513, PSHUF 0.6084 to 0.6740)",
+        J(A.PSUM.history.map((h) => h.it)) === J([0, 10, 20, 30, 40, 50, 59]) && near(H("PSUM")[0], 0.5852) && near(H("PSUM")[6], 0.6472) && near(H("PEVEN")[0], 0.6138) && near(H("PEVEN")[6], 0.6867) && near(H("PLASTIC")[6], 0.6513) && near(H("PSHUF")[6], 0.6740));
+    const real = pull(CF.REAL), psums = B.SEEDS.map((s) => pull(B.edgesOf("PSUM", s))), m = (a) => A[a].mean, gap = m("PSHUF") - m("PLASTIC");
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- HOW MUCH OF THE COMPASS ROUND'S GAP: every PEVEN fly above every PSUM fly (least 0.6642, most 0.6553); of PSHUF over PLASTIC's 0.0301, evening the real sums closes 0.0255 (85 percent) and the real sums on random partners open 0.0332 (110 percent); all 12 PSUM wirings carry the real pull (536.31) to 1e-9, PEVEN's is under 1e-9",
+        Math.min(...sc("PEVEN")) > Math.max(...sc("PSUM")) && near(gap, 0.0301) && near(m("PEVEN") - m("PLASTIC"), 0.0255) && near((m("PEVEN") - m("PLASTIC")) / gap, 0.847, 5e-4) && near(m("PSHUF") - m("PSUM"), 0.0332) && near((m("PSHUF") - m("PSUM")) / gap, 1.101, 5e-4) &&
+        near(real, 536.31, 0.005) && psums.every((p) => Math.abs(p - real) < 1e-9) && pull(B.edgesOf("PEVEN", 1)) < 1e-9);
+    const note = src("brain/FLY_COMPASS_BALANCED_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 9. The result"));
+    ok("the expectations, written before the code, against what came -- every one: A WORSE (85), B BETTER (85), C CANNOT (55), D CANNOT (55), USES 12 of 12 in each new arm (85), PSUM's mean between 0.62 and 0.66 (65) at 0.6434, PEVEN's between 0.65 and 0.70 (65) at 0.6719",
+        /A: \*\*WORSE about 85 percent\.\*\* B: \*\*BETTER about 85\.\*\* C: CANNOT about 55, WORSE about 35\. D: CANNOT about 55, WORSE about 35\. USES 12 of 12 in each new arm, about 85\. PSUM's mean between 0\.62 and 0\.66, about 65; PEVEN's between 0\.65 and 0\.70, about 65/.test(flat) &&
+        R.A.word === B.WORDS.A[1] && R.B.word === B.WORDS.B[0] && R.C.word === B.WORDS.C[2] && R.D.word === B.WORDS.D[2] && A.PSUM.uses === 12 && A.PEVEN.uses === 12 && m("PSUM") >= 0.62 && m("PSUM") <= 0.66 && m("PEVEN") >= 0.65 && m("PEVEN") <= 0.70);
+    ok("the registration's RESULT SECTION (section 9) carries the four readings' words, the commit the file was read at, that every expectation came, what section 4 said such a reading would say, the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 9\. The result/.test(note) && ["A", "B", "C", "D"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /e8245294/.test(res) && /Every expectation came/.test(res) && /the pull is all of T1, as far as 12 draws can tell/.test(res) && /recovery rate went to 0 in all 24/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /closes 0\.0255 of it \(85 percent\)/.test(res) && /opens 0\.0332 \(110 percent\)/.test(res) && /least PEVEN fly 0\.6642, the most PSUM fly 0\.6553/.test(res) && /What it does not mean/.test(res) && /not that they cost the animal/.test(res));
 });
 
 console.log(`\nflyCompassBalanced-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
