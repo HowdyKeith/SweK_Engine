@@ -137,3 +137,5 @@ The same rule gives a second reading for k = 4: **FOUR TICKS COST NOTHING THAT M
 **Its gate.** In a harness that awaits every read, the type's controls equal `delayed(1)`'s to 1e-4 over a flight. A device that cannot be had leaves the CPU type in place, and the page says so. How late each sub is is exposed, so the page can show it.
 
 The page gets a switch to fly the fly-circuit subs on the GPU, OFF by default, and the CPU type stays the default. **Whether it is worth turning on is PART A's answer, and the rig's timing.**
+
+**SMOKE DISCLOSURE TO PART A (2026-11-18, while building, BEFORE THE REGISTERED READ).** Smoke-testing the study, I flew the FIRST 6 of the 500 registered dives (`auditSets(90000).safety`, seeds 90000 to 90005, nominal) in all four arms, and so SAW their means: -0.4033, -0.4030, -0.4028 and -0.4024 for k = 0, 1, 2 and 4. It should have been flown on a sanity set. Nothing was chosen on them: the arms, the bars and the readings were fixed above before, and are unchanged. The registered read flies all 500 once, those 6 included.
