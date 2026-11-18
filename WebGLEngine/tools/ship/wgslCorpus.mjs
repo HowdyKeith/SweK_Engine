@@ -1037,6 +1037,8 @@ export const EXCLUDED = Object.freeze([
     // and the pass itself is graded end to end by tools/ship/gpuDriven-selfcheck.mjs on the browser harness.
     Object.freeze({ id: "gpuDriven.cullLodWgsl", kind: "lives on its own gate",
                     why: "four bindings (uniform, instances, indirect commands, records) and an atomicAdd -- outside the one-buffer harness signature; graded by gpuDriven-selfcheck through gfx/device.js" }),
+    Object.freeze({ id: "reservoirPilotGpu.READOUT_WGSL", kind: "lives on its own gate",
+                    why: "v4926: the fly pilot's readout and the autopilot's laws on the device -- six bindings (controls, counts, the reservoir's activity, the features, the law and readout tables, the output cells), outside the one-buffer harness signature; graded against the CPU pilot to 1e-4 by brain/reservoirPilotGpu-selfcheck" }),
     Object.freeze({ id: "gpuHaul.haulWgsl", kind: "lives on its own gate",
                     why: "reads a flights buffer and writes a records buffer -- two storage bindings; graded against the economy's own positions by gpuUniverse-selfcheck" }),
     Object.freeze({ id: "conv2d.conv2dSubWgsl", kind: "lives on its own gate",
