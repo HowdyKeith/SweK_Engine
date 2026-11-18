@@ -33,6 +33,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import * as H from "../tools/ship/headlessGpu.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 import * as GP from "./reservoirPilotGpu.mjs";
 import * as CS from "./pilotSubCircuitState.mjs";
 import * as P from "./pilotSubPolicy.mjs";
@@ -45,6 +46,8 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
+// v4926: the price table as a report (tools/ship/gateReport.mjs), so the numbers outlive the terminal; an empty table when no device ran
+const REPORT = gateReport("brain/reservoirPilotGpu-selfcheck.mjs"), PRICE = [];
 const thr = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
 const rd = (f) => JSON.parse(fs.readFileSync(new URL("../" + f, import.meta.url), "utf8"));
 const cj = rd("vendor/hemibrain/hemibrain-cx-heading-loop.json"), C = { neurons: cj.neurons, edges: cj.edges, io: cj.io }, file = rd("brain/pilotSubFlyCxWip.json");
@@ -200,6 +203,7 @@ if (device) {
             g.step(xs); await g.controls();
             let t0 = performance.now(); for (let k = 0; k < ticks; k++) { g.step(xs); await g.controls(); } const dev = (performance.now() - t0) / ticks; g.destroy();
             const hs = xs.map(() => new Float64Array(POL.HIDDEN)); t0 = performance.now(); for (let k = 0; k < ticks; k++) xs.forEach((x, b) => { hs[b] = POL.step(W, x, hs[b]).h; }); const cpu = (performance.now() - t0) / ticks;
+            PRICE.push([batch, Number(dev.toFixed(3)), Number(cpu.toFixed(3)), software ? "software" : "hardware"]);
             lines.push(`batch ${batch}: device ${dev.toFixed(3)} ms a tick (step, readout and the controls read back), CPU pilot ${cpu.toFixed(3)} ms`);
         }
         for (const l of lines) console.log("  " + l + (software ? "   [software adapter]" : ""));
@@ -213,5 +217,8 @@ sec("9. SOURCE");
 }
 
 if (skipped) console.log(`\nSKIPPED sections 1 to 8 (no device): ${skipped}`);
+if (PRICE.length) REPORT.table("the price: ms a tick on the device (step, readout, controls read back) against the CPU pilot, by batch", ["batch", "device ms", "CPU ms", "adapter"], PRICE, "printed, not asserted; a software adapter says nothing about a graphics card");
+else REPORT.skip("the price table", skipped ? "no WebGPU device here: " + skipped : "section 8 did not run");
+REPORT.write();
 console.log(`\n${fails ? "FAIL" : skipped ? "PASS (DEVICE SECTIONS SKIPPED)" : "PASS"}  reservoirPilotGpu-selfcheck: ${fails} failing row${fails === 1 ? "" : "s"}`);
 H.exitCleanly(fails ? 1 : 0);

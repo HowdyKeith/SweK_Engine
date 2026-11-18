@@ -1,0 +1,44 @@
+{
+ "gate": "brain/reservoirPilotGpu-selfcheck.mjs",
+ "at": "2026-11-18",
+ "tables": [
+  {
+   "title": "the price: ms a tick on the device (step, readout, controls read back) against the CPU pilot, by batch",
+   "columns": [
+    "batch",
+    "device ms",
+    "CPU ms",
+    "adapter"
+   ],
+   "rows": [
+    [
+     1,
+     0.267,
+     0.027,
+     "software"
+    ],
+    [
+     16,
+     1.453,
+     0.455,
+     "software"
+    ],
+    [
+     128,
+     13.821,
+     3.411,
+     "software"
+    ],
+    [
+     1024,
+     94.143,
+     25.087,
+     "software"
+    ]
+   ],
+   "note": "printed, not asserted; a software adapter says nothing about a graphics card"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
