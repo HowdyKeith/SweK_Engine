@@ -12,6 +12,7 @@
 //   4  THE DRAWING IS THE STATE each hull is where its craft is, turned as it is turned; a barrel runs from its seat's mount along where the seat points; a ring stands at a seat a NETWORK works and at no other; a destroyed ship is drawn dark; one object a craft
 //   5  THE PANELS            thirteen seat rows a ship, `network` where a network works the seat and `rule` where none does, the hit points and the networks seated the fight's own
 //   7  A PEER'S BRAIN FILES   given to a side the way the file button gives them: they take the seats and the escorts they have a brain for, the fight is the core's own for the same files, each file's fate is listed under the controls, and `clear` forgets them
+//   8  A PRESET             a side's `best ship` button sets its seats, helm and cannon to the core's preset (the sights stay as chosen), leaves the other side alone, and builds the core's own fight
 //   6  A FIGHT THAT CANNOT BE BUILT is said: with a brain file taken away, choosing the hand that needs it names the file and builds nothing
 //
 // SABOTAGE LOG: (18 mutants, each written into space-duel.html itself, the gate run in the browser, the page restored byte for byte; the number is how many rows went red):
@@ -20,6 +21,7 @@
 //   (G11, the verdict without the fingerprint, was written and did NOT APPLY -- its text did not match the page's -- so it is not counted and that clause of section 2 is unsabotaged.)
 //   AND FIVE ON THE PEER FILES (section 7), all red: H1 the choice does not carry the peer files 2 | H2 clear does not forget 1 | H3 side A's peer lines are not shown 1 | H4 a side's files go to the other side 2 | H5 the lines are dropped 1
 //   AND TWO ON THE MAGAZINES CONTROL, both red: J1 the magazines control is not read 5 | J2 the panel does not say rounds left 1
+// AND FIVE ON THE PRESET BUTTON (section 8, 2026-11-18), all red: K1 side B's button sets side A 1 | K2 the button resets the sights 1 | K3 the fight is not built again 1 | K4 the button has no title 1 | K5 the cannon box is not set 1
 // LATER (2026-11-17), FOUND BY LOOKING AT A PICTURE OF A FLEET: a new fight was framed on the two flagships only, so a fleet's other ships fell outside the view; the framing now fits every capital ship and a row checks it (sabotage: the old framing put back exactly -- red by that row; over 36 fleets it left ships outside the view in 16, the new framing in none). None went 0 red. WHAT THE FIRST RUNS OF THIS GATE FOUND, before any sabotage: the page did not load at all (OrbitControls imports "three" and the page had no import map); two of three fights were not node's (Math.log, above); and the first camera this page shipped with showed an empty sky, both ships just
 // outside the frame -- found by LOOKING at the picture SWEK_DUEL_SHOT writes, which no row reads. NOT CHECKED: that anything is in the frame (no row looks at pixels), the orbit controls, the layout at a phone's width, the cannon's beam, the page on a real GPU, and the FILE BUTTON itself (section 7 hands the files to the function the button's handler calls; no file dialog is opened).
 "use strict";
@@ -93,6 +95,10 @@ else {
             const C3 = await import("/render/spaceDuelCore.mjs"), fe = C3.createFight({ ...args.SETUPS[2], escorts: 2, a: { ...args.SETUPS[2].a, peer: args.PEER } }, U.files); while (!fe.done) fe.step(100); while (!fp.done) fp.step(100);
             out.peer.same = fp.snapshot().fingerprint === fe.snapshot().fingerprint;
             $("peerClearA").click(); out.peerCleared = { names: U.peersOf("A"), seated: U.fight.snapshot().brains.seated, notes: $("notes").textContent, count: $("peerCountA").textContent };
+            // a preset: side B's best-ship button, over a side chosen otherwise
+            apply(args.SETUPS[0]); $("newBtn").click(); $("gunnersB").value = "green"; $("handB").value = "gpu"; $("helmB").value = "broadside"; $("cannonB").checked = false; const pre = U.fight; $("bestB").click(); const fb = U.fight;
+            out.preset = { b: U.setupNow().b, a: U.setupNow().a, rebuilt: fb !== pre && fb !== null, title: $("bestB").title, hasA: !!$("bestA"), titleA: $("bestA").title, notes: $("notes").textContent };
+            const fx = C3.createFight(U.setupNow(), U.files); while (!fx.done) fx.step(100); while (!fb.done) fb.step(100); out.preset.same = fx.snapshot().fingerprint === fb.snapshot().fingerprint && fb.snapshot().brains.seated[1] === 1;
             return out;
         }`,
     });
@@ -127,6 +133,9 @@ else {
         ok("!! four files given to side A (a gunner, a broken file, a pilot, a copy of the gunner) over a side whose seats were the hand gunner's: the gunner's brain is in all thirteen seats (the snapshot, the rings and the panel agree), the pilot's flies the two escorts -- 15 networks seated where there were none -- and the fight is the core's own for the same files", r.peer.names.join() === "rig-gunner.json,broken.json,mac-pilot.json,copy.json" && r.peer.seated[0] === 15 && r.peer.nets === 13 && r.peer.rings === 13 && r.peer.netCells === 13 && r.peer.same && r.peer.setup.peer.length === 4 && r.peer.setup.hand === "rule", `seated ${r.peer.seated}`);
         ok("!! each file's fate is under the controls: SEATED with what it works for the gunner and the pilot, REFUSED with the reason for the broken file (not JSON) and the copy (a duplicate, naming the first); the count beside the button says four files", /SEATED\s+rig-gunner\.json: seatGunnerMlp, seat -- 13 seats/.test(r.peer.notes) && /SEATED\s+mac-pilot\.json: pilot6dofPolicy, pilot/.test(r.peer.notes) && /REFUSED\s+broken\.json: not JSON/.test(r.peer.notes) && /REFUSED\s+copy\.json: the same weights as rig-gunner\.json/.test(r.peer.notes) && r.peer.count === "4 files");
         ok("`clear` forgets them: no file, no line, no count, and the side is the hand gunner's again (no network seated)", r.peerCleared.names.length === 0 && r.peerCleared.seated[0] === 0 && !/SEATED|REFUSED/.test(r.peerCleared.notes) && r.peerCleared.count === "");
+        console.log("8. A PRESET");
+        { const P = r.preset, best = C.presetOf("best"), H = (id) => C.HELMS.find((h) => h.id === id);
+          ok("!! side B's `best ship` button over a side chosen otherwise (the GPU Brain's gunner, the broadside rule, no cannon, green sights): its gun seats, helm and cannon become the preset's, ITS SIGHTS STAY GREEN, side A is untouched, the fight is built again and is the core's own fight for what the controls now say, with ONE brain seated on side B, the helm (no gun network); both sides have the button, its title the preset's note, and the notes say the new helm", P.b.hand === "rule" && P.b.helm === "flywired" && P.b.cannon === true && P.b.gunners === "green" && JSON.stringify(P.a) === JSON.stringify(SETUPS[0].a) && P.rebuilt && P.same && P.hasA && P.title === best.note && P.titleA === best.note && P.notes.includes(H("flywired").note), JSON.stringify(P.b)); }
     }
 }
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

@@ -62,6 +62,13 @@ export const HELMS = Object.freeze([
     Object.freeze({ id: "compass", label: "trained helm over the fly's steering circuit with its inputs (corrects the bow-on rule)", rule: "face", file: "helm-compass", note: "220 neurons, the compass and the goal cells with the steering cells; what was trained is three weights and no synapse: it throttles back and damps the spin about one axis. On 600 pairs it leads the bow-on rule by 0.47 and cannot be told from the first trained helm; the fly's wiring took no part" }),
     Object.freeze({ id: "flywired", label: "the fly's steering circuit, wired as the fly wires it (corrects the bow-on rule)", rule: "face", file: "helm-flywired", note: "the ship's heading goes into the fly's compass cells and the enemy's bearing into its goal cells; the connectome's own weights do the rest and NOTHING inside is learned (two gains outside it are). it asks whether its ship has a cannon: WITH ONE it leads the bow-on rule by about 1.0 on 600 pairs (three times over), six shuffles of its connections lead by 0.3 or less, and an ideal comparator does no better; WITHOUT ONE it turns a little the other way and leads by 0.15 (at the gain it has with a cannon it trailed by 0.69); in fleets of three with the cannon it leads by 1.2, and against eight trained-pilot fighters by 0.08" }),
 ]);
+/** LOADOUTS a page offers in one click: a hand, a helm and the cannon (the sights stay as chosen: they are the crew, not the ship). `best`: Keith, 2026-11-18, "a best ship loadout preset: the cannon-aware fly-wired helm plus the hand gunner".
+ *  Why these two: the helm's own studies flew it with exactly these seats (tools/ship/takeFlyWiredHelmFix.mjs: it leads the bow-on rule by about 1.0 with the cannon and +0.146 without), and no fly-wired gunner has beaten the hand gunner in a fleet with the cannon or against fighters (tools/ship/takeFlyWiredGunnerShips.mjs). */
+export const PRESETS = Object.freeze([
+    Object.freeze({ id: "best", label: "best ship", choice: Object.freeze({ hand: "rule", helm: "flywired", cannon: true }), note: "the cannon-aware fly-wired helm with the hand gunner in the seats, the cannon on: the helm's studies flew it with these seats and it led the bow-on rule (about 1.0 with the cannon, +0.15 without). NOT a loadout searched for: the car's always-firing gunner (car-big) has led the hand gunner in a seat, and it was not tried with this helm" }),
+]);
+/** A preset by id, or a refusal by name. */
+export function presetOf(id) { const p = PRESETS.find((q) => q.id === id); if (!p) throw new Error(`spaceDuelCore.presetOf: no preset "${id}" (${PRESETS.map((q) => q.id).join(", ")})`); return p; }
 /** The rations of the magazines a page offers (battleshipDuel's `ammo`): the whole magazines, and what tools/ship/takeAmmoStudy.mjs flew. */
 export const RATIONS = Object.freeze([1, 0.5, 0.25, 0.125, 0.0625]);
 export const GUNNERS = Object.freeze(Object.keys(BF.GUNNERS)), KINDS = D.KINDS, MAX_SHIPS = D.MAX_SHIPS, MAX_ESCORTS = D.MAX_ESCORTS;
@@ -128,5 +135,5 @@ export function createFight(setup = {}, files = {}) {
 
 export function reportLines() {
     return ["[spaceDuelCore] what space-duel.html knows without a page: the hands and helms a side can be given, the side they make, and a ship-against-ship fight stepped and read a frame at a time",
-        `  ${HANDS.length} hands (${HANDS.map((h) => h.id).join(", ")}), ${HELMS.length} helms (${HELMS.map((h) => h.id).join(", ")}), ${Object.keys(FILES).length} brain files the page loads; a fight stepped to its end is battleshipDuel.duel() of the same choices`];
+        `  ${HANDS.length} hands (${HANDS.map((h) => h.id).join(", ")}), ${HELMS.length} helms (${HELMS.map((h) => h.id).join(", ")}), ${Object.keys(FILES).length} brain files the page loads, ${PRESETS.length} preset${PRESETS.length === 1 ? "" : "s"} (${PRESETS.map((p) => p.id).join(", ")}); a fight stepped to its end is battleshipDuel.duel() of the same choices`];
 }
