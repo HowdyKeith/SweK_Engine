@@ -534,7 +534,7 @@ export const TODO = [
         status: "open", size: "large", order: 30,
         title: "More of the tracking circuit: elevation (the sheet's other axis) and a target's motion",
         why: "brain/flyTracking.mjs uses one axis of the LC10a cells' dendritic sheet (ACROSS) for both of a gun's axes and drives a cell by where a target IS. The sheet's other axis (ALONG, already baked in brain/lc10Places.mjs) is unused, and a real LC10a cell answers a small MOVING object: nothing in the model moves.",
-        note: "New modelling with new hand-set choices (which sheet axis is elevation, a motion term): after the rig has settled the places question, and registered before any fight as the others were.",
+        note: "New modelling with new hand-set choices (which sheet axis is elevation, a motion term): after the rig has settled the places question, and registered before any fight as the others were. 2026-11-18, THE MOTION TERM BUILT AND TRIED ON SCRATCH PAIRS (brain/flyTracking.mjs `moving`, seatFlyWired5: the cells driven at the bearing plus tau times its rate): no tau beat 0 against fighters and tau 0.15 trailed in fleets (about -0.25, z -2.5), so no study was registered; see the module header. Still open: a slip from the target's own velocity, and elevation on the sheet's other axis.",
         evidence: "node -e 'const s=require(\"fs\").readFileSync(\"brain/flyTracking.mjs\",\"utf8\");console.log(\"the tracking module uses the sheet\\u0027s other axis:\",/PL\\.ALONG/.test(s))'   # false today",
     },
     {
