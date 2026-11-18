@@ -3047,8 +3047,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-match-consumes-layer",
-        state: "PARKED",
-        what: "PARKED 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): the arena approach has nothing to route around -- no space scene has static obstacles -- so a field-and-aim-point layer could only reproduce a straight line; a round would need an invented rock field and edits to two heavily gated files. Reopen once a space scene has obstacles of its own. WAS: brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",
+        blocker: "UPSTREAM",
+        what: "PARKED (UPSTREAM: it waits on a space scene with obstacles) 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): the arena approach has nothing to route around -- no space scene has static obstacles -- so a field-and-aim-point layer could only reproduce a straight line; a round would need an invented rock field and edits to two heavily gated files. Reopen once a space scene has obstacles of its own. WAS: brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",
         how: "Give the match's pilots the navigation layer (a field and an aim point) for the approach, and score the approach separately from the combat. Moving ships are already the TRAFFIC kind of brain/subHardNav.mjs.",
         why: "A result on the harder test exists now; the match is the place a second vessel type would use it.",
     },

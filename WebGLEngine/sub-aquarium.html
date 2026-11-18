@@ -406,7 +406,9 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
 // A device that cannot be had leaves the CPU type in place and says so; the line says how late the subs on the device are.
 function mountGpuSwitch(circuit, cpuKind) {
   const box = $("gpuFly"); let gpuKind = null, device = null, pilots = new Map(), timer = null;   // sub -> its device pilot: a sub re-seated frees its last one
-  box.disabled = !navigator.gpu; if (!navigator.gpu) box.parentElement.title = "This browser has no WebGPU: the fly-circuit subs fly on the CPU.";
+  box.disabled = !navigator.gpu;
+  // an absent navigator.gpu is often an insecure origin (a LAN address over http), not a browser without WebGPU: the shared probe says which (ui/webgpuProbe.mjs)
+  if (!navigator.gpu) import("/ui/webgpuProbe.mjs").then((P) => { const p = P.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location }); box.parentElement.title = (p.message || "WebGPU is not available to this page") + " -- the fly-circuit subs fly on the CPU."; if (p.reason === "insecure-origin") P.showOriginBanner(p); }).catch(() => {});
   const report = () => {
     const live = [...pilots.values()], late = live.map((p) => p.lateness).filter((v) => v !== null), bad = live.find((p) => p.failed);
     $("msg").textContent = bad ? `the GPU refused (${String(bad.failed).slice(0, 80)}): those subs fly the autopilot` : `${live.length} fly-circuit sub${live.length === 1 ? "" : "s"} on the GPU, ${late.length ? `${Math.min(...late)} to ${Math.max(...late)} ticks late` + (Math.max(...late) > 4 ? " -- later than the 4 ticks that were measured to cost nothing, so what this costs is not known" : "") : "flying the autopilot until the first read lands"}`;
@@ -452,5 +454,6 @@ function mountGpuSwitch(circuit, cpuKind) {
 </script>
 <p class="note">Names and addresses reach this page as text only. A sub is numbers; the code that flies it is the code this page already loaded.</p>
 <script type="module" src="/ui/pageNotesMount.mjs"></script>
+<script type="module" src="/ui/originNotice.js"></script>
 </body>
 </html>
