@@ -62,7 +62,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (g, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${g}_${arm}.json`), "utf8")).leads, near = (s, v) => Math.abs(s.mean - v) < 5e-4, R = (g) => rd[g].reading;
+    const re = Object.fromEntries(G.REGIMES.map((g) => [g, G.fightReadings({ ships: k(g, "ships"), mixed: k(g, "mixed") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT DOES NOT SHIP: the mixed less the ships-sticky is -0.094 (z -1.9, CANNOT BE TOLD) in escort fleets without the cannon, +0.154 (z 3.6, LEADS) with it, and -0.269 (z -7.3, TRAILS) in fleets with no escorts -- where the only difference is that a seat with no target lets its gun go back to rest; no file was written", near(R("escorts").gain, -0.094) && near(R("escortsCannon").gain, 0.154) && near(R("fleet").gain, -0.269) && rd.escorts.words.gain === "CANNOT BE TOLD" && rd.escortsCannon.words.gain === "LEADS" && rd.fleet.words.gain === "TRAILS" && !rd.verdict.ok && rd.verdict.reasons.join() === "in fleet the gain TRAILS" && !fs.existsSync(G.DEFAULT_OUT)
+        && G.REGIMES.every((g) => ["mixed", "ships", "gain"].every((q) => Math.abs(re[g][q].mean - R(g)[q].mean) < 1e-12 && re[g][q].n === 300)), `${R("escorts").gain.mean.toFixed(3)} ${R("escortsCannon").gain.mean.toFixed(3)} ${R("fleet").gain.mean.toFixed(3)}`);
+    ok("against the plain side: the ships-sticky +0.118 (LEADS) and the mixed +0.024 in escort fleets without the cannon; -0.101 and +0.053 with it; +0.012 and -0.257 (TRAILS) with no escorts. The forecast was wrong in two of three: it said a lead without the cannon too, and CANNOT BE TOLD with no escorts", near(R("escorts").ships, 0.118) && near(R("escorts").mixed, 0.024) && near(R("escortsCannon").ships, -0.101) && near(R("escortsCannon").mixed, 0.053) && near(R("fleet").ships, 0.012) && near(R("fleet").mixed, -0.257) && rd.fleet.words.mixed === "TRAILS");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

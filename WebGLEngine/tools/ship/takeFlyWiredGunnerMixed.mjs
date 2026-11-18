@@ -15,6 +15,10 @@
 // FORECAST, for the record: in the escort fleets the gain LEADS, by about 0.1 (the fighters are a sixth of what each side shoots at for most of a fight, and against fighters alone the hand's way was 0.15 better); with the cannon about the same; in the fleet with no escorts
 //   CANNOT BE TOLD (only the idle rest differs, and a seat is seldom without a target there).
 // WHAT SHIPS: brain/seatFlyWired4WeightsDefault.json (policy seatFlyWired4, the gains -3) if the gain LEADS in at least one escort fleet and TRAILS in no fight. It would replace the ships-sticky gunner as the `flywired` hand on space-duel.html.
+// READ 2026-11-18 (brain/seatFlyWired4WeightsDefault.reading.json): the mixed less the ships-sticky -0.094 (z -1.9, CANNOT BE TOLD) in escort fleets without the cannon, +0.154 (z 3.6, LEADS) with it, -0.269 (z -7.3, TRAILS) in fleets without escorts.
+//   IT DOES NOT SHIP (it trails in a fight) and no file was written; the page keeps the ships-sticky gunner. The forecast was wrong twice: no lead without the cannon, and a large loss with no escorts, where all that differs is that a seat with
+//   no target lets its gun go back to rest (the network gunner holds it where it was). So RESTING THE GUN COSTS a gun that lays itself by rates: it then starts every new target from its rest, not from near the last one. A mixed gunner that keeps
+//   the network's hold when it has no target is the obvious next arm; it is not flown here.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerMixed/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship against fighters (the plain ship to the bit: nothing to fly), the trained 6DOF fighter pilot, a hand gunner on ships with the circuit on fighters (the other way round), a rule for which target is a fighter told by anything but the aim radius.
 "use strict";

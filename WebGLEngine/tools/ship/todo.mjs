@@ -530,6 +530,14 @@ export const TODO = [
         evidence: "node -e 'console.log(\"not started: no study file\", require(\"fs\").existsSync(\"tools/ship/takeFlyWiredFights.mjs\"))'",
     },
     {
+        id: "fly-mixed-gunner-hold",
+        status: "open", size: "small", order: 31,
+        title: "The mixed fly-wired gunner with the network's hold when it has no target",
+        why: "tools/ship/takeFlyWiredGunnerMixed.mjs (read 2026-11-18): the gunner that hands fighters to the hand gunner LEADS the ships-sticky one with escorts and the cannon (+0.154, z 3.6) but TRAILS in fleets without escorts (-0.269, z -7.3), where all that differs is that its gun goes back to rest with no target. Keeping the hold there (handOn only where a fighter is the target) is one line in brain/seatTurretGunner.mjs and a fresh registered study.",
+        note: "Register before flying, fresh seeds; the same three fights.",
+        evidence: "node tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs   # section 3 pins the reading",
+    },
+    {
         id: "fly-tracking-more-circuit",
         status: "open", size: "large", order: 30,
         title: "More of the tracking circuit: elevation (the sheet's other axis) and a target's motion",
