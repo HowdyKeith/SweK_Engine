@@ -124,11 +124,37 @@ kept connections are 63 percent of every possible ring-to-compass pair -- in the
 part of the ring is set by plasticity, not by the wiring. The strongest connection is 75 synapses (an ER4m neuron onto
 EPG(PB08)_L4). The licence is the dataset's, as above, with the same caution.
 
+## Circuit: Projection neurons onto the Kenyon cells (ALPN > KC)
+
+The **antennal-lobe projection neurons** (ALPN) carry odours from the antennal lobe's glomeruli to the mushroom body's
+**Kenyon cells**: each Kenyon cell takes a few of them through its claws, and that sampling is how an odour becomes a
+sparse set of Kenyon cells. Added 2026-11-18 for realistic odours in the mushroom body rounds (Keith: "Let's do all 5").
+
+**Fetched the way the mushroom body was**: from the same two public release tables (above, with their sizes and sha256),
+no token and no Neuprint query, read over HTTPS from inside a Claude Code session on 2026-11-18; both tables matched the
+sha256 above. **`tools/maleCnsPnKc.py`** bakes them into `pn-kc-circuit.json`; run twice it gives the same bytes. Which
+cells: every body whose `class` is `ALPN` (group PN) and every body whose `class` is `Kenyon_Cell` (group KC), the KCs in
+exactly the order `mushroom-body-circuit.json` has them. A projection neuron's glomerulus is its type before the first
+underscore (`DA1_lPN` -> `DA1`), or none for a multiglomerular type (one starting `M_`).
+
+| group | count |
+|---|---|
+| PN | 686 (348 in 72 glomeruli, 338 multiglomerular; 343 with the soma on each side) |
+| KC | 4,064 (the mushroom body file's) |
+4,750 cells.
+
+**What is kept and what is not.** Topology only, and only one direction: projection neuron onto Kenyon cell. At every
+weight there are 22,586 such connections carrying 390,928 synapses; **the file keeps the 19,980 of at least 5 synapses**,
+which carry 385,887 (99 percent). 271 of the 686 projection neurons reach a Kenyon cell; 3,768 of the 4,064 Kenyon cells
+are reached, by a median of 5 projection neurons each and at most 16. The licence is the dataset's, as above, with the
+same caution.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json` — see the circuit sections above.
 - `mushroom-body-circuit.json` — see the mushroom body section above (from the public release tables, not Neuprint).
 - `ring-compass-circuit.json` — see the ring neurons section above (from the same public release tables).
+- `pn-kc-circuit.json` — see the projection neurons section above (from the same public release tables).
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch
