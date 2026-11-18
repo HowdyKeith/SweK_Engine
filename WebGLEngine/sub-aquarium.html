@@ -91,6 +91,7 @@
   <label title="Put a sea of islands, icebergs (with a keel: a sub passes beneath one that is shallower than it swims) and patrolling ships in the tank and send the subs to goals through it. The sub's own pilot flies; the guidance only replaces the wandering. Contact is counted, not punished. Standard 500 x 300 m tank only. 'plan ahead' is the arm that did best in the harder navigation test (brain/SUB_FIELD_NAV_WIP.md); 'straight' ignores the sea."><span>navigation</span> <select id="navSel"><option value="">off (wander)</option><option value="any+predict">plan ahead</option><option value="any+replan">re-plan</option><option value="any">plan once</option><option value="straight">straight at the goal</option></select></label> <button id="navSeaBtn" disabled title="Draw a new sea (the counters start again)">new sea</button>
   <label title="A steady current the whole tank swims in: every sub feels it and its pilot is told it (the explorer cruises at 3 m/s). Off by default, which is the tank as it always was. The direction is as the plan view shows it."><span>current</span> <select id="curSpeed"><option value="0" selected>off</option><option value="0.3">0.3 m/s</option><option value="0.6">0.6 m/s</option><option value="1">1.0 m/s</option><option value="1.5">1.5 m/s</option></select> <select id="curDir"><option value="right">&rarr; right</option><option value="left">&larr; left</option><option value="down">&darr; down</option><option value="up">&uarr; up</option></select></label>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
+  <label title="Fly the fly-circuit subs with their reservoir and readout on this machine's GPU (WebGPU). The tank's tick cannot wait for the GPU, so each such sub flies the newest controls that have come back: one tick late or more, and the PD autopilot until the first lands. Measured on 500 dives: four ticks late costs nothing that matters (brain/RESERVOIR_GPU_WIP.md). Off by default; the CPU pilot stays the default."><input type="checkbox" id="gpuFly" disabled> <span>fly circuit on the GPU</span></label>
   <span id="msg" class="sub"></span>
 </div>
 <main>
@@ -401,6 +402,27 @@ function frame(now) {
   render(); requestAnimationFrame(frame);
 }
 refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 5000); requestAnimationFrame(frame);
+// UNNUMBERED (PART B of "A TANK PILOT TYPE ON THE DEVICE, ONE TICK LATE", brain/RESERVOIR_GPU_WIP.md): the switch that flies the fly-circuit subs on the GPU, OFF by default.
+// A device that cannot be had leaves the CPU type in place and says so; the line says how late the subs on the device are.
+function mountGpuSwitch(circuit, cpuKind) {
+  const box = $("gpuFly"); let gpuKind = null, device = null, pilots = new Map(), timer = null;   // sub -> its device pilot: a sub re-seated frees its last one
+  box.disabled = !navigator.gpu; if (!navigator.gpu) box.parentElement.title = "This browser has no WebGPU: the fly-circuit subs fly on the CPU.";
+  const report = () => {
+    const live = [...pilots.values()], late = live.map((p) => p.lateness).filter((v) => v !== null), bad = live.find((p) => p.failed);
+    $("msg").textContent = bad ? `the GPU refused (${String(bad.failed).slice(0, 80)}): those subs fly the autopilot` : `${live.length} fly-circuit sub${live.length === 1 ? "" : "s"} on the GPU, ${late.length ? `${Math.min(...late)} to ${Math.max(...late)} ticks late` + (Math.max(...late) > 4 ? " -- later than the 4 ticks that were measured to cost nothing, so what this costs is not known" : "") : "flying the autopilot until the first read lands"}`;
+  };
+  const off = (why) => { tank.registerPilotKind("flycx", cpuKind); if (gpuKind) gpuKind.destroy(); gpuKind = null; pilots = new Map(); clearInterval(timer); timer = null; box.checked = false; $("msg").textContent = why; };
+  box.onchange = async () => {
+    if (!box.checked) return off("the fly-circuit subs fly on the CPU again");
+    try {
+      if (!device) { const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no GPU adapter"); device = await adapter.requestDevice(); device.lost.then(() => { device = null; if (gpuKind) off("the GPU was lost: the fly-circuit subs fly on the CPU"); }); }
+      const G = await import("/render/subAquariumFlyCxGpu.mjs"), k = G.flyCxGpuKind(circuit, device);
+      if (!box.checked) return;
+      gpuKind = Object.freeze({ ...k, build(w, ctx = {}) { const p = k.build(w, ctx), key = ctx.sub || p, old = pilots.get(key); if (old) old.destroy(); pilots.set(key, p); return p; }, destroy: k.destroy });
+      tank.registerPilotKind("flycx", gpuKind); report(); timer = setInterval(report, 1000);
+    } catch (e) { off("the GPU is not available here (" + String((e && e.message) || e).slice(0, 80) + "): the fly-circuit subs fly on the CPU"); }
+  };
+}
 (async () => {   // the compass-dropout view (UNNUMBERED): mounted after the tank is running; a failure here leaves the tank alone
     const host = $("dropoutHost");
     try {
@@ -417,8 +439,9 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
             }
         } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
         try {   // UNNUMBERED (brain/TANK_PILOTS_WIP.md): the stateful fly pilot as a kind of sub the tank can fly -- the autopilot's laws plus a residual read from this circuit run with a memory (1,729 weights); registering re-seats any such sub already in the tank
-            const fx = await import("/render/subAquariumFlyCx.mjs");
-            tank.registerPilotKind(fx.CIRCUIT, fx.flyCxKind(circuit));
+            const fx = await import("/render/subAquariumFlyCx.mjs"), cpuKind = fx.flyCxKind(circuit);
+            tank.registerPilotKind(fx.CIRCUIT, cpuKind);
+            mountGpuSwitch(circuit, cpuKind);
         } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
         try {   // 2026-11-17 (nextRounds fish-pilot-tank-kind): the zebrafish TEN-core pilot as a kind of sub the tank can fly (803 weights, no state; render/subAquariumFish.mjs says what seating it shows); its weights come with the sub
             const fk = await import("/render/subAquariumFish.mjs");
