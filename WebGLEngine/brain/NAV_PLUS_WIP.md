@@ -414,3 +414,16 @@ Checks 2, 3 and 4 run before any HELD87 flight.
 * J6: no more collisions for the route on all 200, about 50 percent.
 
 **What a result would not say.** How often the plan changes at sea; anything about a stream that must be sensed; a stream that varies in time or depth; the corner-angle margin. SUPPORTED says that when this solver's time-aware plan departs from the still-water plan, the vessel gets there faster.
+
+### AMENDMENT 1 TO ITEM 2 PART 3 (2026-11-18; after the code (73346178) was reviewed, BEFORE any DEV3 or HELD87 field or flight; procedural only, as the registration allows before DEV)
+
+The review (two lenses, each finding checked by a skeptic; seeds 1001 to 1200 only, in no set) found one major defect and minor ones. None touches the kind, the sets, the arms, S, a reading, a bar or the verdict rule.
+1. **Check 5 was applied to DEV** (30 scenarios, so S rarely holds 20). The DEV sanity run would have printed only NOT WEIGHED. DEV now prints its readings, no check 5, and NO VERDICT LINE ("nothing is chosen on DEV").
+2. **A refusal before flying** names every failed check with its consequence (NOT WEIGHED for check 2 or 3, NOT FLOWN for check 4) and exits 3.
+3. **The HELD87 flights are written the moment they exist**, before the extras and the report, so a later throw cannot lose them, and the file then refuses a second flight.
+4. **Check 1 holds the flown seeds to the literal HELD87 list.**
+5. **One tie test** (|r - 1| < 1e-9) now feeds the faster, slower and non-tied counts. Before, a ratio exactly 1e-9 from 1 fell between them.
+6. **A gate row ties S to the flight.** Each arm's t = 0 field built inside flyPlus equals planChains' field for that arm. planChains now also returns its fields.
+7. **The aim chain's "no progress" stop is not in the registration's wording.** It stops the walk when a cell's aim point is the point it stands on. It is inert: the only such point is the waypoint, where the registered stop ends the walk anyway (the gate logs removing the waypoint stop as an equivalent mutant for this reason). It is kept and said here.
+
+Said plainly, from the review: on seeds 1001 to 1200, S predicted flight differences one way. A few scenarios outside S still flew differently, through aim differences off the chain's vertices. The complement's non-ties are reported, as registered.

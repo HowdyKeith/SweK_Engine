@@ -17,6 +17,7 @@
 //   route arm FLIES its plan" added; then 1
 //   PART 3's chain (section 5): C1 chains differ only beyond 1e-3 m 1 | C2 the point count ignored 1 | C3 the no-progress stop removed 1 | C5 the route chain's plan built in still water 1
 //   C4 the route chain walked on buildAim's points, not the time-aware ones: 0 red at first (no row held planChains to the time-aware points); the row added; then 1
+//   E4 planChains' reference field on another ladder than the flight's 2 (the field-tie row, PART 3 AMENDMENT 1)
 //   C6 the stop at the waypoint removed: 0 red, AN EQUIVALENT MUTANT -- the next step finds the waypoint's own cell aiming at the waypoint, and the no-progress stop ends the chain there
 "use strict";
 import * as R from "./subNavRoute.mjs";
@@ -118,6 +119,14 @@ sec("5. THE CHAIN (ITEM 2 PART 3)");
         if (R.chainsDiffer(timed, plain)) held = { sd, same: !R.chainsDiffer(R.planChains(sc).route, timed) };
     }
     ok("!! the route's chain is walked on the time-aware aim points (a seed in 501 to 600 where they differ from buildAim's on the route field: planChains follows the time-aware ones)", !!held && held.same, held ? `seed ${held.sd}` : "no such seed");
+    // S's fields are the flight's own t = 0 plans: capture each arm's t = 0 field inside flyPlus (seeds in no set) and compare with planChains' fields
+    const sameF = (a, b) => a.margin === b.margin && ["dist", "fx", "fz", "blocked"].every((k) => a[k].every((v, i) => Object.is(v, b[k][i])));
+    const tied = [1001, 1002, 1003].every((sd) => {
+        const sc = R.streamScenario(sd), pc = R.planChains(sc), got = [];
+        for (const [k, arm] of R.ROUTE_ARMS.entries()) { const o = R.routeOptions(sc, arm), pf = o.planField || H.buildLadderField; P.flyPlus(pilot, sc, "any+crab", { ...o, seconds: 0.1, planField: (...a) => { const f = pf(...a); if (!got[k]) got[k] = f; return f; } }); }
+        return got.length === 2 && sameF(got[0], pc.fields[0]) && sameF(got[1], pc.fields[1]);
+    });
+    ok("!! S is computed on the flight's own t = 0 plans: the field each arm builds inside flyPlus equals planChains' field for that arm (seeds 1001 to 1003)", tied);
     const st = { theta: 0, px: 100, py: 0, halfWidth: 30 };
     ok("  inBand: within the half-width of the centre line, not at it", R.inBand(st, 500, 29.9) && !R.inBand(st, 0, 30) && !R.inBand(st, 0, -31));
     ok("  the sets of Part 3: DEV 901 to 930, HELD87 9501 to 9700", R.ROUTE_SETS.dev3[0] === 901 && R.ROUTE_SETS.dev3.length === 30 && R.ROUTE_SETS.held87[0] === 9501 && R.ROUTE_SETS.held87.length === 200);

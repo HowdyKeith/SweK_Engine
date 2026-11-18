@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/subNavRouteCondStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subNavRouteCondStudy-selfcheck.mjs      (a few seconds; NOTHING here flies or builds DEV3 or HELD87: the flights and S are fixtures, the command's flying is replaced)
+// Run: node tools/ship/subNavRouteCondStudy-selfcheck.mjs      (a few seconds; NOTHING here flies DEV3 or HELD87 or builds a field of them: the flights and S are fixtures, the command's
+// flying is replaced. The command does build the two sets' scenario OBJECTS -- a seed's draws, no plan and no flight)
 //
 // THE GATE OF tools/ship/subNavRouteCondStudy.mjs (NAV_PLUS ITEM 2 PART 3, registered first):
 //   1 THE READINGS  R1 TIME on S only (the complement does not move it), R2 REACH on all, the verdict's branches and HARMFUL, the reported complement and all-scenario lines.
@@ -11,6 +12,9 @@
 //   D1 R1 read on all scenarios, not S 1 | D2 the collision condition dropped 1 | D3 ties dropped from the median 2 | D4 S's size never checked 2 | D5 HELD87 flown when the chain does not bite 1
 //   D6 S printed after the flights 1 | D7 the inS flag not written 1 | D8 a second HELD87 flight allowed 1 | D9 the reach branch's gain bar 7 1
 //   D10 check 2 blind to the chains: 0 red at first (the command's check was stubbed and stillIsShared had no row); the row added; then 1
+//   PART 3 AMENDMENT 1's fixes, each with its row written first: E1 DEV judged like the held read (check 5 applied, no readings) 1 | E2 the flights written after the extras (a throw loses them) 1
+//   E3 a refusal before flying exits 0 1 | E6 exact ties counted as faster or slower 1. Not given a mutant: check 1's literal list in the command -- in the gate the flown list IS the literal list,
+//   so a mutant there is equivalent; the literal-list row holds checksOf itself.
 "use strict";
 import fs from "node:fs";
 import * as Y from "./subNavRouteCondStudy.mjs";
@@ -62,16 +66,22 @@ sec("3. THE COMMAND");
 {
     const run = (argv, fl = {}) => {
         const out = [], err = [], files = [], at = {}; let flown = 0;
-        const code = Y.command(argv, { out: (m) => out.push(m), err: (m) => err.push(m), writeFile: (f, t) => files.push([f, t]), exists: fl.exists || (() => false), exitIo: { err: (m) => err.push(m), exit: (c) => { throw new Error("exit " + c); } },
-            flights: { s: (scs) => new Set(scs.slice(0, Math.round(scs.length * 0.3)).map((sc) => sc.seed)), runs: (scs) => { at.runs = out.length; flown += scs.length; return runsOf(scs.map(() => ["reached", 150, "reached", 140])); }, still: () => true, old: () => true, extras: () => ({ bite: 7, inBand: 3 }), ...fl } });
+        let code; try { code = Y.command(argv, { out: (m) => out.push(m), err: (m) => err.push(m), writeFile: (f, t) => files.push([f, t]), exists: fl.exists || (() => false), exitIo: { err: (m) => err.push(m), exit: (c) => { throw new Error("exit " + c); } },
+            flights: { s: (scs) => new Set(scs.slice(0, Math.round(scs.length * 0.3)).map((sc) => sc.seed)), runs: (scs) => { at.runs = out.length; flown += scs.length; return runsOf(scs.map(() => ["reached", 150, "reached", 140])); }, still: () => true, old: () => true, extras: () => ({ bite: 7, inBand: 3 }), ...fl } }); } catch (e) { if (/^exit /.test(e.message)) throw e; err.push(String(e.message)); code = -1; }
         return { code, out: out.join("\n"), lines: out, err: err.join("\n"), files, flown, at };
     };
     const thrown = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
     ok("!! refused: an unknown set; --write on DEV; HELD87 without --write; HELD87 already flown; an unknown option exits 2", run(["--set", "held86"]).code === 2 && run(["--write"]).code === 2 && run(["--set", "held87"]).code === 2 && run(["--set", "held87", "--write"], { exists: () => true }).code === 2 && /exit 2/.test(thrown(() => run(["--seeds", "3"]))));
     const nb = run(["--set", "held87", "--write"], { s: (scs) => new Set(scs.slice(0, 2).map((sc) => sc.seed)) }), ns = run(["--set", "held87", "--write"], { still: () => false });
+    ok("!! a refusal before flying exits 3 and names each failed check with its consequence (check 4 failing and check 2 failing together print NOT WEIGHED and NOT FLOWN)", nb.code === 3 && ns.code === 3 && (() => { const both = run(["--set", "held87", "--write"], { still: () => false, s: (scs) => new Set(scs.slice(0, 2).map((sc) => sc.seed)) }); return /FAIL STILL WATER/.test(both.out) && /FAIL THE CHAIN BITES/.test(both.out) && /VERDICT: NOT WEIGHED/.test(both.out) && /VERDICT: NOT FLOWN/.test(both.out); })());
     ok("!! check 4 (the chain bites) or check 2 failing: HELD87 is NOT flown and nothing written", nb.flown === 0 && nb.files.length === 0 && /VERDICT: NOT FLOWN: THE PLANS DO NOT DIFFER/.test(nb.out) && ns.flown === 0 && /VERDICT: NOT WEIGHED/.test(ns.out) && run(["--set", "held87", "--write"], { old: () => false }).flown === 0);
     const w = run(["--set", "held87", "--write"]), sLine = w.lines.findIndex((l) => /^S \(fixed before any HELD87 flight\): 60 of 200/.test(l));
     ok("!! HELD87: S is printed BEFORE the flights are called; 200 flown once; the verdict; every flight written with its inS flag", sLine >= 0 && sLine < w.at.runs && w.flown === 200 && /VERDICT: SUPPORTED/.test(w.out) && w.files.length === 1 && w.files[0][0].endsWith("brain/subNavRouteHeld87.jsonl") && (() => { const ls = w.files[0][1].trim().split("\n").map((l) => JSON.parse(l)); return ls.length === 400 && ls.filter((l) => l.inS).length === 120 && ls.every((l) => l.stream && typeof l.along === "boolean"); })());
+    const d = run(["--set", "dev3"]);
+    ok("!! DEV is a sanity run: its readings and the arm table are printed (check 5 does not apply), no VERDICT line, nothing written", /R1 TIME ON S/.test(d.out) && /any\+crab\+route/.test(d.out) && !/VERDICT/.test(d.out) && /DEV: a sanity run, not a result/.test(d.out) && !/S IS LARGE ENOUGH/.test(d.out) && d.files.length === 0 && d.flown === 30);
+    const tw = run(["--set", "held87", "--write"], { extras: () => { throw new Error("boom"); } });
+    ok("!! the flights are written before anything after them can throw", tw.files.length === 1 && tw.files[0][1].trim().split("\n").length === 400, tw.err.slice(0, 80));
+    ok("!! check 1 holds the flown seeds to the literal HELD87 list", Y.checksOf(runsOf(rep(200, ["reached", 150, "reached", 140])), { still: true, old: true, bite: { met: true, n: 30, inS: 9, share: 0.3 }, S: sFirst(30), seeds: R.ROUTE_SETS.held87 }).every((c) => c.ok) && !Y.checksOf(runsOf(rep(199, ["reached", 150, "reached", 140])), { still: true, old: true, bite: { met: true, n: 30, inS: 9, share: 0.3 }, S: sFirst(30), seeds: R.ROUTE_SETS.held87 })[0].ok);
     ok("  the reported extras are printed (start-heading bite, start or waypoint in the band)", /7 of 200 scenarios have t = 0 start headings/.test(w.out) && /3 have the start or the waypoint inside the stream's band/.test(w.out));
 }
 

@@ -117,7 +117,7 @@ export const chainsDiffer = (a, b) => a.length !== b.length || a.some((p, i) => 
 export function planChains(sc) {
     const shapes = H.planShapes(sc, 0), at = (x, y) => streamAt(sc.stream, x, y), f0 = H.buildLadderField(shapes, sc.goal, sc.start), f1 = buildRouteLadder(shapes, sc.goal, sc.start, { currentAt: at, V: V_PLAN });
     const ref = aimChain(f0, N.aimOf(f0, sc.goal), sc.start.x, sc.start.y, sc.goal), route = aimChain(f1, timedAimOf(f1, sc.goal), sc.start.x, sc.start.y, sc.goal);
-    return { inS: chainsDiffer(ref, route), ref, route };
+    return { inS: chainsDiffer(ref, route), ref, route, fields: [f0, f1] };
 }
 /** Is (x, y) inside the stream's band (reported). */
 export const inBand = (st, x, y) => Math.abs(-(x - st.px) * Math.sin(st.theta) + (y - st.py) * Math.cos(st.theta)) < st.halfWidth;
