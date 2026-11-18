@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/flyTrainedHome-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyTrainedHome-selfcheck.mjs      (about a minute; IT NEVER RUNS THE ROUND -- its one training is of one iteration, its audits are of 2 lives, and it starts no process)
+// Run: node tools/ship/flyTrainedHome-selfcheck.mjs      (about three minutes; IT NEVER RUNS THE ROUND -- its one training is of one iteration, its audits are of 2 lives but for the verdict's
+// three flights of committed flies after the reading, and it starts no process)
 //
 // THE GATE OF THE TRAINED-TO-FIND-HOME ROUND (registered in brain/FLY_TRAINED_HOME_WIP.md before brain/rl/homeTrainEnv.mjs, brain/rl/homingTrainFly.mjs, tools/ship/flyTrainedHome.mjs and
 // tools/ship/takeFlyTrainedHome.mjs existed): does a compass fly trained on the homing score find home better than the same fly trained to hold a course?
@@ -11,6 +12,8 @@
 //                               a record's home and course scores are lives flown here by hand; a COURSE64 record is the committed fly flown home
 //   5  THE RECORDS              36 flies; G, T1, H, V
 //   6  THE COMMAND              it is this round's; no training of the round's, no process
+//   7  THE VERDICT              the results file as committed unread at 76d8bc95, read from the file: the checks, G, T1, H and V, the arms, the description after the reading (home follows
+//                               course; draw 12's 64 lives flown again, the scoping's draw 2, HOMEP's least re-audited), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 30, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 5; every one red by name but TWO, both findings (the number is the rows red):
 //   THE TASK (brain/rl/homeTrainEnv.mjs): E1 paid every tick 3 | E2 dist is the score 2 | E3 the reward is the compass life's 3 | E4 it docks at the end 2 | E5 the homing task edited (a
@@ -28,6 +31,14 @@
 //   ones (F14); one does now -- 1 red. F2 was run again on the stricter rows: 4 red.
 //   ONE ROW WAS WIDENED BEFORE THE COMMIT, A FINDING OF tools/ship/definitionGates-selfcheck.mjs: the library's BAT_EPS, BAT_BASE and BAT_STEP were named by no gate (the all-shapes count
 //   went from 858 to 861, the import-owned from 664 to 667); the battery row now names them.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's home score (HOMES draw 2) changed in a digit the double holds 1 (the file's
+//   hash alone: a change of 1e-12 in a fly that is no arm's least or most is under the arms row's 5e-5, and the hash is what holds the file's bytes) | V2 G against HOMES 3 | V3 the rank
+//   sums' BETTER and WORSE swapped 5 | V4 the sign tests' BETTER and WORSE swapped 5 | V5 H against the start 5 | V6 the floors' hand rule changed in a digit the double holds 3 (the
+//   hash, the checks, and the verdict section throwing on the reading the failed check leaves unweighed -- red by name) | V7 draw 12's trainer sample at iteration 10 changed in a digit
+//   the double holds 2 | V8 the note's G says BETTER 1 | V9 the note's expectation of G is WORSE 55 1 | V10 the note names another commit 1 | V11 the note drops that section 5 said
+//   nothing for WORSE 1 | V12 the note drops that the batteries were measured outside the tree 1 | V13 the note's gap 0.0040 1 | V14 the note's HOMEP rate a 0.0096 1. None went 0 red.
+//   TWO SLIPS WERE FOUND BEFORE THE SABOTAGES, BOTH MINE IN THE NOTE: the gap between HOMEP and COURSE64 written 0.0040 from the rounded means (it is 0.00405, 0.0041), which the
+//   described row found red; and HOMEP's mean rate a written 0.0096 (it is 0.009546, 0.0095), found when the row was written. V13 and V14 put each back and go red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -59,7 +70,7 @@ const byHand = (fly, seed) => { const env = new CE.CompassEnv(); let o = env.res
     return Math.max(0, 1 - closest / out); };
 const committed = (arm, s) => F.trainer.lines.find((x) => x.kind === "draw" && x.arm === arm && x.s === s);
 
-console.log("flyTrainedHome-selfcheck -- the trained-to-find-home round (the compass fly trained on the homing score, against the same fly trained to hold a course): the task, the fly, the numbers, one training, the records, the command\n");
+console.log("flyTrainedHome-selfcheck -- the trained-to-find-home round (the compass fly trained on the homing score, against the same fly trained to hold a course): the task, the fly, the numbers, one training, the records, the command, the verdict\n");
 
 console.log("1. THE TASK (brain/rl/homeTrainEnv.mjs: brain/rl/homeEnv.mjs's life, its return the homing score)");
 section(() => {
@@ -184,6 +195,52 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training is of one iteration with 2 home lives and 1 course life that are not the round's audits, its one COURSE64 fly flown on the 2 (and one call refused before it starts); it starts no process; the file's size and time are what they were",
         J(calls) === J(['trainOne("COURSE64", 1)', 'trainOne("HOMEP", 5, tiny, TWO, COURSE)', 'courseOne(4, F.trainer, TWO)']) && ![...TWO, ...COURSE].some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n7. THE VERDICT (the whole results file was committed at 76d8bc95 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, T.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = T.reading(lines, F), A = R.arms, Fl = R.floors;
+    const of = (a) => lines.filter((r) => (r.kind === "draw" || r.kind === "fly") && r.arm === a).sort((x, y) => x.s - y.s), rec = (a, s) => of(a).find((r) => r.s === s), all = T.ARMS.flatMap(of);
+    const rank = (v) => { const o = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]), r = []; o.forEach((p, k) => { r[p[1]] = k + 1; }); return r; };
+    const spearman = (rs) => { const x = rs.map((r) => r.home), y = rs.map((r) => r.course), a = rank(x), b = rank(y), m = (x.length + 1) / 2; let s = 0, sa = 0, sb = 0;
+        for (let i = 0; i < x.length; i++) { s += (a[i] - m) * (b[i] - m); sa += (a[i] - m) ** 2; sb += (b[i] - m) ** 2; } return new Set(x).size === x.length && new Set(y).size === y.length ? s / Math.sqrt(sa * sb) : NaN; };
+    ok("!! the results file is the one the run wrote: 38 records, sha256 c931f32e5705cdba... (three starts: the first two killed at two hours after 12 and 36 records, the third 28.0 minutes)",
+        lines.length === 38 && createHash("sha256").update(bytes).digest("hex") === "c931f32e5705cdbadeb3ca729958a67a0eb7375593cf2feb02b8c4ac5b5522c6");
+    ok("!! THE CHECKS HOLD: both committed files as committed and passing their own checks, 36 flies each once, HOMEP draw 1 the same twice; the floors -- vision off 0.4559, the start 0.4568, the hand rule 0.5551, told 0.9948",
+        R.checks.length === 0 && near(Fl.off, 0.4559) && near(Fl.start, 0.4568) && near(Fl.hand, 0.5551) && near(Fl.told, 0.9948) && lines.find((r) => r.kind === "recheck").weightsHash === rec("HOMEP", 1).weightsHash);
+    ok("!! *** G: THE FLY TRAINED TO FIND HOME FINDS HOME WORSE THAN THE SAME FLY TRAINED TO HOLD A COURSE -- ranks 97 (p 0.0014) *** -- *** T1: AND WORSE THAN ONE ON A SHUFFLE TRAINED THE SAME WAY -- ranks 101 (p 0.0036) ***",
+        R.G.word === T.WORDS.G[1] && R.G.b === "COURSE64" && R.G.sumA === 97 && R.G.ties === 0 && near(R.G.p, 1.433e-3, 5e-7) && R.T1.word === T.WORDS.T1[1] && R.T1.b === "HOMES" && R.T1.sumA === 101 && R.T1.ties === 0 && near(R.T1.p, 3.637e-3, 5e-7));
+    ok("!! H: IT FINDS HOME WORSE THAN THE RULE SET BY HAND -- 0 of 12 above its 0.5551 (p 2/4096); V: BETTER THAN PATH INTEGRATION ALONE -- 12 of 12 above 0.4559 (p 2/4096)",
+        R.H.word === T.WORDS.H[1] && R.H.above === 0 && R.H.below === 12 && R.H.p === 2 / 4096 && R.H.ref === Fl.hand && R.V.word === T.WORDS.V[0] && R.V.above === 12 && R.V.p === 2 / 4096 && R.V.ref === Fl.off);
+    ok("!! the arms (home mean, sd, least, most; course; rates a and c, b 0 in every fly): HOMEP 0.5501 0.0039 0.5442 0.5542, 0.6501, 0.0095 0.000018 | HOMES 0.5623 0.0117 0.5348 0.5773, 0.6882, 0.0057 0.000023 | COURSE64 0.5541 0.0024 0.5478 0.5564, 0.6688, 0.0090 0.000012",
+        near(A.HOMEP.mean, 0.5501) && near(A.HOMEP.sd, 0.0039) && near(A.HOMEP.min, 0.5442) && near(A.HOMEP.max, 0.5542) && near(A.HOMEP.course, 0.6501) && near(A.HOMEP.rates.a, 0.0095) && near(A.HOMEP.rates.c, 0.000018, 5e-7) &&
+        near(A.HOMES.mean, 0.5623) && near(A.HOMES.sd, 0.0117) && near(A.HOMES.min, 0.5348) && near(A.HOMES.max, 0.5773) && near(A.HOMES.course, 0.6882) && near(A.HOMES.rates.a, 0.0057) && near(A.HOMES.rates.c, 0.000023, 5e-7) &&
+        near(A.COURSE64.mean, 0.5541) && near(A.COURSE64.sd, 0.0024) && near(A.COURSE64.min, 0.5478) && near(A.COURSE64.max, 0.5564) && near(A.COURSE64.course, 0.6688) && near(A.COURSE64.rates.a, 0.0090) && near(A.COURSE64.rates.c, 0.000012, 5e-7) &&
+        all.length === 36 && all.every((r) => r.rates.b === 0));
+    const hp = of("HOMEP"), c64 = of("COURSE64"), upHome = hp.filter((r, i) => r.home > c64[i].home).map((r) => r.s), upCourse = hp.filter((r, i) => r.course > c64[i].course).map((r) => r.s);
+    const plastic = F.homing.lines.filter((r) => r.kind === "fly" && r.arm === "PLASTIC"), plasticMean = plastic.reduce((n, r) => n + r.home, 0) / plastic.length;
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED, FROM THE RECORDS: home follows course (Spearman 0.86 over the 36 flies; 0.87, 0.82, 0.62 within the arms); HOMEP above its COURSE64 draw at home and on the course on draws 5 and 6 alone, below it at home by 0.0041; COURSE64 above the hand rule on 5 of 12; the start 0.4568 to HOMEP's 0.5501, the homing round's PLASTIC 0.5493",
+        spearman(all).toFixed(2) === "0.86" && spearman(hp).toFixed(2) === "0.87" && spearman(of("HOMES")).toFixed(2) === "0.82" && spearman(c64).toFixed(2) === "0.62" && J(upHome) === J([5, 6]) && J(upCourse) === J([5, 6]) &&
+        near(A.HOMEP.mean - A.COURSE64.mean, -0.0041) && c64.filter((r) => r.home > Fl.hand).length === 5 && plastic.length === 12 && near(plasticMean, 0.5493),
+        `Spearman ${[all, hp, of("HOMES"), c64].map((v) => spearman(v).toFixed(3)).join(" ")}`);
+    const bat = T.batteryOf(12), lives = Array.from({ length: bat.eps }, (_, k) => bat.base + 17 * k), d12 = rec("HOMEP", 12), kept = H.homeScore(T.flyOf("HOMEP", 12, PF.unpackWeights(d12.weights)), lives);
+    const c12 = H.homeScore(T.flyOf("COURSE64", 12, PF.unpackWeights(committed("BAT64", 12).weights)), lives), h12 = H.homeScore(V.policyOf("PLASTIC", 1).setParams(V.HAND), lives), sample = d12.history.find((h) => h.it === 10);
+    ok("!! FLOWN AFTER THE READING: draw 12 kept iteration 10, and its fly on the draw's 64 lives scores the trainer's sample there to the bit (0.6242); its COURSE64 fly scores 0.6015 and the hand rule 0.6139 on them -- both below it, as on all 12 draws' lives; on the audit it is below both",
+        d12.keptAt === 10 && sample && kept === sample.ret && near(kept, 0.6242) && near(c12, 0.6015) && near(h12, 0.6139) && kept > c12 && kept > h12 && d12.home < rec("COURSE64", 12).home && d12.home < Fl.hand, `${kept} ${c12.toFixed(4)} ${h12.toFixed(4)}`);
+    const scoping = Array.from({ length: 100 }, (_, k) => 30000001 + 7919 * k), d2 = H.homeScore(T.flyOf("HOMEP", 2, PF.unpackWeights(rec("HOMEP", 2).weights)), scoping), d11 = rec("HOMEP", 11);
+    ok("!! FLOWN AFTER THE READING: HOMEP draw 2 on the scoping's 100 lives gives section 1's 0.5767 again (0.5540 on the audit, against its COURSE64 draw's 0.5541); HOMEP's least, draw 11, gives its home score again on the 200 audit lives to the bit",
+        near(d2, 0.5767) && near(rec("HOMEP", 2).home, 0.5540) && near(rec("COURSE64", 2).home, 0.5541) && /\| 2 \| 0\.5767 \| 0\.7070 \| 0\.5649 \|/.test(src("brain/FLY_TRAINED_HOME_WIP.md")) &&
+        d11.home === A.HOMEP.min && H.homeScore(T.flyOf("HOMEP", 11, PF.unpackWeights(d11.weights))) === d11.home, `draw 2 on the scoping lives ${d2.toFixed(4)}`);
+    const note = src("brain/FLY_TRAINED_HOME_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: G CANNOT 55 and BETTER 40 came WORSE; T1 CANNOT 60 came WORSE (given 25); H BETTER 55 and CANNOT 40 came WORSE; V BETTER (97) came; HOMEP's mean in 0.545 to 0.575 (70) came",
+        /G: CANNOT about 55, BETTER 40\. T1: CANNOT about 60, WORSE 25, BETTER 15\. H: BETTER about 55, CANNOT 40\. V: \*\*BETTER about 97 percent\*\*\. HOMEP's mean between 0\.545 and 0\.575, about 70\./.test(flat) &&
+        R.G.word === T.WORDS.G[1] && R.T1.word === T.WORDS.T1[1] && R.H.word === T.WORDS.H[1] && R.V.word === T.WORDS.V[0] && A.HOMEP.mean > 0.545 && A.HOMEP.mean < 0.575);
+    ok("the registration's RESULT SECTION (section 10) carries the four readings' words, the commit the file was read at, which expectations did not come, that section 5 said nothing for WORSE, the description and the flights after the reading said as such with the gate's numbers, that the twelve sets of 64 lives were measured once outside the tree, and what it does not mean",
+        /## 10\. The result/.test(note) && ["G", "T1", "H", "V"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /76d8bc95/.test(res) && /\*\*G and H did not come as given, and T1 came the less likely way given\.\*\*/.test(res) &&
+        /\*\*Section 5 said what G CANNOT and G BETTER would mean, and nothing for WORSE\.\*\*/.test(res) && /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) &&
+        /Spearman 0\.86 over the 36 flies, and 0\.87, 0\.82 and 0\.62/.test(res) && /on the same two draws, 5 and 6, and on no other/.test(res) && /\*\*Measured after the reading, not registered, with lives flown:\*\*/.test(res) &&
+        /\*\*12 of 12 draws\*\* \(by 0\.0303 on average, from 0\.0021 to 0\.0888\)/.test(res) && /measured once, by a script that is not in the tree/.test(res) && /\| HOMEP \| 0\.5501 \(0\.5442, 0\.5542\) \| 0\.0039 \| 0\.6501 \| 0\.0095, 0\.000018 \|/.test(res) &&
+        /by 0\.0041, below it on 10 of 12 draws/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyTrainedHome-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
