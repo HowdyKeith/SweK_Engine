@@ -479,3 +479,29 @@ DEV (seeds 901 to 930) met check 4 (13 of 30 in S) and was a sanity run with no 
 **CLOSED: the corner-angle margin.** The term is too small where the collisions happen. The collisions come from the vessel LEAVING the plan, not from turning at its corners. A flown round could recover at most about 2 to 4 flights in 600 against a gain bar of 5.
 
 **OPENED: what the vessel does when it has left the plan.** A new backlog item, nav-zone-fallback-heading: inside a blocked cell the heading falls back to the straight bearing to the waypoint, which pointed into the obstacle in 73 of 101 collisions. A heading rule for the zone (steer to the nearest free cell's aim point, hold the last aim point, or steer away from the nearest shape) was never tried. Separately, all 6 collisions of any+crab+margin came from its 3 s replan clearing the vessel's own surroundings (OWN_CLEAR 15 m) and switching to a leg that grazes the obstacle.
+
+# ITEM 2, PART 5: WHEN THE VESSEL HAS LEFT THE PLAN, RECORDED AND CLOSED (no registered flight; backlog nav-zone-fallback-heading; 2026-11-18)
+
+**What was tried.** A drafted rule, `+zone`: every cell with no aim point aims at the centre of the nearest free cell that has one, within 10 cells. It was passed through flyPlus's aimOf option, with no shared file edited. Before registering it, two independent reviewers prototyped it, with each finding checked by a skeptic. **SAID PLAINLY: the prototype flew seeds 1201 to 1400 of hard-current, hard-current-gap and hard-stream (in no set), and the spent sets HELD71, HELD73, HELD86, HELD87 and DEV 1 to 30. The held set I had drafted, seeds 9701 to 10000, was NOT flown and stays unspent.** I re-checked none of the flights myself. The reviewers reproduced every stored any+crab flight exactly (200 of 200 on each spent set). Passing the stock aimOf through the option changed nothing (60 of 60), and every flight that never entered a cell without an aim point was identical between the arms (0 exceptions in 1,490).
+
+**The drafted rule is HARMFUL everywhere it was flown.**
+* Seeds 1201 to 1400 (600 scenarios): reference reached 585 and collided 15; `+zone` reached 565 and collided 34. Paired 0 against 20, gain -20, p about 2e-6. Each kind alone -6, -7, -7.
+* Clearance (C10, |d| > 0.25 m): 11 better against 74 worse.
+* The four spent held sets pooled (800): gain -23, collisions 16 to 37.
+
+**Why.** At zone entry the vessel is a median 3.8 s from impact. Its track already points into the obstacle (95 of 95 in the census), and it turns about 17 degrees before impact. The nearest free cell is usually the one just left, behind the vessel (the aim was more than 90 degrees off the track in 53 percent of zone ticks), so the rule commanded U-turns and oscillated at the zone's edge. The rule also replaced the cell-flow heading, which most no-aim ticks fly (64,901 against 8,649 on the straight bearing), and that is where most of the harm came from.
+
+**The variants, all on the same seeds, and none better than neutral:**
+
+| variant | gain | detail |
+|---|---|---|
+| fill only cells with zero flow | -3 | |
+| that, with the neighbour's aim point | -2 | |
+| the nearest free cell's AIM POINT instead of its centre | about 0 | +8/-11 pooled over 1,490, clearance leaning to harm, p 0.094 |
+| hold the last aim point | -19 | |
+| steer away from the nearest shape | -33 | |
+| slow when the command is far off the heading | -19 or -8 | at a 40 or 60 deg threshold |
+
+**THE ENTRY-TICK COUNTERFACTUAL closes it.** From the moment of zone entry, with any of 12 fixed headings at full or half speed, only 15 of 100 census collisions escape. **The heading the census found at impact (the straight bearing in 73 of 101) is a CORRELATE of being doomed, not a cause.** No rule acting after the vessel has left the plan can do much.
+
+**CLOSED: nav-zone-fallback-heading.** If anything is left, it is the APPROACH: legs that run along the edge of the inflated zone, where a 5 m drift costs the plan. That is what the margin does, and the HELD70 sweep could not tell a wider top rung from the incumbent (m16 against m12). The crab already counters the drift. So with this planner and autopilot, about 2 percent collisions in these current kinds is where the series stands, and I do not open a further item on it.

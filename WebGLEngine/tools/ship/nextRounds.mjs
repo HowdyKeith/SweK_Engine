@@ -3005,8 +3005,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-zone-fallback-heading",
-        blocker: "OPEN",
-        what: "OPENED 2026-11-18 by the collision census of brain/NAV_PLUS_WIP.md ITEM 2 PART 4 (3,110 spent flights, no fresh seed): when the vessel drifts about 5 m off a leg into the inflated zone, its blocked cell has no aim point and the heading falls back to the cell's flow or, when that is zero, the STRAIGHT BEARING TO THE WAYPOINT (brain/subHardNav.mjs baseTarget) -- the source of the heading at impact in 73 of 101 current-kind collisions; the ground track pointed into the obstacle at entry in 95 of 95.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-18 WITHOUT A REGISTERED FLIGHT (brain/NAV_PLUS_WIP.md ITEM 2 PART 5): a prototype on seeds 1201-1400 (in no set) and the spent held sets showed the drafted rule (aim at the nearest free cell's centre) HARMFUL -- gain -20 in 600, collisions 15 to 34 -- and every variant harmful or neutral; from zone entry only 15 of 100 census collisions are escapable with any fixed heading, so the fallback heading is a correlate of being doomed, not a cause. The held seeds 9701-10000 were not flown. WAS: OPENED 2026-11-18 by the collision census of brain/NAV_PLUS_WIP.md ITEM 2 PART 4 (3,110 spent flights, no fresh seed): when the vessel drifts about 5 m off a leg into the inflated zone, its blocked cell has no aim point and the heading falls back to the cell's flow or, when that is zero, the STRAIGHT BEARING TO THE WAYPOINT (brain/subHardNav.mjs baseTarget) -- the source of the heading at impact in 73 of 101 current-kind collisions; the ground track pointed into the obstacle at entry in 95 of 95.",
         how: "A heading rule inside the zone, registered and flown against any+crab on a fresh set: steer to the aim point of the nearest FREE cell, or hold the last aim point, or steer away from the nearest shape; paired reach and collisions, with near-miss clearance as the continuous reading (collisions are about 2 percent).",
         why: "It is the mechanism the census found; the corner-angle margin it replaces was closed for being too small where the collisions happen.",
     },
