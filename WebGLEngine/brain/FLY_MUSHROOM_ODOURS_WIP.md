@@ -73,3 +73,39 @@ synapse count is taken as a strength. A result says how this fly codes these odo
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyMushroomOdours.mjs run` -> `brain/flyMushroomOdoursRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyMushroomOdours.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed at 62dd5be5 before it was read; read once, here)
+The run: 38 records (sha256 d45d35df2f7ccbbf...), one start of 49.3 minutes on four processes. **The checks hold**: the
+vendored wiring and the mushroom round's file as committed, 36 draws each once with the registered recipe, each arm's
+wiring and the mushroom round's teachers, PLASTIC draw 1 the same twice. The floors on the real wiring: the untrained fly
+0.0260, the hand rule 0.5003.
+
+* **T1: THE FLY ON THE REAL PROJECTION-NEURON WIRING, TAUGHT BY ITS REAL TEACHERS, CANNOT BE TOLD APART FROM ONE ON A SHUFFLE OF THAT WIRING AT LEARNING THE ODOURS** -- ranks 144 (the middle 150), p 0.76.
+* **T2: THE FLY ON THE REAL PROJECTION-NEURON WIRING, TAUGHT BY ITS REAL TEACHERS, CANNOT BE TOLD APART FROM ONE WHOSE PURE TEACHERS ARE OTHER NEURONS' AT LEARNING THE ODOURS** -- ranks 146, p 0.84.
+* **H: THE FLY ON THE REAL PROJECTION-NEURON WIRING, TAUGHT BY ITS REAL TEACHERS, LEARNS THE ODOURS BETTER THAN THE RULE SET BY HAND** -- 11 of 12 above its 0.5003, 1 below (p 0.0063).
+* **USES: 12 of 12 in every arm** (with p_a at 0 every arm falls to about 0.03).
+
+| arm | mean | sd | least | most | a | the odours' Kenyon-cell overlap |
+|---|---|---|---|---|---|---|
+| PLASTIC | 0.7509 | 0.1977 | 0.1093 | 0.8550 | 1.04 | 0.4162 |
+| SHUFPN | 0.8137 | 0.0405 | 0.7480 | 0.8803 | 1.17 | 0.4221 |
+| PFAM | 0.8060 | 0.0445 | 0.7313 | 0.8760 | 1.09 | 0.4162 |
+
+**Every expectation came**: T1 CANNOT (50), T2 CANNOT (60), H BETTER (95), USES 12 of 12 in each arm (85). What section 5
+said such a reading would say: **with odours made the fly's way, through the real projection neurons, the real wiring codes
+them no better than a shuffle that keeps every degree, and which output neuron learns from which teacher still does not
+matter** -- as with the random odours of the mushroom round. The trained flies beat the hand rule by about 0.3, as the
+scoping found: here the readout is worth learning.
+
+**Described after the reading, not registered (the gate recomputes it):** PLASTIC draw 10's training never took off -- the
+trainer's battery returned between -0.075 and 0.04 for its first 50 iterations and 0.19 at the last -- and the fly scores
+0.1093; the rest of PLASTIC lie from 0.7050 to 0.8550. The rank sums weigh it as one low fly, and without it the arms'
+medians are 0.8095, 0.8118 and 0.8132. **The scoping's 3 of 3 for the real wiring was the luck of three draws**: on draws 1
+to 3, the scoping's, PLASTIC is ahead of SHUFPN again here (0.8550, 0.8513, 0.8503 against 0.7867, 0.8100, 0.8137), and on
+draws 4 to 12 it is not; the expectation of BETTER at 45 leaned on those three. The two odours' Kenyon-cell sets overlap a
+little more on the shuffles (0.4221) than on the real wiring (0.4162), the opposite of what better coding would need.
+
+**What it does not mean.** About these odours only: random glomerular patterns, the projection neurons firing at their
+glomerulus's strength and the multiglomerular ones silent, the Kenyon cells chosen by a global rank. It does not say the
+real wiring carries no structure that matters for natural odours, whose glomerular patterns are not random; nor that the
+teachers' pairing does not matter for a task with more than one meaning to keep apart.

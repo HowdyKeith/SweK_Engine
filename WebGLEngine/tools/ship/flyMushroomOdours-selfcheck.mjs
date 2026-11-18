@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyMushroomOdours-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyMushroomOdours-selfcheck.mjs      (about five seconds; IT NEVER RUNS THE ROUND -- its one training is of 2 iterations on draw 906, its audits are of 2 lives,
+// Run: node tools/ship/flyMushroomOdours-selfcheck.mjs      (about twenty seconds; IT NEVER RUNS THE ROUND -- its one training is of 2 iterations on draw 906, its audits are of 2 lives,
 // and it starts no process)
 //
 // THE GATE OF THE MUSHROOM ODOUR ROUND (registered in brain/FLY_MUSHROOM_ODOURS_WIP.md before brain/rl/pnOdorEnv.mjs, tools/ship/flyMushroomOdours.mjs and
@@ -13,6 +13,8 @@
 //   5  ONE TRAINING             a record's weights are the trainer's from the task and fly made here by hand; its scores and overlap lives flown here by hand
 //   6  THE RECORDS              36 draws; T1, T2, H, USES
 //   7  THE COMMAND              it is this round's; no training of the round's, no process
+//   8  THE VERDICT              the results file as committed unread at 62dd5be5, read from the file: the checks, the three readings and USES, the arms, the description after the
+//                               reading (one training that never took off; the medians; the scoping's three draws), re-audits, the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 33, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's 5; every one red by name but ONE, a finding (the number is the rows red):
 //   THE TASK (brain/rl/pnOdorEnv.mjs): E1 multiglomerular neurons fire as glomerulus 0 5 | E2 the top 10 percent fire 6 | E3 odour B redrawn with p 0.3 6 | E4 no noise 6 | E5 the weakest
@@ -27,6 +29,11 @@
 //   F13 WENT 0 RED, AND IT WAS RIGHT TO: checkRecords compared each record's teachers with the mushroom round's committed record AND with teachFor, and the first can never fire alone --
 //   the mushroom round's file must pass its own checks first, and they hold every one of its records' teachers to teachFor. The comparison was redundant, so it is gone (a comment says
 //   why), and F13b takes the check that remains away: 1 red. Row 3's teachers row still compares every draw with the committed records directly.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score (SHUFPN draw 7) changed in a digit the double holds 1 (the file's hash
+//   alone: a change of 1e-12 in a fly that is no arm's least or most is under the arms row's 5e-5, and the hash is what holds the file's bytes) | V2 T1 against PFAM 2 | V3 USES needs
+//   0.3 3 | V4 the rank sums' BETTER and WORSE swapped 2 | V5 the note's T1 says BETTER 1 | V6 the note's expectation of T1 is CANNOT 60 1 | V7 the note names another commit 1 | V8 the
+//   note drops the luck of three draws 1 | V9 the note drops what it does not mean 1 | V10 the hand rule's floor changed in a digit the double holds 2 | V11 the note's medians 0.8096 1 |
+//   V12 H against the start 2. None went 0 red.
 //   THREE THINGS WERE FOUND BEFORE THE SABOTAGES: tools/ship/definitionGates-selfcheck.mjs found the library's auditScore named by no gate (the tree-wide count went from 405 to 406; a
 //   row now tests it against lives flown by hand); the one training's scores were 0 on its 2 lives, so the row comparing them with lives by hand compared two zeros (the training moved
 //   from draw 901 to 906, whose score is 0.30 and 0.23 with p_a at 0, and the row now demands they differ from 0 and from each other); and the check that the vendored wiring is the
@@ -194,6 +201,38 @@ section(() => {
     const me = src("tools/ship/flyMushroomOdours-selfcheck.mjs"), calls = [...me.matchAll(/O\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations with 4 flies tried on draw 906, audited on 2 lives not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"SHUFPN", 906, TINY, TWO']) && !TWO.some((x) => O.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n8. THE VERDICT (the whole results file was committed at 62dd5be5 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, O.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = O.reading(lines, mushroom), A = R.arms, F = R.floors;
+    const of = (a) => lines.filter((r) => r.kind === "draw" && r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), rec = (a, s) => of(a).find((r) => r.s === s);
+    const median = (v) => { const w = [...v].sort((x, y) => x - y); return (w[5] + w[6]) / 2; };
+    ok("!! the results file is the one the run wrote: 38 records, sha256 d45d35df2f7ccbbf... (one start, 49.3 minutes on four processes)", lines.length === 38 && createHash("sha256").update(bytes).digest("hex") === "d45d35df2f7ccbbf36b6a081bbc34a1353c1abf637dd14ca0651e5403bbdbbfd");
+    ok("!! THE CHECKS HOLD: the vendored wiring and the mushroom round's file as committed, 36 draws each once with the recipe, each arm's wiring and the mushroom round's teachers, PLASTIC draw 1 the same twice; the floors -- the untrained fly 0.0260, the hand rule 0.5003",
+        R.checks.length === 0 && near(F.start, 0.0260) && near(F.hand, 0.5003) && lines.find((r) => r.kind === "recheck").weightsHash === rec("PLASTIC", 1).weightsHash);
+    ok("!! *** T1: THE REAL PROJECTION-NEURON WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT AT LEARNING THE ODOURS -- ranks 144 (p 0.76) *** -- *** T2: NOR THE REAL TEACHERS FROM PFAM'S -- ranks 146 (p 0.84) ***",
+        R.T1.word === O.WORDS.T1[2] && R.T1.sumA === 144 && R.T1.ties === 0 && near(R.T1.p, 0.7553, 5e-5) && R.T2.word === O.WORDS.T2[2] && R.T2.sumA === 146 && R.T2.ties === 0 && near(R.T2.p, 0.8428, 5e-5));
+    ok("!! H: THE TRAINED FLY LEARNS THE ODOURS BETTER THAN THE RULE SET BY HAND -- 11 of 12 above its 0.5003, 1 below (p 26/4096); USES 12 of 12 in every arm",
+        R.H.word === O.WORDS.H[0] && R.H.above === 11 && R.H.below === 1 && R.H.p === 26 / 4096 && R.H.ref === F.hand && O.ARMS.every((a) => A[a].uses === 12));
+    ok("!! the arms (mean, sd, least, most; a; with p_a at 0; the odours' Kenyon-cell overlap): PLASTIC 0.7509 0.1977 0.1093 0.8550, 1.0422, 0.0259, 0.4162 | SHUFPN 0.8137 0.0405 0.7480 0.8803, 1.1671, 0.0276, 0.4221 | PFAM 0.8060 0.0445 0.7313 0.8760, 1.0940, 0.0265, 0.4162",
+        near(A.PLASTIC.mean, 0.7509) && near(A.PLASTIC.sd, 0.1977) && near(A.PLASTIC.min, 0.1093) && near(A.PLASTIC.max, 0.8550) && near(A.PLASTIC.rate, 1.0422) && near(A.PLASTIC.ratesOff, 0.0259) && near(A.PLASTIC.overlap, 0.4162) &&
+        near(A.SHUFPN.mean, 0.8137) && near(A.SHUFPN.sd, 0.0405) && near(A.SHUFPN.min, 0.7480) && near(A.SHUFPN.max, 0.8803) && near(A.SHUFPN.rate, 1.1671) && near(A.SHUFPN.ratesOff, 0.0276) && near(A.SHUFPN.overlap, 0.4221) &&
+        near(A.PFAM.mean, 0.8060) && near(A.PFAM.sd, 0.0445) && near(A.PFAM.min, 0.7313) && near(A.PFAM.max, 0.8760) && near(A.PFAM.rate, 1.0940) && near(A.PFAM.ratesOff, 0.0265) && near(A.PFAM.overlap, 0.4162));
+    const d10 = rec("PLASTIC", 10), early = d10.history.filter((h) => h.it <= 50).map((h) => h.ret), rest = sc("PLASTIC").filter((x, i) => i !== 9);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: PLASTIC draw 10's training never took off (the battery between -0.075 and 0.04 to iteration 50, 0.19 at the last; the fly 0.1093), the rest of PLASTIC 0.7050 to 0.8550; the arms' medians 0.8095, 0.8118, 0.8132; on draws 1 to 3 (the scoping's) PLASTIC ahead of SHUFPN, on the rest not",
+        near(d10.score, 0.1093) && d10.score === A.PLASTIC.min && near(Math.min(...early), -0.075, 1e-9) && Math.max(...early) < 0.04 && near(d10.history[d10.history.length - 1].ret, 0.1917) && near(Math.min(...rest), 0.7050) && near(Math.max(...rest), 0.8550) &&
+        near(median(sc("PLASTIC")), 0.8095) && near(median(sc("SHUFPN")), 0.8118) && near(median(sc("PFAM")), 0.8132) && [1, 2, 3].every((s) => rec("PLASTIC", s).score > rec("SHUFPN", s).score) && [4, 6, 7, 8, 9, 10, 11, 12].some((s) => rec("PLASTIC", s).score < rec("SHUFPN", s).score) &&
+        PF.rankSum(sc("PLASTIC").slice(3), sc("SHUFPN").slice(3)).p > 0.01, `medians ${median(sc("PLASTIC")).toFixed(4)} ${median(sc("SHUFPN")).toFixed(4)} ${median(sc("PFAM")).toFixed(4)}`);
+    ok("!! RE-AUDITED AFTER THE READING: PLASTIC draw 10 (the arm's least) gives its score again on the 200 lives to the bit, and so does the hand rule's floor",
+        O.auditScore(O.flyOf("PLASTIC", 10).setParams(PF.unpackWeights(d10.weights)), O.WIRING.real) === d10.score && O.auditScore(M.policyOf("PLASTIC", 1).setParams(M.HAND), O.WIRING.real) === F.hand);
+    const note = src("brain/FLY_MUSHROOM_ODOURS_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: T1 CANNOT (50), T2 CANNOT (60), H BETTER (95), USES 12 of 12 in each arm (85) -- every one came",
+        /T1: CANNOT about 50, BETTER 45\. T2: CANNOT about 60, BETTER 35\. H: \*\*BETTER about 95 percent\*\*\. USES 12 of 12 in each arm, about 85\./.test(flat) && R.T1.word === O.WORDS.T1[2] && R.T2.word === O.WORDS.T2[2] && R.H.word === O.WORDS.H[0] && O.ARMS.every((a) => A[a].uses === 12));
+    ok("the registration's RESULT SECTION (section 10) carries the three readings' words and USES, the commit the file was read at, that every expectation came, what section 5 said such a reading would say, the description after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 10\. The result/.test(note) && ["T1", "T2", "H"].every((t) => res.includes(`**${t}: ${R[t].word}**`)) && /\*\*USES: 12 of 12 in every arm\*\*/.test(res) && /62dd5be5/.test(res) && /\*\*Every expectation came\*\*/.test(res) &&
+        /the real wiring codes them no better than a shuffle that keeps every degree, and which output neuron learns from which teacher still does not matter/.test(res) && /\*\*Described after the reading, not registered \(the gate recomputes it\):\*\*/.test(res) &&
+        /0\.8095, 0\.8118 and 0\.8132/.test(res) && /\*\*The scoping's 3 of 3 for the real wiring was the luck of three draws\*\*/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyMushroomOdours-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
