@@ -46,13 +46,13 @@ export function conflictShips(state, t, obstacles, { minDepth = -Infinity, horiz
     return obstacles.filter((o) => o.type === "ship" && o.keel + H.VMARGIN > minDepth && H.shipConflict(state, t, [o], { at: H.posAt, horizon, clear, minDepth }));
 }
 /** The dive depth for a conflict: the deepest keel + VMARGIN + DIVE_PAD, or null when there is no conflict or it is deeper than DIVE_MAX. */
-export function diveDepth(ships) {
+export function diveDepth(ships, diveMax = DIVE_MAX) {   // diveMax: FOLLOW-UP 10's +under passes 70; the default is the registered 60
     if (!ships.length) return null;
     const d = Math.max(...ships.map((o) => o.keel)) + H.VMARGIN + DIVE_PAD;
-    return d <= DIVE_MAX ? d : null;
+    return d <= diveMax ? d : null;
 }
 /** The options as a pilot: transforms the target, then FOLLOW-UP 7's sweep, then the autopilot. `stats` counts the ticks each option acted and the deepest depth. */
-export function trafficPilot(sc, { leastbad = false, dive = false, base = (s, t, c) => AP.decide(s, t, c), dt = S.DT } = {}) {
+export function trafficPilot(sc, { leastbad = false, dive = false, base = (s, t, c) => AP.decide(s, t, c), dt = S.DT, diveMax = DIVE_MAX } = {}) {
     const sweep = W.sweepPilot(base), stats = { leastbadTicks: 0, diveTicks: 0, deepest: 0 }; let i = 0;
     const pilot = (s, target, cv) => {
         const t = i * dt; i++; let tgt = target;
@@ -61,7 +61,7 @@ export function trafficPilot(sc, { leastbad = false, dive = false, base = (s, t,
             const ships = conflictShips(s, t, sc.obstacles, { minDepth: sc.minDepth });
             if (ships.length) {
                 if (leastbad && G.giveWayHeading(s, tgt, t, sc.obstacles, sc.minDepth) === null) { const h = leastBadHeading(s, tgt.heading, t, ships); if (h !== null) { tgt = { ...tgt, heading: h }; stats.leastbadTicks++; } }
-                if (dive) { const d = diveDepth(ships); if (d !== null && d > tgt.depth) { tgt = { ...tgt, depth: d }; stats.diveTicks++; } }
+                if (dive) { const d = diveDepth(ships, diveMax); if (d !== null && d > tgt.depth) { tgt = { ...tgt, depth: d }; stats.diveTicks++; } }
             }
         }
         return sweep.pilot(s, tgt, cv);

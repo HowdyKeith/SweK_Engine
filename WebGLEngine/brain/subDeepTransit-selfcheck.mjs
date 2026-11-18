@@ -15,6 +15,9 @@
 //   P2 the shallowest keel (1), P3 bergs counted as ships (1), P4 the transit allowed shallower (1), P5 exactly 140 m kept deep (1), P6 no climb back (2), P7 the speed changed too (2),
 //   P8 the reference given a transit (1), P9 the dive and sweep bypassed (3), P10 the dive off (2), P11 the ship bar "no more" (2), P12 the copy against every arm (1),
 //   P13 --write allowed on DEV (1), P14 NO CRUSH always true (1).
+// FOLLOW-UP 10 SABOTAGE LOG (each broken in brain/subDeepTransit.mjs or brain/subTrafficDive.mjs, run, restored; red = FAIL rows of a gate that loaded):
+//   F1 UNDER_MAX 65 1 | F2 +under ignored (the limit stays 60) 1 | F3 +beneath hides ships at keel <= depth, not keel + VMARGIN 1 | F4 the dive left at 60 under +under 1 | F5 +beneath ignored 1
+//   F6 the measurement always on (FOLLOW-UP 9's record changed) 2 | F7 diveDepth ignores its limit option 2
 "use strict";
 import fs from "node:fs";
 import * as P from "./subDeepTransit.mjs";
@@ -96,6 +99,21 @@ sec("7. THE SOURCE");
 {
     const code = [new URL("./subDeepTransit.mjs", import.meta.url), new URL("../tools/ship/subDeepTransitStudy.mjs", import.meta.url)].map((u) => fs.readFileSync(u, "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")).join("\n");
     ok("!! no clock and no Math.random in either file; the study's registered numbers", !/Math\.random|Date\.now|new Date|performance\.now/.test(code) && T.GAIN === 5 && T.P_LEVEL === 0.10 && T.COPY_SEEDS === 5 && T.OUT_FILE === "brain/subDeepTransitHeld82.jsonl" && S.EXPLORER.crushDepth === 100);
+}
+
+sec("FOLLOW-UP 10: UNDER EVERY KEEL");
+{
+    const P10 = await import("./subDeepTransit.mjs"), D10 = await import("./subTrafficDive.mjs"), H10 = await import("./subHardNav.mjs");
+    const sc = P10.scenarioOf(7883), keels = sc.obstacles.filter((o) => o.type === "ship").map((o) => o.keel);
+    ok("!! +under: the limit is 70; the transit at 70 is the deepest keel of ALL the ships + VMARGIN + DIVE_PAD (here " + (Math.max(...keels) + 7).toFixed(2) + " m), where at 60 it leaves out keels over 53 m", P10.UNDER_MAX === 70 && Math.abs(P10.transitDepth(sc, 70) - (Math.max(...keels) + 7)) < 1e-12 && P10.transitDepth(sc) < P10.transitDepth(sc, 70) && P10.transitDepth(sc) === P10.transitDepth(sc, 60));
+    ok("!! the dive's limit is an option: a keel of 60 dives to 67 at 70 and is refused at the registered 60 (the default)", D10.diveDepth([{ keel: 60 }], 70) === 67 && D10.diveDepth([{ keel: 60 }]) === null && D10.diveDepth([{ keel: 53 }]) === 60);
+    ok("!! a ship +beneath leaves out cannot be hit: at a depth of keel + VMARGIN or more, gapTo is Infinity whatever the horizontal gap", [20, 37.5, 55].every((k) => H10.gapTo({ keel: k, x: 0, y: 0, vx: 0, vy: 0, r: 20 }, 0, 0, k + H10.VMARGIN, 0) === Infinity));
+    ok("!! the three arms are the prototype's (pinned on spent HELD82 seeds; all 270 HELD82 and DEV flights matched the prototype when built): 7883 R collided at 2722 ticks, U and L reach (5058, 7513); 7920 R leaves (3461), U reaches (4184), L leaves (3467)", (() => { const f = (s, a) => { const r = P10.flyDeep(P10.scenarioOf(s), a); return `${r.status}:${r.ticks}`; }; return f(7883, P10.REFERENCE10) === "collided:2722" && f(7883, P10.DESIGNATED10) === "reached:5058" && f(7883, P10.ATTRIBUTION10) === "reached:7513" && f(7920, P10.REFERENCE10) === "left:3461" && f(7920, P10.DESIGNATED10) === "reached:4184" && f(7920, P10.ATTRIBUTION10) === "left:3467"; })());
+    const plain = P10.flyDeep(P10.scenarioOf(2), "sweep+dive+deep"), meas = P10.flyDeep(P10.scenarioOf(2), "sweep+dive+deep", { measure: true });
+    ok("!! measure off is FOLLOW-UP 9's record field for field; measure on only adds minShipClear and hiddenShipTicks (the flight unchanged)", !("minShipClear" in plain) && J(Object.keys(meas).filter((k) => !(k in plain))) === J(["minShipClear", "hiddenShipTicks"]) && meas.ticks === plain.ticks && meas.path === plain.path);
+    const hit = P10.flyDeep(P10.scenarioOf(7883), P10.REFERENCE10, { measure: true }), u = P10.flyDeep(P10.scenarioOf(7883), P10.DESIGNATED10, { measure: true });
+    ok("  the clearance is near 0 on a ship collision; +beneath counts the ticks it hid a ship; the reference hides none", hit.status === "collided" && hit.minShipClear < 0.5 && u.hiddenShipTicks > 0 && hit.hiddenShipTicks === 0, `${hit.minShipClear.toFixed(3)}, ${u.hiddenShipTicks}`);
+    ok("  an unknown arm is still refused by name; HELD88 is 10201 to 10400", /unknown arm "deep70"/.test((() => { try { P10.flyDeep(sc, "deep70"); return ""; } catch (e) { return e.message; } })()) && P10.HELD88[0] === 10201 && P10.HELD88.length === 200);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
