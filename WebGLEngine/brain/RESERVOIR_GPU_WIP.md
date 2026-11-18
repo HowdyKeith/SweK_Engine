@@ -130,6 +130,20 @@ The same rule gives a second reading for k = 4: **FOUR TICKS COST NOTHING THAT M
 
 **Expectations, written before any dive is flown.** E1 ONE TICK COSTS NOTHING THAT MATTERS: about 80 percent (a tick is 1/30 s; the hull's time constants are seconds). E2 FOUR TICKS COST NOTHING THAT MATTERS: about 50 percent. E3 the cost grows with k: about 75 percent.
 
+### PART A RESULT (2026-11-18, read once: `node tools/ship/latenessStudy.mjs --write`, 500 dives, file brain/rig-results/lateness-90000.json)
+
+**ONE TICK COSTS NOTHING THAT MATTERS. FOUR TICKS COST NOTHING THAT MATTERS.** All three checks passed (on time is the pilot bit for bit on 10 dives; the delay exact for k = 1, 2, 4 on a recorded run; the same 500 dives in every arm). No dive ended early in any arm.
+
+    k   mean score  nominal  recovery  current   k minus on time (2 se interval)
+    0   -0.4228     -0.347   -0.453    -0.409    -
+    1   -0.4226     -0.347   -0.453    -0.408    +0.0002 (0.0002 to 0.0002)
+    2   -0.4224     -0.347   -0.452    -0.408    +0.0004 (0.0003 to 0.0004)
+    4   -0.4221     -0.346   -0.452    -0.408    +0.0007 (0.0006 to 0.0008)
+
+Expectations: E1 (one tick costs nothing, about 80 percent) RIGHT. E2 (four ticks cost nothing, about 50 percent) RIGHT; I gave it too little. E3 (the cost grows with k, about 75 percent) WRONG as written: there is no cost at all. The difference GROWS with k but it is a GAIN, and it is tiny: 0.0007 at four ticks is a fourteenth of the margin. Said plainly: a few ticks of lateness is a slight damping of a pilot whose output is mostly the PD laws, and it does not hurt; that gain is an observation on a set flown once, not a reading, and nothing is chosen on it. The intervals are narrow because the arms are paired dive by dive and differ only in a few ticks of controls.
+
+**What it decides.** The device type's lateness is not a reason to keep it off: in the page it is 2 to 3 ticks late, inside the four ticks measured. Whether it is worth turning on is the rig's timing alone.
+
 ### PART B, THE TYPE (built after PART A is read, whatever it says)
 
 `render/subAquariumFlyCxGpu.mjs`: a tank pilot type for the fly circuit that runs it on a WebGPU device through `brain/reservoirPilotGpu.mjs`. Every tick it submits the step and returns the newest controls that have come back, flying the PD autopilot until the first lands. It resets the device's memory when the sub's dive changes, as the CPU type does.
