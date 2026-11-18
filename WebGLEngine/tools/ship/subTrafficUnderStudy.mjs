@@ -12,7 +12,7 @@ import * as P from "../../brain/subDeepTransit.mjs";
 import * as AP from "../../brain/autopilotSub.mjs";
 import * as E from "../../brain/navEnergy.mjs";
 import * as S from "../../physics/mechanics/subModel6dof.mjs";
-import { statsOf, pairOf } from "./subGiveWayStudy.mjs";
+import { statsOf, pairOf, signTest } from "./subGiveWayStudy.mjs";
 import { parseOrExit } from "./cliArgs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
@@ -64,7 +64,7 @@ export function report(res, checks, { set, n }) {
     L2.push(`bars: (a) ship collisions ${t.d.ships} at most half of R's ${t.r.ships}: ${t.bars.ships}; (b) net ${t.pair.net} >= ${GAIN} at p <= ${P_LEVEL}: ${t.bars.gain}; (c) exits ${t.d.left} no more than R's ${t.r.left} and at most 1: ${t.bars.exits}`);
     L2.push(`reported (moves nothing): L against R: gained ${l.pair.gained}, lost ${l.pair.lost}, net ${l.pair.net}, p ${l.pair.p.toFixed(4)}; ships ${l.d.ships} against ${l.r.ships}; exits ${l.d.left}`);
     const clr = (a) => res[a].map((r) => r.minShipClear), up = clr(U).filter((c, i) => c > clr(R)[i] + 1e-9).length, down = clr(U).filter((c, i) => c < clr(R)[i] - 1e-9).length;
-    L2.push(`reported (moves nothing): minimum ship clearance, U against R: larger in ${up}, smaller in ${down}`);
+    L2.push(`reported (moves nothing): minimum ship clearance, U against R: larger in ${up}, smaller in ${down}, exact sign p ${signTest(Math.min(up, down), up + down).toFixed(4)}`);
     for (const a of [R, U]) { const rs = res[a], shipC = rs.filter((r) => r.status === "collided" && r.hit === "ship"); L2.push(`reported (moves nothing): ${a} failures -- ship collisions in scenarios with a keel over ${DEEP_KEEL} m ${shipC.filter((r) => r.deepKeel).length}, in the others ${shipC.filter((r) => !r.deepKeel).length}; other collisions ${rs.filter((r) => r.status === "collided" && r.hit !== "ship").length}; exits ${rs.filter((r) => r.status === "left").length}; timeouts ${rs.filter((r) => r.status === "timeout").length} (coarser than the diagnosis's classes: the record does not say WHICH ship was hit)`); }
     L2.push(dev ? "DEV: a sanity run, not a result (no verdict is drawn on DEV)" : `VERDICT: ${t.verdict}${t.harmful ? "   HARMFUL" : ""}`);
     return L2;

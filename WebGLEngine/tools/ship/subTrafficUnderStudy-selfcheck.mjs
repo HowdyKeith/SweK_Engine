@@ -41,7 +41,7 @@ sec("1. THE TEST");
     const harm = Y.testOf(res3("rrrrr" + base, "sssss" + base), U);
     ok("!! 5 lost: net -5 is HARMFUL, NOT SUPPORTED", harm.pair.net === -5 && harm.harmful && harm.verdict === "NOT SUPPORTED");
     const r = res3("ssssssss" + base, "rrrrrrrs" + base, "rrrrssss" + base), L2 = Y.report(r, Y.checksOf(r, { copy: true, bites: true, seeds: P.HELD88.slice(0, 48) }), { set: "held88", n: 48 }).join("\n");
-    ok("!! the report prints the three bars, L against R (reported), the clearance comparison and the failure classes; the verdict line", /bars: \(a\)/.test(L2) && /L against R: gained 4, lost 0, net 4/.test(L2) && /minimum ship clearance, U against R/.test(L2) && /keel over 53 m/.test(L2) && /VERDICT: SUPPORTED/.test(L2));
+    ok("!! the report prints the three bars, L against R (reported), the clearance comparison and the failure classes; the verdict line", /bars: \(a\)/.test(L2) && /L against R: gained 4, lost 0, net 4/.test(L2) && /minimum ship clearance, U against R: larger in \d+, smaller in \d+, exact sign p \d/.test(L2) && /keel over 53 m/.test(L2) && /VERDICT: SUPPORTED/.test(L2));
 }
 
 sec("2. THE CHECKS");
