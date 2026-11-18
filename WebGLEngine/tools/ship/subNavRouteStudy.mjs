@@ -52,9 +52,9 @@ export function oldFlightsStand(stored, fly = (sc) => P.flyPlus(pilot, sc, "any+
     const want = new Map(stored.filter((r) => r.arm === "any+crab").map((r) => [`${r.kind}|${r.seed}`, r]));
     return CURRENT_KINDS.every((k) => P.PLUS_SETS.held73.slice(0, REPRO_SEEDS).every((s) => { const w = want.get(`${k}|${s}`), g = fly(P.plusScenario(s, k)); return !!w && w.status === g.status && w.ticks === g.ticks && w.path === g.path; }));
 }
-export function checksOf(runs, { still, old, bite }) {
+export function checksOf(runs, { still, old, bite, seeds = null }) {
     const a = runs.filter((r) => r.arm === R.ROUTE_REFERENCE), b = runs.filter((r) => r.arm === R.ROUTE_DESIGNATED);
-    const same = a.length > 0 && a.length === b.length && a.every((r, i) => r.seed === b[i].seed && r.kind === b[i].kind);
+    const same = a.length > 0 && a.length === b.length && a.every((r, i) => r.seed === b[i].seed && r.kind === b[i].kind && r.kind === R.STREAM_KIND) && (!seeds || (a.length === seeds.length && a.every((r, i) => r.seed === seeds[i])));
     return [{ name: "SAME SCENARIOS", ok: same, text: `both arms fly the same ${a.length} scenarios in the same order: ${same}` },
         { name: "STILL WATER IS THE SHARED PLAN", ok: still === true, text: `on DEV seeds 1 to ${STILL_SEEDS} with the stream's speed 0 the two arms fly the same flight to the digit: ${still}` },
         { name: "THE OLD FLIGHTS STAND", ok: old === true, text: `with the new options off any+crab reproduces ${STORED_73} on HELD73's first ${REPRO_SEEDS} seeds of each kind: ${old}` },
@@ -70,11 +70,14 @@ export function judge(runs, scs = []) {
     const pr = paired(rt, ref), cr = cell(rt), cf = cell(ref);
     const isFaster = med <= FASTER_RATIO && pT <= FASTER_P, safe = pr.gain >= 0 && cr.collided <= cf.collided;
     const supported = isFaster && safe, partly = !supported && (isFaster || (med <= PARTLY_RATIO && pT <= FASTER_P) || (pr.gain >= REACH_GAIN && pr.p <= REACH_P));
-    const along = new Set(scs.filter(alongTrack).map((sc) => sc.seed)), split = (inSet) => { const xs = ratios.filter((x) => along.has(x.seed) === inSet).map((x) => x.r); return { n: xs.length, median: median(xs) }; };
+    const along = new Set(scs.filter(alongTrack).map((sc) => sc.seed)), split = (inSet) => {
+        const xs = ratios.filter((x) => along.has(x.seed) === inSet), f = xs.filter((x) => x.r < 1 - TIE).length, sl = xs.filter((x) => x.r > 1 + TIE).length, sub = (rs) => rs.filter((r) => along.has(r.seed) === inSet), q = paired(sub(rt), sub(ref));
+        return { n: xs.length, median: median(xs.map((x) => x.r)), faster: f, slower: sl, pT: signP(f, sl), gain: q.gain, pR: q.p, collided: [cell(sub(rt)).collided, cell(sub(ref)).collided] };
+    };
     return { n: ratios.length, faster, slower, median: med, pT, isFaster, pr, cr, cf, supported, partly, harmful: pr.gain <= HARMFUL, verdict: supported ? "SUPPORTED" : partly ? "PARTLY SUPPORTED" : "NOT SUPPORTED",
         medT: { route: median(rt.filter((r) => r.reached).map((r) => r.t)), ref: median(ref.filter((r) => r.reached).map((r) => r.t)) }, along: split(true), across: split(false) };
 }
-export function report(runs, checks, scs, title) {
+export function report(runs, checks, scs, title, flownBite = null) {
     const L = [`ITEM 2 PART 2, THE CURRENT IN THE COST: ${title}`];
     for (const c of checks) L.push(`  ${c.ok ? "PASS" : "FAIL"} ${c.name}: ${c.text}`);
     if (checks.some((c) => !c.ok)) { L.push("A CHECK FAILED: the verdict is NOT WEIGHED.", "VERDICT: NOT WEIGHED"); return L; }
@@ -83,8 +86,9 @@ export function report(runs, checks, scs, title) {
     const j = judge(runs, scs);
     L.push(`R1 TIME (both reached, ${j.n}): the route faster on ${j.faster}, slower on ${j.slower}; median ratio ${j.median.toFixed(4)}; exact sign p ${j.pT.toFixed(4)}: ${j.isFaster ? "FASTER" : "not FASTER"} (the bar: median at most ${FASTER_RATIO} and p at most ${FASTER_P})`);
     L.push(`R2 REACH: ${j.pr.aOnly} only the route, ${j.pr.bOnly} only the reference, both ${j.pr.both}, neither ${j.pr.neither}; gain ${j.pr.gain}, exact sign p ${j.pr.p.toFixed(4)}; collisions ${j.cr.collided} against ${j.cf.collided}${j.harmful ? "   HARMFUL" : ""}`);
-    L.push(`reported: the stream along the track: ${j.along.n} scenarios, median ratio ${j.along.median.toFixed(4)}; across it: ${j.across.n}, median ratio ${j.across.median.toFixed(4)}`);
-    L.push(`VERDICT: ${j.verdict}`);
+    for (const [name, x] of [["along the track", j.along], ["across it", j.across]]) L.push(`reported (moves nothing): the stream ${name}: ${x.n} both reached, median ratio ${x.median.toFixed(4)}, faster ${x.faster} slower ${x.slower} (p ${x.pT.toFixed(4)}); reach gain ${x.gain} (p ${x.pR.toFixed(4)}); collisions ${x.collided[0]} against ${x.collided[1]}`);
+    if (flownBite) L.push(`reported (moves nothing): ${flownBite.moved} of ${flownBite.n} of these scenarios (${(100 * flownBite.share).toFixed(1)} percent) have t = 0 start headings more than ${AIM_DEG} degrees apart`);
+    L.push(`VERDICT: ${j.verdict}${j.harmful ? "   HARMFUL" : ""}`);
     return L;
 }
 
@@ -93,9 +97,12 @@ export function command(argv, io = {}) {
     const spec = { values: { "--part": "string", "--set": "string", "--seeds": "number" }, flags: ["--write"] };
     const cli = parseOrExit("subNavRouteStudy", spec, argv, io.exitIo), part = cli.values["--part"], set = cli.values["--set"] || "dev", seeds = cli.values["--seeds"];
     if (part !== undefined && part !== "a") { err("subNavRouteStudy: --part takes a (PART B is --set dev or --set held86)"); return 2; }
+    if (part !== undefined && (cli.values["--set"] !== undefined || seeds !== undefined || cli.flags.has("--write"))) { err("subNavRouteStudy: --part a takes no --set, --seeds or --write (it flies nothing and writes nothing)"); return 2; }
     if (part === undefined && !R.ROUTE_SETS[set]) { err(`subNavRouteStudy: --set needs dev or held86, got ${JSON.stringify(set)}`); return 2; }
     if (cli.flags.has("--write") && set !== "held86") { err("subNavRouteStudy: --write goes with --set held86 only"); return 2; }
     if (seeds && set === "held86") { err("subNavRouteStudy: HELD86 is flown whole; --seeds is for DEV"); return 2; }
+    if (set === "held86" && !cli.flags.has("--write")) { err("subNavRouteStudy: HELD86 is flown ONCE, so its flights are always written: add --write"); return 2; }
+    if (set === "held86" && (io.exists || fs.existsSync)(path.join(ENG, OUT_FILE))) { err(`subNavRouteStudy: HELD86 was already flown (${OUT_FILE} exists); it is flown ONCE`); return 2; }
     const f = { bite: biteOf, runs: routeRuns, still: stillIsShared, old: () => oldFlightsStand(fs.readFileSync(path.join(ENG, STORED_73), "utf8").trim().split("\n").map((l) => JSON.parse(l))), ...(io.flights || {}) };
     if (part === "a") {
         const b = f.bite(partAScenarios(), meanCurrent);
@@ -106,9 +113,12 @@ export function command(argv, io = {}) {
     const dev = R.streamSetOf("dev"), bite = f.bite(dev, streamCurrent);
     out(`check 4 on DEV (field only, ${dev.length} hard-stream scenarios): ${bite.moved} moved, ${(100 * bite.share).toFixed(1)} percent against a bar of ${100 * BITE_BAR}`);
     if (set === "held86" && !bite.met) { out("THE ROUTE DOES NOT BITE on DEV: HELD86 is NOT flown."); out("VERDICT: NOT FLOWN: THE STREAM DOES NOT MOVE THE PLAN"); return 0; }
-    const scs = set === "dev" ? (seeds ? dev.slice(0, seeds) : dev) : R.streamSetOf(set), runs = f.runs(scs);
-    for (const l of report(runs, checksOf(runs, { still: f.still(), old: f.old(), bite }), scs, `${set.toUpperCase()}, ${scs.length} hard-stream scenarios${set === "dev" ? " (DEV: a sanity run, not a result)" : ", flown once"}`)) out(l);
-    if (cli.flags.has("--write")) { writeFile(path.join(ENG, OUT_FILE), runs.map((r) => JSON.stringify({ set, ...r, cEst60: undefined, cMean: undefined })).join("\n") + "\n"); out(`wrote ${runs.length} flights to ${OUT_FILE}`); }
+    // checks 2 and 3 do not read the flights: they are flown FIRST, and a failure on HELD86 flies nothing (Amendment 1)
+    const still = f.still(), old = f.old();
+    if (set === "held86" && !(still && old)) { for (const c of checksOf([], { still, old, bite }).filter((c) => c.name !== "SAME SCENARIOS" && !c.ok)) out(`  FAIL ${c.name}: ${c.text}`); out("A CHECK FAILED before any HELD86 flight: HELD86 is NOT flown."); out("VERDICT: NOT WEIGHED"); return 0; }
+    const scs = set === "dev" ? (seeds ? dev.slice(0, seeds) : dev) : R.streamSetOf(set), flownBite = set === "dev" && !seeds ? bite : f.bite(scs, streamCurrent), runs = f.runs(scs);
+    for (const l of report(runs, checksOf(runs, { still, old, bite, seeds: scs.map((sc) => sc.seed) }), scs, `${set.toUpperCase()}, ${scs.length} hard-stream scenarios${set === "dev" ? " (DEV: a sanity run, not a result)" : ", flown once"}`, flownBite)) out(l);
+    if (cli.flags.has("--write")) { const byS = new Map(scs.map((sc) => [sc.seed, sc])); writeFile(path.join(ENG, OUT_FILE), runs.map((r) => JSON.stringify({ set, ...r, cMean: undefined, stream: byS.get(r.seed).stream, along: alongTrack(byS.get(r.seed)) })).join("\n") + "\n"); out(`wrote ${runs.length} flights to ${OUT_FILE}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));

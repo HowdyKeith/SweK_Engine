@@ -35,14 +35,14 @@ sec("1. THE STREAM");
     const st = { theta: Math.PI / 2, px: 100, py: 0, halfWidth: 30, speed: 2 };   // a stream running along +y through x = 100
     const c0 = R.streamAt(st, 100, 50), c15 = R.streamAt(st, 115, -20), c30 = R.streamAt(st, 130, 0), c40 = R.streamAt(st, 60, 0);
     ok("!! the peak on the centre line runs along theta; cos^2 across it (half the peak at a quarter... at d = 15 of 30: 2 cos^2(pi/4) = 1); zero at the half-width and beyond", close(c0[0], 0, 1e-12) && close(c0[1], 2) && close(Math.hypot(c15[0], c15[1]), 1) && c30[0] === 0 && c30[1] === 0 && c40[1] === 0 && c0[2] === 0, JSON.stringify([c0, c15].map((v) => v.map((x) => +x.toFixed(4)))));
-    const sc = R.streamScenario(7), base = H.hardScenario(7, "hard-current");
+    const sc = R.streamScenario(507), base = H.hardScenario(507, "hard-current");
     ok("!! the scenario is hard-current's start, waypoint, islands, icebergs and weight error for the seed; its uniform current is dropped (current null)", JSON.stringify(sc.start) === JSON.stringify(base.start) && JSON.stringify(sc.goal) === JSON.stringify(base.goal) && JSON.stringify(sc.obstacles) === JSON.stringify(base.obstacles) && sc.weightError === base.weightError && sc.current === null && sc.kind === "hard-stream");
     const ss = Array.from({ length: 200 }, (_, i) => R.streamScenario(1000 + i).stream), inR = (v, lo, hi) => v >= lo && v < hi;
     ok("!! the stream's draws are in their registered ranges (theta 0 to 2 pi, P x 120 to 280, y -60 to 60, half-width 25 to 45, peak 1.2 to 2.2) and spread across them", ss.every((s) => inR(s.theta, 0, 2 * Math.PI) && inR(s.px, 120, 280) && inR(s.py, -60, 60) && inR(s.halfWidth, 25, 45) && inR(s.speed, 1.2, 2.2)) && Math.max(...ss.map((s) => s.speed)) > 2.1 && Math.min(...ss.map((s) => s.speed)) < 1.3);
-    const r = ((a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; })((7 * 7919 + 90001) >>> 0);
+    const r = ((a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; })((507 * 7919 + 90001) >>> 0);
     const want = [r() * 2 * Math.PI, 120 + 160 * r(), -60 + 120 * r(), 25 + 20 * r(), 1.2 + r()], got = sc.stream;
     ok("!! drawn from mulberry(seed x 7919 + 90001) in the registered order: theta, the point's x then y, the half-width, the peak", [got.theta, got.px, got.py, got.halfWidth, got.speed].every((v, i) => close(v, want[i], 1e-9)));
-    ok("  the same seed gives the same scenario; speedScale 0 is still water everywhere", JSON.stringify(R.streamScenario(7)) === JSON.stringify(sc) && R.streamScenario(7, { speedScale: 0 }).stream.speed === 0 && R.streamAt(R.streamScenario(7, { speedScale: 0 }).stream, sc.stream.px, sc.stream.py).every((v) => v === 0));
+    ok("  the same seed gives the same scenario; speedScale 0 is still water everywhere", JSON.stringify(R.streamScenario(507)) === JSON.stringify(sc) && R.streamScenario(507, { speedScale: 0 }).stream.speed === 0 && R.streamAt(R.streamScenario(507, { speedScale: 0 }).stream, sc.stream.px, sc.stream.py).every((v) => v === 0));
     ok("  an unknown set is refused by name", /unknown set "held9"/.test(thr(() => R.streamSetOf("held9"))) && R.ROUTE_SETS.held86[0] === 9301 && R.ROUTE_SETS.held86.length === 200);
 }
 

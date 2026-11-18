@@ -279,3 +279,28 @@ They differ ONLY in the plan.
 * G8: the time gain is larger on along-track streams than on across-track ones, about 80 percent.
 
 **What a result would not say.** Anything about a stream the vessel must sense rather than read from a map; a stream that varies in time or with depth; a vessel at another speed (V is the cruise); or the shared solver and the GPU fleet's (not edited). Nothing about the corner-angle margin (still open). `hard-stream` is a family I made with these parameters, and the stream is drawn independently of the islands.
+
+### AMENDMENT 1 TO ITEM 2 PART 2 (2026-11-18; made AFTER the code was committed (01330867) and reviewed, BEFORE any DEV or HELD86 flight of hard-stream)
+
+**What happened, said first.** Before flying anything registered, I had the code reviewed against this registration by three independent lenses, each finding checked by a skeptic. The reviewers were told not to touch DEV or HELD86. **They flew hard-stream seeds 501 to 700, which are in no set, with both arms, and so the following is now KNOWN to me before any registered flight:**
+* the start-heading bite there was 24 of 200 (12 percent; in 30-seed windows 2, 5, 3, 8, 1 and 5), so a 30-seed DEV lands on either side of check 4's 15 percent bar about as often as not;
+* of 194 scenarios both arms reached, 144 were EXACT TIES (the stream never touches the path either arm flies), and 50 differed;
+* with the ties kept in R1's median, the median ratio is 1 (R1 not FASTER); with them dropped, about 0.973 (it would read PARTLY SUPPORTED).
+
+Nothing below is chosen to change what that predicts.
+
+**The tie reading is CONFIRMED AS CODED, not changed.** The registration's sentence "Ties, |r - 1| < 1e-9, are dropped" did not say whether it covers the median as well as the sign test. The code committed before any flight drops ties from the SIGN TEST only and keeps them in the MEDIAN, and its gate pinned that ("dropped from the sign test but stay in the median"), before anyone had flown a hard-stream seed. That is the usual sign-test convention, and the reading fixed before the data. Changing it now would flip the surrogate's reading to the better one, so it stays as it was. The report prints the counts, so a reader can see both.
+
+**Procedural fixes (none touches an arm, a bar or a verdict rule):**
+1. Checks 2 and 3 do not read the HELD86 flights, so they now run FIRST; a failure flies nothing and prints NOT WEIGHED. Before this, a failed check would have spent the held set on a read that could not be weighed.
+2. HELD86 is refused without --write, and refused if its file already exists (flown ONCE).
+3. The registered "reported" items are now printed for the flown set: its own start-heading share (field only), and the along/across split with its R1 and R2 numbers and collisions. Before this, only DEV's share and two medians were printed.
+4. HARMFUL is printed beside the verdict.
+5. Check 1 also requires the exact HELD86 seed list and kind.
+6. PART A refuses flags it ignored.
+7. Each written flight carries its stream and the along flag.
+8. The gates: the still-water identity now covers every DEV field (120); the route gate no longer builds a DEV scenario (seed 7 became 507).
+
+**Said plainly, not changed:** check 4 measures only the t = 0 start-cell heading, so a stream met later on the route (seeds 532 and 540 of the surrogate gained 7 and 10 percent with 0 degrees at the start) does not count toward it. PART A uses the route arm's time-aware aim points on the directional field. The lowest-dist flow is not the time-optimal successor under a directional cost, a limitation of the registered solver that a later round could fix with a successor rule that is the shared flow at c = 0.
+
+**What I now expect (the registered expectations stand; this is added, and moves nothing).** Check 4 is about a coin flip. If HELD86 is flown, NOT SUPPORTED is the likely verdict under the reading as coded, because most scenarios tie.

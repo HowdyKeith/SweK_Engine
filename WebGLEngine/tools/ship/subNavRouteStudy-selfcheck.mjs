@@ -13,6 +13,8 @@
 //   Y4 HARMFUL at gain < -5: 0 red at first (no fixture at exactly -5); the -5 row added; then 1 | Y5 HELD86 flown when check 4 fails on DEV 1 | Y6 check 4 always passes 1
 //   Y7 PART A planned in still water 1 (the row was added before the pass) | Y8 the partial bar's p 0.01: 0 red at first (the fixture's p was tiny); the p 0.013 row added; then 1
 //   Y9 the along bar 0.9: 0 red at first (the fixture's angles were far from the bar); the acos(0.75) / acos(0.65) row added; then 1
+//   AMENDMENT 1's fixes, each with its row written first: Z1 checks 2 and 3 after the HELD86 flights again 1 | Z2 a second HELD86 flight allowed (the file exists) 1 | Z3 HELD86 without --write 1
+//   Z4 the held set's start-heading share not reported 1 | Z5 SAME SCENARIOS blind to the seed list 1 | Z6 HARMFUL not beside the verdict 1 | Z7 --part a with --set accepted 1 | Z8 DEV's share reported as the held set's 1
 "use strict";
 import fs from "node:fs";
 import * as Y from "./subNavRouteStudy.mjs";
@@ -62,6 +64,8 @@ sec("2. THE CHECKS");
     const shifted = runs.map((r) => (r.arm === "any+crab+route" ? { ...r, seed: r.seed + 1 } : r));
     ok("!! each check fails on its own break and names itself", bad({}).length === 0 && J(bad({}, shifted)) === J(["SAME SCENARIOS"]) && J(bad({ still: false })) === J(["STILL WATER IS THE SHARED PLAN"]) && J(bad({ old: false })) === J(["THE OLD FLIGHTS STAND"]) && J(bad({ bite: { n: 30, moved: 4, share: 4 / 30, met: false } })) === J(["THE ROUTE BITES"]));
     const L = Y.report(runs, Y.checksOf(runs, { ...good, old: false }), [], "fixture").join("\n");
+    ok("!! SAME SCENARIOS names the seeds: a run of 3 scenarios against an expected list of 4 fails it", J(Y.checksOf(runs.slice(0, 6), { ...good, seeds: [9301, 9302, 9303, 9304] }).filter((c) => !c.ok).map((c) => c.name)) === J(["SAME SCENARIOS"]) && Y.checksOf(runs, { ...good, seeds: [9301, 9302, 9303, 9304] }).every((c) => c.ok));
+    ok("!! HARMFUL is printed beside the verdict", /VERDICT: NOT SUPPORTED   HARMFUL/.test(Y.report(runsOf([...rep(6, ["reached", 150, "timeout", 0]), ...rep(20, ["reached", 150, "reached", 150])]), Y.checksOf(runsOf([...rep(6, ["reached", 150, "timeout", 0]), ...rep(20, ["reached", 150, "reached", 150])]), good), [], "fixture").join("\n")));
     ok("!! one failed check: NOT WEIGHED and no verdict", /VERDICT: NOT WEIGHED/.test(L) && !/R1 TIME/.test(L));
 }
 
@@ -76,13 +80,19 @@ sec("3. THE BITE");
 
 sec("4. THE COMMAND");
 {
-    const run = (argv, fl = {}) => { const out = [], err = [], files = []; let flown = 0; const code = Y.command(argv, { out: (m) => out.push(m), err: (m) => err.push(m), writeFile: (f, t) => files.push([f, t]), exitIo: { err: (m) => err.push(m), exit: (c) => { throw new Error("exit " + c); } }, flights: { bite: () => ({ n: 30, moved: 9, share: 0.3, met: true }), runs: (scs) => { flown += scs.length; return runsOf(scs.map(() => ["reached", 150, "reached", 140])); }, still: () => true, old: () => true, ...fl } }); return { code, out: out.join("\n"), err: err.join("\n"), files, flown }; };
+    const run = (argv, fl = {}) => { const out = [], err = [], files = []; let flown = 0; const code = Y.command(argv, { out: (m) => out.push(m), err: (m) => err.push(m), writeFile: (f, t) => files.push([f, t]), exitIo: { err: (m) => err.push(m), exit: (c) => { throw new Error("exit " + c); } }, exists: fl.exists || (() => false), flights: { bite: () => ({ n: 30, moved: 9, share: 0.3, met: true }), runs: (scs) => { flown += scs.length; return runsOf(scs.map(() => ["reached", 150, "reached", 140])); }, still: () => true, old: () => true, ...fl } }); return { code, out: out.join("\n"), err: err.join("\n"), files, flown }; };
     const thrown = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
     ok("!! refused: an unknown set, --part b, --write on DEV, --seeds on HELD86; an unknown option exits 2 before anything runs", run(["--set", "held9"]).code === 2 && run(["--part", "b"]).code === 2 && run(["--write"]).code === 2 && run(["--set", "held86", "--seeds", "3"]).code === 2 && /exit 2/.test(thrown(() => run(["--sets", "dev"]))));
     const nf = run(["--set", "held86", "--write"], { bite: () => ({ n: 30, moved: 3, share: 0.1, met: false }) });
     ok("!! check 4 failing on DEV: HELD86 is NOT flown and nothing is written", nf.code === 0 && nf.flown === 0 && nf.files.length === 0 && /VERDICT: NOT FLOWN: THE STREAM DOES NOT MOVE THE PLAN/.test(nf.out));
     const w = run(["--set", "held86", "--write"]);
     ok("!! HELD86: 200 scenarios flown, the verdict printed, every flight written to brain/subNavRouteHeld86.jsonl", w.flown === 200 && /VERDICT: SUPPORTED/.test(w.out) && w.files.length === 1 && w.files[0][0].endsWith("brain/subNavRouteHeld86.jsonl") && w.files[0][1].trim().split("\n").length === 400);
+    ok("!! HELD86 is flown ONCE: refused without --write, and refused when brain/subNavRouteHeld86.jsonl already exists, before anything is measured or flown", run(["--set", "held86"]).code === 2 && run(["--set", "held86"]).flown === 0 && (() => { const x = run(["--set", "held86", "--write"], { exists: () => true }); return x.code === 2 && x.flown === 0 && /already flown/.test(x.err); })());
+    const ck = run(["--set", "held86", "--write"], { still: () => false });
+    ok("!! check 2 (or 3) failing is found BEFORE any HELD86 flight: nothing flown, nothing written, NOT WEIGHED", ck.flown === 0 && ck.files.length === 0 && /FAIL STILL WATER IS THE SHARED PLAN/.test(ck.out) && /VERDICT: NOT WEIGHED/.test(ck.out) && run(["--set", "held86", "--write"], { old: () => false }).flown === 0);
+    let bitten = []; const rb = run(["--set", "held86", "--write"], { bite: (scs) => { bitten.push(scs.length); return { n: scs.length, moved: scs.length === 200 ? 17 : 9, share: scs.length === 200 ? 0.085 : 0.3, met: true }; } });
+    ok("!! the held set's own start-heading share is reported (field only), beside DEV's check 4; each written flight carries its stream and the along flag", J(bitten) === J([30, 200]) && /reported \(moves nothing\): 17 of 200 of these scenarios/.test(rb.out) && (() => { const l = JSON.parse(rb.files[0][1].split("\n")[0]); return l.stream && typeof l.along === "boolean" && l.set === "held86"; })());
+    ok("  --part a refuses --set, --seeds and --write", run(["--part", "a", "--set", "dev"]).code === 2 && run(["--part", "a", "--seeds", "3"]).code === 2 && run(["--part", "a", "--write"]).code === 2);
     const a = run(["--part", "a"], { bite: () => ({ n: 60, moved: 0, share: 0, met: false }), runs: () => { throw new Error("PART A must not fly"); } });
     ok("!! PART A prints its record and its reading and flies nothing", a.code === 0 && a.flown === 0 && /PART A \(a record, not a test\): 0 of 60/.test(a.out) && /DOES NOT MOVE THE PLAN: the uniform-current route arm is NOT FLOWN/.test(a.out));
 }

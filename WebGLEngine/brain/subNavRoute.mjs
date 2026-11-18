@@ -58,7 +58,7 @@ export function segmentTime(x0, y0, x1, y1, currentAt, V = V_PLAN) {
 }
 /**
  * The time-aware aim points (the registration's rule): buildAim's (subFieldNav), with one more condition for taking the next cell's aim point -- the straight segment's time (segmentTime) is no
- * more than the plan's time from the cell to that point (its dist less the point's) plus one cell. With no current they are buildAim's bit for bit (the gate holds it on 120 fields).
+ * more than the plan's time from the cell to that point (its dist less the point's) plus one cell. With no current they are buildAim's bit for bit (the gate holds it on 40 fields).
  */
 export function buildTimedAim(field, goal) {
     const { w, h, dist, fx, fz, blocked, currentAt, V } = field, ax = new Float64Array(w * h).fill(NaN), ay = new Float64Array(w * h).fill(NaN), ad = new Float64Array(w * h).fill(NaN), order = [];

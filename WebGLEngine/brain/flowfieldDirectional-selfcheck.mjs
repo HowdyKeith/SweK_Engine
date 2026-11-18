@@ -6,7 +6,7 @@
 //   1 THE STEP      stepCost: still water costs `cell`; with the current, against it, across it by the closed forms (to the 1/1024 quantum); impassable when the cross component reaches V or
 //                   the ground speed falls to G_MIN.
 //   2 KNOWN ANSWERS on an empty grid the dist of k cells up-current, down-current and across is k steps of the closed form: THE VESSEL TRAVELS FROM THE NEIGHBOUR TOWARD THE SETTLED CELL.
-//   3 STILL WATER   on 40 nav fields (seeds 1 to 10 of four hard kinds) the field is the shared solver's bit for bit (dist, fx, fz).
+//   3 STILL WATER   on 120 nav fields (seeds 1 to 30 of four hard kinds) the field is the shared solver's bit for bit (dist, fx, fz).
 //   4 TERMINATION   pops never exceed the cell count, with a current whose costs are not whole numbers.
 //   5 REFUSALS      V <= 0; a blocked mask of the wrong size.
 // SABOTAGE LOG (each broken in brain/flowfieldDirectional.mjs, run, restored; red = failing rows):
@@ -50,11 +50,11 @@ sec("2. KNOWN ANSWERS (an empty grid, 21 x 21, the goal in the middle)");
 sec("3. STILL WATER IS THE SHARED SOLVER, bit for bit");
 {
     let n = 0, bad = 0;
-    for (const kind of ["hard-current", "hard-current-gap", "hard-islands", "hard-gaps"]) for (let s = 1; s <= 10; s++) {
+    for (const kind of ["hard-current", "hard-current-gap", "hard-islands", "hard-gaps"]) for (let s = 1; s <= 30; s++) {
         const sc = P.plusScenario(s, kind), f = H.buildLadderField(H.planShapes(sc, 0), sc.goal, sc.start), r = D.solveDirectional(f, f.blocked, [f.goalCell]); n++;
         for (let i = 0; i < f.dist.length; i++) if (!Object.is(r.dist[i], f.dist[i]) || !Object.is(r.fx[i], f.fx[i]) || !Object.is(r.fz[i], f.fz[i])) { bad++; break; }
     }
-    ok("!! with no current, dist, fx and fz equal brain/flowfieldCpu.js's on 40 nav fields (seeds 1 to 10 of four kinds)", n === 40 && bad === 0, `${bad} of ${n} differ`);
+    ok("!! with no current, dist, fx and fz equal brain/flowfieldCpu.js's on 120 nav fields (seeds 1 to 30 of four kinds: every DEV field of those kinds, and hard-stream's geometry is hard-current's)", n === 120 && bad === 0, `${bad} of ${n} differ`);
 }
 
 sec("4. TERMINATION");
