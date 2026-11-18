@@ -28,7 +28,8 @@ const ratiosOf = (runs, keep = () => true) => {
     const ref = new Map(runs.filter((r) => r.arm === R.ROUTE_REFERENCE).map((r) => [r.seed, r]));
     return runs.filter((r) => r.arm === R.ROUTE_DESIGNATED && keep(r.seed)).map((r) => { const b = ref.get(r.seed); return b && r.reached && b.reached ? { seed: r.seed, r: r.t / b.t } : null; }).filter(Boolean);
 };
-const timeOf = (xs) => { const tie = (x) => Math.abs(x.r - 1) < TIE, f = xs.filter((x) => !tie(x) && x.r < 1).length, sl = xs.filter((x) => !tie(x) && x.r > 1).length, nt = xs.filter((x) => !tie(x));   // one tie test feeds every count (Amendment 1 of Part 3) return { n: xs.length, faster: f, slower: sl, ties: xs.length - nt.length, median: median(xs.map((x) => x.r)), medianNoTies: median(nt.map((x) => x.r)), p: signP(f, sl) }; };
+// one tie test (|r - 1| < TIE) feeds every count (Amendment 1 of Part 3)
+const timeOf = (xs) => { const tie = (x) => Math.abs(x.r - 1) < TIE, f = xs.filter((x) => !tie(x) && x.r < 1).length, sl = xs.filter((x) => !tie(x) && x.r > 1).length, nt = xs.filter((x) => !tie(x)); return { n: xs.length, faster: f, slower: sl, ties: xs.length - nt.length, median: median(xs.map((x) => x.r)), medianNoTies: median(nt.map((x) => x.r)), p: signP(f, sl) }; };
 /** The registered readings: R1 TIME on S; R2 REACH on all; the verdict; the reported items. */
 export function judge(runs, S, scs = []) {
     const t = timeOf(ratiosOf(runs, (s) => S.has(s))), rest = timeOf(ratiosOf(runs, (s) => !S.has(s))), all = timeOf(ratiosOf(runs));
@@ -89,8 +90,8 @@ export function command(argv, io = {}) {
     const runs = f.runs(scs);
     // the flights are written the moment they exist, before anything else can throw (a HELD87 read is never lost, and the file then refuses a second flight)
     if (cli.flags.has("--write")) { const byS = new Map(scs.map((sc) => [sc.seed, sc])); writeFile(path.join(ENG, OUT_FILE), runs.map((r) => JSON.stringify({ set, ...r, cMean: undefined, inS: S.has(r.seed), stream: byS.get(r.seed).stream, along: alongTrack(byS.get(r.seed)) })).join("\n") + "\n"); out(`wrote ${runs.length} flights to ${OUT_FILE}`); }
-    const extra = f.extras(scs), dev = set === "dev3";
-    for (const l of report(runs, checksOf(runs, { still, old, bite, S, seeds: dev ? R.ROUTE_SETS.dev3 : R.ROUTE_SETS.held87, dev }), S, scs, `${set.toUpperCase()}, ${scs.length} hard-stream scenarios${dev ? " (DEV: a sanity run, not a result)" : ", flown once"}`, extra, { dev })) out(l);
+    const extra = f.extras(scs), isDev = set === "dev3";
+    for (const l of report(runs, checksOf(runs, { still, old, bite, S, seeds: isDev ? R.ROUTE_SETS.dev3 : R.ROUTE_SETS.held87, dev: isDev }), S, scs, `${set.toUpperCase()}, ${scs.length} hard-stream scenarios${isDev ? " (DEV: a sanity run, not a result)" : ", flown once"}`, extra, { dev: isDev })) out(l);
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));

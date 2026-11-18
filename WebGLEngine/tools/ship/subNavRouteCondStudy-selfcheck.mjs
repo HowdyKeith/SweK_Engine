@@ -13,7 +13,9 @@
 //   D6 S printed after the flights 1 | D7 the inS flag not written 1 | D8 a second HELD87 flight allowed 1 | D9 the reach branch's gain bar 7 1
 //   D10 check 2 blind to the chains: 0 red at first (the command's check was stubbed and stillIsShared had no row); the row added; then 1
 //   PART 3 AMENDMENT 1's fixes, each with its row written first: E1 DEV judged like the held read (check 5 applied, no readings) 1 | E2 the flights written after the extras (a throw loses them) 1
-//   E3 a refusal before flying exits 0 1 | E6 exact ties counted as faster or slower 1. Not given a mutant: check 1's literal list in the command -- in the gate the flown list IS the literal list,
+//   E3 a refusal before flying exits 0 1 | E6 exact ties counted as faster or slower 2. *** THESE FOUR WERE FIRST RUN AGAINST A STUDY THAT DID NOT PARSE (an edit had commented out
+//   the rest of a one-line function, and a name was declared twice), and the count -- FAIL rows -- read the import crash as green and each mutant as red. Re-run on the mended file,
+//   counting only FAIL rows of a gate that loaded; the numbers here are those. *** Not given a mutant: check 1's literal list in the command -- in the gate the flown list IS the literal list,
 //   so a mutant there is equivalent; the literal-list row holds checksOf itself.
 "use strict";
 import fs from "node:fs";
