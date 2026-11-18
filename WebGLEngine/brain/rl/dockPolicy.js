@@ -99,7 +99,11 @@ function trainDockES(opts = {}) {
         for (const x of rets) { const adv = (x.r - mean) / sd; const eps = noises[x.i]; const c = adv * x.sgn; for (let j = 0; j < n; j++) grad[j] += c * eps[j]; }
         const scale = lr / (rets.length * sigma); for (let j = 0; j < n; j++) theta[j] += scale * grad[j];
         // full eval each iter, on a fixed battery, and keep the best (ES walks can drift off a good spot)
-        const ev = evaluate(theta, { ...evOpts, episodes: opts.batteryEps || 24 });
+        // 2026-11-18 (unnumbered) -- TWO MORE OPTIONS, AND WITHOUT THEM NOTHING CHANGES. The battery above never steers the walk (it draws no random number and moves no weight): it only
+        // chooses which point of the walk is handed back, and every training of every round chose on the same 16 or 24 lives. `batteryBase` is the battery's first seed (5000 unless given:
+        // `seedBase: undefined` is evaluate()'s own default); `keep: "last"` hands back the walk's last point instead of the best (brain/FLY_COMPASS_TRAINER_WIP.md). The gate
+        // tools/ship/flyCompassTrainer-selfcheck.mjs pins that without them the answers are the same to the bit, and tools/ship/paintingFly-selfcheck.mjs pins them as before.
+        const ev = evaluate(theta, { ...evOpts, episodes: opts.batteryEps || 24, seedBase: opts.batteryBase });
         const score = ev.dockRate * 1000 - ev.avgDist - (ev.avgCrashes || 0) * 200;   // docks, then closeness, penalize crashes
         if (score > best.score) best = { params: theta.slice(), score, ev };
         // v3969 -- AN OPTIONAL PER-ITERATION OBSERVER, AND IT IS OPTIONAL SO THAT NOTHING CHANGES WITHOUT ONE.
@@ -113,6 +117,7 @@ function trainDockES(opts = {}) {
         if (opts.onIter) { try { opts.onIter({ it, score, ev, bestScore: best.score }); } catch { /* an observer must never take the run down */ } }
         if (it % Math.max(1, (iters / 6) | 0) === 0 || it === iters - 1) history.push({ it, ...ev });
     }
+    if (opts.keep === "last") return { params: theta.slice(), history, best: best.ev };
     return { params: best.params, history, best: best.ev };
 }
 
