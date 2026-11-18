@@ -429,3 +429,34 @@ The review (two lenses, each finding checked by a skeptic; seeds 1001 to 1200 on
 Said plainly, from the review: on seeds 1001 to 1200, S predicted flight differences one way. A few scenarios outside S still flew differently, through aim differences off the chain's vertices. The complement's non-ties are reported, as registered.
 
 **A defect in Amendment 1's own commit (2c4921e8), found and mended before any DEV3 or HELD87 flight.** Two edits left tools/ship/subNavRouteCondStudy.mjs unable to parse: a comment cut a one-line function in half, and a name was declared twice. Its gate died on import. My count of FAIL rows read that crash as green, and read the four sabotages of the amendment as red. The first DEV run exited on the syntax error before building anything. Mended, every touched gate was re-run requiring its own pass line, and the four sabotages were re-run counting only the FAIL rows of a gate that loaded (all red: 1, 1, 1, 2).
+
+## ITEM 2 PART 3, RESULT (2026-11-18; `node tools/ship/subNavRouteCondStudy.mjs --set dev3`, then `--set held87 --write`; HELD87 = seeds 9501 to 9700 of hard-stream, flown ONCE; 400 flights in brain/subNavRouteHeld87.jsonl): **PARTLY SUPPORTED**
+
+DEV (seeds 901 to 930) met check 4 (13 of 30 in S) and was a sanity run with no verdict. On HELD87, S was fixed from the fields and printed before any flight: **41 of 200 scenarios.** All five checks passed (40 of S reached by both arms).
+
+| arm | reached | collided | median t (s) |
+|---|---|---|---|
+| any+crab (reference) | 194/200 | 6 | 135.8 |
+| any+crab+route (designated) | 195/200 | 5 | 135.7 |
+
+* **R1 TIME ON S** (40 both reached): **the route faster on 31, slower on 8, 1 tie; exact sign p 0.0003; median ratio 0.9660.** Not FASTER: the median misses the 0.95 bar. It is inside the partial bar of 0.98 with p <= 0.05.
+* **R2 REACH** (all 200): 1 only the route, 0 only the reference; gain 1; **collisions 5 against 6**.
+* **VERDICT: PARTLY SUPPORTED.**
+* **Reported, moving nothing.**
+  * The complement of S: 154 both reached, 148 exact ties, 6 non-tied (4 faster, 2 slower).
+  * Over all 200 (Part 2's reading): faster 35, slower 10, 149 ties, median 1.0000, p 0.0002.
+  * On S with ties dropped: 0.9633.
+  * S with the stream along the track: 27 faster to 5 slower, p 0.0001, median 0.9582. Across it: 4 to 3, median 0.9911.
+  * 17 of 200 scenarios had start headings more than 5 degrees apart; 40 had the start or waypoint in the band.
+
+**Against the expectations (written before any registered seed, in view of the disclosed surrogate).**
+* J1, the chain bites on DEV: HELD (43 percent).
+* J2, at least 20 of S reached by both: HELD (40).
+* J3, FASTER on S (about 40): MISSED (0.966 against 0.95).
+* J4, SUPPORTED about 30, PARTLY about 50: PARTLY.
+* J5, at least 90 percent of the complement ties: HELD (148 of 154, 96 percent).
+* J6, no more collisions for the route: HELD (5 against 6).
+
+**What it says.** When this solver's time-aware plan departs from the still-water plan, the vessel gets there faster in the clear majority of cases (31 of 39 non-tied, p 0.0003). The typical saving is about 3 to 4 percent, not the 5 percent the bar asked for. It costs nothing in reach or collisions. The saving is in streams that lie along the track (27 to 5); across-track departures are a wash. Where the plans do not differ, 96 percent of flights are identical. So the plan changes rarely (S is a fifth of the set), and when it does, it is usually right, by a little. Together with Part 2 (NOT SUPPORTED overall), the directional solver is a sound but small improvement in this family, concentrated in the along-track case.
+
+**Not checked, said plainly.** The stream is read from a perfect map, steady and uniform in depth. The vessel is the PD autopilot's at the cruise. The lowest-dist flow is not the time-optimal successor. A few scenarios outside S flew differently through aim differences off the chain's vertices (6 non-tied in the complement).
