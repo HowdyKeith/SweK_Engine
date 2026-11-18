@@ -225,6 +225,22 @@ Round 3's audits (51-62, 71-82, 91-102) have been read for the champions; **a se
 **Why this is not a tuned pass, and what it cannot claim.** The comparator was not searched for: GUARDED-FILTER is the reference Amendment 1 item 1 named and tuned on the baseline seeds (before any audit was read), and the only thing changed is which of the registered references the check names. But I chose the restatement AFTER seeing the registered form fail, and a reader should weigh the verdicts below knowing that. **Nothing else is changed:** the 12 circuits, the controls, the recipe, the three audits, the margin rules and the expectations stand. The verdicts of the first run, now readable and marked POST HOC: **WIRING IN BETWEEN** (cx wins against the strongest family on two or more audits but not every family on every audit), **RULE DOES NOT BEAT THE RULE** (cx against GUARDED on the audits: +0.046, -0.026, +0.045 against margins 0.076, 0.064, 0.087), cx beats NO STATE on two of three audits (0.082 and 0.062, not 0.012) and WITHHELD on one; the training line shows most controls had a champion in only 1 to 3 of 4 searches.
 **A second incident, recorded.** The first run's result file was lost on Keith's rig by a command sequence I gave (a copy to a protected folder failed, and the next command reset the file). The run is fully seeded, so it was rerun to rebuild the records; the rerun's report is compared with the numbers quoted here, and any difference is stated at the head of the rerun's reading.
 
+## Round 4, RESULT (WRITTEN 2026-11-18 FROM THE STORED RUN; the run was flown on Keith's 1080 and read at v4906, whose note says "read WIRING-CHIP FAIL for both advisors", but no result section was written here until now)
+
+**Said first: this is a write-up of an already-read run, not a new reading.** The report was regenerated from the stored file, with nothing flown: `node tools/ship/advisorChipStudyCmd.mjs report --in brain/rig-results/advisorChipStageA.noisy.jsonl` (12 circuits, the noisy gauge, fresh audits 111-122, 131-142, 151-162). The numbers below are that report's.
+
+**Checks: all passed.** STAGE A COMPLETE; IDENTITY (a null advisor, and an advisor that is a copy of the brain's own rule, change nothing); THE ADVISOR IS NOT TRIVIAL (GUARDED-FILTER minus SPIN on far and both: 0.300, 0.228, 0.231 against needs of 0.044, 0.034, 0.038).
+
+**Advisor GUARDED: the WIRING-CHIP VERDICT is FAIL** (against the strongest family, cx gains more on 0 of 3 audits). The BOTTOM LINE is MIXED: the chip neither helps nor hurts cx consistently. Its VETO effect on cx is -0.016, -0.031 and -0.108, and it HURTS or is MIXED for every circuit. Across the 12 circuits, the chip effect against the brain's own level gives r = -0.43.
+
+**Advisor GUARDED-FILTER: the WIRING-CHIP VERDICT is FAIL** (0 of 3). The BOTTOM LINE: any conservative nudge helps, and the advisor's content is not what mattered.
+* Its VETO effect on cx is +0.164, +0.119 and +0.165. It HELPS 11 of 12 circuits (degree:0 MIXED), and the controls gain as much as cx or more: NO STATE +0.178, +0.203, +0.196.
+* CONTENT (VETO minus the 30-decision STALE advisor): +0.008, -0.014, -0.003.
+* The brain does not add to the rule: VETO(cx) minus GUARDED-FILTER alone is -0.122, -0.181, -0.106.
+* r = 0.72 across the circuits.
+
+**Against the expectation recorded first** ("the chip's value tracks the champion's level, not the wiring; WIRING-CHIP PASS about 10 percent"): FAIL on both advisors, as expected. With GUARDED-FILTER the value tracked the brain's level (r 0.72); with GUARDED it ran the other way (r -0.43). Rounds 5 to 34 above built on this result.
+
 # Round 5 (UNNUMBERED): THE LANGUAGE-MODEL CHIP -- a local language model in the Round 4 socket, read against a fixed depth cap and the hand-written rules -- REGISTERED 2026-10-30 BEFORE ANY CODE FOR IT AND BEFORE ANY RESERVED SEED IS FLOWN (Keith, 2026-10-30: "lets do step 1"; nothing below has been built or run)
 
 Round 4 put a hand-written rule in the advisor socket. Keith's adapter, local-model tool and three practice runs since (2026-10-29, `brain/rig-results/livePractice*.jsonl`) have put a language model there on PRACTICE dives (seeds 501-508, kinds far and both, 16 dives, the brain `GUARDED-OBS`, the VETO combination). This round is the registered test the practice runs said the model would need.
