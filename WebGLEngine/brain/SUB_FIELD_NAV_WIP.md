@@ -576,3 +576,71 @@ The module, the study and the gate were committed and sabotaged first (a3387e92;
 * Why 7920 leaves in both arms: an exit the sweep did not catch.
 * The ships too deep to pass under.
 * The transit's price in energy (`brain/NAV_MISSIONS_WIP.md`'s meter can be pointed at it).
+
+## WHY FOLLOW-UP 9'S DEEP ARM STILL FAILS (2026-11-18; post hoc, a diagnosis of spent sets, NOT a registered result; Keith: "Let's do all 6 items", item 4 nav-traffic-avoid-not-slow)
+
+A diagnosis re-flew the deep arm and its reference on the spent HELD82, HELD81 and DEV sets. The re-flights match all 120 stored HELD82 flights and the 60 stored HELD81 sweep+dive flights exactly. The deep arm had never been flown on HELD81. There it reached 54 of 60 against 49 (+7 -2), but HELD81 is spent, so that is not a result.
+
+**The deep arm's 14 failures on HELD82 and HELD81 fall into four classes:**
+* **(A) A ship too deep to pass under** (keel over 53 m, since keel + VMARGIN 5 + DIVE_PAD 2 > DIVE_MAX 60): **9 of its 12 ship collisions.** Two missed passing under by 0.8 m and 0.3 m.
+* **(B) The climb near the goal** (inside ASCEND_M 140 m), which ignores ships overhead: 2 (7912, 7832).
+* **(C) A descent too slow** for a ship arriving within 20 s (the autopilot's 1 m/s climb-rate limit): 1 (7888).
+* **(D) An exit, because the plan lost its route:** 2, **7920** and 7863. **The ships that close the route are ones the deep vessel is ALREADY BENEATH**, because the plan filters ships against the scenario's minDepth (the shallower of start and goal), not the vessel's own depth.
+
+**Energy.** The transit has no depth cost under the needs model (the hull takes no damage below a strain of 0.8; the deepest point was 60.5 m). On flights both arms reached, the paired energy difference had a median of -3.9 kJ on HELD82 and -4.3 kJ on HELD81, about 0.1 percent of a battery.
+
+## FOLLOW-UP 10: UNDER EVERY KEEL -- the last flown round of nav-traffic-avoid-not-slow (REGISTERED 2026-11-18, BEFORE ANY CODE FOR IT AND BEFORE ANY HELD88 SEED IS FLOWN)
+
+**What was flown before this registration, said first.** Prototypes of 8 configurations were flown on the spent sets above and on **hard-traffic seeds 1401 to 1600 (in no set): about 2,400 flights there.** The designs below were chosen after seeing them, so the true effect is likely smaller than the prototype's, and the set is sized for half of it. The prototype numbers on 1401 to 1600, against the deep arm (R: 182 reached, 15 ship collisions, 1 berg, 1 exit, 1 timeout):
+
+| configuration | reached | paired | sign p | ship collisions |
+|---|---|---|---|---|
+| the limit raised to 70 m alone | 192 | +10 -0 | 0.002 | 5 |
+| the beneath filter alone | 181 | +8 -9 | | 17 |
+| **both (the designated arm U)** | **196** | **+15 -1** | **0.0005** | **3** |
+
+U had 0 exits, and its deepest point was 68.1 m. A limit of 80 was identical to 70 tick for tick, alone and combined: any limit of 67 m or more gives the same arm, because the generator's keels are at most 60 m. **U costs vertical clearance**: on 1401 to 1600 the median minimum ship clearance fell from 20.0 m to 7.0 m, because it passes beneath ships it used to avoid.
+
+**The question.** On fresh hard-traffic scenarios, does a deep transit that may go as deep as needed to pass under every keel the sea holds, AND whose plan no longer routes around ships the vessel is already beneath, reach more goals than FOLLOW-UP 9's deep arm, with fewer ship collisions and no more exits?
+
+**The arms (FOLLOW-UP 9's sweep+dive+deep, with nothing else changed):**
+* **R `sweep+dive+deep`**, the REFERENCE: FOLLOW-UP 9's designated arm, DIVE_MAX 60.
+* **U `sweep+dive+deep+under+beneath`**, DESIGNATED. Two changes:
+  * **+under:** the transit and the conflict dive may go to 70 m. The transit becomes the deepest keel of ALL the ships + VMARGIN + DIVE_PAD, at most 67 m, a hull strain of 0.67, below the needs model's damage-free 0.8.
+  * **+beneath:** at each tick the plan, the give-way, the yield and the dive see the scenario's obstacles WITHOUT the ships whose keel + VMARGIN is at or above the vessel's present depth; bergs are untouched. Such a ship cannot be hit: the collision test needs depth - 0.6 < keel, and the vessel is at least 5 m below the keel. A gate row holds that the collision verdicts equal a full-list check.
+* **L `sweep+dive+deep+under`**: the limit alone. A SECONDARY reading for attribution, not judged by the verdict.
+
+**The set.** **HELD88 = hard-traffic seeds 10201 to 10400: 200 scenarios, flown ONCE.** A grep for 10201 and 10400 over the navigation modules, their studies and notes finds nothing; the only hits are other families' seed ranges (planner, zero-range), with their own generators. DEV = seeds 1 to 30 (spent), a sanity run only. Why 200 and not the series' 60: at the prototype's rates, the gain bar below has about 38 percent power at 60 scenarios and about 98 percent at 200; at half the effect, 6 and 63 percent.
+
+**The registered test: U against R, paired by seed.**
+* **SUPPORTED** iff all three hold:
+  * **(a)** U's ship collisions are at most half of R's;
+  * **(b)** the net gain (only U reached, minus only R) is at least 5, at an exact two-sided sign p <= 0.10;
+  * **(c)** U has no more exits than R, and at most 1. The series' "no exit" bar was set per 60 scenarios; it is restated here for 200, said openly.
+* **PARTLY SUPPORTED** iff (c) holds and exactly one of (a) and (b) holds.
+* **NOT SUPPORTED** otherwise.
+* **HARMFUL** is printed beside it if the net gain is -5 or worse.
+
+**Reported (moving nothing):**
+* L against R, the same three readings (the limit's share);
+* each arm's status counts, timeouts, deepest point, and energy (navEnergy);
+* the MINIMUM SHIP CLEARANCE per flight: the larger of the horizontal gap less radius and half-hull, and the vertical gap below the keel, with a paired sign test;
+* the failure classes A to D of U's failures.
+
+**Checks (a failure: NOT WEIGHED; all run before any HELD88 flight):**
+1. **THE COPY:** R reproduces the stored FOLLOW-UP 9 flights of HELD82 (brain/subDeepTransitHeld82.jsonl) on its first five seeds (status, ticks, path).
+2. **SAME SCENARIOS:** every arm flies the 200 HELD88 seeds in order (checked after).
+3. **THE LIMIT BITES:** on DEV, some U flight goes deeper than 60.8 m.
+4. **NO HULL DAMAGE:** no arm's deepest point reaches 80 m (checked after).
+
+**This is the last flown round for this item, said before it is flown.** What the prototype leaves (contact while still descending, under the 1 m/s climb-rate limit) is a property of the autopilot, not the navigation. Whatever HELD88 reads, the item closes on it with that residue named.
+
+**Expectations, written before any HELD88 seed.**
+* K1: SUPPORTED, about 60 percent (the prototype's effect, discounted for selection).
+* K2: (a) holds, about 75.
+* K3: (b) holds, about 70.
+* K4: U has at most 1 exit, about 85.
+* K5: L gains at least 5 over R, about 60.
+* K6: U's median minimum ship clearance is below R's, about 95 percent (it passes beneath).
+
+**What a result would not say.** Anything about drafts deeper than the vessel can go, or keels the vessel must sense: keels are known exactly. Nor anything about a hull with a shallower damage depth: 67 m is safe only for this hull.
