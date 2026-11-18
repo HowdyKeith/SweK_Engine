@@ -346,3 +346,71 @@ Nothing below is chosen to change what that predicts.
 * The vessel reads the stream from a perfect map. The stream is steady and uniform in depth. The vessel is the PD autopilot's at the cruise speed.
 * The lowest-dist flow is not the time-optimal successor under a directional cost (Amendment 1).
 * A family where the stream crosses the track more often, or a verdict on the scenarios the stream touches, would be a new registration, not a re-reading of this one.
+
+### CORRECTION TO THE ITEM 2 PART 2 RESULT (2026-11-18, after the result was written; found by the review of the next round's draft)
+
+The RESULT said: "144 of the 194 are exact ties: the stream never touches the path either arm flies", and "in this family the stream touches the path in only about a quarter of scenarios". **BOTH ARE WRONG.** The straight start-to-waypoint segment enters the stream's band in 194 of the 200 HELD86 scenarios, and the centre line separates start from waypoint in 177. Every across-track stream separates them, and 85 of the 97 across-track scenarios both arms reached tie. The ties are scenarios where THE STREAM IS ON THE WAY AND THE TIME-AWARE PLAN PICKS THE SAME ROUTE. A band whose speed depends only on the distance from its centre line has to be crossed somewhere, and both arms cross it. They are not scenarios where the stream misses the path. The verdict (NOT SUPPORTED) and every registered number stand. Only that explanation was wrong, and I wrote it without checking.
+
+# ITEM 2, PART 3: WHEN THE PLAN CHANGES, IS IT FASTER? (backlog nav-current-in-field residue; Keith 2026-11-18, "We can keep working through the still open in the backlog items"; REGISTERED 2026-11-18 BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS REGISTERED SEEDS IS FLOWN)
+
+**What this replaces, said first.** My first draft for this residue was a family whose stream point sits on the track ("a family where the stream meets the track more often"). Two independent reviewers showed its premise false (the correction above). They also showed it would change almost nothing. **They prototyped it, and several variants, by flying hard-stream seeds 701 to 900 (in no set), so the following is KNOWN before this registration:**
+* The draft's family: 134 of 197 ties; median 1.0000 (0.9497 with ties dropped); along-track faster 49 to 8; across-track 84 of 90 ties.
+* Always adverse within 30 degrees of the track: median 0.9582.
+* Within 20 degrees, either sense: 0.9948.
+* **A field-only predicate fixed before flight, "the two arms' t = 0 aim chains differ", picked 62 of 200 on the draft's family. It caught 60 of the 63 scenarios whose flights differed and none of the 134 ties. On that subset, both reached 60, faster 52, slower 8, median 0.9446.**
+* The start-heading bite (Part 2's check 4) on Part 2's kind: 36 of 200; on that subset the median was 0.9649.
+
+**The question.** Part 2 asked whether the plan helps OVERALL; most of the time the plan does not change, so most flights tie. This part asks the CONDITIONAL question: **in the scenarios where the time-aware plan picks a different route from the still-water plan, is the vessel faster?** That is the quality of the route the solver picks, measured where it picks one.
+
+**NOTHING IN THE FAMILY, THE SOLVER OR THE ARMS CHANGES.**
+* Part 2's `hard-stream` kind, exactly.
+* The directional solver and the time-aware aim points.
+* The two arms, each planning once at t = 0, both crabbing on the estimate.
+* Only the READING changes: it is taken on a subset fixed before any flight.
+
+**THE SUBSET S (field only, computed before any HELD87 flight, and written in the output before the flights).** For each scenario, build both arms' t = 0 plans: the shared ladder with subFieldNav.aimOf for the reference, and the directional ladder in the stream's map with timedAimOf for the route. Walk each plan's AIM CHAIN from the start: p0 = the start; p(k+1) = the aim point of the cell holding p(k). Stop at the waypoint, at a cell with no aim point, or after 400 steps. **A scenario is in S iff the two chains differ:** a different number of points, or any point more than 1e-6 m from its counterpart.
+
+**Sets.**
+* **DEV = seeds 901 to 930 of hard-stream:** fresh, in no set, never prototyped. It is the chain-bite check and a sanity run. NOTHING IS CHOSEN ON DEV.
+* **HELD87 = seeds 9501 to 9700 of hard-stream: 200 scenarios, 400 flights, flown ONCE.** No navigation set names these seeds (9501 appears only as a sub-pilot training seed, a different generator).
+
+**The registered readings.**
+* **R1 TIME, on S.** Over the S scenarios both arms reach: FASTER iff the median ratio t(route) / t(reference) is at most 0.95 AND the exact two-sided sign test gives p <= 0.05. Ties (|r - 1| < 1e-9) are dropped from the sign test and kept in the median, as Part 2. The bar is Part 2's, not chosen on the surrogate.
+* **R2 REACH, on all 200.** gain = only the route reached minus only the reference; p from the exact sign test; collisions on all 200.
+* **THE VERDICT.**
+  * **SUPPORTED** iff R1 is FASTER on S AND gain >= 0 AND the route has no more collisions than the reference, on all 200.
+  * **PARTLY SUPPORTED** iff not SUPPORTED and one of these holds on S:
+    * FASTER (but a safety condition failed);
+    * the median is at most 0.98 with sign p <= 0.05;
+    * gain >= 5 with p <= 0.10, on all 200.
+  * **NOT SUPPORTED** otherwise.
+  * **HARMFUL** is printed beside the verdict iff gain <= -5.
+* **Reported, moving nothing.**
+  * the size of S;
+  * the complement: its tie count, its non-tied count and their median;
+  * R1 over all 200 (Part 2's reading);
+  * the ties-dropped median on S;
+  * the along/across split on S;
+  * the start-heading bite;
+  * the count of scenarios whose start or waypoint lies in the stream's band.
+
+**Checks (a failure: NOT WEIGHED).**
+1. **SAME SCENARIOS.** The exact HELD87 seed list, both arms.
+2. **STILL WATER IS THE SHARED PLAN.** On DEV seeds 901 to 903 with speed 0, the two arms fly the same flight to the digit, AND neither chain differs.
+3. **THE OLD FLIGHTS STAND** (as Part 2).
+4. **THE CHAIN BITES (on DEV, before HELD87):** at least 15 percent of the 30 DEV scenarios are in S. If not, HELD87 is NOT flown.
+5. **S IS LARGE ENOUGH:** at least 20 scenarios of S are reached by both arms. If not, the verdict is NOT WEIGHED.
+
+Checks 2, 3 and 4 run before any HELD87 flight.
+
+**CLOSED AFTER DEV.** No amendment after any DEV flight may change the kind, the sets, the arms, S's definition, a reading, a bar, the verdict rule or the tie rule. A defect found after DEV makes the round NOT WEIGHED, and a new attempt is a new registration on new seeds. Procedural fixes are allowed only before DEV is flown.
+
+**Expectations, written before any registered seed and in view of the surrogate above.**
+* J1: the chain bites on DEV, about 90 percent (31 percent on the surrogate; its 30-seed windows ran 7 to 14).
+* J2: at least 20 of S both reached, about 95 percent.
+* J3: FASTER on S, about 40 percent. The surrogate's S median was 0.9446, on the draft's family; on Part 2's kind, the start-heading subset gave 0.9649.
+* J4: SUPPORTED about 30, PARTLY about 50.
+* J5: at least 90 percent of the complement ties, about 85 percent.
+* J6: no more collisions for the route on all 200, about 50 percent.
+
+**What a result would not say.** How often the plan changes at sea; anything about a stream that must be sensed; a stream that varies in time or depth; the corner-angle margin. SUPPORTED says that when this solver's time-aware plan departs from the still-water plan, the vessel gets there faster.
