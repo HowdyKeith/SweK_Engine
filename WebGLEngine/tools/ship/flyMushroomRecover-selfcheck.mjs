@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flyMushroomRecover-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyMushroomRecover-selfcheck.mjs      (a few seconds; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
+// Run: node tools/ship/flyMushroomRecover-selfcheck.mjs      (about ten seconds; IT NEVER RUNS THE ROUND -- its training is tiny, on a draw the round does not use, and it starts no process)
 //
 // THE GATE OF THE MUSHROOM RECOVERY ROUND (registered in brain/FLY_MUSHROOM_RECOVER_WIP.md before brain/rl/mushroomRecoverFly.mjs, tools/ship/flyMushroomRecover.mjs and
 // tools/ship/takeFlyMushroomRecover.mjs existed): does a fly that can undo its lessons do better when the meanings swap?
@@ -9,6 +9,8 @@
 //   3  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its scores again
 //   4  THE RECORDS              24 draws; R and H on each task; USES and b at 0
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at 67354bc3, read from the file: the checks, R and H on each task, USES and b at 0, the arms, the rates,
+//                               re-audits, the measurement after the reading (the hand rule with recovery, said as not registered), the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the first 19, this gate,
 // tools/ship/flyHomeOffset-selfcheck.mjs and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the commands' 6; every one red by name (the number is the rows red):
 //   THE FLY (brain/rl/mushroomRecoverFly.mjs): K1 recovery toward 0 1 | K2 B_SCALE 0.1 3 | K3 the start recovers 1 | K4 a frozen fly recovers 1
@@ -18,6 +20,10 @@
 //   THE COMMAND: C4 recover's second training is ONE's 1 | C5 exits 0 on a word it does not know 1 | C6 reads without the mushroom round's file 1 (and the offset round's command's three)
 //   F8 WENT 0 RED FIRST, A FINDING ABOUT THIS GATE: the records made in section 4 gave a draw the same weights on both tasks, so a recheck looked for on ONE matched REV's; they now differ by
 //   task, and F8 was run again (2 red, as above). ONE ROW OF MINE WAS WRONG WHEN FIRST RUN: two of the committed ONE flies share a score, so RECOV copied fly for fly is 14 ties, not 12.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score changed in a digit the double holds 2 | V2 R against PFAM 5 | V3 BETTER and
+//   WORSE swapped 4 | V4 USES needs 0.3 5 | V5 the note's REV R says CANNOT 1 | V6 the note's expectation of ONE R is WORSE 1 | V7 the note names another commit 1 | V8 the note says the
+//   recovering fly does worse 1 | V9 the note drops what it does not mean 1 | V10 the note's 0.5000 is 0.4000 1 | V11 the hand rule with recovery's floor changed 3 | V12 a REV fly with b at 0
+//   says it recovers 3. None went 0 red. ONE ROW OF MINE CLAIMED A NUMBER IT DID NOT CHECK when first written (the Spearman of b against the score); it computes it now.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -118,6 +124,37 @@ section(() => {
     const me = src("tools/ship/flyMushroomRecover-selfcheck.mjs"), calls = [...me.matchAll(/R\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is tiny and on draw 901 (and one refused); it starts no process; the file's size and time are what they were",
         calls.length === 2 && /^"TWO", 1$/.test(calls[0]) && /^"REV", 901, TINY, TINY_AUDIT$/.test(calls[1]) && !R.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at 67354bc3 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, R.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), Rd = R.reading(lines, mushroom), O = Rd.tasks.ONE, V = Rd.tasks.REV, F = Rd.floors, mfl = mushroom.lines.find((r) => r.kind === "floors");
+    const of = (t) => lines.filter((r) => r.kind === "draw" && r.task === t).sort((a, b) => a.s - b.s), rec = (t, s) => of(t).find((r) => r.s === s);
+    ok("!! the results file is the one the run wrote: 26 records, sha256 f49dca61697f1407... (one start, 4.9 minutes on two processes)", lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "f49dca61697f1407d5018cafc6835624fd832d0a761bcb51f037d10faea08eba");
+    ok("!! THE CHECKS HOLD: the mushroom round's file as committed, 24 draws each once, REV's draw 1 the same twice; the start and the hand rule the mushroom round's to the bit; the hand rule with a recovery of 0.1 scores 0.7627 on ONE and 0.5000 on REV",
+        Rd.checks.length === 0 && J(F.start) === J(mfl.start) && J(F.hand) === J(mfl.hand) && near(F.handB.ONE, 0.7627) && near(F.handB.REV, 0.5000) && lines.find((r) => r.kind === "recheck").weightsHash === rec("REV", 1).weightsHash);
+    ok("!! *** REV: R -- THE FLY THAT CAN RECOVER DOES BETTER THAN THE MUSHROOM ROUND'S FLY (ranks 205, p 0.00086); H -- AND BETTER THAN THE RULE SET BY HAND (11 of 12 above 0.2220, p 0.0063) ***",
+        V.R.word === R.WORDS.R[0] && V.R.sumA === 205 && near(V.R.p, 8.579e-4, 1e-7) && V.H.word === R.WORDS.H[0] && V.H.above === 11 && V.H.below === 1);
+    ok("!! *** REV: 10 OF 12 FLIES USE THEIR RECOVERY (they lose 0.141 to 0.235 with b at 0), 2 END WITH b AT 0 *** -- and with b at 0 the arm falls to 0.2282, the mushroom round's level (0.2524)",
+        V.arms.RECOV.uses === 10 && V.arms.RECOV.bZero === 2 && near(V.arms.RECOV.ratesOff, 0.2282) && of("REV").filter((r) => r.recovery > 0).every((r) => r.score - r.ratesOff > 0.140 && r.score - r.ratesOff < 0.236));
+    ok("!! *** ONE: EVERY FLY ENDS WITH b AT 0 (12 of 12, USES 0) *** -- R CANNOT (ranks 143, p 0.71); H WORSE (0 of 12 above 0.8943)",
+        O.arms.RECOV.bZero === 12 && O.arms.RECOV.uses === 0 && of("ONE").every((r) => r.recovery === 0 && r.score === r.ratesOff) && O.R.word === R.WORDS.R[2] && O.R.sumA === 143 && O.H.word === R.WORDS.H[1] && O.H.above === 0);
+    ok("!! the arms (mean, sd, least, most): REV RECOV 0.3785 0.0743 0.2053 0.4777 (PLASTIC 0.2524) | ONE RECOV 0.7692 0.0483 0.6603 0.8370 (PLASTIC 0.7757)",
+        near(V.arms.RECOV.mean, 0.3785) && near(V.arms.RECOV.sd, 0.0743) && near(V.arms.RECOV.min, 0.2053) && near(V.arms.RECOV.max, 0.4777) && near(V.arms.PLASTIC.mean, 0.2524) && near(O.arms.RECOV.mean, 0.7692) && near(O.arms.RECOV.sd, 0.0483) && near(O.arms.RECOV.min, 0.6603) && near(O.arms.RECOV.max, 0.8370) && near(O.arms.PLASTIC.mean, 0.7757));
+    ok("described, not registered: REV's recovery rates b 0.0623 to 0.1077 where not 0 (mean 0.0720 over the 12); the flies with more recovery scored higher (Spearman 0.59); a 0.95 to 1.24 on REV, 0.63 to 1.27 on ONE",
+        (() => { const x = of("REV").map((r) => r.recovery), y = of("REV").map((r) => r.score), rk = (v) => { const o = v.map((q, i) => [q, i]).sort((p, q) => p[0] - q[0]), r = new Array(v.length); o.forEach(([, i], k) => (r[i] = k + 1)); return r; }, A = rk(x), B = rk(y); return near(1 - 6 * A.reduce((t, v, i) => t + (v - B[i]) ** 2, 0) / (12 * 143), 0.594, 5e-3); })() &&
+        Math.min(...of("REV").filter((r) => r.recovery > 0).map((r) => r.recovery)) > 0.0622 && Math.max(...of("REV").map((r) => r.recovery)) < 0.1078 && near(V.arms.RECOV.recovery, 0.0720) && Math.min(...of("REV").map((r) => r.rate)) > 0.949 && Math.max(...of("REV").map((r) => r.rate)) < 1.237 && Math.min(...of("ONE").map((r) => r.rate)) > 0.624 && Math.max(...of("ONE").map((r) => r.rate)) < 1.270);
+    const again = (t, s, off) => { const w = PF.unpackWeights(rec(t, s).weights); return M.auditScore(off ? R.recoveryOff(s, w) : R.policyOf(s).setParams(w), t); };
+    ok("!! RE-AUDITED AFTER THE READING: REV's draw 7 (the arm's most) gives its score and its score with b at 0 again to the bit, REV's draw 1 (the least) its score, and the hand rule with a recovery of 0.1 its 0.5000 on REV",
+        rec("REV", 7).score === V.arms.RECOV.max && rec("REV", 1).score === V.arms.RECOV.min && again("REV", 7) === rec("REV", 7).score && again("REV", 7, true) === rec("REV", 7).ratesOff && again("REV", 1) === rec("REV", 1).score && M.auditScore(R.policyOf(1).setParams(R.HAND_B), "REV") === F.handB.REV);
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED -- THE HAND RULE WITH A RECOVERY OF 0.1 SCORES 0.5000 ON REV, ABOVE EVERY TRAINED FLY (the most 0.4777): the trainer found recovery but not as much of it, nor the readout to go with it", of("REV").every((r) => r.score < F.handB.REV) && F.handB.REV === 0.5);
+    const note = src("brain/FLY_MUSHROOM_RECOVER_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came -- every one: REV R BETTER (70), H BETTER (75), USES at least 6 (60) with 10; ONE R CANNOT (60), H WORSE (90), b at 0 in at least 10 (75) with 12",
+        /REV: R \*\*BETTER about 70 percent\*\*, CANNOT 30; H BETTER about 75; USES at least 6 of 12, about 60\. ONE: R CANNOT about 60, WORSE 30; H WORSE about 90; b at 0 in at least 10 of 12, about 75\./.test(flat) &&
+        V.R.word === R.WORDS.R[0] && V.H.word === R.WORDS.H[0] && V.arms.RECOV.uses >= 6 && O.R.word === R.WORDS.R[2] && O.H.word === R.WORDS.H[1] && O.arms.RECOV.bZero >= 10);
+    ok("the registration's RESULT SECTION (section 10) carries the four readings' words, the commit the file was read at, that every expectation came, what section 5 said such a reading would say, the measurement after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && ["ONE", "REV"].every((t) => ["R", "H"].every((n) => res.includes(`**${t} ${n}: ${Rd.tasks[t][n].word}**`))) && /67354bc3/.test(res) && /Every expectation came/.test(res) && /a fly that can undo its lessons does better when the meanings swap, and leans on it/.test(res) &&
+        /Measured after the reading \(not registered; the gate recomputes it\)/.test(res) && /scores 0\.5000 on REV, above every trained fly/.test(res) && /What it does not mean/.test(res) && /not how the fly does it/.test(res));
 });
 
 console.log(`\nflyMushroomRecover-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

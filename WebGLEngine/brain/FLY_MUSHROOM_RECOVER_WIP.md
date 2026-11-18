@@ -74,3 +74,31 @@ mushroom round's 60 iterations; the mushroom trainer round asks separately wheth
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyMushroomRecover.mjs run` -> `brain/flyMushroomRecoverRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyMushroomRecover.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at 67354bc3, then read once)
+One start, 4.9 minutes on two processes, 26 records (24 draws, REV's draw 1 trained a second time, the floors; sha256
+f49dca61697f1407...). **The checks hold.** The hand rule with a recovery of 0.1 scores 0.7627 on ONE and 0.5000 on REV.
+* **REV R: THE FLY THAT CAN RECOVER DOES BETTER THAN THE MUSHROOM ROUND'S FLY** (ranks 205, p 0.00086).
+* **REV H: THE FLY THAT CAN RECOVER DOES BETTER THAN THE RULE SET BY HAND** (11 of 12 above 0.2220, p 0.0063).
+* **ONE R: THE FLY THAT CAN RECOVER CANNOT BE TOLD APART FROM THE MUSHROOM ROUND'S FLY** (ranks 143, p 0.71).
+* **ONE H: THE FLY THAT CAN RECOVER DOES WORSE THAN THE RULE SET BY HAND** (0 of 12 above 0.8943).
+
+| task | RECOV: mean (least, most) | with b at 0 | USES | b at 0 | PLASTIC |
+|---|---|---|---|---|---|
+| REV | 0.3785 (0.2053, 0.4777) | 0.2282 | 10 of 12 | 2 of 12 | 0.2524 |
+| ONE | 0.7692 (0.6603, 0.8370) | 0.7692 | 0 of 12 | 12 of 12 | 0.7757 |
+
+**Every expectation came.** So, as section 5 put it, **a fly that can undo its lessons does better when the meanings
+swap, and leans on it**: ten of the twelve REV flies lose 0.14 to 0.24 with their recovery set to 0, and the arm falls
+to the mushroom round's level. And the same trainer, given the same choice on ONE, drove recovery to 0 in every fly.
+The plastic compass flies drove it to 0 for the same reason: their tasks never asked them to undo a lesson.
+Described, not registered: REV's recovery rates ran 0.062 to 0.108 where not 0, and the flies with more of it scored
+higher (Spearman 0.59).
+
+Measured after the reading (not registered; the gate recomputes it): **the hand rule with a recovery of 0.1 scores
+0.5000 on REV, above every trained fly** (the most 0.4777). The trainer found recovery, but not as much of it, nor the
+readout to go with it. The mushroom trainer round found the same walk length too short on ONE.
+
+**What it does not mean.** Section 7 holds. The recovery here draws every connection back equally, every trial, whether
+taught or not. That undoing pays in this task says nothing about how the animal undoes a lesson (dopamine without
+Kenyon-cell activity, or extinction in other compartments): a result says what this fly needs, not how the fly does it.
