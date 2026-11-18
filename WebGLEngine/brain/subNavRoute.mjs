@@ -12,7 +12,7 @@ import * as P from "./subNavPlus.mjs";
 import * as D from "./flowfieldDirectional.mjs";
 
 export const STREAM_KIND = "hard-stream", V_PLAN = N.CRUISE;
-export const ROUTE_SETS = Object.freeze({ dev: N.range(1, 30), held86: N.range(9301, 9500) });
+export const ROUTE_SETS = Object.freeze({ dev: N.range(1, 30), held86: N.range(9301, 9500), dev3: N.range(901, 930), held87: N.range(9501, 9700) });   // dev3 and held87: ITEM 2 PART 3 (the conditional reading)
 export const ROUTE_ARMS = Object.freeze(["any+crab", "any+crab+route"]), ROUTE_REFERENCE = "any+crab", ROUTE_DESIGNATED = "any+crab+route";
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -96,3 +96,29 @@ export function routeOptions(sc, arm) {
 }
 /** Fly one stream scenario under an arm: flyPlus("any+crab") with the arm's options. */
 export const flyRoute = (pilot, sc, arm, o = {}) => ({ ...P.flyPlus(pilot, sc, "any+crab", { ...o, ...routeOptions(sc, arm) }), arm });
+
+// ---- ITEM 2 PART 3: where the two plans differ -------------------------------------------------------------------------------------------------------------------------------------------------------------
+export const CHAIN_STEPS = 400, CHAIN_EPS = 1e-6;
+/** A plan's AIM CHAIN from (x, y): p0 = the point; p(k+1) = the aim point of the cell holding p(k); it stops at the waypoint, at a cell with no aim point (or outside the grid), at no progress, or after CHAIN_STEPS. Returns [[x, y], ...] including p0. */
+export function aimChain(field, aim, x, y, goal) {
+    const out = [[x, y]];
+    for (let k = 0; k < CHAIN_STEPS; k++) {
+        const [px, py] = out[out.length - 1], c = N.cellOf(field, px, py); if (!c) break;
+        const ax = aim.ax[c.i], ay = aim.ay[c.i]; if (Number.isNaN(ax)) break;
+        if (ax === px && ay === py) break;
+        out.push([ax, ay]);
+        if (ax === goal.x && ay === goal.y) break;
+    }
+    return out;
+}
+/** Do the two chains differ: a different number of points, or any point more than CHAIN_EPS m from its counterpart. */
+export const chainsDiffer = (a, b) => a.length !== b.length || a.some((p, i) => Math.hypot(p[0] - b[i][0], p[1] - b[i][1]) > CHAIN_EPS);
+/** The registered predicate S for a stream scenario: both arms' t = 0 plans (the shared ladder with aimOf; the directional ladder in the stream's map with timedAimOf) walked from the start. { inS, ref, route } (the chains). */
+export function planChains(sc) {
+    const shapes = H.planShapes(sc, 0), at = (x, y) => streamAt(sc.stream, x, y), f0 = H.buildLadderField(shapes, sc.goal, sc.start), f1 = buildRouteLadder(shapes, sc.goal, sc.start, { currentAt: at, V: V_PLAN });
+    const ref = aimChain(f0, N.aimOf(f0, sc.goal), sc.start.x, sc.start.y, sc.goal), route = aimChain(f1, timedAimOf(f1, sc.goal), sc.start.x, sc.start.y, sc.goal);
+    return { inS: chainsDiffer(ref, route), ref, route };
+}
+/** Is (x, y) inside the stream's band (reported). */
+export const inBand = (st, x, y) => Math.abs(-(x - st.px) * Math.sin(st.theta) + (y - st.py) * Math.cos(st.theta)) < st.halfWidth;
+
