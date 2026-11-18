@@ -3011,6 +3011,13 @@ export const NEXT_ROUNDS = [
         why: "It is the mechanism the census found; the corner-angle margin it replaces was closed for being too small where the collisions happen.",
     },
     {
+        id: "space-approach-doctrine",
+        blocker: "OPEN",
+        what: "OPENED 2026-11-18 from prototypes on space seeds 1601-1800 (brain/SPACE_ITEMS_2026-11-18.md; a lead, not a result): the fighters' full-throttle, no-brake approach to a capital ship is dominated by a slow arrival -- with the closing speed capped (unlimited fuel) the ship is destroyed in about 46 of 48 fights it otherwise wins every time. Either the doctrine is poor or the ship's hand gunners are tuned against fast fighters (as they were built and gated), or both.",
+        how: "A registered round on fresh space seeds (not 1601-1800): today's doctrine against a speed-capped arrival (the cap defined exactly: closing speed to the nearest foe's centre, every mode, thrust cut at the cap), under the gunner presets named in advance; an endpoint that does not top out (time until the ship dies, damage per strafe-second); ties handled in every sign test.",
+        why: "It is a balance and doctrine finding the space needs item turned up, and the arena's gunner training and gates rest on today's doctrine.",
+    },
+    {
         id: "nav-margin-sweep-any",
         state: "CLOSED",
         what: "CLOSED (found stale 2026-11-17; done 2026-11-06): brain/NAV_PLUS_WIP.md ITEM 1, the margin sweep on HELD70: THE INCUMBENT MARGIN STANDS (nothing the sea can tell apart). WAS: The any-angle arm's margin was never swept: 12 m was chosen on DEV for the cell arms, and the harder test adds a ladder 12, 8, 6, 3 m (Amendment 1) without sweeping its top rung or the 5 m vertical margin.",
@@ -3040,8 +3047,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-match-consumes-layer",
-        blocker: "OPEN",
-        what: "brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",
+        state: "PARKED",
+        what: "PARKED 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): the arena approach has nothing to route around -- no space scene has static obstacles -- so a field-and-aim-point layer could only reproduce a straight line; a round would need an invented rock field and edits to two heavily gated files. Reopen once a space scene has obstacles of its own. WAS: brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",
         how: "Give the match's pilots the navigation layer (a field and an aim point) for the approach, and score the approach separately from the combat. Moving ships are already the TRAFFIC kind of brain/subHardNav.mjs.",
         why: "A result on the harder test exists now; the match is the place a second vessel type would use it.",
     },
@@ -3420,8 +3427,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-needs-and-limits",
-        blocker: "OPEN",
-        what: "The submarine has a needs model (charge, hull; brain/NEEDS_AND_LIMITS.md); space vehicles have none.",
+        state: "OPEN",
+        what: "RE-SCOPED 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): no round registered -- a rendezvous task with a delta-v budget is foregone (deterministic, judged 3/10), and a fuel budget in the battle is inert because fights are decided in one pass (a speed cap with unlimited fuel does the same; judged 4/10). A needs round needs a task where fuel left after arrival acts (repeated passes, a return trip, station-keeping over time) and a craft that can brake. The lead it turned up is space-approach-doctrine. WAS: The submarine has a needs model (charge, hull; brain/NEEDS_AND_LIMITS.md); space vehicles have none.",
         how: "A propellant budget, hull stress, docking and station-keeping, as non-combat tasks.",
         why: "The match scores combat only; a vehicle that has to arrive with fuel is a different task.",
     },
