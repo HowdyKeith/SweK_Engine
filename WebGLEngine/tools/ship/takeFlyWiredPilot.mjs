@@ -11,6 +11,8 @@
 //
 // REGISTERED 2026-11-18, BEFORE ANY ATTACK BELOW WAS FLOWN (one scratch attack of each kind, seed 99011, was flown while adding the pilot to the fighter job; in no registered set). Readings, each a mean with a word at |z| >= 2: each arm against the plain ship; BOTH LESS THE BETTER ALONE.
 // FORECAST, for the record: the helm CANNOT BE TOLD or leads a little (it did +0.027 against PD fighters); the gunner TRAILS, by more than against PD fighters (-0.148 there; it lays by rates and a trained fighter jinks), and so does both.
+// READ 2026-11-18 (brain/flyWiredPilot.reading.json): the plain ship wins 233 and is lost in 64 of 300 (173 hit points left on average); the helm +0.081 (z 3.8) LEADS; the gunner -0.308 (z -17) TRAILS; both -0.146 TRAILS (both less the helm -0.227). The forecast was right; the gunner costs twice what
+//   it costs against PD fighters. Against fighters a ship wants the hand gunner in its seats and the fly-wired helm at its helm.
 // NOTHING SHIPS: it says what the shipped brains do against the real threat. Every arm's leads are kept (brain/rig-results/flyWiredPilot/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the League and close-quarters pilots, green or ace gunners, two ships, escorts.
 "use strict";
