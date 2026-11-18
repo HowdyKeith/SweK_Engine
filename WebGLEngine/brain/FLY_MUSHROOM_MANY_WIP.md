@@ -76,3 +76,49 @@ memories crowd, not why the animal's are paired as they are.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyMushroomMany.mjs run` -> `brain/flyMushroomManyRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyMushroomMany.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at b5aaccb2, then read once)
+One start, 73.5 minutes on four processes, 26 records (24 draws, PLASTIC draw 1 trained a second time, the floors; sha256
+c4b98dd773e749ef...). **The checks hold**: the vendored wiring and the mushroom and odour rounds' files as committed and
+passing their own checks, each arm's teachers the mushroom round's, PLASTIC draw 1 the same twice. On the audit the
+untrained fly scores 0.0118 and the hand rule 0.6566; on average an odour shares 0.1530 of its Kenyon cells with another
+odour of its life.
+* **T2: THE FLY TAUGHT BY ITS REAL TEACHERS CANNOT BE TOLD APART FROM ONE WHOSE TEACHERS ARE PERMUTED AT LEARNING EIGHT
+  ODOURS** (PLASTIC's ranks 135, the middle 150, no ties, p 0.41).
+* **H: THE FLY TAUGHT BY ITS REAL TEACHERS LEARNS EIGHT ODOURS BETTER THAN THE RULE SET BY HAND** (12 of 12 above 0.6566,
+  p 0.00049).
+* **USES: 12 of 12 in each arm.**
+
+| arm | mean (least, most) | sd | with p_a at 0 | a |
+|---|---|---|---|---|
+| PLASTIC | 0.8908 (0.8750, 0.9055) | 0.0084 | 0.0122 | 1.0878 |
+| PFAM | 0.8923 (0.8428, 0.9181) | 0.0185 | 0.0122 | 1.0111 |
+
+**Every expectation came**: T2 CANNOT (55), H BETTER (97), USES 12 of 12 in each arm (90). So, as section 5 put it,
+**with eight meanings to keep apart, the real pairing still does no better than a permuted one**. That is the third time,
+after random odours and two odours through the projection neurons. The trained fly leaves the hand rule well behind
+(0.89 against 0.66), and with its learning rate at 0 it scores about what the untrained fly does.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** draw for draw (the same
+draw's trainer noise and lives), PLASTIC is above PFAM on 3 of 12 (draws 4, 10 and 11) and below on 9. As a sign test,
+which was not registered, that is p 0.15. PFAM spreads about twice as wide (sd 0.0185 against 0.0084) and holds both the
+round's best fly (0.9181, draw 3) and its worst (0.8428, draw 10). With the rate at 0, every fly of both arms scores
+between 0.0098 and 0.0148.
+
+**Measured after the reading, not registered (the gate recomputes two of the 24 audits):** the hand rule fixes the
+readout by the teachers: v_m is +1/88 for each neuron PPL1 teaches and -1/88 for each PAM teaches.
+- **Written for the real teachers and flown on each PFAM draw's fly, it scores 0.1090** on average, from -0.3119
+  (draw 2) to 0.3363, and 0 of 12 reach 0.6566. A readout fixed to one pairing fails on another.
+- **Written again for each draw's own permuted teachers, it scores 0.6474** on average, from 0.3553 to 0.8185 (draw 5).
+  **8 of the 12 permutations score above the real pairing's 0.6566.**
+
+So the question this round left open does have an answer for a readout set by hand: which Kenyon-cell inputs each
+teacher's neurons sample moves its score from 0.36 to 0.82, and the real pairing is not among the better ones. It does
+not matter to the trained fly. Its score does not follow its permutation's hand-rule score (Spearman -0.03 over PFAM's
+12), and every trained fly, PLASTIC or PFAM, is above every one of these hand rules.
+
+**What it does not mean.** Section 7 holds. CANNOT is not equal, and twelve draws a side would miss a small difference.
+The hand rule's numbers are measured after the reading, on one formula whose bias and p_a were chosen with the real
+teachers on the plain task; that 8 of 12 permutations beat it says this fly's real pairing is not where that formula does
+best, not that the animal's pairing is poor. The animal's output neurons have fixed partners downstream, which this fly
+does not.

@@ -1,7 +1,7 @@
 // WebGLEngine/tools/ship/flyMushroomMany-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flyMushroomMany-selfcheck.mjs      (about twenty seconds; IT NEVER RUNS THE ROUND -- its one training is of 2 iterations on draw 901, its audits are of 2 lives, and it
-// starts no process)
+// Run: node tools/ship/flyMushroomMany-selfcheck.mjs      (about a minute and a half; IT NEVER RUNS THE ROUND -- its one training is of 2 iterations on draw 901, its audits are of 2 lives
+// but for the verdict's three on the round's 200 (two hand rules and one committed fly, after the reading), and it starts no process)
 //
 // THE GATE OF THE MUSHROOM MANY-ODOUR ROUND (registered in brain/FLY_MUSHROOM_MANY_WIP.md before brain/rl/manyPnOdorEnv.mjs, tools/ship/flyMushroomMany.mjs and
 // tools/ship/takeFlyMushroomMany.mjs existed): does the teachers' pairing matter when eight odours must be kept apart?
@@ -12,6 +12,8 @@
 //   3  ONE TRAINING             a record's weights are the trainer's from the task and fly made here by hand; its scores again
 //   4  THE RECORDS              24 draws; T2, H, USES
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at b5aaccb2, read from the file: the checks, T2, H, USES, the arms, the description after the reading, the hand
+//                               rule on the permuted flies (measured after the reading), a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the
 // command as a process) for all 34; every one red by name (the number is the rows red):
 //   THE TASK (brain/rl/manyPnOdorEnv.mjs): E1 14 trials an odour 2 | E2 three bad of eight 2 | E3 the eight odours one odour 2 | E4 no noise 1 | E5 the reward over all the trials 1 | E6 the
@@ -24,6 +26,12 @@
 //   C5 reads without the odour round's file 1.   THE NOTE: N1 its 16 trials an odour 1 | N2 its audit from 11000001 1 | N3 its T2 a sign test 1 | N4 it drops why the answer may be no 1
 //   FOUND BEFORE THE SABOTAGES: tools/ship/definitionGates-selfcheck.mjs found the library's overlapOf named by no gate (the floors row now calls it); two rows of section 1 as first
 //   written tested nothing they named (a loop condition that was always true, and a staying-away row of conditions unrelated to it), and were rewritten to fly every trial by hand.
+// THE VERDICT'S SABOTAGES (2026-11-18, after the reading, the same runner, this gate alone): V1 a record's score (PFAM draw 7) changed in a digit the double holds 1 (the file's hash alone: the
+//   draw is no arm's least or most and the change is under the arms row's 5e-5) | V2 T2 PFAM against PLASTIC 3 | V3 H against the start 1 (section 4's made records alone: on the real file
+//   every fly is above the start as it is above the hand rule, 12 of 12 either way, and only the record where PLASTIC lies between them tells the two apart) | V4 USES needs 0.9 3 | V5 the
+//   floors' hand rule changed in a digit the double holds 1 (the file's hash: nothing in the verdict recomputes that floor to the bit) | V6 the note's T2 says BETTER 1 | V7 the note's
+//   expectation of H is 90 percent 1 | V8 the note names another commit 1 | V9 the note's 8 of 12 permutations above the real pairing is 7 1 | V10 the note's relabelled hand rule 0.6574 1 |
+//   V11 the note's unregistered sign test p 0.015 1 | V12 the note's PFAM least 0.8475 1 | V13 the note's draws PLASTIC wins 4, 9 and 11 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -36,6 +44,7 @@ import * as PF from "./paintingFly.mjs";
 import * as OE from "../../brain/rl/odorEnv.mjs";
 import * as PE from "../../brain/rl/pnOdorEnv.mjs";
 import * as ME from "../../brain/rl/manyPnOdorEnv.mjs";
+import { signTest } from "./voxelHome.mjs";
 import { trainDockES } from "../../brain/rl/dockPolicy.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
@@ -154,6 +163,42 @@ section(() => {
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one training through the round's code is of 2 iterations on draw 901 (and one refused); its audits are of 2 lives not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"PLASTIC", 0', '"PFAM", 901, TINY, TWO']) && !Y.SEEDS.includes(901) && !TWO.some((x) => Y.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at b5aaccb2 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, Y.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = Y.reading(lines, F), Fl = R.floors, A = R.arms;
+    const of = (a) => lines.filter((r) => r.kind === "draw" && r.arm === a).sort((x, y) => x.s - y.s), P = of("PLASTIC"), Q = of("PFAM"), all = [...P, ...Q];
+    ok("!! the results file is the one the run wrote: 26 records, sha256 c4b98dd773e749ef... (one start, 73.5 minutes on four processes)", lines.length === 26 && createHash("sha256").update(bytes).digest("hex") === "c4b98dd773e749ef81adea78073640d672d6d63d3fd11a19bf0a4c1e36e8dec8");
+    ok("!! THE CHECKS HOLD: the wiring and both committed files as committed and passing their own checks, 24 draws each once with the mushroom round's teachers, PLASTIC draw 1 the same twice; the floors -- the start 0.0118, the hand rule 0.6566, the odours' Kenyon-cell overlap 0.1530",
+        R.checks.length === 0 && near(Fl.start, 0.0118) && near(Fl.hand, 0.6566) && near(Fl.overlap, 0.1530) && lines.filter((r) => r.kind === "recheck").length === 1 && lines.find((r) => r.kind === "recheck").weightsHash === P[0].weightsHash);
+    ok("!! *** T2 -- THE FLY TAUGHT BY ITS REAL TEACHERS CANNOT BE TOLD APART FROM ONE WHOSE TEACHERS ARE PERMUTED AT LEARNING EIGHT ODOURS (PLASTIC's ranks 135, the middle 150, no ties, p 0.41); H -- IT LEARNS THEM BETTER THAN THE RULE SET BY HAND (12 of 12 above 0.6566, p 2/4096) *** -- USES 12 of 12 in each arm",
+        R.T2.word === Y.WORDS.T2[2] && R.T2.sumA === 135 && R.T2.ties === 0 && near(R.T2.p, 0.4095) && R.H.word === Y.WORDS.H[0] && R.H.above === 12 && R.H.below === 0 && R.H.p === 2 / 4096 && R.H.ref === Fl.hand && A.PLASTIC.uses === 12 && A.PFAM.uses === 12);
+    ok("!! the arms (mean, sd, least, most; with p_a at 0; a): PLASTIC 0.8908 0.0084 0.8750 0.9055, 0.0122, 1.0878 | PFAM 0.8923 0.0185 0.84275 0.9181, 0.0122, 1.0111; the trainer's battery at iteration 59 0.8445 and 0.8415",
+        near(A.PLASTIC.mean, 0.8908) && near(A.PLASTIC.sd, 0.0084) && near(A.PLASTIC.min, 0.8750) && near(A.PLASTIC.max, 0.9055) && near(A.PLASTIC.ratesOff, 0.0122) && near(A.PLASTIC.rate, 1.0878) &&
+        near(A.PFAM.mean, 0.8923) && near(A.PFAM.sd, 0.0185) && near(A.PFAM.min, 0.84275) && near(A.PFAM.max, 0.9181) && near(A.PFAM.ratesOff, 0.0122) && near(A.PFAM.rate, 1.0111) && near(A.PLASTIC.history[6].ret, 0.8445) && near(A.PFAM.history[6].ret, 0.8415));
+    const st = signTest(P.map((r, i) => r.score - Q[i].score), 0), offs = all.map((r) => r.ratesOff), rates = (v) => v.map((r) => r.rate);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: draw for draw PLASTIC above PFAM on 3 of 12 (draws 4, 10 and 11) and below on 9 -- as a sign test, not registered, p 598/4096; PFAM holds the round's best fly (draw 3) and its worst (draw 10); with the rate at 0 every fly scores 0.0098 to 0.0148; a from 0.8514 to 1.4883 in PLASTIC, 0.7904 to 1.2118 in PFAM",
+        P.every((r, i) => r.s === Q[i].s) && st.above === 3 && st.below === 9 && st.p === 598 / 4096 && J(P.filter((r, i) => r.score > Q[i].score).map((r) => r.s)) === J([4, 10, 11]) &&
+        Q.find((r) => r.score === Math.max(...all.map((x) => x.score))).s === 3 && Q.find((r) => r.score === Math.min(...all.map((x) => x.score))).s === 10 && near(Math.min(...offs), 0.0098) && near(Math.max(...offs), 0.0148) &&
+        near(Math.min(...rates(P)), 0.8514) && near(Math.max(...rates(P)), 1.4883) && near(Math.min(...rates(Q)), 0.7904) && near(Math.max(...rates(Q)), 1.2118));
+    // the hand rule written for a fly's own teachers: M.HAND's formula (v +1/88 for each neuron its teachers make PPL1-taught, -1/88 for each PAM-taught one, bias 0.1, p_a 2)
+    const handFor = (T) => { const sg = T.map(([p, f]) => (p > f ? 1 : f > p ? -1 : 0)), n = sg.filter((x) => x !== 0).length, w = new Float32Array(M.CIRCUIT.nm + 2); sg.forEach((x, m) => (w[m] = x / n)); w[M.CIRCUIT.nm] = 0.1; w[M.CIRCUIT.nm + 1] = 2; return Array.from(w); };
+    const real2 = Y.auditScore(M.policyOf("PFAM", 2).setParams(M.HAND)), own5 = Y.auditScore(M.policyOf("PFAM", 5).setParams(handFor(M.teachFor("PFAM", 5))));
+    ok("!! MEASURED AFTER THE READING, NOT REGISTERED (two of the 24 audits recomputed here): the hand rule written for the real teachers, flown on PFAM draw 2's fly, scores -0.3119; written for PFAM draw 5's own teachers, 0.8185, above the real pairing's 0.6566; written for the real teachers it is M.HAND itself",
+        near(real2, -0.3119) && near(own5, 0.8185) && own5 > Fl.hand && J(handFor(M.teachFor("PLASTIC", 1))) === J(Array.from(M.HAND)), `${real2.toFixed(4)}, ${own5.toFixed(4)}`);
+    const d10 = Q.find((r) => r.s === 10);
+    ok("!! RE-AUDITED AFTER THE READING: PFAM's draw 10 (the round's least) gives its score again to the bit", d10.score === A.PFAM.min && Y.auditScore(M.policyOf("PFAM", 10).setParams(PF.unpackWeights(d10.weights))) === d10.score);
+    const note = src("brain/FLY_MUSHROOM_MANY_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came -- every one: T2 CANNOT (55), H BETTER (97), USES 12 of 12 in each arm (90)",
+        /T2: CANNOT about 55, WORSE 35, BETTER 10\. H: \*\*BETTER about 97 percent\*\*\. USES 12 of 12 in each arm, about 90\./.test(flat) && R.T2.word === Y.WORDS.T2[2] && R.H.word === Y.WORDS.H[0] && A.PLASTIC.uses === 12 && A.PFAM.uses === 12);
+    ok("the registration's RESULT SECTION (section 10) carries both readings' words, USES, the commit the file was read at, that every expectation came, what section 5 said such a reading would say, the description and the measurement after the reading said as such with the gate's numbers, and what it does not mean",
+        /## 10\. The result/.test(note) && res.includes(`**T2: ${R.T2.word}**`) && res.includes(`**H: ${R.H.word}**`) && /\*\*USES: 12 of 12 in each arm\.\*\*/.test(res) && /b5aaccb2/.test(res) && /\*\*Every expectation came\*\*/.test(res) &&
+        /\*\*with eight meanings to keep apart, the real pairing still does no better than a permuted one\*\*/.test(res) && /\| PLASTIC \| 0\.8908 \(0\.8750, 0\.9055\) \| 0\.0084 \| 0\.0122 \| 1\.0878 \|/.test(res) && /\| PFAM \| 0\.8923 \(0\.8428, 0\.9181\) \| 0\.0185 \| 0\.0122 \| 1\.0111 \|/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /3 of 12 \(draws 4, 10 and 11\)/.test(res) && /p 0\.15/.test(res) &&
+        /\*\*Measured after the reading, not registered \(the gate recomputes two of the 24 audits\):\*\*/.test(res) && /\*\*Written for the real teachers and flown on each PFAM draw's fly, it scores 0\.1090\*\*/.test(res) && /\*\*Written again for each draw's own permuted teachers, it scores 0\.6474\*\*/.test(res) &&
+        /\*\*8 of the 12 permutations score above the real pairing's 0\.6566\.\*\*/.test(res) &&
+        /-0\.3119/.test(res) && /0\.8185/.test(res) && /Spearman -0\.03/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyMushroomMany-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
