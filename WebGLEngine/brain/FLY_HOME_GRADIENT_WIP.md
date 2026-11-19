@@ -82,3 +82,34 @@ before it is read, and read here.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeGradient.mjs run --jobs N` -> `brain/flyHomeGradientRound.jsonl`, committed byte for byte,
 whole, before it is read; `node tools/ship/takeFlyHomeGradient.mjs read` prints the checks and the reading.
+
+## 10. The result (run on Keith's machine, the whole results file committed unread there at 1ac6ffcf, then read once here)
+15 records (sha256 138ea7125387ad24...). **The checks hold**: round 4's file as committed and passing its own checks;
+**Keith's machine flew round 4's HOMEP draw 1 home and the homing round's floors to the committed numbers to the bit**,
+before any training; 12 draws with 16 lives a fly tried, each kept point the first best of the trainer's own scores;
+HOME16 draw 1 the same twice.
+* **W: THE HOMING FLY WALKED ON 16 LIVES A FLY FINDS HOME BETTER THAN THE HOMING FLY WALKED ON 4** (11 of 12 above,
+  p 0.0063).
+* **G16: THE HOMING FLY WALKED ON 16 LIVES A FLY CANNOT BE TOLD APART FROM THE FLY TRAINED TO HOLD A COURSE AT FINDING
+  HOME** (ranks 126, the middle 150, p 0.18).
+
+| arm | home: mean (least, most) | course |
+|---|---|---|
+| HOME16 | 0.5517 (0.5358, 0.5559) | 0.6555 |
+| HOMEP (round 4) | 0.5501 | 0.6501 |
+| COURSE64 (round 4) | 0.5541 | 0.6688 |
+
+**One of the two expectations came**: G16 CANNOT (55). W came BETTER, which was given 30. So, as section 5 put it,
+**HOMEP's walk was costing it**: scored on 4 lives, the trainer stepped the wrong way often enough to matter. The
+chooser round, read after this registration, found the same of the choice of point; both cost HOMEP.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** HOME16 is above HOMEP by
+0.0016 on average, and below it on draw 12 alone, which is the arm's least (0.5358; without it the mean is 0.5531). 5 of
+the 12 walks kept a point from their first ten iterations, as both scoping walks did, where none of HOMEP's did. Against
+the chooser round's HOMEBYC (HOMEP's walk, chosen by the course score: 0.5542), draw for draw, HOME16 is above on 3 and
+below on 9 (not registered, p 0.15): a better walk with the homing chooser did less, on these draws, than the old walk
+with the course chooser.
+
+**What it does not mean.** Section 7 holds. The gain is small (0.0016) and rests on 11 of 12 draws going one way, not on
+its size. The walks keep HOMEP's homing chooser, which the chooser round found wanting, so this round does not say what a
+16-life walk does with the course chooser. And it says what this trainer finds, not how an animal learns to home.

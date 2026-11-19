@@ -10,6 +10,8 @@
 //   2  ONE TRAINING             a record is the chooser round's walk with the recipe given, the trainer's by hand with the lives given; its scores again; the two checks of the machine
 //   3  THE RECORDS              12 draws, a second training, the two checks of the machine; W and G16
 //   4  THE COMMAND              it is this round's; it checks the machine before any training; no training of the round's, no process
+//   5  THE VERDICT              the results file as run on Keith's machine and committed unread there at 1ac6ffcf, read from the file: the checks, W, G16, the arms, the
+//                               description after the reading, a re-audit here, the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the library's and the note's, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name (the number is the rows red):
 //   THE ROUND: G1 8 lives a fly 1 | G2 the recipe's iterations 59 3 | G3 the walk on HOMEP's 4 lives whatever the recipe 2 | G4 the walk's last point kept 1 | G5 the home score on the
@@ -24,6 +26,9 @@
 //   whatever the scores), so section 2's walks try 4. The command row as first tightened (the machine's records appended only when they hold, the trainings only after) quoted the
 //   command's file append, and this gate's last row, which reads its own text for any file write, went red on the runner's baseline; the runner was stopped (it restored the library it
 //   held, checked by hand), the quoted text is put together from two pieces, and the 31 were run again from the start.
+// THE VERDICT'S SABOTAGES (2026-11-19, after the reading, the same runner, this gate alone): V1 a record's home score (draw 5) changed in a digit the double holds 1 (the file's hash
+//   alone) | V2 W against COURSE64 4 | V3 the sign test's BETTER and WORSE swapped 4 | V4 G16 against HOMEP 2 | V5 the note's W says CANNOT 1 | V6 the note's expectation of W BETTER is 40 1 |
+//   V7 the note names another commit 1 | V8 the note says both expectations came 1 | V9 the note's average gain 0.0026 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -39,6 +44,8 @@ import * as CE from "../../brain/rl/compassEnv.mjs";
 import { HomeTrainEnv } from "../../brain/rl/homeTrainEnv.mjs";
 import { HomingTrainFly } from "../../brain/rl/homingTrainFly.mjs";
 import { trainDockES } from "../../brain/rl/dockPolicy.js";
+import { createHash } from "node:crypto";
+import { signTest } from "./voxelHome.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -147,6 +154,32 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its trainings through the round's code are of 2 iterations (and one refused), its checks of the machine on 2 lives not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(["trainOne(0)", "trainOne(5, TINY2, TWO, COURSE)", "trainOne(5, TINY1, TWO, COURSE)", "reflyOne(F.trained, TWO)", "floors(TWO)"]) && ![...TWO, ...COURSE].some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) &&
         !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was run on Keith's machine and committed there at 1ac6ffcf before it was read; read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, Y.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = Y.reading(lines, F), A = R.arms;
+    const own = lines.filter((r) => r.kind === "draw").sort((a, b) => a.s - b.s), hp = T.SEEDS.map((s) => homep(s)), d = own.map((r, i) => r.home - hp[i].home), mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const cl = fs.readFileSync(path.join(ENG, C.RESULTS), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), byc = T.SEEDS.map((s) => cl.find((r) => r.kind === "draw" && r.arm === "HOMEBYC" && r.s === s));
+    ok("!! the results file is the one the machine wrote: 15 records, sha256 138ea7125387ad24...", lines.length === 15 && createHash("sha256").update(bytes).digest("hex") === "138ea7125387ad2464c206bb6ffd76ca07a3206e2e7aef71e023d35c991e9024");
+    ok("!! THE CHECKS HOLD: round 4's file as committed and passing its own checks; THE MACHINE FLEW ROUND 4'S HOMEP DRAW 1 HOME AND THE HOMING ROUND'S FLOORS TO THE COMMITTED NUMBERS TO THE BIT; 12 draws with 16 lives a fly, each kept point the first best of the trainer's scores; draw 1 the same twice",
+        R.checks.length === 0 && Y.reflyHolds(lines.find((r) => r.kind === "refly"), F) && Y.floorsHold(lines.find((r) => r.kind === "floors"), F));
+    ok("!! *** W -- THE HOMING FLY WALKED ON 16 LIVES A FLY FINDS HOME BETTER THAN HOMEP (11 of 12 above, p 26/4096); G16 -- IT CANNOT BE TOLD APART FROM COURSE64 (ranks 126, p 0.18) ***",
+        R.W.word === Y.WORDS.W[0] && R.W.above === 11 && R.W.below === 1 && R.W.p === 26 / 4096 && R.G16.word === Y.WORDS.G16[2] && R.G16.sumA === 126 && near(R.G16.p, 0.1782));
+    ok("!! the arms (home mean, sd, least, most; course): HOME16 0.5517 0.0053 0.5358 0.5559, 0.6555 | HOMEP 0.5501, 0.6501 | COURSE64 0.5541, 0.6688",
+        near(A.HOME16.mean, 0.5517) && near(A.HOME16.sd, 0.0053) && near(A.HOME16.min, 0.5358) && near(A.HOME16.max, 0.5559) && near(A.HOME16.course, 0.6555) && near(A.HOMEP.mean, 0.5501) && near(A.COURSE64.mean, 0.5541));
+    const vb = signTest(own.map((r, i) => r.home - byc[i].home), 0), rest = own.filter((r) => r.s !== 12);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: HOME16 is above HOMEP by 0.0016 on average, below on draw 12 alone (the arm's least, 0.5358; without it the mean is 0.5531); 5 of 12 kept a point from their first ten iterations, none of HOMEP's; against the chooser round's HOMEBYC (0.5542), draw for draw, 3 above and 9 below (not registered, p 0.15)",
+        near(mean(d), 0.0016) && J(own.filter((r, i) => d[i] < 0).map((r) => r.s)) === J([12]) && own.find((r) => r.s === 12).home === A.HOME16.min && near(mean(rest.map((r) => r.home)), 0.5531) &&
+        own.filter((r) => r.keptAt < 10).length === 5 && hp.every((r) => r.keptAt >= 10) && near(mean(byc.map((r) => r.home)), 0.5542) && vb.above === 3 && vb.below === 9 && vb.p === 598 / 4096);
+    const d12 = own.find((r) => r.s === 12);
+    ok("!! RE-AUDITED HERE AFTER THE READING: the machine's draw 12 (the arm's least), flown home in the sandbox, gives its score again to the bit", H.homeScore(T.flyOf("HOMEP", 12, PF.unpackWeights(d12.weights)), T.AUDIT) === d12.home);
+    const note = src("brain/FLY_HOME_GRADIENT_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: G16 CANNOT (55) came; W came BETTER, which was given 30",
+        /W: CANNOT about 65, BETTER 30, WORSE 5\. G16: CANNOT about 55, WORSE 25, BETTER 20\./.test(flat) && R.W.word === Y.WORDS.W[0] && R.G16.word === Y.WORDS.G16[2]);
+    ok("the registration's RESULT SECTION (section 10) carries both readings' words, the machine and the commit, the expectation that did not come, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && res.includes(`**W: ${R.W.word}**`) && res.includes(`**G16: ${R.G16.word}**`) && /1ac6ffcf/.test(res) && /\*\*One of the two expectations came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /0\.0016 on average/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyHomeGradient-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
