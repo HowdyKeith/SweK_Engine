@@ -95,3 +95,24 @@ So every file is consistent within itself: Gen2, Gen4 and Gen5 are first-order, 
 **The rig command is unchanged** (section 8). Its log now prints `orientation step: euler` near the top. If it says anything else, stop the run.
 
 **Not checked, said now.** Gen3 (Addendum 13, 4b-E), the replicate file and stage A were not re-flown. They predate the switch by date (2026-10-29/30) and are mapped to first-order on that basis alone.
+
+## 10. RESULT 2026-11-19, READ ONCE: NOT SUPPORTED in both cells. Sections 1 to 9 are unchanged.
+
+**The run.** Section 8's command, on the rig (win32-x64, 4 workers), into Addendum 12's own file, stamped `orientation step: euler` at the top as section 9 requires. The first pass trained 40 circuits and stopped when one worker process (P/whole/wer3:1) died with a Windows access violation (exit 3221225477, 0xC0000005) and returned no result; the parent stopped on it. Only the parent writes to the file, and only from a returned result, so nothing partial was written. The same command resumed it ("40 already in") and trained the other 24. That night the rig had several unrelated processes die the same way (gate runs during a verify, among them); the cause is not known and is not this addendum's code. **The file was checked before the report was run:** 98 lines; its first 34 are byte-identical to the 34 the tree held (Addendum 12's records, so the real wiring's four searches and the references are the ones already there); the 64 new circuits are all present, 4 in each of the 16 family-cells, none twice, every one stamped `euler` and replicate 7.
+
+**The registered test** (`report --in brain/rig-results/fishVestibularGen2.jsonl`, run once on the complete file):
+
+| cell | real wiring (mean of 4 searches) | 44 shuffled circuits: mean, sd, range | at or above the real | rank of 45 | p | line p <= 0.05 |
+|---|---|---|---|---|---|---|
+| P/B | -0.432 | -0.453, 0.024, -0.521 to -0.411 | 8 | 9 | 0.2000 | not met |
+| P/whole | -0.418 | -0.443, 0.018, -0.481 to -0.408 | 2 | 3 | 0.0667 | not met |
+
+**ADDENDUM 17 OVERALL (registered): NOT SUPPORTED (0 of 2 cells at p <= 0.05).** On 4b-P, ranked as circuits among 44 shuffled wirings, the real extracted wiring (NO STATE) is not in the top two of 45 in either cell.
+
+**Against the forecast (section 7, which replaced section 4's).** "Neither" was forecast at about 95 percent and is what came back. P/whole landed at rank 3, inside the rank 1 to 5 band forecast at about 15 percent, and ONE circuit short of the line: two shuffled circuits at or above it give p 3/45; one would have given 2/45 and met it. P/B landed at rank 9, outside both the rank 1 to 5 band (about 5 percent) and the rank 23 or worse band (about 34 percent).
+
+**Printed, not decisive.** The real wiring is above the shuffled mean in both cells: by 0.021 on P/B (0.9 shuffled sd) and 0.025 on P/whole (1.4 sd). Addendum 12's gaps were 0.020 and 0.022 against 12 shuffled circuits, so 32 more circuits moved the shuffled means by about 0.001 to 0.003 and left the direction where it was. Section 7 measured how weak this test is at a gap this size (a true gap of the whole observed size clears the line 2 percent of the time on P/B and 12 percent on P/whole), and the reading should be taken that way: **a miss here says the effect, if there is one, is too small for a circuit-level rank of 45 to see; it does not say the wiring makes no difference.** It is the same reading Addendum 12 gave at the search level (p 0.1308 and 0.0516), now at the right unit, and the same direction.
+
+**What it does not say.** Anything about memory (Addenda 9 to 11), the tuning (14 and 15, which did clear its line at 2nd of 45), the escape task (13), another task, the plain net, or the larval fish. The fresh-shuffle replicate (Addendum 16) is a different test and stands as registered on its own file. Section 6's unchecked points stand: the unequal family sizes (16, 16, 12) are pooled as registered, and four searches of the real wiring may not be enough to make its mean steady on P/B (across its four searches the sd is 0.013, 0.037 and 0.017 on audits a1 to a3; P/whole's is 0.013, 0.011 and 0.013).
+
+**Nothing is re-run or re-cut.** Scoring each real search singly against the 44, or dropping a family, would be a different test; neither is registered and neither is reported here.

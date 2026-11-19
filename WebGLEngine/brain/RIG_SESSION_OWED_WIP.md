@@ -14,7 +14,7 @@ Built from a read of `docs/CHANGELOG.md` entries v4880 to v4912 and of the notes
 ```
 node tools/ship/plainNetVariantsCmd.mjs run --specs all --out brain/plainNetVariants.jsonl --workers 8      # ~10.5 core-hours (brain/PLAIN_NET_VARIANTS_WIP.md)
 node tools/ship/trainSubVestibularCmd.mjs run --specs wiringShuffledFresh --out brain/fishVestibularGen6.jsonl --workers 4   # ~10.6 core-hours (brain/FISH_WIRING_FRESH_WIP.md, Addendum 16)
-node tools/ship/trainSubVestibularCmd.mjs run --specs wiringPermutations --out brain/rig-results/fishVestibularGen2.jsonl --workers 4   # ~21 core-hours (brain/FISH_WIRING_RANK_WIP.md, Addendum 17; resumes Addendum 12's own file)
+node tools/ship/trainSubVestibularCmd.mjs run --specs wiringPermutations --out brain/rig-results/fishVestibularGen2.jsonl --workers 4   # ~21 core-hours (brain/FISH_WIRING_RANK_WIP.md, Addendum 17; resumes Addendum 12's own file)   -- DONE 2026-11-19: NOT SUPPORTED, section 10
 ```
 
 Each is resumable (a second run skips what is in the file) and writes one line per circuit. They are CPU work: run them one after another, not beside the GPU steps below, or the timings in step 3 read a loaded box. Read each with its `report --in <file>` line; do not read a results file before its run is whole.
