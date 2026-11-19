@@ -2860,11 +2860,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "ai-managed-sub-stations",
-        blocker: "UPSTREAM",
-        what: "IDEA ONLY, NOT STARTED AND NOT DESIGNED (Keith): the engine's AI managing ALL the stations of a submarine -- helm and planes, ballast and trim, navigation, the sensors, and the energy and hull -- each by a brain, instead of one pilot flying the whole boat. If \"stations\" meant something else, correct this entry.",
-        how: "No work proposed. If taken up: a station is a function from what that station can sense to what it commands, a captain layer decides between them, and the existing per-purpose pieces (the PD autopilot, the surfacing and emergency wrappers, the navigator and the estimators, the refill trip) are the first station brains.",
-        why: "Logged so the idea is not lost; it only means something once the needs task (piece 3) exists, because the stations only conflict when the boat has needs.",
-        upstream: "needs-pieces-3-and-4-task-and-stateful-pilot",
+        blocker: "OPEN",
+        what: "Keith's idea: the engine's AI managing ALL the stations of a submarine -- helm and planes, ballast and trim, navigation, the sensors, and the energy and hull -- each by a brain, instead of one pilot flying the whole boat. ROUND 1 DONE 2026-11-19 (brain/SUB_STATIONS_WIP.md): brain/subStations.mjs, the stations (energy, damage control, a generic target station, the helm) and a fixed-priority captain that is each existing wrapper BIT FOR BIT when one station speaks (gate brain/subStations-selfcheck.mjs, 26 mutants all red). FINDING: on a boat low on charge AND flooding, energy alone is crushed SOONER than no station (58 s against 92), damage control alone at 341 s, and both under the fixed captain survive 400 s but arrive near the surface with a flat battery and sink again -- each station was written for one problem and the fixed captain only stacks them.",
+        how: "Round 2 (proposed in section 5 of the note, not registered): on boats with two problems at once, does a captain that knows the stations' costs (TRIAGE: cap the rescue's thrust by the charge left; no bottle rationing while there is a leak) keep more boats than the fixed captain? Registered first, fresh seeds, each station alone and none as controls. Then navigation and sonar stations, then the captain in the Sub Aquarium.",
+        why: "The tank runs one event at a time, so no two of these brains had ever run on one boat; round 1 shows that when they do, they fight.",
     },
     {
         id: "fish-vestibular-data-arrived-partial",
