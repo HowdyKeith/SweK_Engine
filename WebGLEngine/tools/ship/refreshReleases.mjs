@@ -48,10 +48,22 @@ import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool d
  * a prerelease at the top of this list would otherwise read as "the fleet is up to date" when the fleet
  * cannot see it.
  */
+// v4926 -- the asset the fleet downloads, by the rule fetchEngineBuild uses (ai-bridge/githubBridge.js: the named zip,
+// else any .zip). Kept here as one pattern so the gate can check that file still spells the same one.
+export const FLEET_ZIP = /^(?:SweK_Engine|EngineProject)_v\d+\.zip$/i;
+/** The release's fleet zip as {name, size, state}, null when it has none; undefined when the payload carries no asset list. */
+export function zipOf(r) {
+    if (!r || !Array.isArray(r.assets)) return undefined;
+    const a = r.assets.find((x) => x && FLEET_ZIP.test(x.name || "")) || r.assets.find((x) => x && /\.zip$/i.test(x.name || ""));
+    return a ? { name: a.name, size: a.size, state: a.state } : null;
+}
 export function rowsFrom(apiJson) {
     return (Array.isArray(apiJson) ? apiJson : [])
         .filter((r) => r && !r.draft && /^v\d+$/.test(r.tag_name || ""))
-        .map((r) => Object.assign({ tag: r.tag_name, publishedAt: r.published_at }, r.prerelease ? { prerelease: true } : {}))
+        // v4926 -- AND THE ZIP, because a release is only something the fleet can run if it carries one (v4926 was
+        // published with an empty asset list and the ledger recorded it as published). A payload with no asset
+        // list (a hand fixture) leaves the field off rather than claiming "none".
+        .map((r) => { const z = zipOf(r); return Object.assign({ tag: r.tag_name, publishedAt: r.published_at }, r.prerelease ? { prerelease: true } : {}, z === undefined ? {} : { zip: z }); })
         // 2026-11-17 -- ONE ROW PER TAG. The v4921 refresh ran two seconds after v4921 was published: page 1 was read before
         // it showed and page 2 after, so page 2 began one release early and the ledger wrote v3961 twice and v4921 not at
         // all (the newest-first row went red on the rig). A tag seen twice is the same release; the fetch below also

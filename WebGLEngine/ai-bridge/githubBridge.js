@@ -347,7 +347,23 @@ async function publishVersion({ repo, tag, name, body, assetPath, draft, prerele
     if (!cr.ok) return cr;
     let asset = null;
     if (assetPath) asset = await uploadAsset({ repo, releaseId: cr.id, uploadUrl: cr.uploadUrl, filePath: assetPath });
-    return { ok: true, release: cr, asset };
+    return _publishOutcome(cr, asset, assetPath);
+}
+
+// *** v4926 -- A RELEASE WITH NO ZIP WAS REPORTED AS A PUBLISH THAT WORKED. *** This returned ok:true whenever the
+// release was CREATED, and the upload's own result went into `asset`, where nothing that printed OK looked: the
+// verified-clone chain printed "[chain] publish OK" from pub.ok alone. v4926 went out that way on 2026-11-19 -- tag
+// and release made, asset list empty, so releases/latest was a release fetchEngineBuild refuses ("has no .zip
+// asset") until the zip was attached by hand eleven minutes later. When a zip was asked for and did not arrive,
+// the publish FAILED: the release exists, and the message says so and names its id, because a release without
+// its asset is the one state a retry must not paper over by creating a second release.
+function _publishOutcome(cr, asset, assetPath) {
+    if (!assetPath) return { ok: true, release: cr, asset: null };
+    if (asset && asset.ok) return { ok: true, release: cr, asset };
+    return { ok: false, releaseCreated: true, release: cr, asset,
+             error: "release " + (cr && cr.tag) + " was CREATED but its zip did not upload: " + ((asset && asset.error) || "no upload result") +
+                    " -- THE RELEASE EXISTS AND HAS NO ASSET. Attach the zip with uploadAsset({ releaseId: " + (cr && cr.id) +
+                    " }) or on the release page; do not publish the tag again." };
 }
 
 // v1129 — one click: auto-tag from the running engine version, build the Gmail-safe
@@ -1182,4 +1198,4 @@ function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
 const AUTH_FAIL = /could not read Username|Authentication failed|invalid username or password|(?:returned error|HTTP(?:\/[\d.]+)?)[: ]+40[13]\b/i;
 function _authFailed(err) { return AUTH_FAIL.test(String(err || "")); }
 
-module.exports = { _allReleasesRaw, _authFailed, _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _publishOutcome, _allReleasesRaw, _authFailed, _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
