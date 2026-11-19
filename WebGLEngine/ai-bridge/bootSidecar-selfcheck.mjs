@@ -1,6 +1,6 @@
 // WebGLEngine/ai-bridge/bootSidecar-selfcheck.mjs — v3936 (was v3285)
 //
-// Run: node ai-bridge/bootSidecar-selfcheck.mjs   (~0.1s — MEASURED; real temp files, no mocks)
+// Run: node ai-bridge/bootSidecar-selfcheck.mjs   (~35-100 ms — MEASURED: 0.1 s at writing; 45 ms in the v4927 sweep and 36-51 ms alone on linux-x64-4c-16gb-142c0d; real temp files, no mocks)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Three rules under test: the three states are never collapsed into two, a sidecar may not grade, and anything
