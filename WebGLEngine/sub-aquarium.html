@@ -45,6 +45,8 @@
   .col { display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; }
   .col .panel.p2d { flex:0 0 auto; }
   .col .panel.plist { flex:1 1 170px; min-height:170px; }
+  .panel[hidden] { display:none; }   /* 2026-11-19: .panel's display:flex would otherwise show a hidden panel (the advisor's) */
+  #advPanel { flex:0 0 auto; min-height:0; } #advTrace svg { width:100%; height:auto; display:block; }
   .canvasbox { position:relative; flex:1 1 auto; min-height:260px; }
   .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
   .canvasbox iframe { position:absolute; inset:0; width:100%; height:100%; border:0; z-index:0; pointer-events:none; background:#000; }
@@ -119,6 +121,9 @@
       <canvas id="compassView" width="1000" height="330" aria-label="Two compass dials and the heading error of each over time"></canvas>
       <div class="tank-note" id="compassNote">Both subs lose the compass for 16 s in every 40 (after 10 s of it working). Green is the true heading, amber is what the pilot is shown. The plain autopilot is shown the last good heading and drifts off it; the navigator integrates the hull&rsquo;s own turn rate and keeps it. Its rate gyro is exact here, so this is the best a navigator can do.</div></section>
     <section class="panel plist" aria-label="The subs in the tank"><h2>Subs</h2><div class="side" id="list"></div></section>
+    <section class="panel plist" id="advPanel" aria-label="The advisor's advice over time" hidden><h2>Advisor <span class="hint" id="advWho"></span></h2>   <!-- 2026-11-19: the advice over time (render/advisorTrace.mjs) -->
+      <div id="advTrace" title="The selected sub's charge (solid) against the rule's surfacing threshold at its depth (red, dashed), its depth (faint: the top is the surface, the bottom its collapse depth), and under them when the rule advised it to surface, to work the pump and to repair. The last 300 s of tank time."></div>
+      <div class="sub" id="advSum"></div></section>
   </div>
 </main>
 <p class="note" id="fishDetail"></p>
@@ -137,6 +142,7 @@ import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
 import { needsLine } from "/render/needsView.mjs";
+import * as ADV from "/render/advisorTrace.mjs";   // 2026-11-19: the advice over time, for the selected sub with the advisor on
 import * as LBL from "/render/subAquariumLabel.mjs";   // 2026-11-17: what flies a sub, said in its row (a waiting or refused kind is named, not called the autopilot)
 import { CLASSES as NEEDS_CLASSES } from "/physics/mechanics/subNeeds.mjs";   // the menu's values are checked against the model's own class table
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
@@ -291,7 +297,18 @@ function renderList() {
     box.appendChild(row);
   }
 }
+const advTraces = new Map(); let advDrawn = "";   // 2026-11-19: every advised sub's last 300 s; the panel draws the selected one's, at most when its newest point changes
+function updateAdvisor(snap) {
+  ADV.record(advTraces, snap);
+  const pts = selected ? advTraces.get(selected) : null, panel = $("advPanel");
+  if (!pts || !pts.length) { panel.hidden = true; advDrawn = ""; return; }
+  panel.hidden = false; const tNow = pts[pts.length - 1].t;
+  if (selected + ":" + tNow === advDrawn) return;
+  advDrawn = selected + ":" + tNow; const me = snap.find((x) => x.id === selected); $("advWho").textContent = me ? me.name : "";
+  ADV.mountSvg($("advTrace"), ADV.traceShapes(pts)); $("advSum").textContent = ADV.summaryLine(pts);
+}
 function updateStats(snap) {
+  updateAdvisor(snap);
   { const me = snap.find((x) => x.id === selected), on = !!(me && me.needs); const adv = !!(on && me.needs.advisor && me.needs.advisor.on); $("advChk").disabled = !on; $("advChk").checked = adv; $("pumpChk").disabled = $("repairChk").disabled = !on || adv; if (on) { $("pumpChk").checked = me.needs.pump > 0; $("repairChk").checked = me.needs.repair > 0; } else $("pumpChk").checked = $("repairChk").checked = false; }   // v4905: the boxes show the selected sub's own state
   for (const s of snap) {
     const cm = document.getElementById("c_" + s.id);
