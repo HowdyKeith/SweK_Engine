@@ -87,3 +87,39 @@ with their audits, four at a time: about 5 hours. Every job is under an hour, an
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeChooser.mjs run` -> `brain/flyHomeChooserRound.jsonl`, committed byte for byte, whole, before
 it is read; `node tools/ship/takeFlyHomeChooser.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at f902ad40, then read once)
+Three starts (the two-hour limit and a container restart; the command goes on from what the file holds), 36 records
+(sha256 8951af17ed60d6dc...). **The checks hold**: round 4's file as committed and passing its own checks; every walk's
+kept point HOMEP's committed weights to the bit and the first best of the trainer's own scores; every choice the first
+best of its chooser's scores.
+* **C256: THE HOMING FLY CHOSEN ON 256 LIVES CANNOT BE TOLD APART FROM THE HOMING FLY CHOSEN ON ITS 64 LIVES AT FINDING
+  HOME** (6 above, 6 below, p 1).
+* **CBC: THE HOMING FLY CHOSEN BY ITS COURSE SCORE FINDS HOME BETTER THAN THE HOMING FLY CHOSEN ON ITS 64 LIVES** (11 of
+  12 above, p 0.0063).
+* **G256: THE HOMING FLY CHOSEN ON 256 LIVES CANNOT BE TOLD APART FROM THE FLY TRAINED TO HOLD A COURSE AT FINDING HOME**
+  (ranks 110, the middle 150, p 0.020).
+* **GBC: THE HOMING FLY CHOSEN BY ITS COURSE SCORE CANNOT BE TOLD APART FROM THE FLY TRAINED TO HOLD A COURSE AT FINDING
+  HOME** (ranks 160, p 0.59).
+
+| arm | home: mean (least, most) | course |
+|---|---|---|
+| HOME256 | 0.5523 (0.5488, 0.5565) | 0.6532 |
+| HOMEBYC | 0.5542 (0.5481, 0.5571) | 0.6686 |
+| HOMEP (round 4) | 0.5501 | 0.6501 |
+| COURSE64 (round 4) | 0.5541 | 0.6688 |
+
+**Three of the four expectations came**: C256 CANNOT (60), G256 CANNOT (60), GBC CANNOT (65). CBC came BETTER, which
+was given 25. So, as section 5 put it, **the choice of point was costing HOMEP**, but not for want of lives: four times
+the homing lives chose no better, and the course score, on 64 lives, chose a homing fly as good at home as the fly
+trained on the course. The walk was not round 4's shortfall; the homing score as a chooser was.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** HOMEBYC is above HOMEP by
+0.0041 on average, which is round 4's gap, and below it on draw 6 alone; HOME256 is above by 0.0022. Neither chooser kept
+HOMEP's own point on any draw. HOMEBYC against HOME256, draw for draw, is 8 above and 4 below (not registered, p 0.39).
+
+**What it does not mean.** Section 7 holds. It says the course score picks this fly's homing point better than the homing
+score does, on these walks; it does not say why. One reading is that holding a heading is what this fly's homing rests
+on, and the course score measures it with less noise; this round does not test that. The gradient round
+(`brain/FLY_HOME_GRADIENT_WIP.md`), registered before this reading, keeps HOMEP's homing chooser, so it asks about the
+walk with the chooser this round found wanting.

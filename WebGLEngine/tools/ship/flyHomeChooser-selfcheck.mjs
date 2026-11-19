@@ -11,6 +11,8 @@
 //                                 choice on its lives; a record's scores and audits again
 //   4  THE RECORDS                12 walks and 24 choices; C256, CBC, G256, GBC
 //   5  THE COMMAND                it is this round's; no walk or choice of the round's, no process
+//   6  THE VERDICT                the results file as committed unread at f902ad40, read from the file: the checks, C256, CBC, G256, GBC, the arms, the description after the
+//                                 reading, a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-18) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the trainer's, the library's and the note's, this gate
 // and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name but TWO, findings (the number is the rows red):
 //   THE TRAINER (brain/rl/dockPolicy.js): D1 onPoint handed the walk's point itself, not a copy 3 | D2 onPoint after the battery 1 | D3 onPoint handed the iteration plus one 2 | D4 onPoint
@@ -27,6 +29,10 @@
 //   kept on either; a walk now records the trainer's own score of every point (its onIter observer's), checkRecords requires the kept point to be their first best, and section 3 flies each
 //   point by hand on HOMEP's 64 battery lives and requires those scores to the bit. C4 -- section 5 read that the command builds the set of walks the file holds, not that it skips them; it now
 //   reads the two filters, of the walks and of the choices. F7, F19, C4 and C6 were run after the fixes, on the same runner; the others before them (the fixes only add rows).
+// THE VERDICT'S SABOTAGES (2026-11-19, after the reading, the same runner, this gate alone): V1 a record's home score (HOME256 draw 3) changed in a digit the double holds 1 (the file's
+//   hash alone: the change is under the arms row's 5e-5) | V2 CBC against COURSE64 5 | V3 the sign test's BETTER and WORSE swapped 5 | V4 G256 and GBC against HOMEP 4 | V5 the note's CBC
+//   says CANNOT 1 | V6 the note's expectation of CBC BETTER is 35 1 | V7 the note names another commit 1 | V8 the note says every expectation came 1 | V9 the note's average gain 0.0051 1.
+//   None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -42,6 +48,7 @@ import * as CE from "../../brain/rl/compassEnv.mjs";
 import { HomeTrainEnv } from "../../brain/rl/homeTrainEnv.mjs";
 import { HomingTrainFly } from "../../brain/rl/homingTrainFly.mjs";
 import { trainDockES, evaluate } from "../../brain/rl/dockPolicy.js";
+import { signTest } from "./voxelHome.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -159,6 +166,32 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one walk through the round's code is of 2 iterations, its one choice on 2 lives and audited on lives not the round's (and two calls refused); it starts no process; the file's size and time are what they were",
         J(calls) === J(["walkOne(0)", "walkOne(5, TINY)", "chooseOne(\"HOMEBYC\", 5, w, TWO, COURSE, 2)", "chooseOne(\"HOME256\", 6, w)"]) && ![...TWO, ...COURSE].some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at f902ad40 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, C.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = C.reading(lines, F), A = R.arms;
+    const of = (a) => lines.filter((r) => r.kind === "draw" && r.arm === a).sort((x, y) => x.s - y.s), B = of("HOMEBYC"), H2 = of("HOME256"), hp = T.SEEDS.map((s) => homep(s)), dB = B.map((r, i) => r.home - hp[i].home), dH = H2.map((r, i) => r.home - hp[i].home), mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    ok("!! the results file is the one the run wrote: 36 records, sha256 8951af17ed60d6dc... (three starts: the two-hour limit and a container restart)", lines.length === 36 && createHash("sha256").update(bytes).digest("hex") === "8951af17ed60d6dc296672eee5d75d62ebe21addc11ac33678cb8982d8ee2876");
+    ok("!! THE CHECKS HOLD: round 4's file as committed and passing its own checks; 12 walks, every kept point HOMEP's committed weights to the bit and the first best of the trainer's own scores; 24 choices, each the first best of its chooser's scores", R.checks.length === 0 && lines.filter((r) => r.kind === "walk").length === 12);
+    ok("!! *** C256 -- CHOSEN ON 256 LIVES, IT CANNOT BE TOLD APART FROM HOMEP (6 above, 6 below, p 1); CBC -- CHOSEN BY ITS COURSE SCORE, IT FINDS HOME BETTER THAN HOMEP (11 of 12 above, p 26/4096) ***",
+        R.C256.word === C.WORDS.C256[2] && R.C256.above === 6 && R.C256.below === 6 && R.C256.p === 1 && R.CBC.word === C.WORDS.CBC[0] && R.CBC.above === 11 && R.CBC.below === 1 && R.CBC.p === 26 / 4096);
+    ok("!! *** G256 -- CANNOT BE TOLD APART FROM COURSE64 (ranks 110, p 0.020); GBC -- CANNOT BE TOLD APART FROM COURSE64 (ranks 160, p 0.59) ***",
+        R.G256.word === C.WORDS.G256[2] && R.G256.sumA === 110 && near(R.G256.p, 0.0205) && R.GBC.word === C.WORDS.GBC[2] && R.GBC.sumA === 160 && near(R.GBC.p, 0.5899));
+    ok("!! the arms (home mean, sd, least, most; course): HOME256 0.5523 0.0021 0.5488 0.5565, 0.6532 | HOMEBYC 0.5542 0.0028 0.5481 0.5571, 0.6686 | HOMEP 0.5501, 0.6501 | COURSE64 0.5541, 0.6688",
+        near(A.HOME256.mean, 0.5523) && near(A.HOME256.sd, 0.0021) && near(A.HOME256.min, 0.5488) && near(A.HOME256.max, 0.5565) && near(A.HOME256.course, 0.6532) && near(A.HOMEBYC.mean, 0.5542) && near(A.HOMEBYC.sd, 0.0028) && near(A.HOMEBYC.min, 0.5481) && near(A.HOMEBYC.max, 0.5571) && near(A.HOMEBYC.course, 0.6686) &&
+        near(A.HOMEP.mean, 0.5501) && near(A.HOMEP.course, 0.6501) && near(A.COURSE64.mean, 0.5541) && near(A.COURSE64.course, 0.6688));
+    const bh = signTest(B.map((r, i) => r.home - H2[i].home), 0);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: HOMEBYC is above HOMEP by 0.0041 on average (round 4's gap), below on draw 6 alone; HOME256 by 0.0022; neither chooser kept HOMEP's own point on any draw; HOMEBYC against HOME256 draw for draw 8 above, 4 below (not registered, p 0.39)",
+        near(mean(dB), 0.0041) && J(B.filter((r, i) => dB[i] < 0).map((r) => r.s)) === J([6]) && near(mean(dH), 0.0022) && B.every((r, i) => r.keptAt !== hp[i].keptAt) && H2.every((r, i) => r.keptAt !== hp[i].keptAt) && bh.above === 8 && bh.below === 4 && near(bh.p, 0.3877));
+    const b3 = B.find((r) => r.s === 12);
+    ok("!! RE-AUDITED AFTER THE READING: HOMEBYC's draw 12 (the largest gain) gives its home score again to the bit", H.homeScore(T.flyOf("HOMEP", 12, PF.unpackWeights(b3.weights)), T.AUDIT) === b3.home);
+    const note = src("brain/FLY_HOME_CHOOSER_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: C256 CANNOT (60), G256 CANNOT (60) and GBC CANNOT (65) came; CBC came BETTER, which was given 25",
+        /C256: CANNOT about 60, BETTER 35\. CBC: CANNOT about 70, BETTER 25\. G256: CANNOT about 60, WORSE 30\. GBC: CANNOT about 65, WORSE 30\./.test(flat) && R.C256.word === C.WORDS.C256[2] && R.CBC.word === C.WORDS.CBC[0] && R.G256.word === C.WORDS.G256[2] && R.GBC.word === C.WORDS.GBC[2]);
+    ok("the registration's RESULT SECTION (section 10) carries the four readings' words, the commit the file was read at, the expectation that did not come, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && ["C256", "CBC", "G256", "GBC"].every((k) => res.includes(`**${k}: ${R[k].word}**`)) && /f902ad40/.test(res) && /\*\*Three of the four expectations came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /0\.0041 on average/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyHomeChooser-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
