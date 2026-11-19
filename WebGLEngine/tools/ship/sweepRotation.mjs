@@ -39,6 +39,11 @@ import { parseArgs, refusalLines } from "./cliArgs.mjs";
 //     history; the reading goes to the ledger's `heldOutliers`. It is written once same-side outliers SPAN A DAY
 //     (v4917, HOLD_SPAN_MS below -- v4916's "the second in a row" was one host saying it twice).
 // What is never held: a red, a kill that survived its retry, a skip, or a gate with fewer than two prior readings.
+//   v4926 -- NOR A GREEN READING OF A GATE THE RECORD CALLS RED. The hold protects a TIMING; it was also keeping a VERDICT
+//   the newer run contradicts. On the rig, pilotLateness and slugMorph were recorded red by a verify, re-run alone as
+//   that verify told the reader to, finished green -- and were held as slow, so the red stayed in the record and the next
+//   verify would have failed on it again. The advice the pool prints could never clear such a red. A held green reading
+//   of a recorded red is written instead: the old timing came from a failing run and is not a ring worth protecting.
 export const HOST_OUTLIER_FACTOR = 2;
 export const RETRY_CAP_MS = 120000;
 // *** v4917 -- "THE SECOND IN A ROW IS WRITTEN" LASTED ONE ROUND. *** v4916 wrote the second same-side outlier, on the
@@ -323,7 +328,8 @@ export function mergeTimings(file, rows, stamp, capMs = null, { heldBefore = nul
     for (const r of rows) {
         priorMs[r.gate] = (file.timings || {})[r.gate];
         if (heldBefore) {
-            const side = r.finished && !r.skipped && r.code === 0 ? hostOutlier((file.serialRing || {})[r.gate], r.ms, factor) : null;
+            const recordedRed = (file.codes || {})[r.gate] !== undefined && (file.codes || {})[r.gate] !== 0;   // v4926 -- see the header
+            const side = r.finished && !r.skipped && r.code === 0 && !recordedRed ? hostOutlier((file.serialRing || {})[r.gate], r.ms, factor) : null;
             const before = heldBefore[r.gate];
             if (side) {
                 const same = before && before.side === side;

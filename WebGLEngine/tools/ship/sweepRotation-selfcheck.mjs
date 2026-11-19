@@ -271,6 +271,18 @@ console.log("\n*** v4916 -- ONE BOX ID, MORE THAN ONE MACHINE: A CAP IS RETRIED,
         JSON.stringify(second.merged.serialRing.g) === "[3306,5377,32628]", JSON.stringify(second.merged.serialRing.g));
     const old = mergeTimings(file, [rows[0]], D1d, 20000, { heldBefore: { g: { ms: 29616, at: D0, side: "slow", median: 3820 } } });
     ok("a hold written by v4916, which carried no `since`, is read as starting at its own stamp", old.held.length === 0 && old.merged.timings.g === 32628);
+    // v4926 -- the rig's own readings (win32-x64-12c-32gb-b70b27, 2026-11-19): pilotLateness recorded red (exit 1) by a verify, re-run
+    // alone green at 5800 ms against a ring whose median is 2548; slugMorph recorded red (exit 3221225477) and re-run green at 32980
+    // against 2857. Both were HELD, so both reds stayed and the next verify would have read them again.
+    const redFile = { budgetMs: 3000, timings: { pl: 2400, sm: 2900 }, codes: { pl: 1, sm: 3221225477 }, at: { pl: "T0", sm: "T0" },
+                      serialRing: { pl: [2548, 2400, 2700], sm: [2857, 2800, 2900] }, finished: { pl: true, sm: true } };
+    const cleared = mergeTimings(redFile, [{ gate: "pl", ms: 5800, code: 0, finished: true }, { gate: "sm", ms: 32980, code: 0, finished: true }], D0, 20000, { heldBefore: {} });
+    ok("!! *** v4926: a GREEN reading of a gate the record calls RED is written, not held, however slow -- the red is cleared ***",
+        cleared.held.length === 0 && cleared.merged.codes.pl === 0 && cleared.merged.codes.sm === 0 && cleared.merged.timings.pl === 5800 &&
+        cleared.merged.timings.sm === 32980 && !("pl" in cleared.heldOut) && !("sm" in cleared.heldOut) && hostOutlier(redFile.serialRing.pl, 5800) === "slow",
+        `held ${cleared.held.length}; codes now ${cleared.merged.codes.pl} and ${cleared.merged.codes.sm}`);
+    // SABOTAGE (v4926), against sweepRotation.mjs, restored by copy: S1 the recordedRed test removed (v4925's rule) -> 1 red, this row
+    // by name ('held 2'). S2 red read as exit 1 only -> 1 red, this row ('held 1': slugMorph's 3221225477 crash is a red too).
     const back = mergeTimings(file, [{ gate: "g", ms: 4100, code: 0, finished: true }], D4h, 20000, { heldBefore: first.heldOut });
     const flip = mergeTimings(file, [{ gate: "g", ms: 900, code: 0, finished: true }], D1d, 20000, { heldBefore: first.heldOut });
     ok("a normal reading after a hold is written and clears it; an outlier on the OTHER side starts its own count, however late",
