@@ -208,3 +208,28 @@ Keith, 2026-11-19: "then navigation and sonar as stations".
 **Gate:** `brain/subStationsNavSonar-selfcheck.mjs` (14 mutants, every one red; the log is in its header). Round 1's, round 2's and the aquarium captain's gates are green beside it.
 
 **NEXT (proposed, NOT registered): round 3, a captain that weighs sonar against energy.** In the duel with needs: does a captain that lets the energy claim through only when the charge will not last the fight (a CHARGE-AT-RISK rule: the charge left against the draw at the current speed for the time left) keep the wins of sonar alone without being run flat? Registered first, with fresh duel seeds; the duel's own sets are used by other rounds. Then navigation against energy in the aquarium (a courier with a battery: does it reach more goals with a captain that times its charging between legs?).
+
+## 12. ROUND 3, REGISTRATION (2026-11-19, written and committed before any code for it and before any duel of its sets is flown)
+
+Keith, 2026-11-19: "round 3, a captain that lets the energy claim override sonar only when the charge won't last the fight, tested on fresh duel seeds."
+
+**THE QUESTION.** In a duel on a low battery, does a captain that lets the energy station's surface claim outrank sonar ONLY when the charge will not last the fight keep sonar's fight, and beat the fixed ranking?
+
+**THE TASK (`brain/duelStationsTask.mjs`, to be built).** `brain/subDuel.mjs`'s duel, unchanged: 240 s, side A against the scripted drone of the scenario's kind, both boats on battery needs (the duel's `needs` option). Side A's tactician is `subTactics.makeTactician(THETA_DEFAULT)` behind `subStations.duelSide`, with the helm `helmOf(autopilot)`. Per duel, the battery is a fraction of capacity drawn from the seed, uniform in 0.05 to 0.30 (the same for both boats). The energy station reads the charge the duel hands the tactician at each look (`obs.self.charge`, a fraction of the start, times the start).
+
+**THE CREWS.**
+* SONAR: the sonar station alone (round 1's duel side).
+* FIXED: sonar and the energy station under the fixed ranking (energy 50 outranks sonar 30).
+* RISK: sonar and the energy station, with energy's surface claim passed through ONLY WHEN THE CHARGE IS AT RISK. Its pump and repair asks always pass.
+
+**RISK, FIXED NOW (no tuning on any set).** At each tick the captain knows the fight's length (240 s: an assumption, said plainly; a real boat would not), the time t of the last look, the charge c then (a fraction of capacity) and the start c0. The rate is r = (c0 - c) / t. **The charge is AT RISK iff t is at least 10 s and c - r x (240 - t) is under 0.02**: at the rate spent so far, the battery would be flat before the fight ends. Before 10 s nothing is at risk (the rate is not known). The energy station must ALSO claim (its own rule: under its threshold at the depth) for the surface to be flown.
+
+**THE SETS.** DEV: seeds 171001 to 171006, crossed with the four drone kinds (24 duels), to check that the task is not degenerate. If SONAR and FIXED score the same on every DEV duel (the energy station never claims), the battery range is amended on DEV and the amendment written before HELD; nothing about RISK changes. HELD: seeds 173001 to 173024 x 4 kinds (96 duels). No file in the tree uses a duel seed from 171000 to 173999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once).** The score is the duel's own score for side A.
+* **(V1) RISK BEATS FIXED** iff RISK's mean score is above FIXED's AND the exact one-sided sign test over the duels where the two scores differ gives p at most 0.05. FIXED BEATS RISK by the same rule the other way. Otherwise NO DIFFERENCE SHOWN.
+* **(V2) RISK KEEPS SONAR'S FIGHT** iff RISK's mean score is at least SONAR's less 0.05.
+* **THE BOTTOM LINE.** V1 RISK BEATS FIXED and V2 kept: "a captain that weighs the charge against the fight keeps the fight and beats the ranking". V1 without V2: "better than the ranking, still short of sonar alone". V2 without V1: "no worse than sonar alone, and not shown better than the ranking". Neither: reported as it is.
+* **Reported, not in the verdict:** won / lost / drawn for each crew; the duels in which side A ran flat; the ticks the energy station held the con; and whether RISK runs flat in fewer duels than SONAR.
+
+**EXPECTATION, recorded now.** Round 1's measurement (24 training duels at 12 %: running flat cost nothing the score counts) says the energy claim rarely pays inside one fight. So: V2 kept about 80 percent; V1 RISK BEATS FIXED about 70 percent. RISK will run flat in about as many duels as SONAR. It lets the claim through only when the boat would go flat before the end, and going up mid-fight then costs it the fight, which the score counts.
