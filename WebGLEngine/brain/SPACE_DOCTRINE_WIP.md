@@ -62,7 +62,7 @@ Torque and firing are untouched. CAP comes from DEV (below).
   * **DPSS**, damage per fighter-strafe-second. Strafe seconds = ticks with a live fighter whose c.last.mode is "strafe", divided by 30. Paired medians, over the scenarios with strafe seconds > 0 in both arms.
   * **Fighter losses** (killed + rammed), with the gained and lost counts and a sign test. This is the cost side; it is confounded by fight length, because a fight that ends when the ship dies leaves fighters alive.
   * Ship win, loss and draw counts.
-  * The gunners' hit rate (hitsDealt / 18 / seatRounds).
+  * The ship's damage per round fired (hitsDealt / seatRounds). **CORRECTED 2026-11-19, BEFORE DEV (a procedural fix, which the registration allows only before DEV):** this line first read "the gunners' hit rate (hitsDealt / 18 / seatRounds)". hitsDealt counts DAMAGE, and the ship's rounds deal 60 (main), 10 (point defence) or 400 (wave); 18 is the FIGHTER gun's damage. The ratio is reported as damage per round, which moves nothing.
   * Strafe passes, fighter-seconds alive, and the peak closing speed.
 
 ## THE TEST
@@ -74,6 +74,8 @@ Torque and firing are untouched. CAP comes from DEV (below).
 * else **CAP BETTER** iff C wins more pairs than it loses, the sign p <= 0.05, and the median of R_C - R_D > 0;
 * else **DOCTRINE BETTER** iff the mirror image holds;
 * else **NO DIFFERENCE SHOWN**.
+
+**A CONSEQUENCE OF THE RULE, STATED 2026-11-19 BEFORE DEV (not a change).** Ties stay in the median, so CAP BETTER needs the median of R_C - R_D over ALL 240 pairs above 0, i.e. more than half of all pairs in C's favour, not just most of the discordant ones. A preset with, say, 30 wins, 5 losses and 205 ties clears the sign test (p about 2e-5) and still reads NO DIFFERENCE SHOWN. The gate drives exactly that case. This matters under perfect and ace, where most pairs are expected to tie at 0 damage.
 
 ## OVERALL
 * **SUPPORTED** iff CAP BETTER under BOTH regular (the default) and green (the sight the networks were trained for), and DOCTRINE BETTER under none.
