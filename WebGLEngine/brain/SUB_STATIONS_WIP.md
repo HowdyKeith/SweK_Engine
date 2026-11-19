@@ -235,3 +235,27 @@ Keith, 2026-11-19: "round 3, a captain that lets the energy claim override sonar
 **EXPECTATION, recorded now.** Round 1's measurement (24 training duels at 12 %: running flat cost nothing the score counts) says the energy claim rarely pays inside one fight. So: V2 kept about 80 percent; V1 RISK BEATS FIXED about 70 percent. RISK will run flat in about as many duels as SONAR. It lets the claim through only when the boat would go flat before the end, and going up mid-fight then costs it the fight, which the score counts.
 
 **BUILT AND GATED BEFORE HELD (2026-11-19).** `brain/duelStationsTask.mjs`, `subStations.gatedStation`, and the gate `brain/duelStationsTask-selfcheck.mjs` (21 mutants, every one red; the log is in its header). **DEV (24 duels) is not degenerate**, so the battery range stands: SONAR and FIXED differ on every DEV duel. **Nothing was tuned on DEV;** RISK is as registered. For the record, the DEV numbers, seen before HELD: SONAR mean 1.409 (W/L/D 20/2/2, 5 ran flat); FIXED 0.864 (11/0/13, 0 flat); RISK 1.519 (20/0/4, 0 flat). The run: every crew on the 96 HELD duels once, one line a duel to `brain/duelStationsHeld.jsonl`, committed unread, then read once.
+
+## 13. ROUND 3 RESULT (2026-11-19; `brain/duelStationsHeld.jsonl`, 288 duels, committed unread at `d14bbf970`, then read ONCE)
+
+**BOTTOM LINE (registered): a captain that weighs the charge against the fight keeps the fight and beats the ranking.**
+* **V1: RISK BEATS FIXED.** RISK scores higher in 54 of the 96 HELD duels and lower in 11 (sign test p = 3e-8). Mean 1.098 against 0.566.
+* **V2: RISK KEEPS SONAR'S FIGHT.** Mean 1.098 against SONAR's 1.069, above the line (SONAR less 0.05).
+
+| crew | mean score | won / lost / drawn | ran flat | duels in which energy had the con |
+|---|---|---|---|---|
+| SONAR | 1.069 | 65 / 10 / 21 | 21 | 0 |
+| FIXED | 0.566 | 31 / 1 / 64 | 0 | 96 |
+| **RISK** | **1.098** | 62 / **5** / 29 | **4** | 46 |
+
+**Reported, not in the verdict.**
+* **RISK runs flat in far fewer duels than SONAR:** 4 against 21. Every duel in which RISK ran flat SONAR did too, and SONAR alone ran flat in 17 more (sign test p < 1e-4). It also loses half as many duels (5 against 10). SONAR wins 3 more (65 against 62).
+* **Duel by duel, RISK and SONAR are the same in 71 of 96.** RISK is lower in 18 and higher in 7: not shown better or worse (p 0.99 for "higher"). The means differ by 0.03.
+* **By drone kind (mean score, SONAR / FIXED / RISK):** patrol 1.47 / 1.10 / 1.40; quiet 1.06 / 0.06 / 0.97; evader 1.31 / 0.86 / 1.31; **hunter 0.44 / 0.25 / 0.72**. Against the hunter, the drone that comes after the boat, keeping the charge to go up only when the fight would outlast it is worth the most.
+* **FIXED gave energy the con in all 96 duels** and drew 64 of them: the boat went up and the fight timed out.
+* **Against the expectation in section 12.** V1 (put at about 70 percent) and V2 (about 80 percent) both happened. **I was wrong about running flat:** I wrote that RISK would run flat in about as many duels as SONAR. It ran flat in a fifth as many.
+
+**What it says, and does not.**
+* **The cost-aware rule beats the rank again, on a different pair of stations.** In round 2 the ranking acted too late (damage control holding depth while the battery died); here it acts too early (energy breaking off a fight the battery would have lasted). In both, the better captain asks what an action costs before letting it outrank another.
+* **RISK knows the fight's length (240 s)**, which a real boat would not; section 12 said so before the run. A captain that has to guess it is the next honest version, if this line goes further.
+* One duel model, one tactician, one drone per kind, a battery of 5 to 30 percent.
