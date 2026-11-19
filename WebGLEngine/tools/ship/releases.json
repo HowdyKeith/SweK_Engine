@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/ship/refreshReleases.mjs",
   "note": "WHAT IS ACTUALLY PUBLISHED ON THE RELEASES PAGE -- the record the offline gate reads, refreshed from the GitHub API by tools/ship/refreshReleases.mjs rather than believed. THE FLEET DOWNLOADS releases/latest, so this file is the only thing in the tree that knows what the fleet will actually run.",
-  "refreshedAt": "2026-11-19T19:22:00.733Z",
+  "refreshedAt": "2026-11-19T19:28:22.452Z",
   "source": "GET /repos/HowdyKeith/SweK_Engine/releases (per_page=100)",
   "baseline": {
     "throughVersion": 4660,
@@ -23,449 +23,1000 @@
   },
   "releases": [
     {
+      "tag": "v4928",
+      "publishedAt": "2026-11-19T19:28:18Z",
+      "zip": {
+        "name": "SweK_Engine_v4928.zip",
+        "size": 104370066,
+        "state": "uploaded"
+      }
+    },
+    {
       "tag": "v4926",
-      "publishedAt": "2026-11-19T14:29:21Z"
+      "publishedAt": "2026-11-19T14:29:21Z",
+      "zip": {
+        "name": "SweK_Engine_v4926.zip",
+        "size": 102857613,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4925",
-      "publishedAt": "2026-11-17T21:14:45Z"
+      "publishedAt": "2026-11-17T21:14:45Z",
+      "zip": {
+        "name": "SweK_Engine_v4925.zip",
+        "size": 101453414,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4924",
-      "publishedAt": "2026-11-17T19:28:13Z"
+      "publishedAt": "2026-11-17T19:28:13Z",
+      "zip": {
+        "name": "SweK_Engine_v4924.zip",
+        "size": 101431661,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4921",
-      "publishedAt": "2026-11-17T04:17:04Z"
+      "publishedAt": "2026-11-17T04:17:04Z",
+      "zip": {
+        "name": "SweK_Engine_v4921.zip",
+        "size": 101146176,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4919",
-      "publishedAt": "2026-11-16T22:48:17Z"
+      "publishedAt": "2026-11-16T22:48:17Z",
+      "zip": {
+        "name": "SweK_Engine_v4919.zip",
+        "size": 101151291,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4917",
-      "publishedAt": "2026-11-16T15:22:31Z"
+      "publishedAt": "2026-11-16T15:22:31Z",
+      "zip": {
+        "name": "SweK_Engine_v4917.zip",
+        "size": 101117123,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4913",
-      "publishedAt": "2026-11-09T18:31:11Z"
+      "publishedAt": "2026-11-09T18:31:11Z",
+      "zip": {
+        "name": "SweK_Engine_v4913.zip",
+        "size": 101068209,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4912",
-      "publishedAt": "2026-11-06T02:14:04Z"
+      "publishedAt": "2026-11-06T02:14:04Z",
+      "zip": null
     },
     {
       "tag": "v4909",
-      "publishedAt": "2026-11-02T02:02:54Z"
+      "publishedAt": "2026-11-02T02:02:54Z",
+      "zip": {
+        "name": "SweK_Engine_v4909.zip",
+        "size": 62300030,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4908",
-      "publishedAt": "2026-11-01T19:26:54Z"
+      "publishedAt": "2026-11-01T19:26:54Z",
+      "zip": {
+        "name": "SweK_Engine_v4908.zip",
+        "size": 59220878,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4907",
-      "publishedAt": "2026-10-31T23:50:12Z"
+      "publishedAt": "2026-10-31T23:50:12Z",
+      "zip": {
+        "name": "SweK_Engine_v4907.zip",
+        "size": 59057493,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4906",
-      "publishedAt": "2026-10-31T13:28:51Z"
+      "publishedAt": "2026-10-31T13:28:51Z",
+      "zip": {
+        "name": "SweK_Engine_v4906.zip",
+        "size": 58195594,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4905",
-      "publishedAt": "2026-10-28T08:39:56Z"
+      "publishedAt": "2026-10-28T08:39:56Z",
+      "zip": {
+        "name": "SweK_Engine_v4905.zip",
+        "size": 57112959,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4904",
-      "publishedAt": "2026-10-27T20:37:14Z"
+      "publishedAt": "2026-10-27T20:37:14Z",
+      "zip": {
+        "name": "SweK_Engine_v4904.zip",
+        "size": 56728541,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4903",
-      "publishedAt": "2026-10-27T13:07:30Z"
+      "publishedAt": "2026-10-27T13:07:30Z",
+      "zip": null
     },
     {
       "tag": "v4902",
-      "publishedAt": "2026-10-27T04:35:45Z"
+      "publishedAt": "2026-10-27T04:35:45Z",
+      "zip": {
+        "name": "SweK_Engine_v4902.zip",
+        "size": 56564037,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4901",
-      "publishedAt": "2026-10-27T02:39:03Z"
+      "publishedAt": "2026-10-27T02:39:03Z",
+      "zip": {
+        "name": "SweK_Engine_v4901.zip",
+        "size": 56544130,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4900",
-      "publishedAt": "2026-10-26T08:58:27Z"
+      "publishedAt": "2026-10-26T08:58:27Z",
+      "zip": {
+        "name": "SweK_Engine_v4900.zip",
+        "size": 54792730,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4899",
-      "publishedAt": "2026-10-26T03:12:49Z"
+      "publishedAt": "2026-10-26T03:12:49Z",
+      "zip": {
+        "name": "SweK_Engine_v4899.zip",
+        "size": 54719235,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4896",
-      "publishedAt": "2026-10-23T15:50:27Z"
+      "publishedAt": "2026-10-23T15:50:27Z",
+      "zip": {
+        "name": "SweK_Engine_v4896.zip",
+        "size": 53460431,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4895",
-      "publishedAt": "2026-10-22T13:04:55Z"
+      "publishedAt": "2026-10-22T13:04:55Z",
+      "zip": {
+        "name": "SweK_Engine_v4895.zip",
+        "size": 53182574,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4894",
-      "publishedAt": "2026-10-21T20:20:01Z"
+      "publishedAt": "2026-10-21T20:20:01Z",
+      "zip": {
+        "name": "SweK_Engine_v4894.zip",
+        "size": 53006950,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4893",
-      "publishedAt": "2026-10-21T19:27:21Z"
+      "publishedAt": "2026-10-21T19:27:21Z",
+      "zip": {
+        "name": "SweK_Engine_v4893.zip",
+        "size": 52982198,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4890",
-      "publishedAt": "2026-10-21T13:22:52Z"
+      "publishedAt": "2026-10-21T13:22:52Z",
+      "zip": {
+        "name": "SweK_Engine_v4890.zip",
+        "size": 52863986,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4889",
-      "publishedAt": "2026-10-21T11:37:14Z"
+      "publishedAt": "2026-10-21T11:37:14Z",
+      "zip": {
+        "name": "SweK_Engine_v4889.zip",
+        "size": 52838554,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4888",
-      "publishedAt": "2026-10-21T04:16:43Z"
+      "publishedAt": "2026-10-21T04:16:43Z",
+      "zip": {
+        "name": "SweK_Engine_v4888.zip",
+        "size": 52826322,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4887",
-      "publishedAt": "2026-10-21T03:48:09Z"
+      "publishedAt": "2026-10-21T03:48:09Z",
+      "zip": {
+        "name": "SweK_Engine_v4887.zip",
+        "size": 52823390,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4886",
-      "publishedAt": "2026-10-21T03:04:22Z"
+      "publishedAt": "2026-10-21T03:04:22Z",
+      "zip": {
+        "name": "SweK_Engine_v4886.zip",
+        "size": 52814531,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4885",
-      "publishedAt": "2026-10-21T01:20:34Z"
+      "publishedAt": "2026-10-21T01:20:34Z",
+      "zip": {
+        "name": "SweK_Engine_v4885.zip",
+        "size": 52721829,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4883",
-      "publishedAt": "2026-10-20T22:45:37Z"
+      "publishedAt": "2026-10-20T22:45:37Z",
+      "zip": {
+        "name": "SweK_Engine_v4883.zip",
+        "size": 52598684,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4882",
-      "publishedAt": "2026-10-20T20:52:50Z"
+      "publishedAt": "2026-10-20T20:52:50Z",
+      "zip": {
+        "name": "SweK_Engine_v4882.zip",
+        "size": 52572605,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4879",
-      "publishedAt": "2026-10-20T14:45:56Z"
+      "publishedAt": "2026-10-20T14:45:56Z",
+      "zip": {
+        "name": "SweK_Engine_v4874.zip",
+        "size": 51348363,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4878",
-      "publishedAt": "2026-10-20T00:56:16Z"
+      "publishedAt": "2026-10-20T00:56:16Z",
+      "zip": {
+        "name": "SweK_Engine_v4874.zip",
+        "size": 51348363,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4877",
-      "publishedAt": "2026-10-19T20:16:08Z"
+      "publishedAt": "2026-10-19T20:16:08Z",
+      "zip": {
+        "name": "SweK_Engine_v4874.zip",
+        "size": 51348363,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4874",
-      "publishedAt": "2026-10-18T13:24:27Z"
+      "publishedAt": "2026-10-18T13:24:27Z",
+      "zip": {
+        "name": "SweK_Engine_v4874.zip",
+        "size": 51348792,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4870",
-      "publishedAt": "2026-10-16T20:45:48Z"
+      "publishedAt": "2026-10-16T20:45:48Z",
+      "zip": {
+        "name": "SweK_Engine_v4870.zip",
+        "size": 50737727,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4863",
-      "publishedAt": "2026-10-15T18:04:07Z"
+      "publishedAt": "2026-10-15T18:04:07Z",
+      "zip": {
+        "name": "SweK_Engine_v4863.zip",
+        "size": 50445946,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4862",
-      "publishedAt": "2026-10-15T15:39:46Z"
+      "publishedAt": "2026-10-15T15:39:46Z",
+      "zip": {
+        "name": "SweK_Engine_v4862.zip",
+        "size": 50492131,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4861",
-      "publishedAt": "2026-10-15T12:10:31Z"
+      "publishedAt": "2026-10-15T12:10:31Z",
+      "zip": {
+        "name": "SweK_Engine_v4861.zip",
+        "size": 50437798,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4860",
-      "publishedAt": "2026-10-15T02:24:22Z"
+      "publishedAt": "2026-10-15T02:24:22Z",
+      "zip": {
+        "name": "SweK_Engine_v4860.zip",
+        "size": 50394930,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4859",
-      "publishedAt": "2026-10-15T00:28:58Z"
+      "publishedAt": "2026-10-15T00:28:58Z",
+      "zip": {
+        "name": "SweK_Engine_v4859.zip",
+        "size": 50367719,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4858",
-      "publishedAt": "2026-10-14T21:02:12Z"
+      "publishedAt": "2026-10-14T21:02:12Z",
+      "zip": {
+        "name": "SweK_Engine_v4858.zip",
+        "size": 50352741,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4856",
-      "publishedAt": "2026-10-14T15:05:25Z"
+      "publishedAt": "2026-10-14T15:05:25Z",
+      "zip": {
+        "name": "SweK_Engine_v4856.zip",
+        "size": 50275920,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4855",
-      "publishedAt": "2026-10-14T12:55:22Z"
+      "publishedAt": "2026-10-14T12:55:22Z",
+      "zip": {
+        "name": "SweK_Engine_v4855.zip",
+        "size": 50201446,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4853",
-      "publishedAt": "2026-10-14T01:17:23Z"
+      "publishedAt": "2026-10-14T01:17:23Z",
+      "zip": {
+        "name": "SweK_Engine_v4853.zip",
+        "size": 50180456,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4852",
-      "publishedAt": "2026-10-13T21:57:54Z"
+      "publishedAt": "2026-10-13T21:57:54Z",
+      "zip": {
+        "name": "SweK_Engine_v4852.zip",
+        "size": 50144719,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4850",
-      "publishedAt": "2026-10-13T14:04:36Z"
+      "publishedAt": "2026-10-13T14:04:36Z",
+      "zip": {
+        "name": "SweK_Engine_v4850.zip",
+        "size": 49911107,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4848",
-      "publishedAt": "2026-10-13T03:37:54Z"
+      "publishedAt": "2026-10-13T03:37:54Z",
+      "zip": {
+        "name": "SweK_Engine_v4848.zip",
+        "size": 50041460,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4847",
-      "publishedAt": "2026-10-13T00:48:43Z"
+      "publishedAt": "2026-10-13T00:48:43Z",
+      "zip": {
+        "name": "SweK_Engine_v4847.zip",
+        "size": 50007294,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4846",
-      "publishedAt": "2026-10-12T22:50:11Z"
+      "publishedAt": "2026-10-12T22:50:11Z",
+      "zip": {
+        "name": "SweK_Engine_v4846.zip",
+        "size": 49976162,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4845",
-      "publishedAt": "2026-10-12T17:17:39Z"
+      "publishedAt": "2026-10-12T17:17:39Z",
+      "zip": {
+        "name": "SweK_Engine_v4845.zip",
+        "size": 49970867,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4844",
-      "publishedAt": "2026-10-12T15:17:45Z"
+      "publishedAt": "2026-10-12T15:17:45Z",
+      "zip": {
+        "name": "SweK_Engine_v4844.zip",
+        "size": 49931869,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4843",
-      "publishedAt": "2026-10-12T12:58:01Z"
+      "publishedAt": "2026-10-12T12:58:01Z",
+      "zip": {
+        "name": "SweK_Engine_v4843.zip",
+        "size": 49915646,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4842",
-      "publishedAt": "2026-10-12T04:14:43Z"
+      "publishedAt": "2026-10-12T04:14:43Z",
+      "zip": {
+        "name": "SweK_Engine_v4842.zip",
+        "size": 49843891,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4838",
-      "publishedAt": "2026-10-12T00:15:50Z"
+      "publishedAt": "2026-10-12T00:15:50Z",
+      "zip": {
+        "name": "SweK_Engine_v4838.zip",
+        "size": 49799268,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4837",
-      "publishedAt": "2026-10-11T20:49:31Z"
+      "publishedAt": "2026-10-11T20:49:31Z",
+      "zip": {
+        "name": "SweK_Engine_v4837.zip",
+        "size": 48972062,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4836",
-      "publishedAt": "2026-10-11T16:29:46Z"
+      "publishedAt": "2026-10-11T16:29:46Z",
+      "zip": {
+        "name": "SweK_Engine_v4836.zip",
+        "size": 48922746,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4831",
-      "publishedAt": "2026-10-11T05:59:36Z"
+      "publishedAt": "2026-10-11T05:59:36Z",
+      "zip": {
+        "name": "SweK_Engine_v4831.zip",
+        "size": 48710448,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4830",
-      "publishedAt": "2026-10-11T02:58:30Z"
+      "publishedAt": "2026-10-11T02:58:30Z",
+      "zip": {
+        "name": "SweK_Engine_v4830.zip",
+        "size": 48849515,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4829",
-      "publishedAt": "2026-10-10T23:52:30Z"
+      "publishedAt": "2026-10-10T23:52:30Z",
+      "zip": {
+        "name": "SweK_Engine_v4829.zip",
+        "size": 48639358,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4828",
-      "publishedAt": "2026-10-10T22:21:26Z"
+      "publishedAt": "2026-10-10T22:21:26Z",
+      "zip": {
+        "name": "SweK_Engine_v4828.zip",
+        "size": 48782811,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4826",
-      "publishedAt": "2026-10-10T20:59:32Z"
+      "publishedAt": "2026-10-10T20:59:32Z",
+      "zip": {
+        "name": "SweK_Engine_v4826.zip",
+        "size": 48728038,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4825",
-      "publishedAt": "2026-10-10T04:33:48Z"
+      "publishedAt": "2026-10-10T04:33:48Z",
+      "zip": {
+        "name": "SweK_Engine_v4825.zip",
+        "size": 48711091,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4824",
-      "publishedAt": "2026-10-10T02:47:48Z"
+      "publishedAt": "2026-10-10T02:47:48Z",
+      "zip": {
+        "name": "SweK_Engine_v4824.zip",
+        "size": 48686039,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4823",
-      "publishedAt": "2026-10-09T21:43:46Z"
+      "publishedAt": "2026-10-09T21:43:46Z",
+      "zip": {
+        "name": "SweK_Engine_v4823.zip",
+        "size": 48724338,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4822",
-      "publishedAt": "2026-10-09T13:40:43Z"
+      "publishedAt": "2026-10-09T13:40:43Z",
+      "zip": {
+        "name": "SweK_Engine_v4822.zip",
+        "size": 48697237,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4821",
-      "publishedAt": "2026-10-08T23:15:41Z"
+      "publishedAt": "2026-10-08T23:15:41Z",
+      "zip": {
+        "name": "SweK_Engine_v4821.zip",
+        "size": 48607777,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4820",
-      "publishedAt": "2026-10-08T14:37:21Z"
+      "publishedAt": "2026-10-08T14:37:21Z",
+      "zip": {
+        "name": "SweK_Engine_v4820.zip",
+        "size": 48601190,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4818",
-      "publishedAt": "2026-10-07T22:02:10Z"
+      "publishedAt": "2026-10-07T22:02:10Z",
+      "zip": {
+        "name": "SweK_Engine_v4818.zip",
+        "size": 250479565,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4817",
-      "publishedAt": "2026-10-07T02:58:44Z"
+      "publishedAt": "2026-10-07T02:58:44Z",
+      "zip": {
+        "name": "SweK_Engine_v4817.zip",
+        "size": 47611116,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4816",
-      "publishedAt": "2026-10-07T00:25:51Z"
+      "publishedAt": "2026-10-07T00:25:51Z",
+      "zip": {
+        "name": "SweK_Engine_v4816.zip",
+        "size": 47597077,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4815",
-      "publishedAt": "2026-10-06T16:37:33Z"
+      "publishedAt": "2026-10-06T16:37:33Z",
+      "zip": {
+        "name": "SweK_Engine_v4815.zip",
+        "size": 47517231,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4814",
-      "publishedAt": "2026-10-05T23:11:48Z"
+      "publishedAt": "2026-10-05T23:11:48Z",
+      "zip": {
+        "name": "SweK_Engine_v4814.zip",
+        "size": 47458317,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4813",
-      "publishedAt": "2026-10-05T15:42:19Z"
+      "publishedAt": "2026-10-05T15:42:19Z",
+      "zip": {
+        "name": "SweK_Engine_v4813.zip",
+        "size": 47422261,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4777",
-      "publishedAt": "2026-09-29T02:58:34Z"
+      "publishedAt": "2026-09-29T02:58:34Z",
+      "zip": {
+        "name": "SweK_Engine_v4777.zip",
+        "size": 330553177,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4697",
-      "publishedAt": "2026-09-28T19:11:12Z"
+      "publishedAt": "2026-09-28T19:11:12Z",
+      "zip": {
+        "name": "SweK_Engine_v4697.zip",
+        "size": 43216603,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4667",
-      "publishedAt": "2026-09-25T03:07:42Z"
+      "publishedAt": "2026-09-25T03:07:42Z",
+      "zip": {
+        "name": "SweK_Engine_v4667.zip",
+        "size": 43035568,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4645",
-      "publishedAt": "2026-09-18T14:59:49Z"
+      "publishedAt": "2026-09-18T14:59:49Z",
+      "zip": {
+        "name": "SweK_Engine_v4645.zip",
+        "size": 42471939,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4622",
-      "publishedAt": "2026-09-15T19:08:54Z"
+      "publishedAt": "2026-09-15T19:08:54Z",
+      "zip": {
+        "name": "SweK_Engine_v4622.zip",
+        "size": 40720230,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4487",
-      "publishedAt": "2026-09-08T18:53:13Z"
+      "publishedAt": "2026-09-08T18:53:13Z",
+      "zip": {
+        "name": "SweK_Engine_v4487.zip",
+        "size": 38280824,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4486",
-      "publishedAt": "2026-09-06T19:05:29Z"
+      "publishedAt": "2026-09-06T19:05:29Z",
+      "zip": {
+        "name": "SweK_Engine_v4486.zip",
+        "size": 35019497,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4485",
-      "publishedAt": "2026-09-06T17:46:47Z"
+      "publishedAt": "2026-09-06T17:46:47Z",
+      "zip": {
+        "name": "SweK_Engine_v4485.zip",
+        "size": 35012067,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4481",
-      "publishedAt": "2026-09-06T15:18:11Z"
+      "publishedAt": "2026-09-06T15:18:11Z",
+      "zip": {
+        "name": "SweK_Engine_v4481.zip",
+        "size": 34949905,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4477",
-      "publishedAt": "2026-09-06T05:13:33Z"
+      "publishedAt": "2026-09-06T05:13:33Z",
+      "zip": {
+        "name": "SweK_Engine_v4477.zip",
+        "size": 34908192,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4460",
-      "publishedAt": "2026-09-05T18:50:26Z"
+      "publishedAt": "2026-09-05T18:50:26Z",
+      "zip": {
+        "name": "SweK_Engine_v4460.zip",
+        "size": 33780826,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4438",
-      "publishedAt": "2026-09-04T00:51:23Z"
+      "publishedAt": "2026-09-04T00:51:23Z",
+      "zip": {
+        "name": "SweK_Engine_v4438.zip",
+        "size": 33391039,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4300",
-      "publishedAt": "2026-09-02T02:05:05Z"
+      "publishedAt": "2026-09-02T02:05:05Z",
+      "zip": {
+        "name": "SweK_Engine_v4300.zip",
+        "size": 30912610,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4296",
-      "publishedAt": "2026-09-01T20:42:55Z"
+      "publishedAt": "2026-09-01T20:42:55Z",
+      "zip": {
+        "name": "SweK_Engine_v4296.zip",
+        "size": 30740368,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4148",
-      "publishedAt": "2026-08-29T22:45:01Z"
+      "publishedAt": "2026-08-29T22:45:01Z",
+      "zip": {
+        "name": "SweK_Engine_v4148.zip",
+        "size": 28327469,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4133",
-      "publishedAt": "2026-08-29T13:16:15Z"
+      "publishedAt": "2026-08-29T13:16:15Z",
+      "zip": {
+        "name": "SweK_Engine_v4133.zip",
+        "size": 28164243,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4116",
-      "publishedAt": "2026-08-29T02:00:33Z"
+      "publishedAt": "2026-08-29T02:00:33Z",
+      "zip": {
+        "name": "SweK_Engine_v4116.zip",
+        "size": 28325338,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4106",
-      "publishedAt": "2026-08-28T15:10:13Z"
+      "publishedAt": "2026-08-28T15:10:13Z",
+      "zip": {
+        "name": "SweK_Engine_v4106.zip",
+        "size": 27794883,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4102",
-      "publishedAt": "2026-08-28T13:59:45Z"
+      "publishedAt": "2026-08-28T13:59:45Z",
+      "zip": {
+        "name": "SweK_Engine_v4102.zip",
+        "size": 27769772,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4090",
-      "publishedAt": "2026-08-28T13:42:57Z"
+      "publishedAt": "2026-08-28T13:42:57Z",
+      "zip": {
+        "name": "SweK_Engine_v4090.zip",
+        "size": 27665324,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4070",
-      "publishedAt": "2026-08-27T19:30:58Z"
+      "publishedAt": "2026-08-27T19:30:58Z",
+      "zip": {
+        "name": "SweK_Engine_v4070.zip",
+        "size": 27445850,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4067",
-      "publishedAt": "2026-08-27T17:13:34Z"
+      "publishedAt": "2026-08-27T17:13:34Z",
+      "zip": {
+        "name": "SweK_Engine_v4067.zip",
+        "size": 27424068,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4035",
-      "publishedAt": "2026-08-26T20:59:06Z"
+      "publishedAt": "2026-08-26T20:59:06Z",
+      "zip": {
+        "name": "SweK_Engine_v4035.zip",
+        "size": 27009394,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4030",
-      "publishedAt": "2026-08-26T17:22:46Z"
+      "publishedAt": "2026-08-26T17:22:46Z",
+      "zip": {
+        "name": "SweK_Engine_v4030.zip",
+        "size": 26932706,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4029",
-      "publishedAt": "2026-08-26T15:00:45Z"
+      "publishedAt": "2026-08-26T15:00:45Z",
+      "zip": {
+        "name": "SweK_Engine_v4029.zip",
+        "size": 26918187,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4027",
-      "publishedAt": "2026-08-26T14:11:16Z"
+      "publishedAt": "2026-08-26T14:11:16Z",
+      "zip": {
+        "name": "SweK_Engine_v4027.zip",
+        "size": 26900875,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v4013",
-      "publishedAt": "2026-08-25T19:55:10Z"
+      "publishedAt": "2026-08-25T19:55:10Z",
+      "zip": {
+        "name": "SweK_Engine_v4013.zip",
+        "size": 26656847,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3995",
-      "publishedAt": "2026-08-25T04:39:46Z"
+      "publishedAt": "2026-08-25T04:39:46Z",
+      "zip": {
+        "name": "SweK_Engine_v3995.zip",
+        "size": 26507101,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3975",
-      "publishedAt": "2026-08-24T19:51:14Z"
+      "publishedAt": "2026-08-24T19:51:14Z",
+      "zip": {
+        "name": "SweK_Engine_v3975.zip",
+        "size": 26655013,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3961",
-      "publishedAt": "2026-08-24T00:03:55Z"
+      "publishedAt": "2026-08-24T00:03:55Z",
+      "zip": {
+        "name": "SweK_Engine_v3961.zip",
+        "size": 26524267,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3958",
-      "publishedAt": "2026-08-23T22:44:40Z"
+      "publishedAt": "2026-08-23T22:44:40Z",
+      "zip": {
+        "name": "SweK_Engine_v3958.zip",
+        "size": 26496808,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3943",
-      "publishedAt": "2026-08-23T19:06:48Z"
+      "publishedAt": "2026-08-23T19:06:48Z",
+      "zip": {
+        "name": "SweK_Engine_v3943.zip",
+        "size": 26413043,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3941",
-      "publishedAt": "2026-08-23T13:21:07Z"
+      "publishedAt": "2026-08-23T13:21:07Z",
+      "zip": {
+        "name": "SweK_Engine_v3941.zip",
+        "size": 26380411,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3940",
-      "publishedAt": "2026-08-22T21:16:10Z"
+      "publishedAt": "2026-08-22T21:16:10Z",
+      "zip": {
+        "name": "SweK_Engine_v3940.zip",
+        "size": 27747646,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3938",
-      "publishedAt": "2026-08-22T20:19:37Z"
+      "publishedAt": "2026-08-22T20:19:37Z",
+      "zip": {
+        "name": "SweK_Engine_v3938.zip",
+        "size": 27741918,
+        "state": "uploaded"
+      }
     },
     {
       "tag": "v3936",
-      "publishedAt": "2026-08-22T14:35:51Z"
+      "publishedAt": "2026-08-22T14:35:51Z",
+      "zip": {
+        "name": "SweK_Engine_v3936.zip",
+        "size": 27714227,
+        "state": "uploaded"
+      }
     }
   ],
   "ratchet": {
-    "minReleases": 110,
-    "minLatest": 4926,
+    "minReleases": 111,
+    "minLatest": 4928,
     "note": "A RELEASE THE FLEET WAS ALREADY RUNNING MUST NOT VANISH. Found by sabotage 2: deleting the newest row moved the reported lag from 10 to 148 and turned NOTHING red, because the lag is reported rather than asserted. These two numbers may only RISE, and refreshReleases raises them when it writes. A release deleted upstream -- or a ledger truncated by a bad merge -- now fails here instead of quietly telling the fleet to run something older."
   },
   "lagBudget": {
