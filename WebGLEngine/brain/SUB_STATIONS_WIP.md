@@ -314,3 +314,41 @@ Keith, 2026-11-19: "a navigating courier with a battery, to see whether timing i
 * One sea generator, one navigator arm, one vessel, a battery of 15 to 45 percent, 20 minutes.
 
 **Status: rounds 3 and 4 CLOSED as registered.**
+
+## 16. ROUND 5, REGISTRATION (2026-11-19, written and committed before any code for it beyond one read-only method, and before any run of its sets)
+
+Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's planned route; RISK without the fight's length).
+
+**THE QUESTION.** Round 4's LEGS lost goals in 22 runs, 21 of them with an empty battery, because it estimated a leg as a straight line. Does LEGS with the navigator's PLANNED ROUTE as the leg's length reach more goals than LEGS?
+
+**WHAT WAS ADDED AND MEASURED FIRST, said plainly.**
+* `subTankNav.createNavigator` gained one READ-ONLY method, `routeLength(x, y)`: the planned field's distance from that cell to the goal, or null. It changes nothing the navigator does. Its gates and the aquarium's are green with it.
+* To learn the units, it was read beside the straight line at each new goal on scenes 5, 9 and 13 (neither in round 4's sets nor in this round's). It is in metres, 1.15 to 1.7 times the straight line (420 against 282, 220 against 152, 405 against 285 ...).
+
+**THE TASK.** Round 4's, unchanged (`brain/courierTask.mjs`): the sea, the navigator, the vessel, the 1,200 s, the start, and the battery U(0.15, 0.45) per seed.
+
+**THE CREWS.** FIXED and LEGS as in round 4. **ROUTE: LEGS with one change.** The leg's distance is `routeLength` at the boat's position at the decision (straight line where it is null: no plan yet, or no route). Every constant of LEGS stands as registered in section 14.
+
+**THE SETS.** DEV: seeds 181001 to 181024, only to check that ROUTE and LEGS differ on at least 4 of them; if not, the battery range is amended on DEV, and nothing of ROUTE. HELD: seeds 183001 to 183096. No file in the tree uses a seed from 181000 to 183999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once).** **ROUTE BEATS LEGS** iff ROUTE's mean goals are above LEGS's AND the exact one-sided sign test over the runs where their goal counts differ gives p at most 0.05. LEGS BEATS ROUTE by the same rule the other way. Otherwise NO DIFFERENCE SHOWN. Reported: both against FIXED, by the same test; the runs with an empty battery; the empty seconds; the charging seconds; the boats lost.
+
+**EXPECTATION, recorded now.** ROUTE BEATS LEGS about 45 percent; NO DIFFERENCE about 45 percent. The route is longer, so ROUTE charges more often and for longer, which costs time, and the gain is only in the runs where LEGS set out short. LEGS BEATS ROUTE about 10 percent.
+
+## 17. ROUND 6, REGISTRATION (2026-11-19, written and committed before any code for it and before any duel of its sets is flown)
+
+**THE QUESTION.** Round 3's RISK was told the fight lasts 240 s, which a real boat would not know. Does a captain that does NOT know the fight's length, and asks only whether the charge will last a fixed look-ahead, still beat the fixed ranking and keep sonar's fight?
+
+**THE TASK.** Round 3's, unchanged (`brain/duelStationsTask.mjs`): the duel, the tactician, the drones, and the battery U(0.05, 0.30) per seed.
+
+**THE CREWS.** SONAR, FIXED and RISK as in round 3, plus **BLIND: RISK's rule with the fight's time left replaced by a fixed look-ahead of 60 s.** At risk iff t is at least 10 s and c - r x 60 is under 0.02, with r = (c0 - c) / t as before. It is the same rule with nothing about the fight in it. 60 s is about the time a boat at depth needs to reach the surface and start charging; it is fixed now, not tuned.
+
+**THE SETS.** DEV: seeds 185001 to 185006 x the four kinds (24), only to check that BLIND and FIXED differ on at least 4; if not, the battery range is amended on DEV, and nothing of BLIND. HELD: seeds 187001 to 187024 x the four kinds (96). No file in the tree uses a seed from 185000 to 187999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once), round 3's rules with BLIND in RISK's place.**
+* **(V1) BLIND BEATS FIXED** by the sign test on the duels where their scores differ (p at most 0.05).
+* **(V2) BLIND KEEPS SONAR'S FIGHT** iff its mean score is at least SONAR's less 0.05.
+* **The bottom line** is round 3's sentences with BLIND for RISK.
+* **Reported:** BLIND against RISK by the same sign test (what knowing the fight's length was worth); won, lost and drawn; ran flat; the ticks energy had the con.
+
+**EXPECTATION, recorded now.** A 60 s look-ahead fires LATER than "the rest of the fight" early in a duel (240 - t is larger than 60), and the same near the end. So BLIND lets the energy claim through less often than RISK and runs flat more, close to SONAR. V2 kept about 85 percent; V1 BLIND BEATS FIXED about 75 percent; BLIND against RISK no difference shown about 60 percent.
