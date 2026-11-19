@@ -378,3 +378,23 @@ Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's pl
 * **Against the expectation in section 17.** V1 (put at about 75 percent), V2 (about 85) and "BLIND against RISK, no difference" (about 60) all happened. **I was wrong about running flat:** I wrote that BLIND would run flat more, close to SONAR. It ran flat once, against SONAR's 15. A 60 s look-ahead fires late early in a fight, but early enough: the battery that would go flat within a minute is the one that matters.
 
 **What it says.** The charge-at-risk rule does not need the fight's length, which a real boat would not know. A fixed one-minute look-ahead does as well. Round 3's caveat is answered.
+
+## 19. ROUND 5 RESULT (2026-11-19; `brain/routeHeld.{0,1,2,3}.jsonl`, 288 runs, committed unread at `2cdfb9491`, then read ONCE)
+
+**VERDICT (registered): ROUTE BEATS LEGS.** ROUTE reaches 4.02 goals a run against LEGS's 3.66. It reaches more on 38 of the 96 HELD runs and fewer on 18 (sign test p = 0.005).
+
+| crew | mean goals | goals (runs) | runs with an empty battery | mean empty s | mean charging s | hits | lost |
+|---|---|---|---|---|---|---|---|
+| FIXED | 3.22 | 2: 7, 3: 64, 4: 22, 5: 3 | 43 | 12 | 643 | 180 | 0 |
+| LEGS | 3.66 | 1: 3, 2: 12, 3: 26, 4: 31, 5: 22, 6: 2 | 66 | 163 | 589 | 162 | 0 |
+| **ROUTE** | **4.02** | 1: 1, 2: 9, 3: 10, **4: 47, 5: 25, 6: 4** | **32** | **60** | 665 | 152 | 0 |
+
+**Reported, not in the verdict.**
+* **The straight-line failure is mostly fixed:** ROUTE runs empty in 32 runs against LEGS's 66, for 60 s on average against 163. It charges a little longer (665 s against 589), as the route is longer than the line. That time is repaid.
+* **Both against FIXED:** ROUTE BEATS FIXED, 63 runs more and 11 fewer (p = 3e-10). LEGS BEATS FIXED again, 51 to 21 (p = 3e-4): **round 4 replicates on these fresh seeds.**
+* ROUTE also hits the least (152 against 162 and 180).
+* **Against the expectation in section 16:** ROUTE BEATS LEGS was put at about 45 percent; it happened. I thought the longer charging might eat the gain. It ate a small part of it.
+
+**What it says.** A courier that times its charging by the leg it is about to fly, measured as the route it will fly, reaches the most goals of any crew. The fix was the one the round-4 losses named.
+
+**Status: rounds 5 and 6 CLOSED as registered.** Across six rounds and four pairs of stations (damage and energy, sonar and energy, navigation and energy, twice each for the last two), every captain that weighs what an action costs has beaten the fixed ranking on HELD. The two refinements the losses named (the route, no fight clock) held up on fresh seeds.
