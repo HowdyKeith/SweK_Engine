@@ -92,7 +92,7 @@ sec("6. THE COMMAND");
     const run = (argv) => { const out = [], errs = [], files = [], sets = []; const code = T.command(argv, { out: (m) => out.push(m), err: (m) => errs.push(m), writeFile: (f, t) => files.push([f, t]), flySet: (seeds) => { sets.push(seeds.length + ":" + seeds[0]); return resOf((s) => (s === 3 ? "collided" : ref(s)), seeds.length); }, copySame: () => true }); return { code, out: out.join("\n"), errs, files, sets }; };
     const d = run(["--set", "dev", "--write"]), h = run(["--set", "held82", "--write"]), dv = run(["--set", "dev"]);
     ok("!! --write with DEV is refused (exit 2, nothing flown); DEV flies 1-30 and says it is not a result", d.code === 2 && d.sets.length === 0 && dv.code === 0 && dv.sets[0] === "30:1" && /not a result/.test(dv.out) && dv.files.length === 0);
-    ok("!! held82 flies 7881-7940 once and writes brain/subDeepTransitHeld82.jsonl with all 120 flights, each carrying set held82", h.code === 0 && J(h.sets) === J(["60:7881"]) && h.files[0][0].endsWith("brain/subDeepTransitHeld82.jsonl") && h.files[0][1].trim().split("\n").length === 120 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held82");
+    ok("!! held82 flies 7881-7940 once and writes brain/subDeepTransitHeld82.jsonl with all 120 flights, each carrying set held82", h.code === 0 && J(h.sets) === J(["60:7881"]) && h.files[0][0].replace(/\\/g, "/").endsWith("brain/subDeepTransitHeld82.jsonl") && h.files[0][1].trim().split("\n").length === 120 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held82");
 }
 
 sec("7. THE SOURCE");

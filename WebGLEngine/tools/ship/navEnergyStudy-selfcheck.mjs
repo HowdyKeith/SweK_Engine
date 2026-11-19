@@ -66,7 +66,7 @@ sec("4. THE COMMAND");
     const run = (argv) => { const out = [], errs = [], files = [], sets = []; const code = T.command(argv, { out: (m) => out.push(m), err: (m) => errs.push(m), writeFile: (f, t) => files.push([f, t]), flySet: (seeds) => { sets.push(seeds.length + ":" + seeds[0]); return resOf(seeds.length, (a) => 600000 + (a === "any+predict" ? 100000 : 0)); }, meterOk: () => true }); return { code, out: out.join("\n"), errs, files, sets }; };
     const d = run(["--set", "dev"]), dw = run(["--set", "dev", "--write"]), h = run(["--set", "held80", "--write"]), none = run([]);
     ok("!! DEV flies 1-30, says it is not a result and writes nothing; --write with DEV is refused (exit 2); no set prints the usage", d.code === 0 && d.sets[0] === "30:1" && /not a result/.test(d.out) && d.files.length === 0 && dw.code === 2 && dw.sets.length === 0 && none.code === 2);
-    ok("!! held80 flies 7701-7820 once and writes brain/navEnergyHeld80.jsonl with all 360 flights, each carrying set held80; the reading is printed", h.code === 0 && J(h.sets) === J(["120:7701"]) && h.files[0][0].endsWith("brain/navEnergyHeld80.jsonl") && h.files[0][1].trim().split("\n").length === 360 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held80" && /READING: THE DETOUR COSTS/.test(h.out));
+    ok("!! held80 flies 7701-7820 once and writes brain/navEnergyHeld80.jsonl with all 360 flights, each carrying set held80; the reading is printed", h.code === 0 && J(h.sets) === J(["120:7701"]) && h.files[0][0].replace(/\\/g, "/").endsWith("brain/navEnergyHeld80.jsonl") && h.files[0][1].trim().split("\n").length === 360 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held80" && /READING: THE DETOUR COSTS/.test(h.out));
 }
 
 sec("5. THE SOURCE");

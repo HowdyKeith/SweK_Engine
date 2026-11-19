@@ -80,7 +80,7 @@ sec("4. THE COMMAND");
     const run = (argv, o = {}) => { const out = [], files = []; Y.command(argv, { out: (m) => out.push(m), writeFile: (f, t) => files.push([f, t]), dives: () => dives, flyAll: () => ({ 0: mk(0), 1: mk(-0.001), 2: mk(-0.002), 4: mk(-0.05) }), onTime: () => true, exact: () => true, ...o }); return { out: out.join("\n"), files }; };
     const r = run(["--write"]), nw = run([], { exact: () => false });
     ok("!! the readings are printed for one and four ticks, by the rule (here: one tick costs nothing, four cost)", /READING \(ONE TICK\): ONE TICK COSTS NOTHING THAT MATTERS/.test(r.out) && /READING \(FOUR TICKS\): FOUR TICKS COST$/m.test(r.out), r.out.split("\n").slice(-2).join(" | "));
-    ok("!! --write puts every dive's four scores in brain/rig-results/lateness-90000.json", r.files.length === 1 && r.files[0][0].endsWith("brain/rig-results/lateness-90000.json") && JSON.parse(r.files[0][1]).dives.length === 6 && JSON.parse(r.files[0][1]).dives[0].scores.length === 4);
+    ok("!! --write puts every dive's four scores in brain/rig-results/lateness-90000.json", r.files.length === 1 && r.files[0][0].replace(/\\/g, "/").endsWith("brain/rig-results/lateness-90000.json") && JSON.parse(r.files[0][1]).dives.length === 6 && JSON.parse(r.files[0][1]).dives[0].scores.length === 4);
     ok("!! a failed check prints NOT WEIGHED and no reading", /READING: NOT WEIGHED/.test(nw.out) && !/ONE TICK COSTS/.test(nw.out));
 }
 
