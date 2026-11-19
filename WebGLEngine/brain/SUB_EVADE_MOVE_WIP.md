@@ -1,0 +1,181 @@
+# Submarine duel: which movement number carries league7100's lead, and is pinging a second piece? (REGISTRATION 9 of the evade reads; 2026-11-16; UNNUMBERED; REGISTERED BEFORE ANY CODE FOR IT IS WRITTEN AND BEFORE ANY GEOMETRY OF ITS SETS IS FLOWN)
+
+Keith, 2026-11-16: "lets do the next suggested round, and then the next 2 suggested rounds after that". This is the next one: the split that `brain/SUB_EVADE_LADDER_WIP.md` (its HELD RESULT) named: **searchSpeed against trackSpeed** inside the movement group that carried league7100's lead, and **the three pinging numbers** (pingAfter, pingEvery, searchPing), whose group came out undecided at +0.41 and +0.48 on HELD. A registration and nothing else: **no command, no gate and no geometry of its sets exists yet.**
+
+**What this changes in shared files, said first: nothing.** New files only: this note, `tools/ship/takeEvadeMove.mjs` (the command), `tools/ship/takeEvadeMove-selfcheck.mjs` (its gate), `brain/subEvadeMoveDev.json` and `brain/subEvadeMoveHeld.json`. It imports, and does not edit, `tools/ship/takeEvadeTurn.mjs` (`graft`, `rowOf`), `tools/ship/takeSubLeague.mjs` (`loadRuns`, `decided`, `signed`) and `brain/subTournament.mjs`. The bar and the method are those of the ladder note, which this is a split of: a head-to-head is **decided** at an edge of 0.5 in size with z of 2 in size; both seats, 48 geometries a set (96 duels a matchup).
+
+## 1. What is known (read from the records; nothing here is flown again)
+
+* **The lead and the ladder** (`SUB_EVADE_LADDER_WIP.md`, DEV 114001 and HELD 115001): league7100 beats league7001 and exploit7204 by +1.02 and +0.90 (DEV) and +1.11 and +1.28 (HELD). Its movement numbers (searchSpeed, trackSpeed), grafted onto either comparator, recover **0.87 and 0.84 (DEV) and 0.80 and 0.61 (HELD)** of the lead, decided every time; taken out of league7100 they cost it **-0.76, -0.64, -0.70 and -0.81**. Weapon, listening and time carry nothing. **Pinging** (pingAfter, pingEvery, searchPing) is undecided: +0.16 and -0.08 on DEV, **+0.41 (z 2.5) and +0.48 (z 3.0) on HELD**, with the ten together recovering 0.97 and 0.90 where movement alone recovers 0.80 and 0.61.
+* **The numbers** (from the files): searchSpeed league7100 4.09, league7001 3.83, exploit7204 3.31; **trackSpeed league7100 3.15** (the slowest of the five finders), league7001 4.07, exploit7204 4.50; pingAfter league7100 2, both comparators 1; pingEvery league7100 8.30, league7001 4 (the lower bound), exploit7204 4 (G 4); **searchPing league7100 0 exactly, league7001 0 exactly, exploit7204 8.28**. So **the searchPing (Q) graft onto league7001, and the Q lesion against league7001, are identical to their bases (an edge of exactly 0, printed `identical`, never decided)**: Q can be decided against exploit7204 only, and so is at most ONE, never BOTH (see section 4).
+* **Nothing has been flown with one of these five numbers alone.**
+
+## 2. The question and the arms
+
+**The question, two parts.** **Part A:** of league7100's two movement numbers, which carries the lead: searchSpeed, trackSpeed, or both only together? **Part B:** is pinging a second piece, and if so which of its three numbers?
+
+**The units (MY CHOICE, fixed now):** the five single numbers **S** searchSpeed, **K** trackSpeed, **A** pingAfter, **E** pingEvery, **Q** searchPing, and three sets of them: **M** (S and K), **P** (A, E and Q), **MP** (all five). For each comparator c (league7001, exploit7204), every arm against its own base, both seats, 48 geometries, the arm or the leader first:
+
+| arm | what it is | flown against |
+|---|---|---|
+| LEAD | U(league7100) | U(c) |
+| GRAFT(u) for u in S, K, A, E, Q | U(c) with league7100's number u | U(c) |
+| LESION(u) | U(league7100) with c's number u | U(league7100) |
+| GRAFT(M), GRAFT(P), GRAFT(MP) | U(c) with league7100's numbers of the set | U(c) |
+
+**14 matchups a comparator, 28 a set.** Every other number, and each side's (speed, turn) pair, stays the side's own. An arm whose number is the same in the two finders is identical to its base (an edge of exactly 0), printed as such and never decided: **by the files' own numbers that is the two Q arms against league7001** (both are searchPing 0), and no other single-number arm (S, K, A and E differ in both pairs); the set arms differ as long as one number in the set does.
+
+## 3. The sets and the order
+
+* **smoke**: geometries 1 to 4, never recorded, free to read.
+* **DEV**: **116001 to 116048**, both seats; flown first, read freely, recorded once in `brain/subEvadeMoveDev.json`; it decides whether HELD is spent (R0).
+* **HELD**: **117001 to 117048**, both seats; flown ONCE (`held --write`; refuses without a recorded DEV that replicates and lists no failed check, without `--write`, or if its record exists); the rules are about HELD.
+* No submarine file uses 116001 to 117048 as a geometry (searched as whole numbers in the `.mjs` and `.md` files under `brain` and `tools`). The sets 98001 to 115048 are spent.
+* **Amendments:** as in the other notes: only dated, only before this note's HELD. **Every void-check is an identity or a file's own number, and the command's HELD gate refuses a DEV with a failed check.** **If a smoke report is read, its headline is said in Amendment A before any DEV geometry.**
+* **The order of work:** this note, the command, its gate with a sabotage log (never flying 116001 to 117048), smoke, DEV, then HELD if R0 holds and Keith asks.
+
+## 4. The rules (MY CHOICES, said; Keith may set them differently)
+
+* **A unit u is SUFFICIENT** iff GRAFT(u, c) beats U(c) decided (an edge of 0.5 and z of 2, in the graft's favour) for **both** comparators; **NECESSARY** iff U(league7100) beats LESION(u, c) decided for both. A unit decided for one comparator only is ONE, for none NONE (as in the ladder). **Because Q's two arms against league7001 are identical, Q is at most ONE by construction: it cannot be SUFFICIENT or NECESSARY in the sense above, and is reported as `Q: ONE (exploit7204 only)` or `Q: NONE`; the other four single numbers can be BOTH.**
+* **R0 REPLICATES** iff LEAD is decided for league7100 over both comparators. On DEV, if R0 fails HELD is not flown by this registration.
+* **RM1 THE MOVEMENT SET REPLICATES:** GRAFT(M) is SUFFICIENT (both comparators): the ladder's finding on new geometries.
+* **RM2 THE HEADLINE OF PART A**, in this order, the first that holds: **"MOVEMENT DOES NOT REPLICATE"** iff RM1 fails; **"TRACKSPEED"** iff K is SUFFICIENT and S is not; **"SEARCHSPEED"** iff S is SUFFICIENT and K is not; **"BOTH"** iff both are; **"NEITHER ALONE"** iff neither is (the pair carries it only together).
+* **RM3 THE NECESSARY UNITS:** the units NECESSARY for both comparators, listed (S, K, A, E, Q order).
+* **RP1 PINGING IS A SECOND PIECE** iff GRAFT(P) is SUFFICIENT (decided in the graft's favour for both comparators); **RP2 THE PINGING UNITS** lists A and E that are SUFFICIENT (both comparators) and says whether Q's graft onto exploit7204 is decided (the only comparator where it differs).
+* **Reported with the read, not in a rule:** each arm's edge (se, z, wins-draws-losses, seat edges, status, the share of the lead a graft recovers); **the share of GRAFT(MP) against GRAFT(M)** (what pinging adds to movement); **the forecast quantities of section 5 as yes/no**.
+* **Checks that void the read, said and not weighed. Every one is an identity or a file's own number:** every matchup flew the set's geometries (each seed twice); no non-finite score; every theta one `clampTheta` leaves unchanged; every run's generation 0 is G; **U(league7100) against a copy of itself has an edge of exactly 0**; **every lower side is the finder's final theta of the files, and the leader of the LEAD matchup is league7100's**; **every arm is exactly its base with the donor's numbers of the unit or set and nothing else moved.**
+
+## 5. Forecasts, written before any geometry of any of the two sets is flown (probabilities, mine)
+
+| forecast | probability |
+|---|---|
+| R0 holds on DEV | **90** |
+| R0 holds on HELD | **88** |
+| RM1: the movement set replicates (GRAFT(M) sufficient) | **85** |
+| the headline is "TRACKSPEED" | **40** |
+| the headline is "SEARCHSPEED" | **10** |
+| the headline is "BOTH" | **20** |
+| the headline is "NEITHER ALONE" | **15** |
+| the headline is "MOVEMENT DOES NOT REPLICATE" | **15** |
+| K (trackSpeed) is NECESSARY for both comparators | **50** |
+| RP1: pinging is a second piece (GRAFT(P) sufficient) | **20** |
+| E (pingEvery) is SUFFICIENT | **10** |
+| A (pingAfter) is SUFFICIENT | **3** |
+| Q's graft onto exploit7204 is decided in its favour (Q cannot be BOTH) | **10** |
+
+Why these: the movement group carried the lead on both sets by large margins (0.6 to 0.9 of it, and the whole lead when removed), so I give it 85 to replicate; league7100's trackSpeed is the one number that is unlike every other finder's (3.15 against 4.07 to 4.50), so it is the likeliest single carrier (K sufficient is the sum of the TRACKSPEED and BOTH headlines, 60), while searchSpeed (league7100's 4.09; the five finders' run from 3.31 to 4.30) is nearer the middle of what the finders chose; pinging is undecided with a graft of +0.4 to +0.5 on one set and about 0 on the other, so a decided GRAFT(P) for both comparators on HELD is not likely (20), and of its three numbers only pingEvery differs by a lot (8.30 against 4); a unit that is necessary is a stronger claim than one that is sufficient, and a lesion of league7100 loses less when more than one number carries it (50).
+
+## 6. What a result would not say
+
+* **A mechanism.** A slower tracker could be quieter, lose contact less, or its opposite: no event is read.
+* **That a unit's sufficiency is its only role:** a graft onto league7001 or exploit7204 puts league7100's number into a side whose other numbers are not league7100's; "SUFFICIENT" says it is enough there.
+* **An interaction of two units beyond the sets M, P and MP** (the pair S and K is flown as M; no other pair), **a dose of a number** (each is league7100's own value, not a graded one), **or the lead over exploit7200 or over G or against another opponent.**
+* **That the two comparators are independent:** league7100 is on every arm; the effective number of independent strong finders is nearer three than four.
+
+## 7. Cost
+
+28 matchups of 96 duels a set, about three minutes of one core; the command, its gate and a sabotage pass are the work.
+
+## AMENDMENT A (2026-11-16; written after the command and its gate and after the smoke run, BEFORE any geometry of the DEV set 116001 to 116048 or of HELD is flown)
+
+**1. The smoke headline, said before any DEV geometry (the rule of section 3).** The command's `smoke` was run on geometries 1 to 4 (8 duels a matchup; never recorded; free to read). Its headline was **"TRACKSPEED"**: R0 holds on it (league7100 over league7001 +1.902, over exploit7204 +1.548); the movement set M is sufficient for both comparators (RM1 yes); **K (trackSpeed) is sufficient for both (+1.517 and +1.181) and necessary for both (-1.525 and -1.546)**; S (searchSpeed) is not sufficient and not necessary (its lesions against league7100 are exactly 0, 0-8-0, on these four geometries); A and E are not sufficient (+0.754 and +0.381 against league7001, z 1.0; about 0 against exploit7204); P is not sufficient (RP1 no); Q's graft onto exploit7204 is not decided (-0.002). Eight duels on four geometries are a smoke test and not a reading (the z values of a deterministic 4-4-0 are not evidence), and **the forecasts of section 5 stand as written before it was seen, and are scored as written; but I have seen this headline, and the 40 given to TRACKSPEED is no longer a blind number: the DEV read and HELD are the evidence, and the smoke is not counted in them.**
+
+**2. One void-check added to section 4's list (an identity, said before data):** *an arm identical to its base has an edge of exactly 0* (a row flagged `identical` with any other edge voids the read; the two Q arms against league7001 are such rows by the files' own numbers). It is the 8th check, after the arm check, and is in the command and its gate.
+
+**3. The report's column of set keys is padded to 53 characters** (the length of the set of five), so the three sets align; the first printing padded to 40 and misaligned MP. A formatting change, made after the first gate run and before the smoke report was pinned.
+
+**4. What is not changed:** the units, the arms, the sets, the rules R0, RM1 to RM3, RP1 and RP2, the forecasts, the geometries, the order of work.
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeMove.mjs dev --write`, geometries 116001 to 116048 (96 duels a matchup), exit 0; record `brain/subEvadeMoveDev.json`: 28 matchups, no check failed)
+
+DEV is free to read. **HELD (117001 to 117048) is NOT flown by this note's work so far**: Keith's message for this round ("lets do the next suggested round, and then the next 2 suggested rounds after that") does not say "fly HELD", as his earlier ones did, so I am waiting for his word before spending the set. R0 held on DEV and no check failed (none printed), so the HELD gate of the command would accept this record. Forecasts are scored on DEV only for "R0 holds on DEV" (90): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** league7100 beats league7001 by **+1.047** (z 6.7, 43-43-10) and exploit7204 by **+1.058** (z 4.3, 49-31-16), both decided.
+
+**The arms against each comparator** (an arm's edge over its own base; GRAFT: the comparator with league7100's number or numbers, against the comparator; LESION: league7100 with the comparator's number, against league7100; "share" is the graft's edge over the lead):
+
+| arm | against league7001 | share | against exploit7204 | share |
+|---|---|---|---|---|
+| LEAD | **+1.047** (z 6.7) | | **+1.058** (z 4.3) | |
+| GRAFT S (searchSpeed) | -0.000 | 0.00 | +0.034 | 0.03 |
+| GRAFT K (trackSpeed) | **+0.984** (z 9.3) | **0.94** | **+0.752** (z 5.5) | **0.71** |
+| GRAFT A (pingAfter) | +0.031 | 0.03 | -0.004 | 0.00 |
+| GRAFT E (pingEvery) | +0.313 (z 1.9) | 0.30 | +0.349 (z 2.0) | 0.33 |
+| GRAFT Q (searchPing) | identical (0 exactly) | | -0.069 | -0.07 |
+| LESION S, K | +0.031, **-0.873** (z -6.3) | | -0.066, **-1.043** (z -7.8) | |
+| LESION A, E, Q | +0.113, -0.035, identical | | +0.113, -0.035, -0.097 | |
+| GRAFT M (S+K) | **+0.952** (z 8.8) | 0.91 | **+0.848** (z 7.7) | 0.80 |
+| GRAFT P (A+E+Q) | +0.312 (z 1.6) | 0.30 | +0.216 (z 1.0) | 0.20 |
+| GRAFT MP (all five) | **+1.046** (z 5.9) | 1.00 | **+0.569** (z 2.9) | 0.54 |
+
+**RM1 THE MOVEMENT SET REPLICATES: yes** (GRAFT(M) sufficient for both). **RM2 THE HEADLINE: TRACKSPEED.** **RM3 the necessary units: K.** **RP1 PINGING IS A SECOND PIECE: NO** (GRAFT(P) sufficient for none). **RP2:** neither A nor E is sufficient; Q's graft onto exploit7204 is not decided (-0.069). Units: **K SUFFICIENT BOTH and NECESSARY BOTH**; S, A, E and Q NONE and NONE.
+
+**What pinging adds to movement** (GRAFT(MP) against GRAFT(M)): +0.094 against league7001 and **-0.279** against exploit7204: no consistent sign.
+
+**The forecast quantities as printed** (scored on HELD, not here): RM1 yes; headline TRACKSPEED yes (SEARCHSPEED, BOTH, NEITHER ALONE, MOVEMENT DOES NOT REPLICATE no); K necessary for both yes; RP1 no; E sufficient no; A sufficient no; Q graft onto exploit7204 decided no.
+
+**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, TRACKSPEED, on four training geometries at 8 duels a matchup. That is not independent evidence, and DEV is a different set of 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the 40 I gave TRACKSPEED is no longer a blind forecast; it is scored on HELD as written. Also said: **I flew DEV on my own reading of "do the round"**, as free-to-read data that gates HELD; it spent the DEV set 116001 to 116048, which is recorded once.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The movement lead lives in trackSpeed.** Grafting league7100's trackSpeed alone onto league7001 recovers 0.94 of the lead and onto exploit7204 0.71; giving league7100 either comparator's trackSpeed costs it -0.87 and -1.04, **the whole lead** (+1.05 and +1.06). Its searchSpeed does nothing alone either way (|edge| of 0.07 or less in all four arms). league7100's trackSpeed (3.15) is the slowest of the five finders; the comparators' are 4.07 and 4.50, i.e. at or near the bound of 4.5.
+2. **No arm that does nothing looks like nothing in the seats.** GRAFT S against league7001 is 39-18-39 with seat A -0.681 and seat B +0.680: an edge of exactly about 0 made of two seat effects that cancel. This is why the matchups are flown in both seats and read as one edge.
+3. **A small pinging piece is not ruled out and not shown.** pingEvery alone is **+0.313 and +0.349** (z 1.9 and 2.0) on the two comparators, the same sign and size twice and under the 0.5 bar; pingAfter and searchPing are about 0; the whole pinging set is +0.312 and +0.216. The ladder's pinging group on HELD was +0.411 and +0.479. Together with that read, a pingEvery piece of about 0.3 to 0.5 is the one candidate; it is a **post-hoc reading** from DEV, labelled, and it is exactly what HELD's rules (RP1, RP2) will or will not decide.
+4. **The ping numbers' lesions are the same matchup against both comparators for A and E:** pingAfter is 1 and pingEvery is 4 in both league7001 and exploit7204, so LESION A and LESION E are the identical theta pair (12-75-9 and 11-73-12 on both sides of the table); so "necessary for both comparators" for A or E would be one measurement counted twice. The registration did not say this (it said it of Q against league7001, not of A and E); it changes no rule's outcome here (neither is necessary) and is said for the readers of later rounds.
+5. **MP below M on exploit7204** (+0.569 against +0.848): within the noise of a difference of two edges of about 0.11 and 0.2 standard error each (z of the difference about 1.2); not read as pinging hurting.
+
+**What is NOT shown:** any HELD read; trackSpeed's dose (only league7100's one value, 3.15, was grafted; whether the effect is a threshold, a slope or an optimum is not known); whether it helps against anything but these two comparators; a mechanism.
+
+## HELD RESULT (2026-11-16; `node tools/ship/takeEvadeMove.mjs held --write`, geometries 117001 to 117048 (96 duels a matchup), flown ONCE, exit 0; record `brain/subEvadeMoveHeld.json`: 28 matchups, no check failed)
+
+Flown on Keith's word ("fly Round 1 HELD whenever ready"), after the DEV read above; the registration and the command's HELD gate allowed it (R0 held on DEV and no check failed). **The rules are about this set.**
+
+**R0 holds.** league7100 beats league7001 by **+0.979** (z 6.3, 39-49-8) and exploit7204 by **+1.453** (z 8.4, 52-37-7), both decided.
+
+**The arms against each comparator** (HELD; DEV beside it):
+
+| arm | against league7001 | share | against exploit7204 | share |
+|---|---|---|---|---|
+| LEAD | **+0.979** (DEV +1.047) | | **+1.453** (DEV +1.058) | |
+| GRAFT S (searchSpeed) | +0.066 (-0.000) | 0.07 | +0.034 (+0.034) | 0.02 |
+| GRAFT K (trackSpeed) | **+0.820** (z 6.8; DEV +0.984) | **0.84** | **+0.908** (z 6.0; DEV +0.752) | **0.63** |
+| GRAFT A (pingAfter) | -0.128 (+0.031) | -0.13 | -0.000 (-0.004) | 0.00 |
+| GRAFT E (pingEvery) | +0.305 (z 2.2; DEV +0.313) | 0.31 | +0.255 (z 2.0; DEV +0.349) | 0.18 |
+| GRAFT Q (searchPing) | identical | | +0.065 (-0.069) | 0.05 |
+| LESION S | -0.000 (+0.031) | | -0.103 (-0.066) | |
+| LESION K | **-0.863** (z -5.9; DEV -0.873) | | **-0.871** (z -5.5; DEV -1.043) | |
+| LESION A, E, Q | +0.063, +0.065, identical | | +0.063, +0.065, -0.035 | |
+| GRAFT M (S+K) | **+0.886** (z 8.1; DEV +0.952) | 0.91 | **+0.974** (z 7.7; DEV +0.848) | 0.67 |
+| GRAFT P (A+E+Q) | +0.248 (z 1.5; DEV +0.312) | 0.25 | +0.446 (z 2.0; DEV +0.216) | 0.31 |
+| GRAFT MP (all five) | **+0.949** (z 5.8; DEV +1.046) | 0.97 | **+1.063** (z 5.5; DEV +0.569) | 0.73 |
+
+**RM1 THE MOVEMENT SET REPLICATES: yes.** **RM2 THE HEADLINE: TRACKSPEED** (the same as DEV). **RM3 the necessary units: K.** **RP1 PINGING IS A SECOND PIECE: NO** (GRAFT(P) sufficient for none: +0.248 and +0.446). **RP2:** neither A nor E is sufficient; Q's graft onto exploit7204 is not decided (+0.065). Units: **K SUFFICIENT BOTH and NECESSARY BOTH**; S, A, E and Q NONE and NONE. What pinging adds to movement (MP against M): **+0.063 and +0.089**.
+
+**The forecasts, scored** (as the larger side of each probability; the one at 50 is a coin and is not counted):
+
+| forecast | probability | outcome |
+|---|---|---|
+| R0 holds on DEV | 90 | **true** |
+| R0 holds on HELD | 88 | **true** |
+| RM1: the movement set replicates | 85 | **true** |
+| headline TRACKSPEED | 40 | **true (a miss: the larger side was "no")** |
+| headline SEARCHSPEED | 10 | false (right) |
+| headline BOTH | 20 | false (right) |
+| headline NEITHER ALONE | 15 | false (right) |
+| headline MOVEMENT DOES NOT REPLICATE | 15 | false (right) |
+| K necessary for both | 50 | true (a coin: not counted) |
+| RP1: pinging a second piece | 20 | false (right) |
+| E (pingEvery) sufficient | 10 | false (right) |
+| A (pingAfter) sufficient | 3 | false (right) |
+| Q's graft onto exploit7204 decided | 10 | false (right) |
+
+**11 of 12 as the larger side** (the miss is TRACKSPEED at 40), plus the coin. **Said plainly:** the one miss is the headline, and I **saw it at smoke** (Amendment A), so even the miss is not a blind result; the 40 was written before the smoke and is scored as written.
+
+**Observations (HELD, for reading, not rules; the DEV read's observations stand):**
+
+1. **HELD replicates DEV in every rule and in the size of the effect.** trackSpeed alone grafts +0.820 and +0.908 (DEV +0.984 and +0.752), lesions -0.863 and -0.871 (DEV -0.873 and -1.043): against each comparator the lesion is the size of the lead on league7001 (-0.863 against a lead of +0.979, 0.12 short) and 0.58 short of it on exploit7204 (-0.871 against +1.453; the lead was +1.058 on DEV, where the lesion was -1.043).
+2. **searchSpeed does nothing alone on a second set:** four arms within 0.13 of 0 (+0.066, +0.034, -0.000, -0.103).
+3. **A small pingEvery piece appears again and stays under the bar.** pingEvery alone is +0.305 (z 2.2) and +0.255 (z 2.0) on HELD after +0.313 and +0.349 on DEV: **four reads, the same sign, 0.25 to 0.35, each at z of about 2, none over the registered 0.5 bar.** The whole pinging set is +0.248 and +0.446 (DEV +0.312 and +0.216; the ladder's HELD +0.411 and +0.479). By the registered rules pinging is not a second piece and no pinging unit is sufficient; **a pingEvery piece of about 0.3 is a post-hoc reading of eight sub-bar numbers of the same sign (pingEvery alone on four reads, the whole pinging set on four)**, and what would decide it is a read with a rule for a bar of 0.25, which would be a new registration. MP over M adds +0.06 and +0.09: nothing a seat's noise could not make.
+4. **The lesions of A and E are the same matchup against both comparators, to the digit** (LESION A is +0.063, 8-82-6, against league7001 and against exploit7204; LESION E is +0.065, 8-82-6, against both), as the DEV note said: pingAfter is 1 and pingEvery is 4 in both comparators.
+
+**What is NOT shown:** trackSpeed's dose (the track round's DEV has it; its HELD is not flown); whether the effect reaches other boats (the reach round); any mechanism; whether the small pingEvery piece is real.
