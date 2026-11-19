@@ -92,8 +92,10 @@ sec("4. FLIGHT (the gate's two seeds; full dives for the circuit arms, 60 s for 
     // 60 s dives, on which low -0.04 and -0.06 fly the same, so it is still true after the move and could never have told the two bases apart. What established C06 and R06 as the
     // aquarium's profiles when Round 38 flew is this gate's full-dive row (it held then); check 6 in the committed report is the weaker statement and is said to be so here.
     const rep38 = fs.readFileSync(new URL("../../brain/rig-results/circuit-bias-report.json", import.meta.url), "utf8");
-    ok("!! C06 is the aquarium's circuit profile, fingerprint for fingerprint on full BIAS dives; R06 WAS its rule profile when Round 38 flew (the committed report says PASS) and is not since Round 39 moved it to -0.04",
-        c06 === fps(T.flyDecision(circuitSeat("circuit")), bias) && r06 === fps(T.flyDecision(U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS)), bias) && r06 !== fps(T.flyDecision(circuitSeat("rule")), bias) &&
+    // 2026-11-19, Round 40: the circuit profile now flies the retrained net on -0.04, so C06 is what the profile WAS (circuitSeat("circuit", PLAIN_CHAMPION) on its BASE_PARAMS) and is not it now
+    ok("!! C06 and R06 WERE the aquarium's profiles when Round 38 flew (full BIAS dives; the committed report says PASS): C06 is the decision-circuit champion on -0.06 and R06 the -0.06 rule; since Rounds 39 and 40 neither is",
+        c06 === fps(T.flyDecision(CS.createPlainPolicy(84, "plain").seatFor(Float32Array.from(PLAIN_CHAMPION.weights))), bias) && c06 !== fps(T.flyDecision(circuitSeat("circuit")), bias) &&
+        r06 === fps(T.flyDecision(U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS)), bias) && r06 !== fps(T.flyDecision(circuitSeat("rule")), bias) &&
         /PASS C06 AND R06 ARE THE AQUARIUM'S PROFILES/.test(rep38));
     const w = Float32Array.from(PLAIN_CHAMPION.weights), pol = CS.createPlainPolicy(PLAIN_CHAMPION.hidden, "plain");
     ok("!! C04 is the SAME weights on the -0.04 base (built here independently), and it differs from C06 on these dives",

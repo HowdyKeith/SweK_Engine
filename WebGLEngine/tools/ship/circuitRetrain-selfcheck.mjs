@@ -109,7 +109,11 @@ sec("5. FLIGHT (the gate's two seeds)");
     const P = X.retrainPolicy(), hand = P.handWeights(), moved = Float32Array.from(hand); moved[P.offsets.B2] = 0.9;   // the surfacing output's bias pushed hard
     ok("!! the untrained policy IS R04 (tunedSeat on low -0.04, WIDE_BOUNDS), and startIsR04() says so", fps(P.pilotFor(hand), X.BIASED) === fps(T.flyDecision(U.tunedSeat({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.04 }, U.WIDE_BOUNDS)), X.BIASED) && X.startIsR04());
     ok("!! a moved readout is not the rule: the surfacing bias at 0.9 changes the dives", fps(P.pilotFor(moved), X.BIASED) !== fps(P.pilotFor(hand), X.BIASED));
-    ok("!! C06 is the aquarium's circuit profile and SEAT-04 the shipped seat (profileSame, shippedSame)", X.profileSame(circuitSeat) && X.shippedSame());
+    // 2026-11-19, the replacement made: the audit's check (profileSame) was PASS when flown (the committed report says so); since then the profile IS the retrained NEW, not C06
+    const champW = X.championWeights([0, 1, 2, 3].map((k) => JSON.parse(fs.readFileSync(new URL(`../../brain/rig-results/circuit-retrain/search-${k}.json`, import.meta.url), "utf8"))));
+    ok("!! *** THE REPLACEMENT MADE: the aquarium's circuit profile now flies NEW (the champion on -0.04), not C06; profileSame() was PASS in the committed report and is false since; SEAT-04 is the shipped seat ***",
+        fps(T.flyDecision(circuitSeat("circuit")), X.BIASED) === fps(X.pilotOf("NEW", { weights: Array.from(champW) }), X.BIASED) && X.profileSame(circuitSeat) === false && X.shippedSame() &&
+        /PASS C06 IS THE AQUARIUM'S CIRCUIT PROFILE/.test(fs.readFileSync(new URL("../../brain/rig-results/circuit-retrain-report.json", import.meta.url), "utf8")));
     ok("!! NEW flies the weights it is handed on the -0.04 seat: the start's weights fly R04's dives", fps(X.pilotOf("NEW", { weights: Array.from(hand) }), X.BIASED) === fps(P.pilotFor(hand), X.BIASED));
     ok("  refusals: NEW without weights, an unknown arm or condition", throws(() => X.pilotOf("NEW"), /needs the champion's weights/) && throws(() => X.pilotOf("C04"), /unknown arm/) && throws(() => X.auditJob("C06", "DROP", "0"), /unknown condition/));
 }
@@ -120,6 +124,25 @@ sec("6. SOURCE");
     ok("!! the search is trainNeedsCircuit's (imported, called, not copied): no mutate loop or prune of its own", /import \{ RECIPE, setsOf, search \} from "\.\/trainNeedsCircuit\.mjs"/.test(code) && /search\(Pol, SEARCH_SEEDS\[k\], k, recipe, sets\.train, null\)/.test(code) && !/Pol\.mutate|tryRevert/.test(code));
     ok("!! the seeds appear once each in the code; the base by value; no clock, random or file", ["97500", "52001", "52300", "52901"].every((s) => (code.match(new RegExp(s, "g")) || []).length === 1) && /SS\.SURVEY_R8\.low - 0\.04/.test(code) && !/SURVEY_CONSTANTS/.test(code) && !/Date\.now|Math\.random|new Date|node:fs|readFile|writeFile/.test(code));
 }
+
+sec("7. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/circuit-retrain/, the ledger committed before the audit, the audit read once)");
+{
+    const dir = new URL("../../brain/rig-results/circuit-retrain/", import.meta.url), rd = (f) => JSON.parse(fs.readFileSync(new URL(f, dir), "utf8"));
+    const recs = [0, 1, 2, 3].map((k) => rd(`search-${k}.json`)), c = X.championOf(recs);
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((cd) => [cd, X.mergeKinds(Array.from({ length: X.CHUNKS }, (_, j) => rd(`${a}__${cd}__${j}.json`)))]))]));
+    const v = X.verdictsOf(res), nr = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the ledger: four searches, the champion search 1 (held-out 0.8706), 3 of 4 eligible (search 2 crushed one pool dive), and EVERY held-out below the start's 0.8913",
+        X.ledgerChecks(recs).length === 0 && c.record.k === 1 && c.eligible === 3 && recs[2].poolCrashed === 1 && nr(c.record.heldOut, 0.8706) && recs.every((r) => r.heldOut < r.start.heldOut) && nr(recs[0].start.heldOut, 0.8913));
+    ok("!! the five data checks pass on the committed audit", X.checksOf(res, recs).every((x) => x.ok));
+    ok("!! *** the table: NEW lost 0 at REF and 5 under BIAS (4 crushed, 1 stranded), C06 77, the seat 2; V1 and V2 hold; the bottom line REPLACES ***",
+        res.NEW.REF.crashed === 0 && res.NEW.BIAS.crashed === 4 && res.NEW.BIAS.stranded === 1 && res.C06.BIAS.crashed === 77 && res["SEAT-04"].BIAS.crashed === 2 && v.v1 && v.v2 && X.bottomLine(res) === "THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE");
+    ok("!! the price, reported: NEW minus the seat -0.0269 at REF and -0.0390 under BIAS, both HURTS; NEW minus C06 under BIAS +0.1648 KEEPS",
+        nr(v.refVsSeat.mean, -0.0269) && X.keepsOf(v.refVsSeat) === "HURTS" && nr(v.biasVsSeat.mean, -0.0390) && X.keepsOf(v.biasVsSeat) === "HURTS" && nr(v.biasVsC06.mean, 0.1648) && X.keepsOf(v.biasVsC06) === "KEEPS");
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 40, RESULT"), t = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note states the replacement, the price beyond 2 se, and that the training did not carry to the held-out dives", /IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE/.test(t) && /-0\.0269/.test(t) && /did not carry/.test(t));
+}
+// SECTION 7 SABOTAGE (each restored byte-identical): Q1 one NEW BIAS crush added to its job file -> 1 red ("the table"); Q2 search 2's pool crush removed (it becomes eligible and
+//   champion) -> 2 red ("the ledger", and "THE REPLACEMENT MADE", since the champion it names is then another search).
 
 finished = true;
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)\nnot checked here: what the training finds, and what the champion does on the audit dives.`);

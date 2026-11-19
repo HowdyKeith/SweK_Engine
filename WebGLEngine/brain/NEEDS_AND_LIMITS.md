@@ -1544,3 +1544,21 @@ Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN
 **Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (1 against 7). The price HURTS at REF, about 40: no (-0.0040, 1.3 se; it HURTS under N20, N30 and STN5). DMG no worse, about 80: held (20 against 22).
 
 **What changed, as section 6 fixed it.** `render/subAquariumCircuit.mjs`'s `rule` profile is tunedSeat(SURVEY_CONSTANTS, WIDE_BOUNDS), low -0.04; `render/subAquariumCircuit-selfcheck.mjs` is restated with dated lines; Round 38's gate holds R06 to what the profile WAS. **The price, said plainly:** the -0.04 rule gives up 0.004 to 0.013 of score in four of six conditions (three beyond 2 se) and, with the gauge reading 0.10 high, crushes 1 boat in 300 where the -0.06 rule crushed 7 (Round 38: 14). The same trade the seat made at Round 37, and Keith's decision of 2026-11-19.
+
+## Round 40, RESULT (2026-11-19): THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE -- at a price beyond 2 se in score
+
+**The training** (`node tools/ship/circuitRetrainCmd.mjs train --workers 4`, four searches of about 30 minutes; the ledger `brain/rig-results/circuit-retrain/search-*.json` committed before any audit seed was flown). Every search raised its training score (0.8594 at the start to 0.8922-0.9109) and **every search's held-out score came out BELOW the untrained start's 0.8913** (0.8502 to 0.8817): what the search found on its 16 training dives (32 with both gauges) did not carry to the held-out dives. Three of four were eligible (search 2 crushed one pool dive); the champion by the registered rule is **search 1 (seed 97501), held-out 0.8706** -- the rule asks the best eligible, not one that beats the start, and it was applied as written.
+
+**The audit** (`audit --jobs 4`, 24 jobs, all exit 0, 1,800 dives on 52001-52300 `both`, read once; `brain/rig-results/circuit-retrain-report.json`). All nine checks passed.
+
+| arm | REF score (crushed / stranded) | BIAS score (crushed / stranded) |
+|---|---|---|
+| NEW (the retrained champion, -0.04) | 0.7778 (0 / 0) | 0.8101 (4 / 1) |
+| C06 (the circuit profile as it shipped) | 0.8168 (0 / 0) | 0.6453 (**77** / 0) |
+| SEAT-04 (the shipped seat) | 0.8048 (0 / 0) | 0.8491 (2 / 0) |
+
+V1: NEW's hull under BIAS is no worse than the seat's (5 against 2: 3 <= 2 sqrt 7). V2: no worse at REF (0 against 0). Reported: NEW minus the seat **-0.0269 (se 0.0048) at REF and -0.0390 (se 0.0069) under BIAS, both HURTS**; NEW minus C06 under BIAS +0.1648 (se 0.0208), KEEPS. Bottom line: `THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE`.
+
+**Against the expectations of section 6 (written first).** A champion eligible, about 75: held (3 of 4). V1 holds, about 65: held. V2 holds, about 90: held. Replaces, about 60: came. NEW minus the seat at REF LOSES (inside 2 se), about 70: NO -- it HURTS, by 5.6 se.
+
+**WHAT THIS MEANS and does not.** The retrained net fixes the hull: under a gauge reading +0.10 high it loses 5 boats in 300 where the profile it replaces lost 77 (88 in Round 38). It is not a better pilot: it scores 0.027 below the shipped seat at a sound gauge and 0.039 below it under the bias, and its training did not generalise to its own held-out dives. By the rule registered first (the hull decides; the score is reported, not weighed) it replaces the profile, and it has: `render/subAquariumCircuitWeights.mjs` gains CIRCUIT_CHAMPION (generated from search-1.json, digest 0ec046a3), `render/subAquariumCircuit.mjs`'s `circuit` profile flies it on the -0.04 base, PLAIN_CHAMPION is kept as what Rounds 38 and 40 name as C06, and the gates that pinned the old profile are restated with dated lines. **The circuit profile is now a safe watch-only seat and a weaker one; whether a better-trained net (more training dives, more searches) is worth a round is Keith's call** -- this round retrained once, as registered, and does not retrain again.
