@@ -67,7 +67,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (g, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${g}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (g) => rd[g].reading, blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8"));
+    const re = Object.fromEntries(G.REGIMES.map((g) => [g, G.fightReadings({ ships: k(g, "ships"), sees: k(g, "sees") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT SHIPS: the seeing gunner less the ships-sticky is +0.137 (z 16.1) against eight fighters, +0.102 (z 3.8) in fleets with the cannon, +0.113 (z 3.6) without; every fight LEADS", near(R("fighters").gain, 0.137) && near(R("fleetCannon").gain, 0.102) && near(R("fleetNoCannon").gain, 0.113) && G.REGIMES.every((g) => rd[g].words.gain === "LEADS") && rd.verdict.ok
+        && G.REGIMES.every((g) => ["sees", "ships", "gain"].every((q) => Math.abs(re[g][q].mean - R(g)[q].mean) < 1e-12 && re[g][q].n === 300)), `${R("fighters").gain.mean.toFixed(3)} ${R("fleetCannon").gain.mean.toFixed(3)} ${R("fleetNoCannon").gain.mean.toFixed(3)}`);
+    ok("!! against the plain side: the seeing gunner -0.021 (still TRAILS, by a seventh of the ships-sticky's -0.158) against fighters; -0.160 (TRAILS) and the ships-sticky -0.262 in fleets with the cannon; +0.201 (LEADS) and +0.088 without. The forecast was right that it leads against fighters and FAR UNDER in size (+0.02 forecast), and wrong in the fleets (it said CANNOT BE TOLD)", near(R("fighters").sees, -0.021) && rd.fighters.words.sees === "TRAILS" && near(R("fighters").ships, -0.158) && near(R("fleetCannon").sees, -0.160) && near(R("fleetCannon").ships, -0.262) && near(R("fleetNoCannon").sees, 0.201) && rd.fleetNoCannon.words.sees === "LEADS" && near(R("fleetNoCannon").ships, 0.088));
+    ok("!! and the file: a seatFlyWired7 brain of the weights -3, -3, 0.1", PB.importBrain(PB.describePolicy(FT.POLICY_ID7, FT.movingTarget), blob).ok && Array.from(blob.weights).map((v) => +v.toFixed(6)).join() === "-3,-3,0.1" && blob.policy === "seatFlyWired7");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

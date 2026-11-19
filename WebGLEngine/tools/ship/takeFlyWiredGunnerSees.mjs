@@ -13,6 +13,9 @@
 // REGISTERED 2026-11-19, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: the seeing gunner against the plain side; the ships-sticky against the plain side; THE SEEING LESS THE SHIPS-STICKY, pair by pair.
 // FORECAST, for the record: against fighters the gain LEADS, by about 0.02 (eleven kills in 64 attacks on the scratch pairs is +0.02 of kills over eight); in the fleets CANNOT BE TOLD.
 // WHAT SHIPS: brain/seatFlyWired7WeightsDefault.json (policy seatFlyWired7, the weights -3, -3, 0.1) if the gain LEADS in at least one fight and TRAILS in none. It would then be a candidate for the `flywired` hand on space-duel.html.
+// READ 2026-11-19 (brain/seatFlyWired7WeightsDefault.reading.json): the seeing less the ships-sticky +0.137 (z 16.1) against fighters, +0.102 (z 3.8) in fleets with the cannon, +0.113 (z 3.6) without. IT SHIPS: brain/seatFlyWired7WeightsDefault.json.
+//   Against the plain side it is nearly level against fighters (-0.021, where the ships-sticky gunner was -0.158), leads in fleets without the cannon (+0.201) and still trails with it (-0.160). The forecast was far under against fighters and wrong in
+//   the fleets. NOT ON THE PAGE YET: the page's `flywired` hand became the holding mixed gunner (seatFlyWired6) the same day, and the two have not been flown against each other; the hold with this slip on ships is the next arm (tools/ship/todo.mjs).
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerSees/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other taus and smoothings (chosen on scratch, not searched here), escorts, the trained 6DOF pilot, the mixed gunners with this slip.
 "use strict";
