@@ -195,6 +195,26 @@
     "title": "The GPU reservoir kernel",
     "why": "The fly reservoir's step on a WebGPU device, held to the CPU twin; the rig's timing is owed: node tools/ship/takeReservoirGpu.mjs on the rig, and send back what it prints.",
     "kind": "rig"
+   },
+   {
+    "path": "brain/FISH_VISUAL_INPUTS_PROMPT.md",
+    "title": "A prompt: the Mauthner circuit's visual inputs",
+    "why": "Paste it as the first message of a new session to find out whether the retinal and tectal inputs to the escape circuit are in the Fish1 CAVE data and can feed the Escape task."
+   },
+   {
+    "path": "brain/SUB_EVADE_SHORT_WIP.md",
+    "title": "The short round (submarine duel): HELD unflown",
+    "why": "DEV is read (4, 6 and 12 all NARROW); the HELD set 135001-135096 is flown once and only on the owner's word: node tools/ship/takeEvadeShort.mjs held --write."
+   },
+   {
+    "path": "brain/SUB_EVADE_PINGAWAY_WIP.md",
+    "title": "Round 10, pingaway (submarine duel): paused",
+    "why": "Registered, not built: its command was removed at v4927 because it had no gate, and is rebuilt with one when the round resumes."
+   },
+   {
+    "path": "brain/SUB_EVADE_TYPE_WIP.md",
+    "title": "Round 11, type (submarine duel): paused",
+    "why": "Registered, not built: no command exists yet; it is built and gated when the round resumes."
    }
   ],
   "switchboard.html": [
@@ -232,6 +252,26 @@
   "brain/STATION_AND_PRICE_WIP.md": "a registration and its result, read once; nothing to run",
   "brain/SUBMARINE_WIP.md": "another chat's work-in-progress note; not edited or linked from this chat",
   "brain/LESION_LEFT_SIDE_WIP.md": "the left-side lesion round: its registration and its result (NOT REPLICATED); nothing to run",
-  "brain/RUNG_4A_V6_SHIFT_MAP_WIP.md": "rung 4a version 6, the glomerulus-shift map: its registration and its result (NO SIGNAL); nothing to run"
+  "brain/RUNG_4A_V6_SHIFT_MAP_WIP.md": "rung 4a version 6, the glomerulus-shift map: its registration and its result (NO SIGNAL); nothing to run",
+  "brain/SUB_ECCM_WIP.md": "the submarine duel's seeker ECCM round (item 1 of section E): its registration and its result; nothing to run",
+  "brain/SUB_ENERGY_WIP.md": "the submarine duel's charge-budget round (item 2 of section E): its registration and its results; nothing to run",
+  "brain/SUB_EVADE_WIP.md": "the submarine duel's the turn read of the evade series: its registration and its DEV and HELD results (brain/subEvadeDev.json, brain/subEvadeHeld.json); nothing to run",
+  "brain/SUB_EVADE_ABROAD_WIP.md": "the submarine duel's abroad read of the evade series: its registration and its DEV and HELD results (brain/subEvadeAbroadDev.json, brain/subEvadeAbroadHeld.json); nothing to run",
+  "brain/SUB_EVADE_AWAY_WIP.md": "the submarine duel's away read of the evade series: its registration and its DEV and HELD results (brain/subEvadeAwayDev.json, brain/subEvadeAwayHeld.json); nothing to run",
+  "brain/SUB_EVADE_DOSE_WIP.md": "the submarine duel's dose read of the evade series: its registration and its DEV and HELD results (brain/subEvadeDoseDev.json, brain/subEvadeDoseHeld.json); nothing to run",
+  "brain/SUB_EVADE_GATES_WIP.md": "the submarine duel's gates read of the evade series: its registration and its DEV and HELD results (brain/subEvadeGatesDev.json, brain/subEvadeGatesHeld.json); nothing to run",
+  "brain/SUB_EVADE_LADDER_WIP.md": "the submarine duel's ladder read of the evade series: its registration and its DEV and HELD results (brain/subEvadeLadderDev.json, brain/subEvadeLadderHeld.json); nothing to run",
+  "brain/SUB_EVADE_MOVE_WIP.md": "the submarine duel's move read of the evade series: its registration and its DEV and HELD results (brain/subEvadeMoveDev.json, brain/subEvadeMoveHeld.json); nothing to run",
+  "brain/SUB_EVADE_OPPONENT_WIP.md": "the submarine duel's opponent read of the evade series: its registration and its DEV and HELD results (brain/subEvadeOpponentDev.json, brain/subEvadeOpponentHeld.json); nothing to run",
+  "brain/SUB_EVADE_PAIRS_WIP.md": "the submarine duel's pairs read of the evade series: its registration and its DEV and HELD results (brain/subEvadePairsDev.json, brain/subEvadePairsHeld.json); nothing to run",
+  "brain/SUB_EVADE_PING_WIP.md": "the submarine duel's ping read of the evade series: its registration and its DEV and HELD results (brain/subEvadePingDev.json, brain/subEvadePingHeld.json); nothing to run",
+  "brain/SUB_EVADE_REACH_WIP.md": "the submarine duel's reach read of the evade series: its registration and its DEV and HELD results (brain/subEvadeReachDev.json, brain/subEvadeReachHeld.json); nothing to run",
+  "brain/SUB_EVADE_SEAT_WIP.md": "the submarine duel's seat read of the evade series: its registration and its DEV and HELD results (brain/subEvadeSeatDev.json, brain/subEvadeSeatHeld.json); nothing to run",
+  "brain/SUB_EVADE_SPEEDFINE_WIP.md": "the submarine duel's speed-fine read of the evade series: its registration and its DEV and HELD results (brain/subEvadeSpeedFineDev.json, brain/subEvadeSpeedFineHeld.json); nothing to run",
+  "brain/SUB_EVADE_SPEED_WIP.md": "the submarine duel's speed read of the evade series: its registration and its DEV and HELD results (brain/subEvadeSpeedDev.json, brain/subEvadeSpeedHeld.json); nothing to run",
+  "brain/SUB_EVADE_SPLIT_WIP.md": "the submarine duel's split read of the evade series: its registration and its DEV and HELD results (brain/subEvadeSplitDev.json, brain/subEvadeSplitHeld.json); nothing to run",
+  "brain/SUB_EVADE_TOP_WIP.md": "the submarine duel's top read of the evade series: its registration and its DEV and HELD results (brain/subEvadeTopDev.json, brain/subEvadeTopHeld.json); nothing to run",
+  "brain/SUB_EVADE_TRACK_WIP.md": "the submarine duel's track read of the evade series: its registration and its DEV and HELD results (brain/subEvadeTrackDev.json, brain/subEvadeTrackHeld.json); nothing to run",
+  "brain/SUB_LEAGUE_WIP.md": "the submarine duel's tournament runner and replicated league (item 7 of section E): its registration and its results (brain/subLeagueRuns/); nothing to run"
  }
 }

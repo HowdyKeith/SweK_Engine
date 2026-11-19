@@ -158,6 +158,24 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/subEstimatorStudyV5.mjs",
     "tools/ship/subEstimatorStudyV6.mjs",   // v4922: rung 4a v6's study, reportLines(records); refuses bare (records.find of undefined)
     "tools/ship/lesionLeftSide.mjs",        // v4922: the left-side lesion round, reportLines(records, { plan, sha256 }); refuses bare
+    // v4927: the submarine duel's seventeen evade reads (claude/fish-vestibular-helper), each reportLines(rows, rules, name, ...); each refuses bare (SETS[undefined].first), measured by calling
+    "tools/ship/takeEvadeAbroad.mjs",
+    "tools/ship/takeEvadeAway.mjs",
+    "tools/ship/takeEvadeDose.mjs",
+    "tools/ship/takeEvadeGates.mjs",
+    "tools/ship/takeEvadeLadder.mjs",
+    "tools/ship/takeEvadeMove.mjs",
+    "tools/ship/takeEvadeOpponent.mjs",
+    "tools/ship/takeEvadePairs.mjs",
+    "tools/ship/takeEvadePing.mjs",
+    "tools/ship/takeEvadeReach.mjs",
+    "tools/ship/takeEvadeSeat.mjs",
+    "tools/ship/takeEvadeSpeed.mjs",
+    "tools/ship/takeEvadeSpeedFine.mjs",
+    "tools/ship/takeEvadeSplit.mjs",
+    "tools/ship/takeEvadeTop.mjs",
+    "tools/ship/takeEvadeTrack.mjs",
+    "tools/ship/takeEvadeTurn.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
     // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
     "tools/ship/advisorChipStudy.mjs",
@@ -234,6 +252,24 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/subEstimatorStudyV5.mjs",
     "tools/ship/subEstimatorStudyV6.mjs",   // v4922: rung 4a v6's study, reportLines(records); refuses bare (records.find of undefined)
     "tools/ship/lesionLeftSide.mjs",        // v4922: the left-side lesion round, reportLines(records, { plan, sha256 }); refuses bare
+    // v4927: the submarine duel's seventeen evade reads (claude/fish-vestibular-helper), each reportLines(rows, rules, name, ...); each refuses bare (SETS[undefined].first), measured by calling
+    "tools/ship/takeEvadeAbroad.mjs",
+    "tools/ship/takeEvadeAway.mjs",
+    "tools/ship/takeEvadeDose.mjs",
+    "tools/ship/takeEvadeGates.mjs",
+    "tools/ship/takeEvadeLadder.mjs",
+    "tools/ship/takeEvadeMove.mjs",
+    "tools/ship/takeEvadeOpponent.mjs",
+    "tools/ship/takeEvadePairs.mjs",
+    "tools/ship/takeEvadePing.mjs",
+    "tools/ship/takeEvadeReach.mjs",
+    "tools/ship/takeEvadeSeat.mjs",
+    "tools/ship/takeEvadeSpeed.mjs",
+    "tools/ship/takeEvadeSpeedFine.mjs",
+    "tools/ship/takeEvadeSplit.mjs",
+    "tools/ship/takeEvadeTop.mjs",
+    "tools/ship/takeEvadeTrack.mjs",
+    "tools/ship/takeEvadeTurn.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
     // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
     "tools/ship/advisorChipStudy.mjs",

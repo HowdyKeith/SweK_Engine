@@ -18,7 +18,8 @@ const opts = { ...(useAct ? { actuators: ACTUATORS } : {}), ...(needsJ ? { needs
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const gauss = (r) => { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 const rng = mulberry(seed), score = (th, set = D.TRAIN_SET) => D.evaluate(D.sideHand(th), set, opts).score;
-export function mutateTheta(theta, r) {
+// v4927 (the ship): no longer exported -- nothing imports it (tools/selfPlaySubTactics.mjs keeps its own), and an export nobody calls is an orphan by tools/ship/referenceKind-selfcheck's census; this command is gated as a PROGRAM by brain/subEnergy-selfcheck.mjs.
+function mutateTheta(theta, r) {
     const o = { ...theta }, k = 1 + Math.floor(r() * 3);
     for (let j = 0; j < k; j++) { const name = TA.THETA_NAMES[Math.floor(r() * TA.THETA_NAMES.length)], [lo, hi] = TA.THETA_BOUNDS[name]; o[name] = theta[name] + 0.1 * (hi - lo) * gauss(r); }
     return TA.clampTheta(o);

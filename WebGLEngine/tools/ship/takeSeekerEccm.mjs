@@ -7,6 +7,7 @@
 "use strict";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import * as D from "../../brain/subDuel.mjs";
 import * as T from "../../brain/subTournament.mjs";
 import { sideOf, KITS } from "./takeCountermeasures.mjs";
@@ -94,7 +95,10 @@ const strip = (a) => { const { fights, fingerprints, summary, ...rest } = a; ret
 /** The command: argv (after the program), io { log, exists, write } (defaults to the console and the file system). Returns the exit code. */
 export function command(argv, io = {}) {
     const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s)), check = io.checks || checks;   // io.checks and io.devSet / io.heldSet are for the gate (a failed check to see the exit code; smoke geometries instead of the DEV and HELD sets)
-    const mode = argv[0], flag = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; };
+    // v4927 (the ship): the options are parsed against a spec and an unknown one is REFUSED (tools/ship/cliArgs.mjs; an argv.indexOf reader ignored a mistyped option)
+    const SPEC = { values: { "--set": "string", "--rung": "string" }, flags: ["--write"], positional: true }, cli = parseArgs(argv, SPEC);
+    if (cli.errors.length) { for (const l of refusalLines("takeSeekerEccm", cli.errors, SPEC)) log(l); return 2; }
+    const mode = argv[0], flag = (n) => (Object.prototype.hasOwnProperty.call(cli.values, n) ? cli.values[n] : null);
     if (mode !== "dev" && mode !== "held") { log("usage: takeSeekerEccm.mjs dev [--set smoke|dev] [--write] | held --rung N [--write]"); return 2; }
     if (mode === "dev") {
         const set = io.devSet || flag("--set") || "dev"; if (set !== "smoke" && set !== "dev") { log(`takeSeekerEccm: --set is smoke or dev, not "${set}" (the HELD set is read by the held command, once)`); return 2; }

@@ -51,7 +51,8 @@ export function verdictLines(r) {
 /** The command: argv (after the program), io { log, exists, write, read } (defaults: the console and the file system). Returns the exit code. */
 export function command(argv, io = {}) {
     const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s));
-    const flag = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; }, known = new Set(["--only", "--geometries", "--first", "--smoke", "--record"]);
+    // v4927 (the ship): this command already REFUSES an unknown option (the loop below, by its own message, which its gate pins), so it was never silent; only its reader had the shape tools/ship/cliArgs.mjs's census hunts (indexOf, then the next token). Same semantics, written with findIndex.
+    const flag = (n) => { const at = argv.findIndex((a) => a === n); return at < 0 ? null : argv[at + 1]; }, known = new Set(["--only", "--geometries", "--first", "--smoke", "--record"]);
     for (let i = 0; i < argv.length; i++) if (argv[i].startsWith("--") && !known.has(argv[i])) { log(`takeSubTournament: unknown argument ${argv[i]}`); return 2; }
     const smoke = argv.includes("--smoke"), rec = flag("--record");
     if (smoke && rec) { log("takeSubTournament: --smoke is never recorded"); return 2; }
