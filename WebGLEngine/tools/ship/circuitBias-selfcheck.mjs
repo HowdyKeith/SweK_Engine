@@ -109,6 +109,24 @@ sec("5. SOURCE");
     ok("!! the bases are written by value (low - 0.06, low - 0.04), not read from SURVEY_ROUND33 or SURVEY_CONSTANTS, and nothing shipped is assigned", /SS\.SURVEY_R8\.low - 0\.06/.test(code) && /SS\.SURVEY_R8\.low - 0\.04/.test(code) && !/SURVEY_ROUND33|SURVEY_CONSTANTS/.test(code) && !/BASE_PARAMS\s*=|SURVEY_LOW_SHIFT/.test(code));
 }
 
+sec("6. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/circuit-bias/, read once)");
+{
+    const dir = new URL("../../brain/rig-results/circuit-bias/", import.meta.url), file = (a, c, j) => JSON.parse(fs.readFileSync(new URL(`${a}__${c}__${j}.json`, dir), "utf8"));
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((c) => [c, X.mergeKinds(Array.from({ length: X.CHUNKS }, (_, j) => file(a, c, String(j))))]))]));
+    const v = X.verdictsOf(res), nr = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the five data checks pass on the committed run", X.checksOf(res).every((c) => c.ok));
+    ok("!! *** the bottom lines: the circuit profile pays more under BIAS on either base, and the rule profile on -0.06 pays more ***",
+        J(X.bottomLines(res)) === J(["THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON EITHER BASE", "THE RULE PROFILE ON -0.06 PAYS MORE UNDER BIAS"]));
+    ok("!! the table: crushed under BIAS 88, 51, 14, 1 (C06, C04, R06, SEAT-04) and at REF 1, 1, 0, 0; nothing stranded; V3 -0.0072 HURTS",
+        J(X.ARMS.map((a) => res[a].BIAS.crashed)) === J([88, 51, 14, 1]) && J(X.ARMS.map((a) => res[a].REF.crashed)) === J([1, 1, 0, 0]) &&
+        X.ARMS.every((a) => res[a].REF.stranded === 0 && res[a].BIAS.stranded === 0) && nr(v.price.mean, -0.0072) && v.v3 === "HURTS" && v.v2 === false && v.v2b === false && v.v1["SEAT-04"] === true,
+        J(X.ARMS.map((a) => [a, res[a].REF.score.toFixed(4), res[a].BIAS.score.toFixed(4)])));
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 38, RESULT"), t = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note states 88 of 300, that the forecast's premise was wrong, and that this round changes nothing", /88 of 300 \(29 percent\)/.test(t) && /premise was wrong/.test(t) && /This round changes nothing/.test(t));
+}
+// SECTION 6 SABOTAGE (each restored byte-identical): Q1 one C06 BIAS crush removed from its job file -> 1 red ("the table"); Q2 the note saying the round moves the profile
+//   ("This round changes nothing" deleted) -> 1 red ("the RESULT note").
+
 finished = true;
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)\nnot checked here: what the arms do on the registered dives, and whether either aquarium profile should move.`);
 process.exitCode = fails ? 1 : 0;
