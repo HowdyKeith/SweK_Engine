@@ -2959,6 +2959,14 @@ export const NEXT_ROUNDS = [
         upstream: "fish-vestibular-data-arrived-partial",
     },
     {
+        id: "better-trained-circuit-profile",
+        blocker: "OPEN -- Keith, 2026-11-19 (after v4928): open, not registered, nothing built.",
+        what: "Round 40 (brain/NEEDS_AND_LIMITS.md) retrained the Sub Aquarium's circuit profile with a +0.10-biased gauge in its fitness and it replaced the profile: under the bias it loses 5 of 300 where the old profile lost 77 and the shipped seat 2 -- but it scores 0.027 below the seat at a sound gauge and 0.039 under the bias (both beyond 2 se), and EVERY training search's held-out score came out below the untrained start's (0.8502-0.8817 against 0.8913): the search fitted its 16 training dives (32 with both gauges) and did not generalise. The profile is safe and weaker.",
+        how: "A new registration, written before any training, that targets the generalisation gap: more training dives (TRAIN_SET or a larger fresh set instead of TRAIN_SMALL), held-out-based selection or early stopping, more searches, possibly more gauge conditions (drift, dropouts, a gauge reading low) in the fitness; then Round 40's audit design on fresh seeds, with the hull test against the shipped seat AND a registered score line (e.g. no worse than the seat beyond 2 se) so a weaker net cannot replace the profile again. The training is CPU work: about 30 minutes a search on TRAIN_SMALL with both gauges, so a set ten times larger is a rig-sized run.",
+        why: "The aquarium shows this profile beside the shipped seat; it is now safe under a biased gauge but a worse pilot, and the reason (no generalisation) is measured.",
+        upstream: "aquarium-profiles-under-bias",
+    },
+    {
         id: "aquarium-profiles-under-bias",
         blocker: "CLOSED -- 2026-11-19, Keith chose (b) and (c): Round 39 moved the rule profile to -0.04 (confirmed: no worse in all six conditions, 1 crushed of 300 under BIAS against 7); Round 40 retrained the circuit net with a biased gauge in its fitness and it replaced the circuit profile (5 lost under BIAS against the old profile's 77 and the seat's 2), at a score cost beyond 2 se (-0.027 at REF, -0.039 under BIAS against the seat). brain/NEEDS_AND_LIMITS.md.",
         what: "Round 38 (brain/NEEDS_AND_LIMITS.md, read once): with the charge gauge reading +0.10 high, the aquarium's `circuit` profile (the decision-circuit round's plain-net champion on the -0.06 base) crushes 88 of 300 dives, the same net on -0.04 51, the `rule` profile (-0.06) 14, the shipped seat (-0.04) 1. At a sound gauge they are all within a few thousandths. The net was trained and audited at a sound gauge only.",
