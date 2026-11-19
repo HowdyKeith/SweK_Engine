@@ -259,3 +259,33 @@ Keith, 2026-11-19: "round 3, a captain that lets the energy claim override sonar
 * **The cost-aware rule beats the rank again, on a different pair of stations.** In round 2 the ranking acted too late (damage control holding depth while the battery died); here it acts too early (energy breaking off a fight the battery would have lasted). In both, the better captain asks what an action costs before letting it outrank another.
 * **RISK knows the fight's length (240 s)**, which a real boat would not; section 12 said so before the run. A captain that has to guess it is the next honest version, if this line goes further.
 * One duel model, one tactician, one drone per kind, a battery of 5 to 30 percent.
+
+## 14. ROUND 4, REGISTRATION (2026-11-19, written and committed before any code for it and before any run of its sets)
+
+Keith, 2026-11-19: "a navigating courier with a battery, to see whether timing its charging between legs reaches more goals."
+
+**THE QUESTION.** A courier in the Sub Aquarium's sea (islands, icebergs, ships) carries a battery that only the surface refills. Does a captain that charges BETWEEN LEGS, at a goal and only when the next leg needs it, reach more goals than one that goes up wherever the energy rule says?
+
+**THE TASK (`brain/courierTask.mjs`, to be built).**
+* The sea is `brain/subTankNav.mjs` tankScene(seed), and the navigator createNavigator(scene, { arm: "any+predict", seed }). The boat starts at (20, 150) at 20 m and 2 m/s.
+* The vessel is the needs-task's (`brain/needsTask.mjs` model): a battery hull, a 60 m crush depth, `subNeeds.stepNeeds`. The run lasts 1,200 s, and the battery starts at a fraction of capacity drawn from the seed, U(0.15, 0.45).
+* **The navigator supplies the MISSION every tick** (it is stepped every tick whoever has the con, so its goals and counters follow the boat). The crews' stations claim against that mission, under `subStations.captain` with the helm `helmOf(autopilot)`.
+* One fact, measured before this registration on scene 5 (not in either set): over 300 s a full-battery courier travelled 868 m, reached 2 goals and used 0.84 of its battery, about 0.001 of capacity per metre. A battery lasts about 6 minutes of travel, and a full charge takes about 7.
+
+**THE CREWS.**
+* NAV: no station; the navigator alone. It runs flat and stops.
+* FIXED: the energy station (round 1's), by rank. It goes up wherever its rule says (under 30 % of charge at depth) and charges until the rule lets go (about 57 % near the surface).
+* LEGS: a captain that times the charging, with constants FIXED NOW (none tuned on any set):
+  * **AT EACH ARRIVAL** (and at the start), it estimates the next leg's need. That is the charge spent per metre travelled so far (0.001 before 50 m of travel) x the straight distance to the new goal x 1.5, plus 0.05. **If the charge is under that need, it CHARGES THERE:** it claims the surface (the energy station's surfaceTarget) until the charge reaches the need plus 0.2, capped at 0.95. Otherwise it goes on.
+  * **MID-LEG** it claims the surface only in an EMERGENCY, a charge under 0.10. It then charges as above, to 0.10 plus the leg's need plus 0.2 (capped at 0.95).
+  * The pump and repair asks of the energy station pass as in FIXED.
+
+**THE OUTCOME.** The goals reached (the navigator's arrivals) in 1,200 s. Reported beside it: whether the boat was lost (crushed or grounded), the seconds it spent with an empty battery, the hits, and the time spent charging.
+
+**THE SETS.** DEV: seeds 175001 to 175024, to check that the task is not degenerate. If NAV, FIXED and LEGS reach the same number of goals on 20 or more of the 24, the duration or the battery range is amended on DEV and the amendment written before HELD; LEGS's constants do not change. HELD: seeds 177001 to 177096. No file in the tree uses a seed from 175000 to 177999 for the submarine or tank tasks (grep, 2026-11-19: the only matches are unrelated ids).
+
+**THE VERDICT (HELD, flown once).**
+* **LEGS BEATS FIXED** iff LEGS's mean goals are above FIXED's AND the exact one-sided sign test over the runs where their goal counts differ gives p at most 0.05. FIXED BEATS LEGS by the same rule the other way. Otherwise NO DIFFERENCE SHOWN.
+* Reported, not in the verdict: each crew's mean goals and goal counts; both against NAV; boats lost; empty-battery seconds; charging time; hits.
+
+**EXPECTATION, recorded now.** LEGS BEATS FIXED about 50 percent; NO DIFFERENCE about 40 percent (both charge about as often; where they charge may not matter much when a goal is about 150 s apart and a charge takes minutes); FIXED BEATS LEGS about 10 percent (LEGS's estimate of a leg is a straight line; the navigator's route around an island is longer, and LEGS may set out short).
