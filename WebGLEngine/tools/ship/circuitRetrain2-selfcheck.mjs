@@ -116,6 +116,25 @@ sec("6. SOURCE");
     ok("!! the seeds appear once each in the code; no clock, random or file", ["97600", "55001", "55300", "55901"].every((s) => (code.match(new RegExp(s, "g")) || []).length === 1) && !/Date\.now|Math\.random|new Date|node:fs|readFile|writeFile/.test(code));
 }
 
+sec("7. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/circuit-retrain2/, the ledger committed before the audit, the audit read once)");
+{
+    const dir = new URL("../../brain/rig-results/circuit-retrain2/", import.meta.url), rd = (f) => JSON.parse(fs.readFileSync(new URL(f, dir), "utf8"));
+    const recs = [0, 1, 2, 3].map((k) => rd(`search-${k}.json`)), c = X.championOf(recs);
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((cd) => [cd, X.mergeKinds(Array.from({ length: X.CHUNKS }, (_, j) => rd(`${a}__${cd}__${j}.json`)))]))]));
+    const v = X.verdictsOf(res), nr = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the ledger: three searches chose the start (child 0, held-out 0.8913), search 3 chose child 100 (0.8931); the champion is search 3, child 100, 4 of 4 eligible",
+        X.ledgerChecks(recs).length === 0 && J(recs.map((r) => r.chosenAt)) === J([0, 0, 0, 100]) && c.record.k === 3 && c.record.chosenAt === 100 && c.eligible === 4 && !c.isStart && nr(c.record.heldOut, 0.8931) && nr(recs[0].start.heldOut, 0.8913));
+    ok("!! the five data checks pass on the committed audit", X.checksOf(res, recs).every((x) => x.ok));
+    ok("!! *** the table and the line: NEW 0 crushed in both, CUR 4 under BIAS, the seat 1; V1 and V2 hold; V3 MISSES at REF (-0.0112) and under BIAS (-0.0252); NOTHING IS REPLACED ***",
+        res.NEW.REF.crashed === 0 && res.NEW.BIAS.crashed === 0 && res.CUR.BIAS.crashed === 4 && res["SEAT-04"].BIAS.crashed === 1 && v.v1 && v.v2 && !v.v3ref && !v.v3bias && nr(v.refVsSeat.mean, -0.0112) && nr(v.biasVsSeat.mean, -0.0252) &&
+        X.bottomLine(res) === "THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3 the score at REF; V3 the score under BIAS): NOTHING IS REPLACED");
+    ok("!! and nothing was replaced: the aquarium's circuit profile is still Round 40's CIRCUIT_CHAMPION (seed 97501)", CIRCUIT_CHAMPION.seed === 97501 && CIRCUIT_CHAMPION.digest === "0ec046a3");
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 41, RESULT"), t = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note states the miss, that this round changes nothing that ships, and that the seat's planner is what the circuit lacks", /NOTHING IS REPLACED/.test(t) && /This round changes nothing that ships/.test(t) && /planner/.test(t));
+}
+// SECTION 7 SABOTAGE (each restored byte-identical): Q1 one NEW REF score raised by 3 in its job file (the line then clears at REF) -> 1 red ("the table and the line");
+//   Q2 search 3's chosen child set to 0 -> 1 red ("the ledger").
+
 finished = true;
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)\nnot checked here: what the training finds, and what the champion does on the audit dives.`);
 process.exitCode = fails ? 1 : 0;

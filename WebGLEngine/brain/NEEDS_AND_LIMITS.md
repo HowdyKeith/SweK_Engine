@@ -1593,3 +1593,21 @@ Some search's best checkpoint is NOT the start: about 55 percent (Round 40's sea
 
 ## 7. What will be built
 `tools/ship/circuitRetrain2.mjs` (Round 40's policy and two-gauge seam imported, a checkpointed search of its own -- the ES loop is the recipe's, written out because trainNeedsCircuit.search cannot checkpoint, and the gate holds it to search() child for child on its first segment -- the champion, the audit, the verdicts), `tools/ship/circuitRetrain2Cmd.mjs` (`train`, `audit`, `report`), `tools/ship/circuitRetrain2-selfcheck.mjs` with a mutation pass. The training ledger is committed before the audit; the audit is flown once and read once. **Not in this round:** other gauge conditions in the fitness, other net shapes, a second retraining.
+
+## Round 41, RESULT (2026-11-19): THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3, the score, at REF and under BIAS): NOTHING IS REPLACED
+
+**The training** (`circuitRetrain2Cmd.mjs train --workers 4`, four searches of about 55 minutes on TRAIN_SET with both gauges; the ledger `brain/rig-results/circuit-retrain2/` committed before any audit seed was flown). **Held-out selection found almost nothing to keep:** in three of the four searches no checkpoint beat the untrained start (R04) on held-out dives (0.8913), so they chose child 0; search 3 chose child 100 at 0.8931, 0.0018 above it. All four were eligible. The champion by the registered rule: **search 3, child 100** -- a net a hundred children from the rule.
+
+**The audit** (`audit --jobs 4`, 24 jobs, all exit 0, 1,800 dives on 55001-55300 `both`, read once; `brain/rig-results/circuit-retrain2-report.json`). All nine checks passed.
+
+| arm | REF score (crushed) | BIAS score (crushed) |
+|---|---|---|
+| NEW (Round 41's champion) | 0.7890 (0) | 0.8193 (0) |
+| CUR (the circuit profile since Round 40) | 0.7778 (0) | 0.8055 (4) |
+| SEAT-04 (the shipped seat) | 0.8003 (0) | 0.8444 (1) |
+
+V1 (hull under BIAS, 0 against 1) and V2 (hull at REF, 0 against 0): no worse. **V3, the score line: NEW minus the seat -0.0112 (se 0.0043) at REF and -0.0252 (se 0.0055) under BIAS, both HURTS: MISSES.** Reported: NEW minus CUR +0.0112 (se 0.0054) at REF, KEEPS; +0.0137 (se 0.0079) under BIAS, LOSES. Bottom line: `THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3 the score at REF; V3 the score under BIAS): NOTHING IS REPLACED`.
+
+**Against the expectations of section 6 (written first).** Some search's best checkpoint not the start, about 55: held, barely (one of four, by 0.0018). V1 about 75 and V2 about 95: held. V3 at REF, about 55: NO. V3 under BIAS, about 70: NO. Replaces, about 40: no.
+
+**WHAT THIS MEANS and does not.** The three changes did what they were for: more training dives and held-out selection stopped the overfitting (the champion is no longer below the start on held-out, and it beats Round 40's profile at REF by 0.011) and the score line stopped a weaker net replacing the profile. What they found is that **on this net, recipe and base there was almost nothing to learn: the held-out-selected net is nearly the -0.04 rule, and the rule itself scores below the shipped seat** (the seat is the rule's constants plus a planner; the planner's gain is what the seat has and the circuit does not). So the circuit profile stays Round 40's: safe under the biased gauge, 0.011 below what this round found at REF, and below the seat. **This round changes nothing that ships.** A circuit that matches the seat would need what the seat has -- the planner's look-ahead as an input or a base -- which is a different design, not more training of this one, and is Keith's call.

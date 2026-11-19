@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-19T17:14:00.540Z",
+ "at": "2026-11-19T22:26:38.989Z",
  "poolAt": "2026-11-19T17:14:00.540Z",
  "poolHorizon": "2026-11-15T09:52:44.267Z",
  "budgetMs": 3000,
- "lastRun": 42,
+ "lastRun": 1,
  "heldOutliers": {},
  "rotated": [
   {
@@ -3828,6 +3828,12 @@
    "ms": 10332,
    "code": 0,
    "at": "2026-11-19T17:06:49.691Z"
+  },
+  {
+   "gate": "tools/ship/circuitRetrain2-selfcheck.mjs",
+   "ms": 29540,
+   "code": 0,
+   "at": "2026-11-19T22:26:38.989Z"
   },
   {
    "gate": "tools/ship/citedSources-selfcheck.mjs",

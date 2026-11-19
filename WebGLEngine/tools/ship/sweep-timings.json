@@ -2533,7 +2533,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": 7348,
   "tools/ship/circuitBias-selfcheck.mjs": 4271,
   "tools/ship/ruleMove-selfcheck.mjs": 3278,
-  "tools/ship/circuitRetrain-selfcheck.mjs": 10332
+  "tools/ship/circuitRetrain-selfcheck.mjs": 10332,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 29540
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4943,7 +4944,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": 0,
   "tools/ship/circuitBias-selfcheck.mjs": 0,
   "tools/ship/ruleMove-selfcheck.mjs": 0,
-  "tools/ship/circuitRetrain-selfcheck.mjs": 0
+  "tools/ship/circuitRetrain-selfcheck.mjs": 0,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-19T17:31:54.759Z",
@@ -7353,7 +7355,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": "2026-11-19T15:40:55.831Z",
   "tools/ship/circuitBias-selfcheck.mjs": "2026-11-19T17:06:36.093Z",
   "tools/ship/ruleMove-selfcheck.mjs": "2026-11-19T17:31:54.759Z",
-  "tools/ship/circuitRetrain-selfcheck.mjs": "2026-11-19T17:06:49.691Z"
+  "tools/ship/circuitRetrain-selfcheck.mjs": "2026-11-19T17:06:49.691Z",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "2026-11-19T22:26:38.989Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -9738,7 +9741,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": 20000,
   "tools/ship/circuitBias-selfcheck.mjs": 20000,
   "tools/ship/ruleMove-selfcheck.mjs": 20000,
-  "tools/ship/circuitRetrain-selfcheck.mjs": 20000
+  "tools/ship/circuitRetrain-selfcheck.mjs": 20000,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 120000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -12143,7 +12147,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": true,
   "tools/ship/circuitBias-selfcheck.mjs": true,
   "tools/ship/ruleMove-selfcheck.mjs": true,
-  "tools/ship/circuitRetrain-selfcheck.mjs": true
+  "tools/ship/circuitRetrain-selfcheck.mjs": true,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -14735,7 +14740,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": 7348,
   "tools/ship/circuitBias-selfcheck.mjs": 4271,
   "tools/ship/ruleMove-selfcheck.mjs": 3278,
-  "tools/ship/circuitRetrain-selfcheck.mjs": 10332
+  "tools/ship/circuitRetrain-selfcheck.mjs": 10332,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 29540
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-19T16:15:55.741Z",
@@ -17036,7 +17042,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": "2026-11-19T15:40:55.831Z",
   "tools/ship/circuitBias-selfcheck.mjs": "2026-11-19T17:06:36.093Z",
   "tools/ship/ruleMove-selfcheck.mjs": "2026-11-19T17:31:39.690Z",
-  "tools/ship/circuitRetrain-selfcheck.mjs": "2026-11-19T17:06:49.691Z"
+  "tools/ship/circuitRetrain-selfcheck.mjs": "2026-11-19T17:06:49.691Z",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "2026-11-19T22:26:38.989Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -28284,6 +28291,9 @@
   ],
   "tools/ship/circuitRetrain-selfcheck.mjs": [
    10332
+  ],
+  "tools/ship/circuitRetrain2-selfcheck.mjs": [
+   29540
   ]
  },
  "contended": {
@@ -30585,7 +30595,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": false,
   "tools/ship/circuitBias-selfcheck.mjs": false,
   "tools/ship/ruleMove-selfcheck.mjs": false,
-  "tools/ship/circuitRetrain-selfcheck.mjs": false
+  "tools/ship/circuitRetrain-selfcheck.mjs": false,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -32995,7 +33006,8 @@
   "tools/ship/takeSubTournament-selfcheck.mjs": "alone",
   "tools/ship/circuitBias-selfcheck.mjs": "alone",
   "tools/ship/ruleMove-selfcheck.mjs": "alone",
-  "tools/ship/circuitRetrain-selfcheck.mjs": "alone"
+  "tools/ship/circuitRetrain-selfcheck.mjs": "alone",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T14:18:38.040Z": {
