@@ -166,3 +166,18 @@ Its constants (the thrust cap's curve, the charge under which the weight goes ea
 * This is one task (a leak and a low battery), one vessel and a hand-written captain. It is not a claim about other pairs of problems, nor that a learned captain would do better or worse.
 
 **Status: round 2 CLOSED as registered.** Next, in the order the note proposed: TRIAGE into the Sub Aquarium (the tank runs one event at a time, so a flood and a battery need cannot meet there yet), then navigation and sonar as stations.
+
+## 10. TRIAGE IN THE SUB AQUARIUM (2026-11-19; BUILT)
+
+Keith, 2026-11-19: "putting TRIAGE into the Sub Aquarium (where a flood and a battery problem can't happen together yet)".
+
+**What the tank can now do.** A sub with battery needs can be BREACHED and given a CAPTAIN. Both live on the needs event, so a hull breach and a battery need are on one boat at once.
+* `tank.breach(id, leak = 0.07)`: a leak of `leak` of the weight (above 0, at most 0.2), built over 5 s from now, that never mends (`brain/stationsTask.mjs`'s leak). The default is past the 6 % drop weight. Starting or ending an event mends it.
+* `tank.setCaptain(id, "fixed" | "triage" | null)`: round 1's FIXED captain, or TRIAGE as frozen in registration B, over the sub's own pilot. A captain replaces the refill trip and the advisor (the advisor and a captain do not share a boat). It works the pump and the repair itself. Its damage control rescues on the tank's room (blow at 2 m past the target, drop at 4: the flood event's RESCUE), not the open sea's 5 and 10.
+* The snapshot's `needs` carries `leak` (now) and `captain` ({ kind, con, reason, overrides, watch }).
+
+**The page.** Beside the advisor box: a captain menu (off, fixed, triage) and a breach button (7 %), both enabled only on a sub with needs. The list line says who has the con, in words ("CAPTAIN triage: breach (going up while there is charge)"), "damage control acting" while it overrides, and "BREACHED (leak 7.0%)". Checked in headless Chromium: no page error, and the line reads as above on a breached TRIAGE boat.
+
+**In the tank, one starting state, breached at 7 %** (pinned in the gate, section 4): no captain loses the boat in 25 s; FIXED keeps it 300 s near its depth (31.7 to 29.3 m); TRIAGE keeps it 300 s and climbs (31.7 to 16.0 m) with the con as "breach". One boat, one state, not a rate: the rate is section 9's.
+
+**Gate:** `render/subAquariumCaptain-selfcheck.mjs` (27 mutants, every one red; the log is in its header). The aquarium's other gates (`subAquariumSim`, `subAquariumEvents`, `subAquariumPage`, `advisorTrace`) are green with it.
