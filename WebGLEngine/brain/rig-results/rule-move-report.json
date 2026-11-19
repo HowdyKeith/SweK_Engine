@@ -1,0 +1,23 @@
+{
+ "report": [
+  "ROUND 39: R04 (the rule, low -0.04) against R06 (low -0.06, the aquarium's rule profile when flown) in REF, DMG, N20, N30, STN5, BIAS; 300 dives each, far and both",
+  "  PASS GENERATOR: scenarioX at 3 stations and damage x1 equals needsTask.scenario on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in every condition: true",
+  "  PASS ALIGNED: in every condition both arms fly the same scenarios in the same order: true",
+  "  PASS THE ARMS DIFFER: the arms differ on at least one dive of every condition: true",
+  "  PASS R06 IS THE AQUARIUM'S RULE PROFILE: R06's pilot is subAquariumCircuit.circuitSeat(\"rule\") on the gate's dives, fingerprint for fingerprint, flown before the profile changes: true",
+  "  REF   R04 0.8047 (0/0)  R06 0.8087 (0/0)  hull 0 vs 0 no worse  price -0.0040 (se 0.0031) LOSES (reported)",
+  "  DMG   R04 0.7628 (20/0)  R06 0.7592 (22/0)  hull 20 vs 22 no worse  price +0.0037 (se 0.0045) LOSES (reported)",
+  "  N20   R04 0.8245 (0/0)  R06 0.8310 (0/0)  hull 0 vs 0 no worse  price -0.0065 (se 0.0031) HURTS (reported)",
+  "  N30   R04 0.8207 (0/0)  R06 0.8334 (0/0)  hull 0 vs 0 no worse  price -0.0127 (se 0.0032) HURTS (reported)",
+  "  STN5  R04 0.7581 (0/0)  R06 0.7652 (0/0)  hull 0 vs 0 no worse  price -0.0071 (se 0.0026) HURTS (reported)",
+  "  BIAS  R04 0.8482 (1/0)  R06 0.8387 (7/0)  hull 1 vs 7 no worse  price +0.0095 (se 0.0070) LOSES (reported)",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN REF",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN DMG",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN N20",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN N30",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN STN5",
+  "BOTTOM LINE: R04'S HULL IS NO WORSE THAN R06'S IN BIAS",
+  "BOTTOM LINE: THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN ANY CONDITION"
+ ]
+}

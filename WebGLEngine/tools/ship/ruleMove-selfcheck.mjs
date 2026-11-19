@@ -87,6 +87,24 @@ sec("5. SOURCE");
     ok("!! each condition's seeds appear once in the code (REF's twice: its range and a GENERATOR sample), the gate's once; no clock, random or file", ["53001", "53201", "53401", "53601", "53801", "54201", "54901"].every((s) => (code.match(new RegExp(s, "g")) || []).length === (s === "53001" ? 2 : 1)) && !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync/.test(code));
 }
 
+sec("6. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/rule-move/, read once), AND THE MOVE MADE");
+{
+    const dir = new URL("../../brain/rig-results/rule-move/", import.meta.url), file = (a, c, k) => JSON.parse(fs.readFileSync(new URL(`${a}__${c}__${k}.json`, dir), "utf8"));
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((c) => [c, X.mergeKinds(X.KINDS.map((k) => file(a, c, k)))]))]));
+    const rows = X.rowsOf(res), nr = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the four data checks pass on the committed run", X.checksOf(res).every((c) => c.ok));
+    ok("!! *** the bottom line: THE MOVE IS CONFIRMED, no worse in all six conditions ***", X.bottomLines(res)[6] === "THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN ANY CONDITION" && rows.every((r) => r.noWorse));
+    ok("!! the table: crushed R04 / R06 per condition 0/0, 20/22, 0/0, 0/0, 0/0, 1/7; nothing stranded; prices -0.0040, +0.0037, -0.0065, -0.0127, -0.0071, +0.0095",
+        J(rows.map((r) => [r.b4, r.b6])) === J([[0, 0], [20, 22], [0, 0], [0, 0], [0, 0], [1, 7]]) && [-0.0040, 0.0037, -0.0065, -0.0127, -0.0071, 0.0095].every((v, i) => nr(rows[i].price.mean, v)));
+    const C = await import("../../render/subAquariumCircuit.mjs");
+    const set = X.KINDS.map((k) => X.setOf("BIAS", k, X.GATE_SEEDS)).flat(), g = { gauge: X.gaugeOf("BIAS") }, fp = (p) => T.evaluate(p, set, g).runs.map((r) => r.fingerprint).join("|");
+    ok("!! *** THE MOVE MADE: the aquarium's rule profile now flies R04 (low -0.04) and not R06, on full BIAS dives; profileSame() is false since, and was PASS in the committed report ***",
+        fp(T.flyDecision(C.circuitSeat("rule"))) === fp(X.pilotOf("R04")) && X.profileSame(C.circuitSeat) === false && /PASS R06 IS THE AQUARIUM'S RULE PROFILE/.test(fs.readFileSync(new URL("../../brain/rig-results/rule-move-report.json", import.meta.url), "utf8")));
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 39, RESULT"), t = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note states the confirmation, 1 against 7 under BIAS, and that the decision was Keith's", /THE MOVE IS CONFIRMED/.test(t) && /1 boat in 300 where the -0\.06 rule crushed 7/.test(t) && /Keith's decision of 2026-11-19/.test(t));
+}
+// SECTION 6 SABOTAGE (each restored byte-identical): Q1 one R06 BIAS crush removed from its job file -> 1 red ("the table"); Q2 the profile put back to SURVEY_ROUND33 -> 1 red ("THE MOVE MADE").
+
 finished = true;
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)\nnot checked here: what the two rules do on the registered dives (that is the experiment).`);
 process.exitCode = fails ? 1 : 0;

@@ -1522,3 +1522,25 @@ A champion is eligible (not the start): about 75 percent. V1 holds: about 65 (th
 
 ## 7. What will be built
 `tools/ship/circuitRetrain.mjs` (the policy, the two-gauge evaluate seam, the search jobs through `trainNeedsCircuit.search`, the champion, the audit jobs and verdicts), `tools/ship/circuitRetrainCmd.mjs` (`train --workers N`, `audit --jobs N`, `report`), `tools/ship/circuitRetrain-selfcheck.mjs` with a mutation pass. The training ledger is committed before the audit is flown; the audit is flown once and read once. **Not in this round:** other gauge faults, other net shapes, the reservoir families, retraining more than once.
+
+## Round 38, CORRECTION (2026-11-19, found while Round 39 moved the rule profile; the result is unchanged)
+Check 6 of Round 38's report (`C06 AND R06 ARE THE AQUARIUM'S PROFILES`) is weaker than its words: `circuitBias.profilesSame` flies 60 s dives, on which the -0.04 and -0.06 bases fly the same, so it could not have told the bases apart and is still true after the move. What established C06 and R06 as the aquarium's profiles when the round flew is the gate's full-dive row (`tools/ship/circuitBias-selfcheck.mjs` section 4), which held then. The check is left as committed and the gate says so.
+
+## Round 39, RESULT (2026-11-19): THE MOVE IS CONFIRMED -- R04'S HULL IS NO WORSE THAN R06'S IN ANY CONDITION; the aquarium's rule profile now flies low -0.04
+
+**The run.** `node tools/ship/ruleMoveCmd.mjs run --jobs 2` in the sandbox (beside Round 40's training), 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/rule-move/`, `brain/rig-results/rule-move-report.json`). All five checks passed, R06 flown as the aquarium's `rule` profile on full dives before it changed.
+
+| condition | R04 (crushed) | R06 (crushed) | hull | price, R04 minus R06 (reported) |
+|---|---|---|---|---|
+| REF | 0.8047 (0) | 0.8087 (0) | no worse | -0.0040 (se 0.0031) LOSES |
+| DMG | 0.7628 (20) | 0.7592 (22) | no worse | +0.0037 (se 0.0045) LOSES |
+| N20 | 0.8245 (0) | 0.8310 (0) | no worse | -0.0065 (se 0.0031) HURTS |
+| N30 | 0.8207 (0) | 0.8334 (0) | no worse | -0.0127 (se 0.0032) HURTS |
+| STN5 | 0.7581 (0) | 0.7652 (0) | no worse | -0.0071 (se 0.0026) HURTS |
+| BIAS | 0.8482 (**1**) | 0.8387 (**7**) | no worse | +0.0095 (se 0.0070) LOSES |
+
+Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN ANY CONDITION`.
+
+**Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (1 against 7). The price HURTS at REF, about 40: no (-0.0040, 1.3 se; it HURTS under N20, N30 and STN5). DMG no worse, about 80: held (20 against 22).
+
+**What changed, as section 6 fixed it.** `render/subAquariumCircuit.mjs`'s `rule` profile is tunedSeat(SURVEY_CONSTANTS, WIDE_BOUNDS), low -0.04; `render/subAquariumCircuit-selfcheck.mjs` is restated with dated lines; Round 38's gate holds R06 to what the profile WAS. **The price, said plainly:** the -0.04 rule gives up 0.004 to 0.013 of score in four of six conditions (three beyond 2 se) and, with the gauge reading 0.10 high, crushes 1 boat in 300 where the -0.06 rule crushed 7 (Round 38: 14). The same trade the seat made at Round 37, and Keith's decision of 2026-11-19.

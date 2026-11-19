@@ -87,8 +87,14 @@ sec("4. FLIGHT (the gate's two seeds; full dives for the circuit arms, 60 s for 
     const set = T.setOf(["both"], X.GATE_SEEDS[0], X.GATE_SEEDS[1]), bias = { gauge: F.gaugeOfCond("BIAS") }, ref = { gauge: F.gaugeOfCond("REF") };
     const fps = (p, g) => T.evaluate(p, set, g).runs.map((x) => x.fingerprint).join("|");
     const c06 = fps(X.pilotOf("C06"), bias), c04 = fps(X.pilotOf("C04"), bias), r06 = fps(X.pilotOf("R06"), bias);
-    ok("!! C06 is the aquarium's circuit profile and R06 its rule profile, fingerprint for fingerprint on full BIAS dives",
-        c06 === fps(T.flyDecision(circuitSeat("circuit")), bias) && r06 === fps(T.flyDecision(circuitSeat("rule")), bias) && X.profilesSame(circuitSeat));
+    // 2026-11-19 (Round 39): the aquarium's rule profile moved to low -0.04, so R06 (low -0.06, by value) is no longer it; it WAS when Round 38 flew (its committed report says PASS).
+    // The row now holds C06 to the circuit profile and R06 to what the rule profile was, on FULL dives. *** FOUND WHILE RESTATING IT: the library's check 6 (profilesSame) flies
+    // 60 s dives, on which low -0.04 and -0.06 fly the same, so it is still true after the move and could never have told the two bases apart. What established C06 and R06 as the
+    // aquarium's profiles when Round 38 flew is this gate's full-dive row (it held then); check 6 in the committed report is the weaker statement and is said to be so here.
+    const rep38 = fs.readFileSync(new URL("../../brain/rig-results/circuit-bias-report.json", import.meta.url), "utf8");
+    ok("!! C06 is the aquarium's circuit profile, fingerprint for fingerprint on full BIAS dives; R06 WAS its rule profile when Round 38 flew (the committed report says PASS) and is not since Round 39 moved it to -0.04",
+        c06 === fps(T.flyDecision(circuitSeat("circuit")), bias) && r06 === fps(T.flyDecision(U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS)), bias) && r06 !== fps(T.flyDecision(circuitSeat("rule")), bias) &&
+        /PASS C06 AND R06 ARE THE AQUARIUM'S PROFILES/.test(rep38));
     const w = Float32Array.from(PLAIN_CHAMPION.weights), pol = CS.createPlainPolicy(PLAIN_CHAMPION.hidden, "plain");
     ok("!! C04 is the SAME weights on the -0.04 base (built here independently), and it differs from C06 on these dives",
         c04 === fps(T.flyDecision(() => CS.makeSeat(pol.stepper(w), { params: { ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.04 }, bounds: U.WIDE_BOUNDS })), bias) && c04 !== c06);
