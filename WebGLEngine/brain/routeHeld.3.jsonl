@@ -1,0 +1,17 @@
+{"seed":183004,"crew":"FIXED","c0":0.2592550126137212,"goals":3,"status":"submerged","lost":false,"emptyS":23.2,"chargingS":644.0666666666666,"hits":2,"finalFrac":0}
+{"seed":183004,"crew":"LEGS","c0":0.2592550126137212,"goals":3,"status":"submerged","lost":false,"emptyS":6.566666666666666,"chargingS":760.0333333333333,"hits":2,"finalFrac":0.5163511387251019}
+{"seed":183004,"crew":"ROUTE","c0":0.2592550126137212,"goals":4,"status":"submerged","lost":false,"emptyS":0,"chargingS":758.3666666666667,"hits":2,"finalFrac":0.5076610261762206}
+{"seed":183008,"crew":"FIXED","c0":0.31064830531831833,"goals":4,"status":"submerged","lost":false,"emptyS":15.366666666666667,"chargingS":636.2333333333333,"hits":0,"finalFrac":0}
+{"seed":183008,"crew":"LEGS","c0":0.31064830531831833,"goals":2,"status":"submerged","lost":false,"emptyS":495.3333333333333,"chargingS":349.43333333333334,"hits":2,"finalFrac":0}
+{"seed":183008,"crew":"ROUTE","c0":0.31064830531831833,"goals":4,"status":"submerged","lost":false,"emptyS":0,"chargingS":702.2333333333333,"hits":1,"finalFrac":0.28772375709224596}
+{"seed":183012,"crew":"FIXED","c0":0.416043551475741,"goals":3,"status":"submerged","lost":false,"emptyS":6.366666666666666,"chargingS":607.4,"hits":5,"finalFrac":0}
+{"seed":183012,"crew":"LEGS","c0":0.416043551475741,"goals":5,"status":"submerged","lost":false,"emptyS":33.3,"chargingS":603.4,"hits":3,"finalFrac":0}
+{"seed":183012,"crew":"ROUTE","c0":0.416043551475741,"goals":6,"status":"submerged","lost":false,"emptyS":0,"chargingS":654.3666666666667,"hits":5,"finalFrac":0.18566000158487836}
+{"seed":183016,"crew":"FIXED","c0":0.25902350528631357,"goals":3,"status":"submerged","lost":false,"emptyS":35.43333333333333,"chargingS":611.5666666666666,"hits":2,"finalFrac":0}
+{"seed":183016,"crew":"LEGS","c0":0.25902350528631357,"goals":3,"status":"submerged","lost":false,"emptyS":214.5,"chargingS":525.2,"hits":3,"finalFrac":0}
+{"seed":183016,"crew":"ROUTE","c0":0.25902350528631357,"goals":4,"status":"submerged","lost":false,"emptyS":0,"chargingS":680.3333333333334,"hits":0,"finalFrac":0.15529184385378214}
+{"seed":183020,"crew":"FIXED","c0":0.37270688368007543,"goals":3,"status":"submerged","lost":false,"emptyS":0,"chargingS":645.7666666666667,"hits":1,"finalFrac":0.1576228922368355}
+{"seed":183020,"crew":"LEGS","c0":0.37270688368007543,"goals":2,"status":"submerged","lost":false,"emptyS":413.23333333333335,"chargingS":394.3666666666667,"hits":1,"finalFrac":0}
+{"seed":183020,"crew":"ROUTE","c0":0.37270688368007543,"goals":2,"status":"submerged","lost":false,"emptyS":409.7,"chargingS":396.96666666666664,"hits":0,"finalFrac":0}
+{"seed":183024,"crew":"FIXED","c0":0.4290109926369041,"goals":3,"status":"submerged","lost":false,"emptyS":0,"chargingS":635,"hits":0,"finalFrac":0.22825303666079236}
+{"seed":183024,"crew":"LEGS","c0":0.4290109926369041,"goals":5,"status":"submerged","lost":false,"emptyS":15.4,"chargingS":608.5,"hits":2,"finalFrac":0.07067392703810249}
