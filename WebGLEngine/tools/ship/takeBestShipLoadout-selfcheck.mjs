@@ -65,7 +65,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((arm) => [arm, k(f, arm)]))).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE PRESET TAKES THE CAR'S ALWAYS-FIRING GUNNER: under the cannon-aware fly-wired helm it leads the hand gunner by +0.856 (z 14.6) one ship a side with the cannon, +0.322 (z 9.0) in fleets with it, +0.547 (z 11.5) without; the ships-sticky fly-wired gunner leads it one ship a side (+0.252) and TRAILS it in both fleets (-0.193, -0.142), so only carBig qualifies", near(R("oneCannon").carBigOverHand, 0.856) && near(R("fleetCannon").carBigOverHand, 0.322) && near(R("fleetNoCannon").carBigOverHand, 0.547) && near(R("oneCannon").shipsOverHand, 0.252) && near(R("fleetCannon").shipsOverHand, -0.193) && near(R("fleetNoCannon").shipsOverHand, -0.142) && rd.fleetCannon.words.shipsOverHand === "TRAILS" && rd.fleetNoCannon.words.shipsOverHand === "TRAILS" && rd.verdict.winner === "carBig" && rd.verdict.qualified.join() === "carBig"
+        && G.FIGHTS.every((f) => Object.keys(re[f]).every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! against the plain ship: the car's gunner +1.760, +1.556, +0.605; the hand gunner +0.905, +1.234, +0.057 (CANNOT BE TOLD with no cannon: the helm leads there only by a little); the forecast was right that carBig leads everywhere and UNDER in size (it said 0.5 and 0.3)", near(R("oneCannon").carBig, 1.760) && near(R("fleetCannon").carBig, 1.556) && near(R("fleetNoCannon").carBig, 0.605) && near(R("oneCannon").hand, 0.905) && near(R("fleetCannon").hand, 1.234) && near(R("fleetNoCannon").hand, 0.057) && rd.fleetNoCannon.words.hand === "CANNOT BE TOLD");
+    ok("!! AND THE PAGE CARRIES IT: the `best` preset is the car's always-firing gunner under the cannon-aware fly-wired helm, the cannon on", JSON.stringify(C.presetOf("best").choice) === '{"hand":"car-big","helm":"flywired","cannon":true}');
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

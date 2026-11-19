@@ -98,7 +98,7 @@ else {
             // a preset: side B's best-ship button, over a side chosen otherwise
             apply(args.SETUPS[0]); $("newBtn").click(); $("gunnersB").value = "green"; $("handB").value = "gpu"; $("helmB").value = "broadside"; $("cannonB").checked = false; const pre = U.fight; $("bestB").click(); const fb = U.fight;
             out.preset = { b: U.setupNow().b, a: U.setupNow().a, rebuilt: fb !== pre && fb !== null, title: $("bestB").title, hasA: !!$("bestA"), titleA: $("bestA").title, notes: $("notes").textContent };
-            const fx = C3.createFight(U.setupNow(), U.files); while (!fx.done) fx.step(100); while (!fb.done) fb.step(100); out.preset.same = fx.snapshot().fingerprint === fb.snapshot().fingerprint && fb.snapshot().brains.seated[1] === 1;
+            const fx = C3.createFight(U.setupNow(), U.files); while (!fx.done) fx.step(100); while (!fb.done) fb.step(100); out.preset.same = fx.snapshot().fingerprint === fb.snapshot().fingerprint && fb.snapshot().brains.seated[1] === 14; out.preset.seated = fb.snapshot().brains.seated;
             return out;
         }`,
     });
@@ -135,7 +135,7 @@ else {
         ok("`clear` forgets them: no file, no line, no count, and the side is the hand gunner's again (no network seated)", r.peerCleared.names.length === 0 && r.peerCleared.seated[0] === 0 && !/SEATED|REFUSED/.test(r.peerCleared.notes) && r.peerCleared.count === "");
         console.log("8. A PRESET");
         { const P = r.preset, best = C.presetOf("best"), H = (id) => C.HELMS.find((h) => h.id === id);
-          ok("!! side B's `best ship` button over a side chosen otherwise (the GPU Brain's gunner, the broadside rule, no cannon, green sights): its gun seats, helm and cannon become the preset's, ITS SIGHTS STAY GREEN, side A is untouched, the fight is built again and is the core's own fight for what the controls now say, with ONE brain seated on side B, the helm (no gun network); both sides have the button, its title the preset's note, and the notes say the new helm", P.b.hand === "rule" && P.b.helm === "flywired" && P.b.cannon === true && P.b.gunners === "green" && JSON.stringify(P.a) === JSON.stringify(SETUPS[0].a) && P.rebuilt && P.same && P.hasA && P.title === best.note && P.titleA === best.note && P.notes.includes(H("flywired").note), JSON.stringify(P.b)); }
+          ok("!! side B's `best ship` button over a side chosen otherwise (the GPU Brain's gunner, the broadside rule, no cannon, green sights): its gun seats, helm and cannon become the preset's, ITS SIGHTS STAY GREEN, side A is untouched, the fight is built again and is the core's own fight for what the controls now say, with FOURTEEN brains seated on side B, the car's gunner in all thirteen seats and the helm; both sides have the button, its title the preset's note, and the notes say the new helm", P.b.hand === "car-big" && P.b.helm === "flywired" && P.b.cannon === true && P.b.gunners === "green" && JSON.stringify(P.a) === JSON.stringify(SETUPS[0].a) && P.rebuilt && P.same && P.hasA && P.title === best.note && P.titleA === best.note && P.notes.includes(H("flywired").note), JSON.stringify({ ...P.b, seated: P.seated })); }
     }
 }
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

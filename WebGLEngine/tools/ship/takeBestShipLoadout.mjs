@@ -14,6 +14,9 @@
 //   cannon) and is level without it.
 // WHAT IS DECIDED: a challenger REPLACES the hand gunner in the preset if it LEADS the hand arm in at least one fight and TRAILS it in none; of two that do, the one whose three gains have the larger mean. Otherwise the preset stays as it is. Nothing
 //   is written but the reading: the preset is changed by hand in render/spaceDuelCore.mjs and its gate pins the reading.
+// READ 2026-11-19 (brain/bestShipLoadout.reading.json): the car's always-firing gunner less the hand +0.856 (z 14.6) one ship a side with the cannon, +0.322 (z 9.0) in fleets with it, +0.547 (z 11.5) without; the ships-sticky fly-wired gunner +0.252,
+//   -0.193 (TRAILS), -0.142 (TRAILS). THE PRESET TAKES carBig: render/spaceDuelCore.mjs's `best` is now the car's gunner under the cannon-aware helm. (The page's `flywired` hand has since become the holding mixed gunner, seatFlyWired6, which with no
+//   fighters is the ships-sticky gunner to the bit: this reading stands for it in these fights.)
 // Every arm's leads are kept (brain/rig-results/bestShipLoadout/); the reading file (brain/bestShipLoadout.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other helms, escorts and fighters (the fly-wired mixed gunners' question), rationed magazines (where a gunner that always fires should pay), green or perfect sights.
 "use strict";
