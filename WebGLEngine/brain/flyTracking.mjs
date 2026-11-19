@@ -29,11 +29,15 @@
 //   against eight fighters NO tau beat 0 (117 kills over 64 attacks at tau 0; 97 at 0.05 and 27 at 0.15 unsmoothed, the slip being mostly the sight's own noise differenced; smoothed over 0.4 s, 114 and 108; -0.05 no better), and in fleets of three tau 0.15 smoothed 0.4 s
 //   TRAILS tau 0 (-0.273, se 0.103, without the cannon; -0.233, se 0.099, with it; 24 pairs each), 0.05 is level. So no study was registered and nothing ships: the motion term as modelled here is a cost. NOT TRIED: a slip read off the target's own velocity
 //   (the arena shows it) rather than the sight's noisy aim, a motion term on the cells' own dynamics, the sheet's other axis for elevation.
+// THE SLIP FROM THE TARGET (2026-11-19; round 4): `movingWith({ from: "target" })` reads the slip off the target's own bearing in the ship's frame, from where it really is each tick. On the same scratch fighter attacks tau 0.1 gave 125 kills (128 smoothed over
+//   0.2 s) against 117 at tau 0 (the plain ship 128), 0.2 about level, 0.4 and 0.8 far worse (overshoot); in fleets of three (24 pairs) tau 0.1 was level with and without the cannon (-0.022 to +0.071). So `movingTarget` (seatFlyWired7: tau 0.1, smoothed 0.2 s,
+//   CHOSEN ON THOSE SCRATCH PAIRS) goes to a registered study on fresh pairs: tools/ship/takeFlyWiredGunnerSees.mjs.
 "use strict";
 import * as LC from "./lc10Topology.mjs";
 import * as SY from "./lc10Synapses.mjs";
 import * as PL from "./lc10Places.mjs";
 import * as ST from "./seatTurretGunner.mjs";
+import * as GS from "../physics/mechanics/gunSeats.mjs";
 
 export const POLICY_ID = "seatFlyWired", SIGMA = 0.15, OVERLAP = 15 * Math.PI / 180, BASELINE = 0.5, STEPS = 3, CONTROL_SEED = 4242;
 export const FEATURES = ST.FEATURES, HIDDEN = LC.NEURON_ORDER.length, OUTPUTS = ST.OUTPUTS, WEIGHT_COUNT = 2;   // peerBrain's description of a brain: the seat's eleven features, 281 neurons, the seat's five outputs, two weights (the gains)
@@ -81,7 +85,7 @@ function scrambledPlaces(seed) {
 }
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
-function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, handRest = true, motion = false, smooth = 0 } = {}) {
+function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, handRest = true, motion = false, smooth = 0, from = "aim" } = {}) {
     const GRID = 720, table = new Float64Array(GRID + 1); let peak = 0;
     for (let k = 0; k <= GRID; k++) { const e = Math.PI * k / GRID; table[k] = (raw(e) - raw(-e)) / 2; peak = Math.max(peak, Math.abs(table[k])); }
     const amplitude = peak || 1;
@@ -93,14 +97,14 @@ function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, han
     const gunnerFor = !motion ? (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, sticky, handOn, handRest, forward, layersOf: () => [], post: (y) => y }) : (w, sight0, opts = {}) => {
         // THE TARGET'S MOTION (2026-11-18): the slip is the bearing's change since the tick before, over the tick -- 0 on the first tick the network lays the gun on a target (a new target, or after a tick it was not asked: no target, or the hand's)
         const dt = opts.dt ?? 1 / 30, sight1 = sticky === "ships" ? ST.stickySight(sight0, { only: ST.SHIPS_ONLY }) : sticky ? ST.stickySight(sight0) : sight0, now = { target: null, t: 0 }, prev = { target: null, t: -Infinity, ey: 0, ep: 0, sy: 0, sp: 0 }, keep = smooth > 0 ? Math.exp(-dt / smooth) : 0;
-        const sight = (seat, st, body, targets, t = 0) => { const r = sight1(seat, st, body, targets, t); now.target = r.target; now.t = t; return r; };
-        const fwd = (ww, x) => { const ey = x[1] * Math.PI, ep = x[2] * Math.PI / 2, fresh = now.target !== prev.target || Math.abs(now.t - prev.t - dt) > dt / 2, raw = fresh ? [0, 0] : [wrap(ey - prev.ey) / dt, (ep - prev.ep) / dt];
+        const sight = (seat, st, body, targets, t = 0) => { const r = sight1(seat, st, body, targets, t); now.target = r.target; now.t = t; if (from === "target") { const tg = r.target == null ? null : targets.find((q) => q.id === r.target); if (tg) { const a = GS.reachOf(seat, body, [tg.pos[0] - body.pos[0], tg.pos[1] - body.pos[1], tg.pos[2] - body.pos[2]]); now.ay = a.yaw; now.ap = a.pitch; } } return r; };   // `from: "target"`: the target's own bearing in the ship's frame, from where it really is (no sight's noise)
+        const fwd = (ww, x) => { const ey = x[1] * Math.PI, ep = x[2] * Math.PI / 2, fresh = now.target !== prev.target || Math.abs(now.t - prev.t - dt) > dt / 2, raw = fresh ? [0, 0] : from === "target" ? [wrap(now.ay - prev.ay) / dt, (now.ap - prev.ap) / dt] : [wrap(ey - prev.ey) / dt, (ep - prev.ep) / dt];
             if (fresh) { prev.sy = 0; prev.sp = 0; } else { prev.sy = keep * prev.sy + (1 - keep) * raw[0]; prev.sp = keep * prev.sp + (1 - keep) * raw[1]; }   // `smooth` (seconds, 0 none): the slip low-passed, as a motion detector integrates
-            prev.target = now.target; prev.t = now.t; prev.ey = ey; prev.ep = ep; return forward(ww, x, [prev.sy, prev.sp]); };
+            prev.target = now.target; prev.t = now.t; prev.ey = ey; prev.ep = ep; prev.ay = now.ay; prev.ap = now.ap; return forward(ww, x, [prev.sy, prev.sp]); };
         const d = ST.gunnerFor(w, sight, { ...opts, sticky: false, handOn, handRest, forward: fwd, layersOf: () => [], post: (y) => y }); d.slip = () => ({ ...prev }); return d;
     };
     const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
-    return Object.freeze({ name, amplitude, sticky, motion, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT: count, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
+    return Object.freeze({ name, amplitude, sticky, motion, ...(motion ? { smooth, from } : {}), FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT: count, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
 }
 const FLY_M = circuitOf(matrixOf(), { front: 1 }), LIBS = new Map();
 /** The library for a wiring NAME: "fly:medial", "fly:lateral", "flat", "shuffled:<seed>", "sine". See the header. */
@@ -129,10 +133,13 @@ export const POLICY_ID4 = "seatFlyWired4", mixed = libraryOf("fly:medial for shi
  *  excites the cells it is moving towards. Three weights: the two gains and tau (seconds; 0 is the ships-sticky gunner to the bit). Keith, 2026-11-18: "target motion for the tracking circuit". See tools/ship/takeFlyWiredGunnerMotion.mjs. */
 export const POLICY_ID5 = "seatFlyWired5", moving = libraryOf("fly:medial, sticky to ships, seeing its target move", FLY_M.raw, FLY_M.cells, { sticky: "ships", motion: true });
 /** A motion gunner with another low-pass on the slip (seconds): for the study's hand-set choice and the gate. */
-export const movingWith = ({ smooth = 0 } = {}) => libraryOf(`fly:medial, sticky to ships, seeing its target move, slip smoothed ${smooth} s`, FLY_M.raw, FLY_M.cells, { sticky: "ships", motion: true, smooth });
+export const movingWith = ({ smooth = 0, from = "aim" } = {}) => { if (from !== "aim" && from !== "target") throw new Error(`flyTracking.movingWith: from is "aim" or "target" (got ${from})`); return libraryOf(`fly:medial, sticky to ships, seeing its target move (from the ${from}), slip smoothed ${smooth} s`, FLY_M.raw, FLY_M.cells, { sticky: "ships", motion: true, smooth, from }); };
 /** THE MIXED GUNNER THAT HOLDS (`seatFlyWired6`): the mixed gunner, but with no target its gun stays where it is (the network gunner's hold), not back at rest -- the rest cost the mixed gunner -0.269 in fleets without escorts (tools/ship/takeFlyWiredGunnerMixed.mjs).
  *  So in a fleet with no fighters it IS the ships-sticky gunner to the bit; the hand lays the gun only on a fighter. See tools/ship/takeFlyWiredGunnerHold.mjs. */
 export const POLICY_ID6 = "seatFlyWired6", mixedHold = libraryOf("fly:medial for ships, the hand for fighters, holding with no target", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false });
+/** THE GUNNER THAT SEES ITS TARGET MOVE, FROM WHERE IT REALLY IS (`seatFlyWired7`, 2026-11-19): the motion gunner with the slip read off the TARGET'S OWN BEARING in the ship's frame (its true position each tick: no sight's noise), low-passed over
+ *  0.2 s; three weights, the study's tau 0.1 (0 is the ships-sticky gunner to the bit). The slip from the sight's aim was a cost (see the header); this one was not, on scratch pairs. See tools/ship/takeFlyWiredGunnerSees.mjs. */
+export const POLICY_ID7 = "seatFlyWired7", movingTarget = movingWith({ smooth: 0.2, from: "target" });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
