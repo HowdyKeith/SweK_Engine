@@ -148,4 +148,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log("\n  NOT CLAIMED: that the SOLVER is verified. Advection, the FLIP/PIC blend, the free surface and");
     console.log("  two-way coupling stay UNGRADED -- a fluid at rest exercises the projection and nothing else.");
     console.log("  NOT PLANTED: the curriculum asked for a grade; a plant for flip2d is a separate round.");
+    // SETTLED at v3806: that separate round is the forceslate plant (flip2dDevice's plantMode); this line prints the hydrostatic run's own scope.
 }

@@ -59,7 +59,7 @@
 //
 // IT DOES NOT TOUCH box3d OR jolt. Both loaders already expose angularImpulse() and readTransforms() (7 floats,
 // pos + quat), so the flip is drivable and observable in both TODAY -- but readVelocities() is THREE floats,
-// LINEAR ONLY, so neither backend will report w. The comparison is a separate round and it needs a decision
+// LINEAR ONLY, so neither backend will report w. The comparison is a separate round (SETTLED at v4910: tools/roundhouse/spinningBody.mjs grades box3d and Jolt's w) and it needs a decision
 // this file has no business making. What IS reported here, measured from the tree rather than asserted, is the
 // shape of the gap -- see contractGap().
 //

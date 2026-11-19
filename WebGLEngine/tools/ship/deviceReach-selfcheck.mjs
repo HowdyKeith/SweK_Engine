@@ -15,6 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 import * as D from "../../render/deviceReach.mjs";
 import { renderGlslToPixels, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { PACK24_GLSL, unpack24Signed, PACK24_FLOOR_SIGNED } from "./glslFloatPack.mjs";
@@ -47,7 +48,7 @@ function scan() {
             if (skip.has(e.name)) continue;
             const p = path.join(dir, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!SOURCE_EXT.test(e.name)) continue;
             for (const line of fs.readFileSync(p, "utf8").split("\n")) {
                 if (!/^\s*(\/\/|\*|\/\*)/.test(line)) continue;         // comments only
                 if (/^\s*\/\/\s*const (ENGINE_VERSION|BRAIN_BUILD) = /.test(line)) continue;   // v4880: demoted version notes are history, the hazard render/deviceReach.mjs names
