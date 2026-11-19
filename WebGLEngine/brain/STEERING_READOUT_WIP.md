@@ -52,3 +52,34 @@ Before writing this, I ran v5's study in smoke mode on the new circuit to time i
 ## 7. THE RUN
 
 `node tools/ship/subEstimatorStudyV5Cmd.mjs run --specs <part> --circuit-file vendor/hemibrain/hemibrain-cx-steering.json --audit-base 147000 --out brain/flySteeringStudy.<part>.jsonl` over four processes, with the list split as v6 split it: (a) `cx,er:0-9`, (b) `layer:0-9,nostate:0`, (c) `degree:0-9`, (d) `sign:0-3,count:0-3`. Then the comparison: `run --specs cx --arms RMU --audit-base 147000 --out brain/flySteeringHeadingLoopCx.jsonl` (the heading-loop file is the study's default). The five files are committed unread, then read ONCE with `report --in` over the four, and `report --in` on the fifth.
+
+## 8. RESULT (2026-11-19; the five files committed unread at `8f88f9eb9`, then read ONCE)
+
+**How it was read.** v5's `report` takes one file (the comma list is v6's), so the four parts were joined into one scratch file. A first call with the comma list failed to open anything and read nothing. Before the joined report, the four `refs` records were checked byte-identical (one md5) and the 80 circuit-arm records distinct; the report keeps the first `refs`. The comparison file had its one `report` of its own.
+
+**BOTTOM LINE (registered reading d, read from RMU first): RMU FAIL with SIGNAL -- the P-FL readout does not change rung 4a's answer: a linear readout of the P-FL cells is no better on the real wiring than on rewired controls.**
+
+The report's own last line says "NO SIGNAL in the flag-free ring-map arm". That is v5's bottom-line rule, which keys on RMF; this round's registration reads RMU first (section 3, d), so this note's bottom line is the one above.
+
+| arm | signal check (ER / TYPE-BLOCK / DEGREE, 30 circuits; needs 0.05) | cx skill (audit / safety / reserve) | control family means (audit skill) | verdict |
+|---|---|---|---|---|
+| **RMU** unsigned rate | **0.156: SIGNAL** | 0.38 / 0.29 / 0.38 | ER 0.37, TYPE-BLOCK 0.16, DEGREE 0.03, SIGN 0.38, COUNT 0.33 | **FAIL**: cx beats the strongest family (ER) on 0 of 3 audits |
+| **RMF** side-coded rate | **0.015: NO SIGNAL** | 0.00 / 0.00 / 0.00 | ER 0.00, TYPE-BLOCK 0.00, DEGREE 0.02, SIGN 0.05, COUNT 0.05 | FAIL, not weighed |
+
+**The registered readings, one by one.**
+* (a) **LEAK CHECK passes** (NO STATE 0.00 in both arms).
+* (b) RMU SIGNAL, RMF NO SIGNAL.
+* (c) **RMU FAIL.** cx's RMSE 0.1557 / 0.1795 / 0.2015 against ER's 0.1573 / 0.1809 / 0.2032 (a win needed 0.1416 / 0.1628 / 0.1828 or lower). cx is at ER's mean and at SIGN's (0.1565 / 0.1801 / 0.2024), as in v5. It does beat TYPE-BLOCK (0.16) and DEGREE (0.03) by a wide margin, but the rule is the strongest family.
+* (d) **FAIL with SIGNAL**: the bottom line above.
+* (e) **THE TWO READOUTS ON THE SAME DIVES: THE SAME.** cx under RMU reads 0.38 / 0.29 / 0.38 through the 50 P-FL cells (RMSE 0.1557 / 0.1795 / 0.2015) and 0.38 / 0.29 / 0.38 through the heading loop's 64 E-PG and P-EG cells (`brain/flySteeringHeadingLoopCx.jsonl`: RMSE 0.1561 / 0.1799 / 0.2019). The P-FL readout is 0.0004 better in RMSE on each audit, nowhere near the 0.05 of skill the reading needed. **It does not read more, and it does not read less.**
+* (f) Top factor in 8 of 39 (RMU) and 1 of 39 (RMF); DEGREE touched the cap 4,192 ticks under RMF and 5 under RMU. The target never exceeds pi (largest 2.00 / 2.02 / 1.88 rad). LEAKY1 reads 0.90 / 0.90 / 0.92 again. In the closed loop, cx under RMU closes 0.68 / 0.62 / 0.44 of the gap from the dropout to the navigator, against ER's mean 0.66 / 0.60 / 0.42.
+
+**Against the expectation recorded in section 4.** RMU FAIL with SIGNAL (put at about 60 percent) and RMF NO SIGNAL (about 75 percent) both happened. Reading (e) did not go as expected: I put "the P-FL readout reads LESS" at about 60 percent, and it reads the same.
+
+**What the result says, and does not.**
+* **Reading the loop out through its P-FL cells changes nothing a linear readout can see.** The P-FL cells take their input from E-PG and Delta7 and send almost nothing back (section 4), so they are a mixture of what the old outputs carried. A ridge readout of 50 mixtures does as well as a ridge readout of the 64 cells they mix: 0.38 either way.
+* **The real wiring is again exactly as good as a random wiring of the same cells (ER) and as one with its signs shuffled (SIGN)**, which is v5's finding, now with the fly's own way out. Rung 4a's conclusion stands with the P-FL readout added.
+* **The side-coded rate is still unreadable**, now on cells that are split left and right: the P-FL cells' sides did not make the sign readable.
+* It says nothing about how the fly steers: the goal-direction inputs to the P-FL cells (the fan-shaped body) are not in the circuit, and a fixed left-minus-right readout was not tried (section 5).
+
+**Status: CLOSED as registered.** A further fly round would have to change the model (a ring attractor, `brain/RUNG_4A_CLOSEOUT.md`), not the cells read.
