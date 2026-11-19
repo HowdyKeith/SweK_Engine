@@ -12,6 +12,7 @@
 //   5  THE FRONT DOOR                                 wirings by name; battleshipDuel seats a seatFlyWired file; the pool flies a named wiring; the report; the export list
 //
 // SABOTAGE LOG: 23 mutants of brain/flyTracking.mjs, each a copy of the module with this gate pointed at it (row 5's `seated in the seats` compares with the real module and is red for every copy: NOT counted). 22 red by name the first time. ONE 0-RED, A GAP, CLOSED: the sine not held at its peak behind a quarter turn (no row asked it for a bearing past 90 degrees; row 5 now does). After it: 23 of 23. THEN FIVE for the scrambled places (section 3b), all red: the scramble the identity, ignored, the same for every seed, a place of one value for every cell of both eyes, and `flat` in its stead. Red by name: the eyes swapped, every cell excitatory, no overlap, the places reversed, no places, no constant drive, the read-out swapped, the read-out not odd, the amplitude left at one, a trigger that always fires, one gain for both axes, the elevation's scale, an unbounded rate, `fly:lateral` the medial circuit, `flat` with places, the shuffle the identity, any wiring name taken, a new library each call, two steps, no normalisation, another sigma, S not odd.
+// AND SEVEN ON THE HOLDING GUNNER THAT SEES (2026-11-19), tree copies, all red: X1 no hand on fighters 1 | X2 it rests 1 | X3 no motion 1 | X4 the slip from the aim 1 | X5 unsmoothed 1 | X6 handRest dropped on the motion path 1 | X7 sticky to every target 1
 // AND SEVEN ON THE ELEVATION (section 4d, 2026-11-19), tree copies, all red: E1 the pitch the yaw's S 2 | E2 forward lays the pitch by S 1 | E3 the places ACROSS 2 | E4 the front ignored 1 | E5 not memoised 1 | E6 the front unchecked 1 | E7 sticky to every target 1
 // AND SIX ON THE SLIP FROM THE TARGET (2026-11-19), tree copies: V1 `from` ignored 1 | V2 the bearing the sight's 1 | V3 the last bearing not kept 2 | V6 `from` unchecked 1 | V4 the named policy unsmoothed and V5 its slip from the aim 0 THE FIRST TIME,
 //   A GAP, CLOSED (the library now says its `smooth` and `from`, and a row flies the named policy against the other settings) -> 1 each.
@@ -154,6 +155,14 @@ section(() => {
     ok("!! a target circling the ship at 0.5 rad/s: the slip FROM THE TARGET is that rate on every tick after the first (to within 1%, whatever the sight's noise), the slip from the sight's aim scatters about it by far more", tg.length > 20 && tg.every((v) => Math.abs(Math.abs(v) - om) < 0.005 * 1 + 0.01 * om) && spread(aim) > 20 * spread(tg), `target ${tg.slice(0, 3).map((v) => v.toFixed(4))} spread ${spread(tg).toFixed(4)} | aim spread ${spread(aim).toFixed(3)}`);
 });
 
+section(() => {
+    const W = (lib) => Float32Array.from(lib.WEIGHT_COUNT === 3 ? [-3, -3, 0.1] : [-3, -3]), W0 = Float32Array.from([-3, -3, 0]);
+    const fl = (lib, o, w = W(lib), cannon = true) => D.duel(D.makeSide("n", { cannon, network: { module: lib, weights: w } }), D.makeSide("hand", { cannon }), 90003, "crossing", o).fingerprint, ft = (lib, kind = "swarm", w = W(lib)) => JSON.stringify(BF.fight(99001, kind, { network: { module: lib, weights: w } }));
+    const E = { ships: 3, escorts: 4 };
+    ok("!! THE HOLDING GUNNER THAT SEES (seatFlyWired8, 2026-11-19): AGAINST FIGHTERS ALONE IT IS THE HOLDING GUNNER (seatFlyWired6) TO THE BIT, whatever tau (swarm and beam); IN FLEETS WITH NO FIGHTERS IT IS THE SEEING GUNNER (seatFlyWired7) TO THE BIT; at tau 0 it is the holding gunner everywhere (with escorts too); with escorts at tau 0.1 it is neither; the slip is the seeing gunner's own (from the target, smoothed 0.2 s)", ft(FT.holdSees) === ft(FT.mixedHold) && ft(FT.holdSees, "beam") === ft(FT.mixedHold, "beam") && fl(FT.holdSees, { ships: 3 }) === fl(FT.movingTarget, { ships: 3 }) && fl(FT.holdSees, { ships: 3 }) !== fl(FT.mixedHold, { ships: 3 })
+        && fl(FT.holdSees, E, W0) === fl(FT.mixedHold, E) && fl(FT.holdSees, E) !== fl(FT.mixedHold, E) && fl(FT.holdSees, E) !== fl(FT.movingTarget, E) && FT.holdSees.smooth === 0.2 && FT.holdSees.from === "target" && FT.holdSees.WEIGHT_COUNT === 3 && FT.holdSees.sticky === "ships" && FT.POLICY_ID8 === "seatFlyWired8");
+});
+
 console.log("4d. AN ELEVATION OF ITS OWN (2026-11-19)");
 section(() => {
     const up = FT.elevatedWith({ front: 1 }), dn = FT.elevatedWith({ front: -1 }), deg = (d) => d * Math.PI / 180, B = [2, 5, 10, 20, 45, 80, 90];
@@ -171,7 +180,7 @@ section(() => {
     const job = (wiring) => ({ x: { id: "n", cannon: false, network: wiring ? { policy: "seatFlyWired", weights: [-4, -4], wiring } : { policy: "seatFlyWired", weights: [-4, -4] } }, y: { id: "hand", cannon: false }, kind: "crossing", seed: 90003 }), a = leadOf(job(null)), b = leadOf(job("flat")), c = leadOf(job("fly:medial"));
     ok("!! the pool flies it over a named wiring: `flat` is another fight of the same gains, and `fly:medial` by name is the default", a !== b && a === c, `leads ${a.toFixed(3)}, ${b.toFixed(3)}`);
     ok("the report says real numbers", /281 neurons, 6589 connections, no learned weight inside; with places the command reaches 90% of its peak at 55\.5 degrees and peaks at 80\.5/.test(FT.reportLines()[1]));
-    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID2,POLICY_ID3,POLICY_ID4,POLICY_ID5,POLICY_ID6,POLICY_ID7,S,SIGMA,STEPS,WEIGHT_COUNT,cells,elevatedWith,forward,gunnerFactory,gunnerFor,handWeights,mixed,mixedHold,moving,movingTarget,movingWith,raw,reportLines,signOf,sticky,stickyShips,topology,tuning,wiringOf,withBaseline,zeroWeights");
+    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID2,POLICY_ID3,POLICY_ID4,POLICY_ID5,POLICY_ID6,POLICY_ID7,POLICY_ID8,S,SIGMA,STEPS,WEIGHT_COUNT,cells,elevatedWith,forward,gunnerFactory,gunnerFor,handWeights,holdSees,mixed,mixedHold,moving,movingTarget,movingWith,raw,reportLines,signOf,sticky,stickyShips,topology,tuning,wiringOf,withBaseline,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

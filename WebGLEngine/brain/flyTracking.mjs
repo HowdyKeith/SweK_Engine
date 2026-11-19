@@ -152,6 +152,10 @@ export const POLICY_ID7 = "seatFlyWired7", movingTarget = movingWith({ smooth: 0
  *  (brain/lc10Places.mjs's ALONG, the rank toward larger y in the dataset's own frame). Which end of that axis is the front of the vertical field is not known: `front` +1 puts the gun's line at the larger-y end, -1 at the smaller (a hand-set choice, flown both ways). */
 const ELEVATED = new Map();
 export const elevatedWith = ({ front = 1 } = {}) => { if (front !== 1 && front !== -1) throw new Error(`flyTracking.elevatedWith: front is 1 or -1 (got ${front})`); if (!ELEVATED.has(front)) ELEVATED.set(front, libraryOf(`fly:medial, sticky to ships, elevation along the sheet (front ${front > 0 ? "+y" : "-y"})`, FLY_M.raw, FLY_M.cells, { sticky: "ships", pitchRaw: circuitOf(matrixOf(), { front, places: PL.ALONG }).raw })); return ELEVATED.get(front); };
+/** THE HOLDING MIXED GUNNER THAT SEES ITS TARGET MOVE (`seatFlyWired8`, 2026-11-19): the two gunners that shipped that day in one -- on a SHIP the cells are driven at the bearing plus tau times the target's own bearing rate (seatFlyWired7's slip, low-passed
+ *  over 0.2 s), on a FIGHTER the seat is the hand gunner, with no target it holds (seatFlyWired6). Three weights, the third tau (0.1 as flown; 0 is seatFlyWired6 to the bit). Against fighters alone it IS seatFlyWired6 whatever tau (the network is never
+ *  asked); in fleets with no fighters it IS seatFlyWired7. See tools/ship/takeFlyWiredGunnerHoldSees.mjs. */
+export const POLICY_ID8 = "seatFlyWired8", holdSees = libraryOf("fly:medial for ships, seeing its target move, the hand for fighters, holding with no target", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0.2, from: "target" });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
