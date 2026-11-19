@@ -2507,7 +2507,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": 1425,
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": 2710,
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": 2495,
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 6582
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 6582,
+  "tools/ship/circuitBias-selfcheck.mjs": 4188
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4891,7 +4892,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": 0,
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": 0,
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": 0,
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 0
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 0,
+  "tools/ship/circuitBias-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-18T15:45:41.643Z",
@@ -7275,7 +7277,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": "2026-11-18T15:45:41.643Z",
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": "2026-11-18T15:45:41.643Z",
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": "2026-11-18T15:45:41.643Z",
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": "2026-11-18T15:26:03.847Z"
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": "2026-11-18T15:26:03.847Z",
+  "tools/ship/circuitBias-selfcheck.mjs": "2026-11-19T16:11:00.784Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -9634,7 +9637,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": 20000,
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": 20000,
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": 20000,
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 20000
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": 20000,
+  "tools/ship/circuitBias-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -12013,7 +12017,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": true,
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": true,
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": true,
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": true
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": true,
+  "tools/ship/circuitBias-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -14592,7 +14597,8 @@
   "tools/ship/navEnergyStudy-selfcheck.mjs": 1260,
   "tools/ship/subNavRouteCondStudy-selfcheck.mjs": 187,
   "tools/ship/subNavRouteStudy-selfcheck.mjs": 296,
-  "tools/ship/subTrafficUnderStudy-selfcheck.mjs": 791
+  "tools/ship/subTrafficUnderStudy-selfcheck.mjs": 791,
+  "tools/ship/circuitBias-selfcheck.mjs": 4188
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-16T18:46:23.106Z",
@@ -16867,7 +16873,8 @@
   "tools/ship/navEnergyStudy-selfcheck.mjs": "2026-11-18T15:45:26.380Z",
   "tools/ship/subNavRouteCondStudy-selfcheck.mjs": "2026-11-18T14:45:15.841Z",
   "tools/ship/subNavRouteStudy-selfcheck.mjs": "2026-11-18T14:45:15.841Z",
-  "tools/ship/subTrafficUnderStudy-selfcheck.mjs": "2026-11-18T15:25:48.268Z"
+  "tools/ship/subTrafficUnderStudy-selfcheck.mjs": "2026-11-18T15:25:48.268Z",
+  "tools/ship/circuitBias-selfcheck.mjs": "2026-11-19T16:11:00.784Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -27998,6 +28005,9 @@
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": [
    124,
    791
+  ],
+  "tools/ship/circuitBias-selfcheck.mjs": [
+   4188
   ]
  },
  "contended": {
@@ -30273,7 +30283,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": true,
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": false,
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": true,
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": false
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": false,
+  "tools/ship/circuitBias-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -32657,7 +32668,8 @@
   "tools/ship/subNavRouteStudy-selfcheck.mjs": "loaded",
   "tools/ship/subTrafficDiveStudy-selfcheck.mjs": "alone",
   "tools/ship/subTrafficUnderStudy-selfcheck.mjs": "loaded",
-  "tools/ship/subTurnSweepStudy-selfcheck.mjs": "alone"
+  "tools/ship/subTurnSweepStudy-selfcheck.mjs": "alone",
+  "tools/ship/circuitBias-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T14:18:38.040Z": {
