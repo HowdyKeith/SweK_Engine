@@ -1,0 +1,119 @@
+# SPACE APPROACH DOCTRINE: does a fighter that caps its closing speed beat today's full-throttle approach? (backlog space-approach-doctrine; Keith 2026-11-19, "1, with 3 alongside as a small side task. Take 2 also."; REGISTERED 2026-11-19 BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS REGISTERED SEEDS IS FLOWN)
+
+**What is already known, said first.** This round confirms a lead and splits it by gunner. It is not an open question under the weak presets.
+* brain/SPACE_ITEMS_2026-11-18.md opened the lead from prototypes on space seeds 1601-1800 (never committed): the capped approach won 46 of 48.
+* The design survey for this note flew throwaway space seeds 9990001-9990005 (in no set):
+  * Under the regular and green presets, today's doctrine never killed the ship. Capped at 15 or 8, the ship died in 22-38 s in every regular and green fight flown.
+  * Damage per fighter-strafe-second was about 4 under the doctrine and 32-44 capped (about 9x).
+  * Under perfect and ace, the ship won every fight in both arms, and the damage was 0 in 15 of 16.
+  * Peak closing speed: 31.5 under the doctrine; 15.5-16.0 under cap 15; 9.4-10.2 under cap 8.
+* **So CAP BETTER under regular and green is expected (E1, E2 below).** The round earns its keep through the per-preset split (is it the doctrine, or the gunners?) and the mechanism readings.
+
+**The question.** Today's fighters fly the PD autopilot (brain/autopilot6dof.mjs AP.decide) with the hand doctrine in brain/spaceArena.mjs fighterAim:
+* APPROACH: full thrust at a point 60 units to one side of the ship.
+* STRAFE: inside 220 units and closing, nose on the lead point with the thrust cut.
+
+There is no braking anywhere, so a fighter arrives at about 31 u/s and passes through the gunners' envelope in about a second. **Does a fighter that holds its closing speed under a cap do more to the capital ship, under each gunner preset?**
+
+## THE ARMS (nothing in spaceArena.mjs or battleshipFight.mjs is edited)
+
+Both arms use brain/battleshipFight.mjs build(seed, kind, {gunners, pilot}), with:
+* 8 fighters, the ship's default behaviour (face the nearest foe, cruise at 0.3 thrust);
+* 120 s;
+* no other options.
+
+**D, today's doctrine:** build(seed, kind, {gunners}) with no pilot, so every fighter flies AP.decide.
+
+**C, capped:** the same build, with `pilot` = a wrapper around AP.decide. With `arena` bound after build, at every call:
+1. d = AP.decide(body, target, opts);
+2. c = the craft whose body is `body` (arena.crafts.find(x => x.body === body)); spaceArena calls the pilot with c.body before it replaces the bodies;
+3. foe = SA.nearestFoe(arena, c), the same call the arena makes;
+4. closing = -dot(foe.pos - body.pos, foe.vel - body.vel) / |foe.pos - body.pos|, the closing speed to the foe's CENTRE, in every mode;
+5. return {...d, thrust: 0} when closing >= CAP; otherwise d.
+
+Torque and firing are untouched. CAP comes from DEV (below).
+
+## GUNNER CONDITIONS (named now)
+* **Verdict-bearing:** perfect, ace, regular, green, exactly as battleshipFight.mjs GUNNERS.
+* **Reported, moving nothing:** green sight plus the shipped MLP seat network (brain/seatGunnerMlpWeightsDefault.json, as `network`). It was trained at 40 s against today's doctrine (tools/ship/trainSeatGunner.mjs).
+
+## SETS (space seeds: inputs to battleshipFight.scenario's own generator, Mulberry32 of seed*7+3)
+* **DEV = space seeds 1901-1930 x the four kinds (bow, beam, stern, swarm) = 120 scenarios.** Fresh, never prototyped.
+* **HELD89 = space seeds 2401-2460 x the four kinds = 240 scenarios a condition, FLOWN ONCE.** The results file is written the moment it exists, and the tool refuses a second flight.
+* Already spent and NOT reused:
+  * space seeds 1-40 (gates);
+  * 1, 2, 11, 12 and 21-23 (gunner training);
+  * 1601-1800 (prototypes);
+  * 9990001-9990005 (this note's smoke).
+* The numbers 1901-1930 and 2401-2460 appear as seeds of other generators (gaugeClip dives, the sensed-nav sets). Those are different scenario families and do not clash, as brain/NAV_PLUS_WIP.md said of HELD87.
+
+## DEV FIXES THE CAP, AND NOTHING ELSE
+* Grid: CAP in {6, 9, 12, 15, 20, 25} u/s.
+* Fly D and every cap on DEV under the four verdict-bearing presets.
+* **CAP = the grid value with the highest mean R over all 4 x 120 DEV scenarios. Ties go to the LARGER cap** (closer to today's doctrine).
+* CAP is written into this note and committed before any HELD89 seed is flown. DEV gives no verdict.
+
+## ENDPOINTS, per scenario and arm
+* **PRIMARY, R:**
+  * R = damageOnShip if the ship survives (tally's damage, capped at 1,500);
+  * R = 1500 + (120 - tKill) if the ship is destroyed, with tKill = the tally's t.
+  * Higher is better for the fighters. It orders time-to-kill and damage in one score with no ceiling. It is ordinal and used only by the sign test.
+* Reported, moving nothing:
+  * **DPSS**, damage per fighter-strafe-second. Strafe seconds = ticks with a live fighter whose c.last.mode is "strafe", divided by 30. Paired medians, over the scenarios with strafe seconds > 0 in both arms.
+  * **Fighter losses** (killed + rammed), with the gained and lost counts and a sign test. This is the cost side; it is confounded by fight length, because a fight that ends when the ship dies leaves fighters alive.
+  * Ship win, loss and draw counts.
+  * The gunners' hit rate (hitsDealt / 18 / seatRounds).
+  * Strafe passes, fighter-seconds alive, and the peak closing speed.
+
+## THE TEST
+* The tree's paired exact two-sided sign test (tools/ship/subGiveWayStudy.mjs signTest), paired by (seed, kind) within a preset.
+* A pair is a TIE iff |R_C - R_D| < 1e-9. Ties are dropped from the sign test, counted and printed, and kept in the median of R_C - R_D.
+
+## THE VERDICT, per verdict-bearing preset
+* **FLOOR, NOT WEIGHED** iff fewer than 20 of the 240 pairs are discordant.
+* else **CAP BETTER** iff C wins more pairs than it loses, the sign p <= 0.05, and the median of R_C - R_D > 0;
+* else **DOCTRINE BETTER** iff the mirror image holds;
+* else **NO DIFFERENCE SHOWN**.
+
+## OVERALL
+* **SUPPORTED** iff CAP BETTER under BOTH regular (the default) and green (the sight the networks were trained for), and DOCTRINE BETTER under none.
+* **PARTLY SUPPORTED** iff CAP BETTER under at least one preset and DOCTRINE BETTER under none.
+* **NOT SUPPORTED** otherwise.
+* **HARMFUL** is printed beside the verdict iff DOCTRINE BETTER under any preset.
+
+The per-preset table answers "doctrine or gunners". A cap effect only under the weak presets, with a floor under perfect and ace, says the fast-fighter gunners are what matter.
+
+## CHECKS (a failure means NOT WEIGHED; checks 1-4 and 6 run on DEV before HELD89)
+1. **IDENTITY:** with CAP = Infinity, arm C's tally equals arm D's to the bit on DEV seeds 1901-1903, all kinds, all presets.
+2. **SAME FOE:** on DEV, at every wrapper call, the wrapper's foe is the arena's nearest foe for that craft, and it is never null while the ship flies.
+3. **THE CAP HOLDS:** on DEV at the chosen CAP, the peak closing speed to the ship's centre stays <= CAP + 2 in every C fight, while the doctrine's peak exceeds CAP + 5.
+4. **THE OLD FIGHTS STAND:** the battleshipFight, spaceArena and battleshipPage gates pass unchanged.
+5. **SAME SCENARIOS:** HELD89 holds exactly seeds 2401-2460 x 4 kinds, in both arms, under every preset.
+6. **EVERY FIGHT ENDS** by 120 s.
+
+**CLOSED AFTER DEV:** no amendment may then change the arms, the cap definition, the sets, R, the tie rule, the bars or the verdict rule. Procedural fixes are allowed only before DEV is flown.
+
+## EXPECTATIONS (written before DEV)
+* E1: regular CAP BETTER, about 95%.
+* E2: green CAP BETTER, about 95%.
+* E3: perfect FLOOR (not weighed), about 70%; otherwise NO DIFFERENCE SHOWN.
+* E4: ace FLOOR or NO DIFFERENCE SHOWN, about 70%; CAP BETTER about 25%.
+* E5: DOCTRINE BETTER under any preset, about 5%.
+* E6: SUPPORTED, about 85%.
+* E7: the chosen CAP is 9-15, about 70%.
+* E8: green + MLP behaves like green (C kills the ship in at least 80% of its scenarios), about 85%.
+* E9: arm C loses fewer fighters under regular and green, about 80%.
+
+## WHAT A RESULT WOULD NOT SAY
+* Nothing about the learned 6DOF pilots, escorts, or two ships.
+* Nothing about the trained gunners as a verdict-bearing condition, or whether they would do better retrained against slow fighters.
+* Nothing about which cap is best beyond the DEV grid.
+* The presets are hand rules "chosen, not measured" (battleshipFight.mjs), so nothing about real gunners.
+
+**Cost:** about 50 CPU minutes (DEV 3,360 fights, HELD89 1,920 plus 480 network fights). It parallelises by preset.
+
+## DEV RESULT
+(not yet flown)
+
+## HELD89 RESULT
+(not yet flown)
