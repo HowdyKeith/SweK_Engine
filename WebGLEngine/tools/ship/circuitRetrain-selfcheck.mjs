@@ -95,6 +95,9 @@ sec("4. CHECKS");
         J(names(good(), { start: false })) === J(["NEW'S START IS R04"]) && J(names(good(), { profile: false })) === J(["C06 IS THE AQUARIUM'S CIRCUIT PROFILE"]) && J(names(good(), { shipped: false })) === J(["SEAT-04 IS THE SHIPPED SEAT"]));
     const rep = X.report(still, recs, { dives: 4 });
     ok("!! a failed check says NOT WEIGHED, that nothing is replaced, and draws no verdict", rep.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED and nothing is replaced.") && rep[rep.length - 1] === "BOTTOM LINE: NOT WEIGHED (a check failed)" && !rep.some((l) => /^ {2}V[12] /.test(l)));
+    const tl = X.trainingLines(recs), tlNone = X.trainingLines(recs.map((r) => ({ ...r, poolCrashed: 1 })));
+    ok("  trainingLines: a header, one line per search with ELIGIBLE or not, and the champion -- or 'none eligible -- NEW is the start (R04)'", tl.length === 6 && tl[0].startsWith("ROUND 40 TRAINING") && tl.slice(1, 5).every((l, k) => l.startsWith(`  search ${k} (seed ${X.SEARCH_SEEDS[k]})`) && /ELIGIBLE/.test(l)) &&
+        tl[5] === "CHAMPION: search 0 (held-out 0.5000), 4 of 4 eligible" && tlNone[5] === "CHAMPION: none eligible -- NEW is the start (R04)" && tlNone.slice(1, 5).every((l) => /not eligible/.test(l)));
     const full = X.report(good(), recs, { dives: 4 });
     ok("  a passing report has the training lines, a row per arm, V1, V2, the reported line and one bottom line", full[0].startsWith("ROUND 40 TRAINING") && full.some((l) => l.startsWith("CHAMPION:")) && X.ARMS.every((a) => full.some((l) => l.trim().startsWith(a + " "))) &&
         full.some((l) => /^ {2}V1 /.test(l)) && full.some((l) => /^ {2}V2 /.test(l)) && full.some((l) => l.startsWith("REPORTED, NOT WEIGHED")) && full.filter((l) => l.startsWith("BOTTOM LINE:")).length === 1);
