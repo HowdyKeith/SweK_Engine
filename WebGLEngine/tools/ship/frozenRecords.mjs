@@ -881,7 +881,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4905 -- 187 / 98 / 533 -> 188 / 98 / 533: one more frozen record, NO_GATE_V4905 in tools/ship/reportDoors.mjs (the v4 and v5 study libraries gated from other names; read by code in the same file and named by reportDoors-selfcheck, no field of its own).
     // v4901 -- 186 / 98 / 533 -> 187 / 98 / 533: one more frozen record in the tree (a documentary table of the merged branches or this round's, no field of its own); excluding moves with it (182 -> 183).
     // v4922 -- 190 / 99 / 534 -> 191 / 99 / 534: one more frozen record, NO_GATE_V4922 in tools/ship/reportDoors.mjs (the rung 4a v6 study library gated from tools/subReservoirV6-selfcheck.mjs; read by code in the same file and named by reportDoors-selfcheck, no field of its own -- v4905's shape).
-    currentIncludingModule: Object.freeze({ records: 191, withFields: 99, fields: 534 }),
+    // v4929 -- 191 / 99 / 534 -> 192 / 99 / 534: one more frozen record, COMMIT_BELT_DRIFT_V4929 in world/orreryFleet.mjs (hemibrain's second commit), built by spreading v4912's, no field of its own the census counts.
+    currentIncludingModule: Object.freeze({ records: 192, withFields: 99, fields: 534 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -1103,7 +1104,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4886 -- 176 -> 177: the chain's orphanSets.ADMITTED_V4673 arrives as a record outside this module (fields held at 91/495).
     // v4912 -- 185 -> 186 excluding, 189 -> 190 including: COMMIT_BELT_DRIFT_V4912 in world/orreryFleet.mjs (box3d's fourth commit; no field of its own, read by orreryFleet-selfcheck).
     // v4922 -- 186 -> 187 with NO_GATE_V4922 (tools/ship/reportDoors.mjs), read off the gate.
-    excluding: Object.freeze({ records: 187, withFields: 95, fields: 499 }),
+    // v4929 -- 187 -> 188 with COMMIT_BELT_DRIFT_V4929 (world/orreryFleet.mjs), read off the gate.
+    excluding: Object.freeze({ records: 188, withFields: 95, fields: 499 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

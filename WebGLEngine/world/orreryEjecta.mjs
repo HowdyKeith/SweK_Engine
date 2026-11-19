@@ -689,13 +689,16 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // v4898 -- vendor/hemibrain (the fly central-complex heading loop) arrived at the merge with no entry; its four dependants, dependantsOf run, not typed: the exporter (tools/flyCx.mjs), the rung-4a trainer and its gate, and the stateful pilot's gate.
     "hemibrain": Object.freeze([
         "brain/pilotSubCircuitState-selfcheck.mjs",
-        "tools/flyCx.mjs",
         // v4905 -- the piece 4 trainer reads the vendored circuit (CIRCUIT_FILE), ARRIVED named by orreryEjecta-selfcheck.
         "tools/ship/trainNeedsCircuit.mjs",
         "tools/ship/trainSubState-selfcheck.mjs",
         "tools/ship/trainSubState.mjs",
         // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).
         "sub-aquarium.html",
+        // v4929 -- tools/flyCx.mjs is GONE and tools/flyCxLib.mjs and tools/flyCx-selfcheck.mjs ARRIVED (named by orreryEjecta-selfcheck): the steering readout moved the heading loop's file name from the command into the
+        //   library's circuit table (CIRCUITS.headingLoop.out), and the gate now names both vendored files. The command still writes the body; it reads the name from the library.
+        "tools/flyCx-selfcheck.mjs",
+        "tools/flyCxLib.mjs",
         // v4912 -- ARRIVED with the merge of the sub-aquarium, needs and plain-net lines (named by orreryEjecta-selfcheck): the aquarium core and sim gates, the brain panel gate, the stateful pilot's file library, its gate, and the tank fly bench.
         "ai-bridge/subAquariumCore-selfcheck.mjs",
         "render/brainPanel-selfcheck.mjs",

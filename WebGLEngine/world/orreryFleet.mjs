@@ -750,3 +750,17 @@ export const COMMIT_BELT_DRIFT_V4912 = Object.freeze({
         }),
     }),
 });
+
+/**
+ * v4929 -- hemibrain GAINED A COMMIT: the steering readout (3ca013f5) vendored vendor/hemibrain/hemibrain-cx-steering.json beside the heading loop and rewrote PROVENANCE.md (the licence re-read from the project page), so the
+ * body has a second commit in front of the one v4898 recorded. Everything else is v4912's own object.
+ */
+export const COMMIT_BELT_DRIFT_V4929 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4912,
+    at: "v4929",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4912.arrivedSince4475,
+        hemibrain: Object.freeze({ now: Object.freeze(["3ca013f5", ...COMMIT_BELT_DRIFT_V4912.arrivedSince4475.hemibrain.now]),
+            why: COMMIT_BELT_DRIFT_V4912.arrivedSince4475.hemibrain.why + "; v4929 then vendored the steering readout (the heading loop and PFL1-3, 198 neurons) beside it and re-read the licence from the hemibrain project page" }),
+    }),
+});
