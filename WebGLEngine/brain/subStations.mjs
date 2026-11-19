@@ -97,3 +97,47 @@ export function captain({ helm, stations = [] } = {}) {
     Object.defineProperty(pilot, "aux", { get: () => (auxOut ? { ...auxOut } : null) });
     return pilot;
 }
+
+/**
+ * THE TRIAGE CAPTAIN (round 2, brain/SUB_STATIONS_WIP.md sections 7 and 8): the SAME energy and damage stations, and a captain that knows what their actions cost. Only the captain's choices change:
+ *   T1  damage control's rescue thrust is capped by the charge left: thrust <= clamp(frac / thrustFull, thrustFloor, 1) (thrust spends the charge the boat needs to reach the surface). Off with thrustFull null.
+ *   T2  in trouble with the charge under `earlyDropBelow`, the weight goes at once instead of after the blow (it costs no charge; it is one-way). Off with null.
+ *   T4  (added in registration B, from the DEV failures) once damage control has acted, the boat is BREACHED for the rest of the dive and the captain claims the surface itself (the energy station's surfaceTarget) while it still has
+ *       charge: holding depth against a leak that never stops costs charge for ever. Off with surfaceOnBreach false.
+ *   T3  while the energy station claims the surface AND the boat sinks faster than `unrationSink` (m/s), the claim is flown by the bare pilot towards the float depth, without the surfacing wrapper's bottle rationing. Off with null.
+ * `pilot` is the bare pilot, `model` the vessel, `read` the needs readings. Returns a pilot with the same log, watch and aux as captain(), and `.triage` counting the ticks each of T1 to T3 changed something.
+ */
+export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false });
+export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {} } = {}) {
+    if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
+    const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
+    const counts = { T1: 0, T2: 0, T3: 0, T4: 0 };
+    let breached = false;
+    // the stations are asked through the same captain() so the log, the watch and the aux are kept the same way; T3 swaps the helm for the tick, T1 and T2 edit the commands after it
+    let bare = false;
+    const swapHelm = (state, target, current, aux) => (bare ? pilot(state, { ...target, depth: SD }, current, aux) : helm(state, target, current, aux));
+    const breach = check({ name: "breach", kind: "target", priority: PRIORITY.energy, propose: ({ target }) => (breached ? { claim: AV.surfaceTarget(target, read()), aux: null, reason: "breached: up while there is charge" } : { claim: null, aux: null, reason: null }) });
+    const run = captain({ helm: swapHelm, stations: k.surfaceOnBreach ? [energy, breach, damage] : [energy, damage] });
+    const out = (state, mission, current = [0, 0, 0], aux) => {
+        const r = read(), sinking = k.unrationSink !== null && state.vel[2] < -k.unrationSink;
+        bare = false;
+        if (sinking) { const p = energy.propose({ state, target: mission }); if ((p.claim && p.claim.surface) || (breached && k.surfaceOnBreach && read().refillDepth <= 1)) { bare = true; counts.T3++; } }
+        if (breached && k.surfaceOnBreach) counts.T4++;
+        let cmd = run(state, mission, current, aux);
+        const log = run.log;
+        if (log.overrides.includes("damage")) breached = true;
+        if (log.overrides.includes("damage")) {
+            let c = { ...cmd }, changed = false;
+            if (k.thrustFull !== null) { const cap = Math.max(k.thrustFloor, Math.min(1, r.frac / k.thrustFull)); if (c.thrust > cap) { c.thrust = cap; counts.T1++; changed = true; } }
+            if (k.earlyDropBelow !== null && r.frac < k.earlyDropBelow && c.release !== 1 && !(state.tank && state.tank.released)) { c.release = 1; counts.T2++; changed = true; }
+            if (changed) cmd = sanitize(c);
+        }
+        return cmd;
+    };
+    Object.defineProperty(out, "log", { get: () => run.log });
+    Object.defineProperty(out, "watch", { get: () => run.watch });
+    Object.defineProperty(out, "aux", { get: () => run.aux });
+    Object.defineProperty(out, "triage", { get: () => ({ ...counts }) });
+    return out;
+}
+

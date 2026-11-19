@@ -109,3 +109,34 @@ Its constants (the thrust cap's curve, the charge under which the weight goes ea
 * Reported: the survival count of every crew, the discordant pairs, reaching the surface, and the charge at the end among dives both survive. Also whether round 1's single-dive finding (energy alone crushed sooner than none) holds as a rate: ENERGY's survival against NONE's, by the same sign test, reported and not in the verdict.
 
 **EXPECTATION, recorded now.** TRIAGE BEATS FIXED about 55 percent; NO DIFFERENCE about 40 percent (FIXED may already survive most dives, the charge mattering only for reaching the surface); FIXED BEATS TRIAGE about 5 percent.
+
+## 8. ROUND 2, REGISTRATION B (2026-11-19, written and committed after DEV and before any HELD seed is flown)
+
+**The ranges stand.** On DEV, NONE survives 0 of 48 and FIXED 34 of 48, so the amendment clause of registration A is not triggered. The other references on DEV: ENERGY 0, DAMAGE 16.
+
+**AN AMENDMENT, DISCLOSED: a fourth knob, T4, was added after reading the DEV failures.** Registration A limited TRIAGE to T1 to T3. On DEV, all 14 boats FIXED loses have a leak of 6.2 to 8.0 percent of the weight, more than the 6 percent drop weight. Every one ran its battery flat below the surface (13 of 14 never reached it). Most began with too much charge for the energy station to claim the surface (its threshold is 30 percent at depth), so damage control held the mission depth at full thrust until the charge was nearly gone. **T4: once damage control has acted, the boat is BREACHED for the rest of the dive, and the captain claims the surface itself while it still has charge.** This is a captain's choice about a cost, the charge that holding depth against an unending leak spends, so it is in the spirit of A, but A did not name it. The verdict rule, the sets and the outcome are unchanged, and no HELD seed has been flown.
+
+**THE 12 DEV VARIANTS (the most A allowed), each flown once on the 48 DEV seeds:**
+
+| # | knobs | survived (of 48) | survivors' mean charge at 600 s |
+|---|---|---|---|
+| 1 | all off (must be FIXED) | 34 | 0.448 |
+| 2 | T1: thrust <= frac / 0.3, floor 0.2 | 35 | 0.399 |
+| 3 | T1: thrust <= frac / 0.5, floor 0 | 35 | 0.382 |
+| 4 | T2: drop under 30% charge | 36 | 0.332 |
+| 5 | T2: drop under 20% | 35 | 0.371 |
+| 6 | T3: no rationing when sinking faster than 0.1 m/s | 34 | 0.454 |
+| 7 | T4 | 34 | 0.755 |
+| 8 | T4 + T2 (30%) | 38 | 0.921 |
+| 9 | T4 + T1 (#2) | 35 | 0.817 |
+| 10 | T4 + T2 (30%) + T1 (#2) | 38 | 0.921 |
+| **11** | **T4 + T2 at any charge** | **38** | **0.967** |
+| 12 | T4 + T2 at any charge + T3 (0.1) | 37 | 0.890 |
+
+**TRIAGE IS FROZEN AS #11** (`brain/stationsTask.mjs` FROZEN_TRIAGE). A set no rule between ties, so it was chosen by survival, then the charge at the end, then the fewer knobs. Once breached, it drops the weight at once and goes up while there is charge. **T1 (the thrust cap Keith named) and T3 are LEFT OUT:** on DEV the thrust cap kept one boat more alone and none more with T4. The thrust stays FIXED's full rescue thrust.
+
+**What DEV says and does not.** 38 against 34 on DEV is the set TRIAGE was chosen on, so it is optimistic by construction. Only HELD answers the question. The 10 DEV boats TRIAGE still loses were not studied further.
+
+**Gates, before HELD:** `brain/stationsTask-selfcheck.mjs` (the task, the verdict, the TRIAGE knobs, the crews; 24 mutants, 21 red and 3 equivalent, logged) and `brain/subStations-selfcheck.mjs` (round 1's, still green with TRIAGE added). Neither flies a HELD seed.
+
+**THE RUN:** every crew on the 96 HELD seeds, once, with `brain/stationsTask.mjs` (a short script writes one line a dive to `brain/stationsHeld.jsonl`). The file is committed unread, then read once with the registered verdict.
