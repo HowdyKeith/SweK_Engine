@@ -114,8 +114,35 @@ The per-preset table answers "doctrine or gunners". A cap effect only under the 
 
 **Cost:** about 50 CPU minutes (DEV 3,360 fights, HELD89 1,920 plus 480 network fights). It parallelises by preset.
 
-## DEV RESULT
-(not yet flown)
+## DEV RESULT (2026-11-19, read once: `spaceDoctrineStudyCmd.mjs dev-read`; brain/rig-results/space-doctrine/dev-*.json and dev-report.json)
+
+**CHECK 3 FAILED, SO THE ROUND IS NOT WEIGHED. HELD89 IS NOT FLOWN and stays unspent.**
+
+* **CAP = 12**, by the registered rule (the highest mean R over 4 x 120 DEV scenarios). Mean R by cap: 6: 788.8; 9: 794.9; **12: 797.3**; 15: 791.4; 20: 563.0; 25: 196.3. Arm D: 92.0. E7 (a cap in 9-15) held.
+* Check 1 IDENTITY: PASS (48 tallies, cap Infinity equal to no pilot to the bit).
+* Check 2 SAME FOE: PASS (2,880 probed fights, 16,441,189 decisions, no mismatch, no null foe).
+* **Check 3 THE CAP HOLDS: FAIL.** The capped peak closing speed was 14.05 against the bar CAP + 2 = 14 (one fight of 480: regular, space seed 1930, bow). The doctrine's peak was 33.43 (> 17, the other half, held).
+* Check 6 EVERY FIGHT ENDS: PASS (3,360 fights).
+
+**Why the bar failed: the premise behind it was wrong.** The survey said the smoke overshoot was at most 1.0 at caps 8 and 15. DEV measured the worst overshoot (peak minus CAP) per cap, with the number of fights over +2 out of 480:
+
+| cap | worst overshoot | 95th percentile | fights over +2 |
+|---|---|---|---|
+| 6 | 3.98 | 3.29 | 226 |
+| 9 | 3.02 | 2.40 | 100 |
+| 12 | 2.05 | 1.77 | 1 |
+| 15 | 1.64 | 1.31 | 0 |
+| 20 | 0.77 | 0.65 | 0 |
+| 25 | 0.30 | 0.23 | 0 |
+
+The cap is a thrust CUT. A fighter swinging past the ship turns lateral speed into closing speed with the thrust already off, so the lower the cap, the larger the overshoot. The +2 bar came from too few smoke fights.
+
+**What is NOT done, by the registration's own rule:**
+* The bar is not widened (it is closed after DEV).
+* The chosen cap is not swapped for 15, which would have passed.
+* No verdict is drawn from DEV's means, which favour the capped arm by about 700 R at every cap from 6 to 15. DEV gives no verdict.
+
+The lead stands where brain/SPACE_ITEMS_2026-11-18.md left it, now with a measured overshoot table. **A second registration is Keith's call.** It would need a cap check defined on what the wrapper controls: the thrust is zero at every decision where closing >= CAP, which holds by construction and can be counted exactly. HELD89 (space seeds 2401-2460) stays unspent for it.
 
 ## HELD89 RESULT
 (not yet flown)

@@ -21,6 +21,10 @@
 //   changed to 30 (the bars row); the note's HELD89 range edited (the sets row).
 //   *** 0 RED FIRST: approach ticks counted as strafe, and a pass counted every strafe tick. *** The row bounded the readings
 //   and did not recount them. It now steps its own doctrine arena, reads the modes itself, and must match exactly: both red.
+//   AFTER DEV (2026-11-19, check 3 failed): CAP_CHOSEN set to 12 while the DEV report shows the failed check -> 1 red (the NOT WEIGHED row).
+//   SECTION 4b (added when definitionGates named six exports no row drove), 5 more, all red: the cap test made strict (cappedPilot row);
+//   devChecks' slack widened by 1 (devChecks row); networkOf passing a plain array (networkOf row); readingsOf's gained and lost swapped (readings
+//   row); readHeld pairing C with C (2: readHeld and readings).
 //   NOT A MUTANT, A TRUE NO-OP: the wrapper taking the ship (crafts[0]) instead of nearestFoe would pass every row, because
 //   with one ship and no escorts the nearest foe of every fighter IS the ship. Check 2 guards the code as written, not
 //   arenas with more foes.
@@ -140,6 +144,41 @@ sec("4. ARM C LIVE, ON A THROWAWAY SEED (9990003, in no set)");
         `D: ${d.strafeS.toFixed(2)} strafe s in ${d.passes} passes, DPSS ${d.dpss.toFixed(2)}; C: ${c.strafeS.toFixed(2)} s in ${c.passes} passes, DPSS ${c.dpss === null ? "-" : c.dpss.toFixed(2)}`);
 }
 
+sec("4b. THE PIECES THE COMMAND COMPOSES, EACH DRIVEN WHERE ITS ANSWER IS KNOWN");
+{
+    // cappedPilot on a two-craft arena of plain data: the fighter closes at 10 head-on, so it cuts at cap 10 and not at cap 10.5
+    const fb = { pos: [0, 0, 0], vel: [10, 0, 0], q: [1, 0, 0, 0], w: [0, 0, 0], I: [1, 1, 1] }, sb = { pos: [100, 0, 0], vel: [0, 0, 0], q: [1, 0, 0, 0], w: [0, 0, 0], I: [1, 1, 1] };
+    const arena = { crafts: [{ id: 2, team: 2, body: fb, dead: false }, { id: 1, team: 1, body: sb, dead: false }] };
+    const target = { pos: sb.pos, vel: sb.vel }, opts = {};
+    const pr = { foeOf: new Map(), nullFoe: 0 }, at = S.cappedPilot(() => arena, 10, pr)(fb, target, opts), below = S.cappedPilot(() => arena, 10.5)(fb, target, opts);
+    ok("!! cappedPilot cuts the thrust at closing >= CAP and only there, leaves torque and firing alone, and probes the arena's own foe",
+        at.thrust === 0 && below.thrust > 0 && JSON.stringify(at.torqueBody) === JSON.stringify(below.torqueBody) && at.firing === below.firing && pr.foeOf.get(2) === 1 && pr.nullFoe === 0,
+        `closing 10: cap 10 -> thrust ${at.thrust}, cap 10.5 -> thrust ${below.thrust}`);
+    const row = (o) => ({ cap: 12, peakClosing: 13, over: true, t: 50, probe: { calls: 5, mismatches: 0, nullFoe: 0 }, ...o });
+    const good = S.devChecks([row(), row({ cap: "D", peakClosing: 30, probe: undefined })], 12), bad = S.devChecks([row({ peakClosing: 14.05 }), row({ cap: "D", peakClosing: 30, probe: undefined })], 12);
+    ok("!! devChecks: the cap holds at <= CAP + 2 and fails at 14.05 against 14 (DEV's own case); a mismatched foe and an unfinished fight each fail",
+        good.capHolds.ok && good.sameFoe.ok && good.allEnd.ok && !bad.capHolds.ok &&
+        !S.devChecks([row({ probe: { calls: 5, mismatches: 1, nullFoe: 0 } }), row({ cap: "D", peakClosing: 30 })], 12).sameFoe.ok &&
+        !S.devChecks([row({ over: false }), row({ cap: "D", peakClosing: 30 })], 12).allEnd.ok);
+    const sc = S.scenariosOf(S.HELD89_SEEDS);
+    const fake = (preset, cap, R, extra = {}) => sc.map(({ seed, kind }, i) => ({ seed, kind, preset, cap, network: false, R: typeof R === "function" ? R(i) : R, losses: cap === "D" ? 3 : 1, strafeS: 10, dpss: cap === "D" ? 4 : 30,
+        passes: 8, aliveS: 400, peakClosing: cap === "D" ? 31 : 13, shipStatus: cap === "D" ? "flying" : "destroyed", winner: "none", shipDamagePerRound: 20, ...extra }));
+    const rows = S.PRESETS.flatMap((p) => [...fake(p, "D", 100), ...fake(p, 12, p === "perfect" ? 100 : 1600)]);
+    const H = S.readHeld(rows, 12);
+    ok("!! readHeld pairs each preset by (seed, kind): CAP BETTER where C wins, FLOOR where every pair ties; the overall line and no network reading when none was flown",
+        H.byPreset.perfect.verdict === "FLOOR" && H.byPreset.regular.verdict === "CAP BETTER" && H.byPreset.green.wins === 240 && H.overall === "SUPPORTED" && H.network === null,
+        S.PRESETS.map((p) => p + " " + H.byPreset[p].verdict).join("; ") + " -> " + H.overall);
+    const rd = H.byPreset.regular.readings;
+    ok("readingsOf: C loses fewer fighters in every pair, kills the ship in every scenario, and the DPSS medians are the arms' own",
+        rd.fewerLosses.gained === 240 && rd.fewerLosses.lost === 0 && rd.C.shipDestroyed === 240 && rd.D.shipDestroyed === 0 && rd.dpss.medianC === 30 && rd.dpss.medianD === 4 && rd.dpss.n === 240);
+    const net = S.networkOf({ id: "m" }, { weights: [0.5, -1.25] });
+    const file = JSON.parse(fs.readFileSync(path.join(ENG, S.MLP_WEIGHTS), "utf8"));
+    ok("networkOf hands battleshipFight the shipped MLP as a Float32Array (the module reads subarrays); MLP_WEIGHTS names the seatGunnerMlp file",
+        net.weights instanceof Float32Array && net.weights[1] === -1.25 && net.module.id === "m" && file.policy === "seatGunnerMlp" && file.weights.length === file.weightCount);
+    const lines = S.reportLines();
+    ok("reportLines names the grid, both sets and the cap's state", lines.length === 2 && /6, 9, 12, 15, 20, 25/.test(lines[1]) && /1901-1930/.test(lines[1]) && /2401-2460/.test(lines[1]) && (S.CAP_CHOSEN === null ? /not yet chosen/ : /CAP \d/).test(lines[1]));
+}
+
 sec("5. THE COMMAND REFUSES WHAT THE REGISTRATION FORBIDS");
 {
     const CMD = path.join(HERE, "spaceDoctrineStudyCmd.mjs"), cmdSrc = fs.readFileSync(CMD, "utf8");
@@ -152,6 +191,12 @@ sec("5. THE COMMAND REFUSES WHAT THE REGISTRATION FORBIDS");
         const again = spawnSync(process.execPath, [CMD, "dev", "--preset", "regular", "--dir", tmp], { encoding: "utf8", timeout: 60000 });
         ok("!! an existing flight file is never flown again (exit 2, the file untouched)", again.status === 2 && /REFUSED/.test(again.stderr) && fs.readFileSync(path.join(tmp, "dev-regular.json"), "utf8") === "SENTINEL");
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+    const rep = path.join(ENG, "brain", "rig-results", "space-doctrine", "dev-report.json");
+    const R = fs.existsSync(rep) ? JSON.parse(fs.readFileSync(rep, "utf8")) : null;
+    const failed = R && (!R.identity.ok || !R.checks.sameFoe.ok || !R.checks.capHolds.ok || !R.checks.allEnd.ok);
+    ok("!! a DEV that failed a check keeps CAP_CHOSEN null, so HELD89 cannot be flown on a round that is NOT WEIGHED",
+        R === null || (failed ? S.CAP_CHOSEN === null : S.CAP_CHOSEN === R.cap),
+        R === null ? "DEV not yet read" : failed ? `DEV chose ${R.cap}; check 3 ${R.checks.capHolds.ok ? "passed" : "FAILED (peak " + R.checks.capHolds.cPeak.toFixed(2) + ")"}; CAP_CHOSEN ${S.CAP_CHOSEN}` : `DEV chose ${R.cap}, all checks passed; CAP_CHOSEN ${S.CAP_CHOSEN}`);
     ok("the command is export-free and the library's caller (the orphan census needs a non-gate caller)", !/^\s*export\b/m.test(cmdSrc) && /from "\.\/spaceDoctrineStudy\.mjs"/.test(cmdSrc));
 }
 

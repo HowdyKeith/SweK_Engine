@@ -32,6 +32,8 @@ export const networkOf = (module, file) => ({ module, weights: Float32Array.from
 /**
  * THE CAP, FIXED ON DEV. null until DEV has been flown and read; the HELD89 flight refuses to run while it is null,
  * and the value written here is the one the note records.
+ * 2026-11-19: DEV chose 12, AND CHECK 3 FAILED (peak 14.05 against CAP + 2 = 14), so the round is NOT WEIGHED and this
+ * stays null: HELD89 is not flown. The gate holds the two together (a failed DEV check keeps this null).
  */
 export const CAP_CHOSEN = null;
 
