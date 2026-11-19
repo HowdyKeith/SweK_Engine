@@ -20,7 +20,7 @@
 // Pure: no I/O, no clock beyond the `now` handed in, no randomness.
 "use strict";
 
-const WEIGHTS = { gfc: 963, flycx: 1729 };
+const WEIGHTS = { gfc: 963, flycx: 1729, fish: 803 };   // fish (2026-11-17, nextRounds fish-pilot-tank-kind): brain/pilotSubFish.mjs FISH.WEIGHT_COUNT, the zebrafish TEN-core pilot (render/subAquariumFish.mjs is its kind)
 const PILOT_LABEL = { gfc: "network", flycx: "stateful" };   // what the list calls a sub that arrived with weights, by circuit
 const THETA_NAMES = ["searchSpeed", "trackSpeed", "evadeSpeed", "fireRange", "aimTol", "pingAfter", "echoWindow", "evadeTime", "evadeTurn", "blindSnr", "pingEvery", "searchPing"];
 const MAX_BODY = 64 * 1024, CAP = 24, MAX_W = 1000, MAX_THETA = 10000;
@@ -97,6 +97,7 @@ const SEED_RECIPES = [
     { name: "Explorer tail pilot", weights: "brain/pilotSubWeightsRobustTail2Wip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9400: the one that qualifies on the Munk x3 hull too (brain/SUBMARINE_WIP.md)
     { name: "Explorer noisy-senses pilot", weights: "brain/pilotSubWeightsRobustNoisyWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9602: trained on sensor noise, delay and gusts; qualifies at every disturbance level on five hulls (brain/SUBMARINE_WIP.md)
     { name: "Fly heading-loop pilot (rung 4a)", circuit: "flycx", weights: "brain/pilotSubFlyCxWip.json", theta: null },   // the stateful fly pilot: the cx champion of brain/flyCxStageA.jsonl (tools/ship/flyCxPilotFile.mjs writes the file); no tactician theta of its own
+    { name: "Zebrafish TEN-core pilot (rung 4b)", circuit: "fish", weights: "brain/pilotSubWeightsFishWip.json", theta: null },   // the 803-weight fish champion; no state, not an escape circuit (render/subAquariumFish.mjs says what seating it shows)
 ];
 /** Build the offerable subs from a reader: read(relPath) -> parsed JSON or null. A recipe whose file is missing or invalid is skipped, by name, with the reason. */
 function seedSubs(read) {
@@ -122,7 +123,7 @@ function flyBrainHealth(has) {
 function fishBrainHealth(has, counts = { total: 0, local: 0, remote: 0 }) {
     const pilots = (has && has.pilots) || [], tank = ` Aquarium: ${counts.total} sub${counts.total === 1 ? "" : "s"} (${counts.local} here, ${counts.remote} from peers).`;
     const fishPilots = (has && has.fishPilots) || [];   // pilot weight files that DECLARE they are wired to a fish circuit (circuit: "fish"); a file in vendor/zebrafish does not make a fly-wired pilot a fish
-    if (has && has.fishCircuit && fishPilots.length) return { state: "live", detail: `fish brain: a vendored fish circuit and ${fishPilots.length} sub pilot${fishPilots.length === 1 ? "" : "s"} wired to it. The tank itself still flies the FLY-wired subs: this page does not fly a fish-wired body yet.` + tank };
+    if (has && has.fishCircuit && fishPilots.length) return { state: "live", detail: `fish brain: a vendored fish circuit and ${fishPilots.length} sub pilot${fishPilots.length === 1 ? "" : "s"} wired to it. The tank flies it as one kind of sub (zebrafish) beside the FLY-wired subs, which are all the others.` + tank };
     if (has && has.fishCircuit && pilots.length) return { state: "standin", detail: `fish brain: STAND-IN. A fish circuit is vendored, but no pilot is wired to it yet; ${pilots.length} sub pilot${pilots.length === 1 ? " is" : "s are"} still wired to the FLY's Giant Fiber Circuit.` + tank };
     if (pilots.length) return { state: "standin", detail: `fish brain: STAND-IN. No fish circuit is vendored (ZAPBench is activity, not wiring); ${pilots.length} sub pilot${pilots.length === 1 ? " is" : "s are"} trained on the FLY's Giant Fiber Circuit and can fly.` + tank };
     return { state: "offline", detail: "fish brain: no sub pilot weights in this tree (brain/pilotSubWeights*Wip.json)." + tank };

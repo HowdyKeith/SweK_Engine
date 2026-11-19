@@ -183,6 +183,50 @@ console.log("\n2b. THE CONNING TOWER AND THE TAIL: built here with the real thre
     mat.dispose(); for (const k of Object.keys(geo)) geo[k].dispose();
 }
 
+console.log("\n2c. THE MARKS AND THE NAVIGATION SEA: the pure arithmetic, and the stores built with the real three.js (no GL needed)");
+{
+    ok("  the dark-compass mark is amber (DARK_COLOUR 0xf6a623), its ring is 0.9 of a hull (DARK_RING " + V3.DARK_RING + "), its ghost line GHOST 2.2 rings long, and a station buoy is BUOY_R 1.6 m",
+        V3.DARK_COLOUR === 0xf6a623 && Math.abs(V3.DARK_RING - V3.HULL_LENGTH * 0.9) < 1e-12 && V3.GHOST === 2.2 && V3.BUOY_R === 1.6);
+    ok("  STATION_COLOURS is frozen: open 0xffc94d (amber), visited 0x5be37d (green)", Object.isFrozen(V3.STATION_COLOURS) && V3.STATION_COLOURS.open === 0xffc94d && V3.STATION_COLOURS.visited === 0x5be37d);
+    const dm = V3.darkMark({ id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } });
+    ok("!! darkMark: a dark compass gives a ring centred on the sub (100, -20, 50) of radius DARK_RING and a ghost tip GHOST rings along its believed heading 0 (+X); a valid compass or none gives null; a non-finite belief draws the ring only",
+        dm && dm.centre.join() === "100,-20,50" && dm.r === V3.DARK_RING && Math.abs(dm.tip[0] - (100 + V3.DARK_RING * V3.GHOST)) < 1e-9 && dm.tip[1] === -20 && Math.abs(dm.tip[2] - 50) < 1e-9
+        && V3.darkMark({ x: 0, y: 0, depth: 0, compass: { valid: true, seen: 0 } }) === null && V3.darkMark({ x: 0, y: 0, depth: 0 }) === null
+        && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).tip === null && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).r === 2 * V3.DARK_RING, JSON.stringify(dm));
+    const survey = (finished) => ({ finished, stations: [{ x: 10, y: 20, depth: 30, visited: false }, { x: 40, y: 50, depth: 60, visited: true }] });
+    const sm = V3.stationMarks([{ id: "s", survey: survey(false) }, { id: "f", survey: survey(true) }, { id: "n" }]);
+    ok("!! stationMarks: a running survey's stations become buoys in the scene's frame (id s#i, pos [x, -depth, y], visited flag); a finished survey and a sub with none draw nothing",
+        sm.length === 2 && sm[0].id === "s#0" && sm[0].pos.join() === "10,-30,20" && sm[0].visited === false && sm[1].id === "s#1" && sm[1].visited === true, JSON.stringify(sm));
+    const ms = V3.marksStore(THREE);
+    ok("  marksStore builds an empty group with the buoy sphere of radius BUOY_R and the materials in DARK_COLOUR and STATION_COLOURS",
+        ms.group.children.length === 0 && ms.dark.size === 0 && ms.buoys.size === 0 && ms.buoyGeo.parameters.radius === V3.BUOY_R
+        && ms.darkMat.color.getHex() === V3.DARK_COLOUR && ms.buoyMats.open.color.getHex() === V3.STATION_COLOURS.open && ms.buoyMats.visited.color.getHex() === V3.STATION_COLOURS.visited);
+    const darkRow = { id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } };
+    const sy1 = V3.syncMarks(THREE, ms, [darkRow, { id: "s", survey: survey(false) }]);
+    const sy2 = V3.syncMarks(THREE, ms, []);
+    ok("!! syncMarks: one ring and ghost line per dark sub and one buoy per open station (1 dark, 2 buoys, 4 objects, the ring at the sub scaled to DARK_RING, the visited buoy green), and an empty snapshot clears them all",
+        sy1.dark === 1 && sy1.buoys === 2 && ms.group.children.length === 0 && sy2.dark === 0 && sy2.buoys === 0 && (() => { const s = V3.syncMarks(THREE, ms, [darkRow, { id: "s", survey: survey(false) }]); const d = ms.dark.get("d");
+            const ok_ = s.dark === 1 && ms.group.children.length === 4 && d.ring.position.x === 100 && d.ring.position.y === -20 && d.ring.scale.x === V3.DARK_RING && ms.buoys.get("s#1").material === ms.buoyMats.visited; V3.syncMarks(THREE, ms, []); return ok_; })(), JSON.stringify([sy1, sy2]));
+    ok("  NAV_COLOURS is frozen with island 0x3d6b3a, berg 0xbfe3ff and ship 0xf6a623 (the ship in the same amber as DARK_COLOUR); SEA_TOP is 2 m above the surface and a goal buoy is GOAL_R 2.4 m",
+        Object.isFrozen(V3.NAV_COLOURS) && V3.NAV_COLOURS.island === 0x3d6b3a && V3.NAV_COLOURS.berg === 0xbfe3ff && V3.NAV_COLOURS.ship === 0xf6a623 && V3.SEA_TOP === 2 && V3.GOAL_R === 2.4);
+    const nc = V3.navColumns([{ type: "island", x: 100, y: 50, r: 20, keel: Infinity }, { type: "berg", x: 200, y: 80, r: 12, keel: 18 }], 50);
+    let threw = false; try { V3.navColumns([{ type: "reef", x: 0, y: 0, r: 1, keel: 1 }]); } catch { threw = true; }
+    ok("!! navColumns: an island runs from the floor (-50) to SEA_TOP (h 52, centre -24), a berg hangs from SEA_TOP to its keel (h 20, centre -8), at [x, ., y]; an unknown type throws; null is no sea",
+        nc[0].id === "0:island" && nc[0].h === 52 && nc[0].centre.join() === "100,-24,50" && nc[0].r === 20 && nc[1].id === "1:berg" && nc[1].h === 20 && nc[1].centre.join() === "200,-8,80" && threw && V3.navColumns(null).length === 0, JSON.stringify(nc));
+    const ng = V3.navGoals([{ id: "c", x: 40, y: 60, depth: 20, hue: 200, nav: { goal: { x: 300, y: 100, depth: 25 } } }, { id: "n", x: 0, y: 0, depth: 1 }]);
+    ok("!! navGoals: one goal per courier with a goal, at [x, -depth, y], with a line from the courier's scene position, in its hue; a sub without one gives none",
+        ng.length === 1 && ng[0].id === "c" && ng[0].pos.join() === "300,-25,100" && ng[0].from.join() === "40,-20,60" && ng[0].hue === 200, JSON.stringify(ng));
+    const ns = V3.navStore(THREE);
+    ok("  navStore builds an empty group, the goal sphere of radius GOAL_R and one material per NAV_COLOURS type (the island opaque, berg and ship see-through)",
+        ns.group.children.length === 0 && ns.cols.size === 0 && ns.goals.size === 0 && ns.goalGeo.parameters.radius === V3.GOAL_R
+        && Object.keys(V3.NAV_COLOURS).every((k) => ns.mats[k].color.getHex() === V3.NAV_COLOURS[k]) && ns.mats.island.transparent === false && ns.mats.berg.transparent === true && ns.mats.ship.opacity === 0.55);
+    const sn1 = V3.syncNav(THREE, ns, [{ type: "island", x: 100, y: 50, r: 20, keel: Infinity }, { type: "ship", x: 300, y: 120, r: 9, keel: 6 }], [{ id: "c", x: 40, y: 60, depth: 20, hue: 200, nav: { goal: { x: 300, y: 100, depth: 25 } } }], 50);
+    const isle = ns.cols.get("0:island"), kids = ns.group.children.length;
+    const sn2 = V3.syncNav(THREE, ns, [], [], 50);
+    ok("!! syncNav: one column per obstacle (scaled r x h x r at its centre) and one buoy and line per goal (2 columns, 1 goal, 4 objects), and an empty sea and snapshot clear them",
+        sn1.columns === 2 && sn1.goals === 1 && kids === 4 && isle.scale.y === 52 && isle.scale.x === 20 && isle.position.y === -24 && sn2.columns === 0 && sn2.goals === 0 && ns.group.children.length === 0, JSON.stringify([sn1, sn2]));
+}
+
 console.log("\n3. THE PAGE");
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");

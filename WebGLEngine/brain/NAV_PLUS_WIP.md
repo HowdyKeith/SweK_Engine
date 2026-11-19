@@ -160,3 +160,358 @@ By kind (reached of 60, m12 / m8): hard-islands 59 / 59, **hard-gaps 60 / 60 (ev
 ## Not checked, said plainly
 
 The margin sweep covers one sea family at an exact fix; the crab result is post hoc and unreplicated; K was not swept; the current is uniform in space; the reactive ships' rule was not varied (the turn rate, the sense range, the clearance); the three HELD sets are 240, 200 and 60 scenarios. The gates for the module and the command are sabotaged and logged in their headers (three passes each; the survivors left are argued equivalent there).
+
+# ITEM 2 REPLICATE: THE CRAB ALONE, ON A FRESH SET (backlog nav-current-in-field; Keith 2026-11-17, "Let's do all the next sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** Item 2's strongest reading was post hoc: `any+crab` against `any`, gain 10, p 0.0129. It was the second arm of four, and the note said "it wants its own fresh set before it is called a result". This is that set. Nothing in the arms changes: `any` and `any+crab` are flown exactly as item 2 flew them (`brain/subNavPlus.mjs` PLUS_ARMS, tau 15 s, the estimate from the vessel's own logs, no margin growth).
+
+**The set.** HELD73 = seeds 7301 to 7400 of each of `hard-current` and `hard-current-gap`: 200 scenarios, 400 flights, flown ONCE. These seeds are spent by no navigation module (checked against every `range(...)` in brain/sub*Nav*.mjs, subGiveWay, subSensedNav, subNav3d and subTankNav). DEV (seeds 1 to 30) is flown first as a sanity run and is not a result.
+
+**The registered test.** `any+crab` against `any`, paired by scenario, both kinds pooled. Gain = (only the crab reached) - (only `any` reached); p = the exact two-sided sign test on the discordant pairs.
+* **SUPPORTED** iff gain >= 5, p <= 0.05 AND the crab has no more collisions than `any`. The p bar is 0.05, not item 2's 0.10, because this confirms a finding that was chosen after looking.
+* **PARTLY SUPPORTED** iff gain >= 3 and not SUPPORTED.
+* **NOT SUPPORTED** otherwise. **HARMFUL** is printed beside the verdict if gain <= -5.
+
+**Checks (a failure: NOT WEIGHED).** (1) SAME SCENARIOS: both arms fly the same 200 scenarios in the same order. (2) THE ARMS ARE ITEM 2'S: on item 2's first five HELD71 seeds of each kind, both arms reproduce the flights stored in `brain/subNavPlusCurrentHeld71.jsonl` (status, ticks and path). (3) THE CRAB BITES: the two arms differ on at least one flight.
+
+**Expectations, written before any seed is flown.**
+* E1 the verdict is SUPPORTED: about 60 percent. Item 2's gain of 10 in 200 shrinks toward the registered arm's 7 on a fresh draw, and 5 at p 0.05 needs roughly 9 to 1 among the discordant pairs, or 12 to 3.
+* E2 the crab reaches at least 97 of 100 on hard-current: about 75 percent (item 2: 100).
+* E3 the crab's median path / chord is below `any`'s on hard-current: about 85 percent (1.03 against 1.09).
+* E4 the gain is larger on hard-current than on the gap kind: about 70 percent (7 against 3 in item 2).
+
+**What a result would not say.** The logs the estimate reads are perfect (no sensor noise), the current is steady per scenario, and the vessel is the PD autopilot's. SUPPORTED says that pointing into a known current helps this planner reach goals in these two kinds, nothing about a real current meter.
+
+## ITEM 2 REPLICATE, RESULT (2026-11-17; `node tools/ship/subNavPlusStudy.mjs --study crab --set held73 --write`, HELD73 = seeds 7301 to 7400 of both kinds, flown ONCE; 400 flights in `brain/subNavPlusCrabHeld73.jsonl`): **SUPPORTED**
+
+The study, its checks and its gates were committed and sabotaged first (9ed89170; 14 mutants logged in `tools/ship/subNavPlusStudy-selfcheck.mjs`). DEV was flown once as the sanity run (PARTLY SUPPORTED on 60 scenarios, not a result). All three checks passed: both arms reproduce item 2's stored HELD71 flights tick for tick, so these are the same arms.
+
+| kind | arm | reached | collided | left | timed out | median path / chord |
+|---|---|---|---|---|---|---|
+| hard-current | any | 95/100 | 4 | 1 | 0 | 1.087 |
+| | any+crab | 96/100 | 3 | 1 | 0 | 1.035 |
+| hard-current-gap | any | 90/100 | 9 | 0 | 1 | 1.069 |
+| | any+crab | **98/100** | 2 | 0 | 0 | 1.015 |
+
+`any+crab` against `any`, pooled and paired: **12 only the crab, 3 only `any`, both 182, neither 3; gain 9, exact sign p 0.0352; collisions 5 against 13.** Every bar is met (gain >= 5, p <= 0.05, no more collisions), so the verdict is **SUPPORTED**.
+
+**Against the expectations (written first).** E1 SUPPORTED, about 60: held. E2 the crab reaches at least 97 on hard-current, about 75: MISSED (96; one exit and three collisions). E3 a shorter path on hard-current, about 85: held (1.035 against 1.087). E4 the gain larger on hard-current than on the gap kind, about 70: MISSED, and by a lot. The gain is 1 on hard-current (3 to 2) and 8 on the gap kind (9 to 1). Item 2 had it the other way round: 7 to 0 on hard-current, 5 to 2 on the gap kind.
+
+**What it says.** Pointing the nose into a current the vessel estimates from its own logs helps this planner reach its goals on a fresh set of both current kinds, mostly by not colliding (5 against 13). The track is straighter on both kinds (path / chord 1.035 and 1.015 against 1.087 and 1.069). Two draws of 200 now agree on the pooled gain (10, then 9). They disagree on WHICH kind it comes from, so the per-kind split should not be read as a property of the kinds.
+
+**Not checked, said plainly.** The estimate reads perfect logs. The current is uniform in space and steady per scenario. The vessel is the PD autopilot's. The crab is not yet an option of the tank's couriers or of `subHardNav`'s default arms. Making it the default is a separate decision, not taken here.
+
+# ITEM 2, PART 2: THE CURRENT IN THE COST -- A DIRECTIONAL ROUTE SOLVER (backlog nav-current-in-field; Keith 2026-11-18, "do the directional route solver round next"; REGISTERED 2026-11-18, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**What is open.** The plan does not know the current: brain/flowfieldCpu.js (the shared solver, a drop-in for the GPU Brain fleet's FlowFieldSolver) costs entering a cell the same from every side. This round builds a SEPARATE directional solver; the shared one is NOT edited.
+
+**WHY THE FIRST DRAFT WAS DROPPED, said before anything was built.** The first draft flew the directional solver in the hard-current kinds' UNIFORM current. A review of the draft (three independent lenses, each finding checked by a skeptic; nothing flown on any held seed) showed it tests close to nothing, and I accept the argument: in a uniform current c at water speed V the time to cross a vector v is [-(c.v) + sqrt((c.v)^2 + (V^2 - |c|^2)|v|^2)] / (V^2 - |c|^2). The first term sums to the same value along every route between two points, so what a uniform current does to ROUTE CHOICE is only the second term, an elliptic stretch of V / sqrt(V^2 - |c|^2) along its axis (1.04 at 0.8 m/s, 1.09 at 1.2), the same for +c and -c. On a 4-neighbour grid a route monotone in x is ranked exactly as in still water. The reviewers measured it on DEV (seeds 1 to 30, the mean current, field only): the start cell's aim point was the same in 60 of 60 fields, and no aim point at all moved on any of the 30 hard-current-gap fields. The draft also had a solver that would not terminate (a float64 test against float32 distances re-expands cells without end once costs are not whole numbers) and checks that could not see a reversed sign. Both are fixed below. **A directional cost matters where the current VARIES IN SPACE.** That is what this round tests.
+
+## PART A: THE UNIFORM CURRENT, RECORDED (no flight)
+
+On DEV seeds 1 to 30 of hard-current and hard-current-gap (60 fields, spent as DEV by item 2), build the t = 0 plan (the ladder) with the shared solver and with the directional solver in the scenario's mean current. BITE = the share of the 60 whose start-cell aim heading differs by more than 5 degrees. **Bar: 15 percent.** Below it the uniform-current route arm is NOT FLOWN, and the "current in the cost" residue of nav-current-in-field closes as nothing to gain in a uniform current, by the stretch argument and by this measurement. **SAID PLAINLY: this is a record, not a test.** The reviewers already measured the equivalent figure on these fields before this registration (0 of 60).
+
+## PART B: A STREAM THE PLAN KNOWS
+
+**The kind (NEW: `hard-stream`).** For seed s: the start, the waypoint, the islands and icebergs and the weight error of `hard-current` for s; its uniform current is DROPPED. In its place, a steady STREAM drawn from a stream of its own (mulberry(s x 7919 + 90001)), in this order:
+* direction theta ~ U(0, 2 pi);
+* a point on its centre line P = (U(120, 280), U(-60, 60));
+* half-width w ~ U(25, 45) m;
+* peak speed S ~ U(1.2, 2.2) m/s.
+
+The current at (x, y) is S cos^2(pi d / (2w)) (cos theta, sin theta) for |d| < w, where d is the signed distance from the centre line, and 0 outside. It is horizontal, uniform in depth and constant in time. The vessel cruises at 3 m/s, so against the core of a 2.2 m/s stream it makes 0.8 m/s good.
+
+**What the vessel knows, said plainly.** The route arm's plan KNOWS THE STREAM'S MAP (an atlas), as every arm knows the static map exactly. Both arms crab on the vessel's OWN estimate from its logs (item 2's: tau 15 s), which lags as it crosses the stream.
+
+**The solver (NEW: brain/flowfieldDirectional.mjs).**
+* **Graph.** The nav grid. A backward multi-source exact Dijkstra from the waypoint's cell over the 4 neighbours. An edge between two cells is passable iff both are free or both are blocked (the nav field's two heights and impassDh).
+* **Direction, fixed here.** When neighbour v is relaxed from the settled cell u, the vessel travels v -> u. The step is d = unit(u - v) in world (x, y), with gx along +x and gy along +y. The current is the one at the midpoint of the two cell centres.
+* **Cost.** c_par = c.d; c_perp = |c - c_par d|. The step is impassable if c_perp >= V, or if g = c_par + sqrt(V^2 - c_perp^2) <= 0.05 m/s. Otherwise cost = round(cell x V / g x 1024) / 1024, in still-water metres. The costs are whole multiples of 1/1024, so tied routes stay exactly tied. With c = 0 every step costs exactly `cell`.
+* **Relax.** dist is float32, and the relax compares in float32: nd = fround(d + cost); if nd < dist[v], store it and push nd. A cell is expanded once (a settled flag).
+* **Flow.** The shared solver's rule (the 8-neighbour of lowest dist).
+* **V** = N.CRUISE (3 m/s).
+* **WITH c = 0 EVERYWHERE THE FIELD IS THE SHARED SOLVER'S BIT FOR BIT** (dist, fx, fz); the gate holds that on every DEV field. The gate also holds known answers on an empty grid: k cells up-current of the goal cost k x 5 x 3 / (3 + |c|), k cells down-current k x 5 x 3 / (3 - |c|), across the current k x 5 x 3 / sqrt(9 - |c|^2), each to the 1/1024 quantum. It bounds the pops by the cell count, and a sabotage that flips d must go red.
+
+**The aim points of the route arm (NEW, in brain/subNavRoute.mjs).** buildAim's rule, with one more condition for taking the next cell's aim point. The straight segment from the cell's centre to that point must be clear (as before), AND its TIME must be no more than the plan's time from the cell to that point plus one cell (5 still-water metres). The segment's time is sampled every AIM_STEP at the current there, and is infinite if any sample is impassable. Otherwise the aim is the next cell's centre, as buildAim does. With c = 0 a straight segment is never longer than the staircase plus the waypoint's offset in its cell, so the aim points are buildAim's bit for bit (the gate holds that).
+
+**Not edited:** brain/flowfieldCpu.js and brain/subHardNav.mjs. brain/subNavPlus.mjs gains options that are all off by default:
+* `currentAt(x, y, t)`: the current the vessel feels, at its position;
+* `planField`: the builder of the t = 0 plan;
+* `aim`: the aim-point rule.
+
+With them off, every flight is the flight it was (its gate's rows, and check 3 below).
+
+**The arms (two; both build the plan ONCE at t = 0 with the margin ladder, and fly the crab on the estimate):**
+* `any+crab` (the REFERENCE): the shared solver and buildAim, the plan blind to the stream.
+* `any+crab+route` (**DESIGNATED**): the directional solver in the stream's map, and the time-aware aim points.
+
+They differ ONLY in the plan.
+
+**The set.** HELD86 = seeds 9301 to 9500 of `hard-stream`: 200 scenarios, 400 flights, flown ONCE. No navigation set names these seeds (9310 and 9400 appear in the tree only as sub-pilot training seeds, a different generator). DEV = seeds 1 to 30 of `hard-stream`, the sanity run and check 4. Nothing is chosen on DEV.
+
+**The registered readings (paired by scenario).**
+* **R1, TIME.** Over the scenarios both arms reach, r = t(route) / t(reference). **FASTER** iff the median r is at most 0.95 AND the exact two-sided sign test on r < 1 against r > 1 gives p <= 0.05. Ties, |r - 1| < 1e-9, are dropped.
+* **R2, REACH.** gain = (only the route reached) - (only the reference reached); p is the exact two-sided sign test on the discordant scenarios.
+* **THE VERDICT.**
+  * **SUPPORTED** iff FASTER AND gain >= 0 AND the route has no more collisions than the reference.
+  * **PARTLY SUPPORTED** iff not SUPPORTED and one of these holds:
+    * FASTER (but a safety condition failed);
+    * the median r is at most 0.98 with sign p <= 0.05;
+    * gain >= 5 with p <= 0.10.
+  * **NOT SUPPORTED** otherwise.
+  * **HARMFUL** is printed beside the verdict iff gain <= -5.
+* **Reported, moving nothing.** The status counts of each arm; median times; median path / chord; the share of scenarios whose start aim heading differs by more than 5 degrees; and the readings split by whether the stream lies along the track (|cos(theta - track bearing)| >= 0.7) or across it.
+
+**Checks (a failure: NOT WEIGHED).**
+1. **SAME SCENARIOS.** Both arms fly the same 200 scenarios in the same order.
+2. **STILL WATER IS THE SHARED PLAN.** On DEV seeds 1 to 3 with the stream's speed set to 0, the two arms fly the same flight to the digit.
+3. **THE OLD FLIGHTS STAND.** With the new options off, `any+crab` reproduces the flights stored in brain/subNavPlusCrabHeld73.jsonl on HELD73's first five seeds of each kind (status, ticks, path).
+4. **THE ROUTE BITES (go or no-go, on DEV, BEFORE HELD86 is flown).** At least 15 percent of the 30 DEV scenarios have t = 0 start-cell aim headings differing by more than 5 degrees between the two plans. If not, HELD86 is NOT flown, and the round reads NOT FLOWN: THE STREAM DOES NOT MOVE THE PLAN.
+
+**Expectations, written before any code or seed.**
+* G1: check 4's bar is met, about 80 percent.
+* G2: PART A's bar is met, about 3 percent (see the record above).
+* G3: SUPPORTED about 40 percent; PARTLY about 25.
+* G4: the median r is at most 0.95, about 50 percent.
+* G5: the reach gain is at least 0, about 70 percent. An adverse stream along the track may run the reference out of time (260 s).
+* G6: the route has no more collisions, about 55 percent. A route that rides a stream past islands, with a crab that lags, could hit more.
+* G7: the reference times out at least 5 times on HELD86, about 45 percent.
+* G8: the time gain is larger on along-track streams than on across-track ones, about 80 percent.
+
+**What a result would not say.** Anything about a stream the vessel must sense rather than read from a map; a stream that varies in time or with depth; a vessel at another speed (V is the cruise); or the shared solver and the GPU fleet's (not edited). Nothing about the corner-angle margin (still open). `hard-stream` is a family I made with these parameters, and the stream is drawn independently of the islands.
+
+### AMENDMENT 1 TO ITEM 2 PART 2 (2026-11-18; made AFTER the code was committed (01330867) and reviewed, BEFORE any DEV or HELD86 flight of hard-stream)
+
+**What happened, said first.** Before flying anything registered, I had the code reviewed against this registration by three independent lenses, each finding checked by a skeptic. The reviewers were told not to touch DEV or HELD86. **They flew hard-stream seeds 501 to 700, which are in no set, with both arms, and so the following is now KNOWN to me before any registered flight:**
+* the start-heading bite there was 24 of 200 (12 percent; in 30-seed windows 2, 5, 3, 8, 1 and 5), so a 30-seed DEV lands on either side of check 4's 15 percent bar about as often as not;
+* of 194 scenarios both arms reached, 144 were EXACT TIES (the stream never touches the path either arm flies), and 50 differed;
+* with the ties kept in R1's median, the median ratio is 1 (R1 not FASTER); with them dropped, about 0.973 (it would read PARTLY SUPPORTED).
+
+Nothing below is chosen to change what that predicts.
+
+**The tie reading is CONFIRMED AS CODED, not changed.** The registration's sentence "Ties, |r - 1| < 1e-9, are dropped" did not say whether it covers the median as well as the sign test. The code committed before any flight drops ties from the SIGN TEST only and keeps them in the MEDIAN, and its gate pinned that ("dropped from the sign test but stay in the median"), before anyone had flown a hard-stream seed. That is the usual sign-test convention, and the reading fixed before the data. Changing it now would flip the surrogate's reading to the better one, so it stays as it was. The report prints the counts, so a reader can see both.
+
+**Procedural fixes (none touches an arm, a bar or a verdict rule):**
+1. Checks 2 and 3 do not read the HELD86 flights, so they now run FIRST; a failure flies nothing and prints NOT WEIGHED. Before this, a failed check would have spent the held set on a read that could not be weighed.
+2. HELD86 is refused without --write, and refused if its file already exists (flown ONCE).
+3. The registered "reported" items are now printed for the flown set: its own start-heading share (field only), and the along/across split with its R1 and R2 numbers and collisions. Before this, only DEV's share and two medians were printed.
+4. HARMFUL is printed beside the verdict.
+5. Check 1 also requires the exact HELD86 seed list and kind.
+6. PART A refuses flags it ignored.
+7. Each written flight carries its stream and the along flag.
+8. The gates: the still-water identity now covers every DEV field (120); the route gate no longer builds a DEV scenario (seed 7 became 507).
+
+**Said plainly, not changed:** check 4 measures only the t = 0 start-cell heading, so a stream met later on the route (seeds 532 and 540 of the surrogate gained 7 and 10 percent with 0 degrees at the start) does not count toward it. PART A uses the route arm's time-aware aim points on the directional field. The lowest-dist flow is not the time-optimal successor under a directional cost, a limitation of the registered solver that a later round could fix with a successor rule that is the shared flow at c = 0.
+
+**What I now expect (the registered expectations stand; this is added, and moves nothing).** Check 4 is about a coin flip. If HELD86 is flown, NOT SUPPORTED is the likely verdict under the reading as coded, because most scenarios tie.
+
+## ITEM 2 PART 2, RESULT (2026-11-18; PART A: `node tools/ship/subNavRouteStudy.mjs --part a`; PART B: `--set dev`, then `--set held86 --write`, HELD86 = seeds 9301 to 9500 of hard-stream, flown ONCE; 400 flights in brain/subNavRouteHeld86.jsonl): **PART A: THE UNIFORM CURRENT DOES NOT MOVE THE PLAN. PART B: NOT SUPPORTED.**
+
+**PART A (a record).** 0 of 60 DEV fields of hard-current and hard-current-gap, each planned in its mean current, have start headings more than 5 degrees apart. The uniform-current route arm is NOT FLOWN. Together with the stretch argument above, this closes the "current in the cost" residue of nav-current-in-field for a UNIFORM current: there is nothing for the cost to change.
+
+**PART B.** On DEV, check 4 moved 7 of 30 (23.3 percent, bar 15), so HELD86 was flown. DEV itself read NOT SUPPORTED and is not a result. All four checks passed on HELD86: the same 200 scenarios; still water is the shared plan to the digit; the old HELD73 flights stand; the route bites.
+
+| arm | reached | collided | timeout | median t (s) | median path / chord |
+|---|---|---|---|---|---|
+| any+crab (reference) | 195/200 | 3 | 2 | 135.3 | 1.043 |
+| any+crab+route (designated) | 196/200 | 4 | 0 | 135.3 | 1.048 |
+
+* **R1 TIME** (194 both reached): faster on 32, slower on 18, exact sign p 0.0649; median ratio 1.0000. **Not FASTER.**
+* **R2 REACH**: 2 only the route (seeds 9419 and 9494, where the reference ran out of time), 1 only the reference (9473, where the route collided); gain 1, p 1.0; collisions 4 against 3.
+* **Reported:**
+  * Stream along the track: 97 both reached, faster 27 and slower 11 (p 0.0139), median 1.0000; collisions 2 against 1.
+  * Stream across it: faster 5 and slower 7 (p 0.77); collisions 2 against 2.
+  * 27 of the 200 HELD86 scenarios (13.5 percent) have start headings more than 5 degrees apart.
+* **VERDICT: NOT SUPPORTED.** Not HARMFUL.
+
+**Post hoc, read once from the file, moving nothing.**
+* 144 of the 194 are exact ties: the stream never touches the path either arm flies.
+* Over the 50 that differ, the median ratio is 0.9905. **So the tie reading Amendment 1 kept does not decide this round:** with ties dropped from the median too, 0.9905 is above the partial bar of 0.98, and the verdict is NOT SUPPORTED either way. The surrogate seeds 501 to 700 had suggested about 0.973 there, which would have read PARTLY; the held set did not repeat that.
+* The time change summed over all 194 is -354.5 s, -1.8 s a scenario.
+* The best ratios are 0.738, 0.741, 0.785, 0.801 and 0.824, four of the five with the stream along the track. The worst are 1.046 to 1.110.
+
+**Against the expectations (written first).**
+* G1, check 4's bar met (about 80): HELD.
+* G2, PART A's bar met (about 3): not met, as expected.
+* G3, SUPPORTED (about 40) or PARTLY (about 25): MISSED.
+* G4, median at most 0.95 (about 50): MISSED.
+* G5, reach gain at least 0 (about 70): HELD (gain 1).
+* G6, no more collisions (about 55): MISSED (4 against 3).
+* G7, the reference times out at least 5 times (about 45): MISSED (2).
+* G8, the time gain larger along the track than across (about 80): HELD on the counts (27 to 11 against 5 to 7), not on the medians (1.0000 each).
+
+**What it says.** A plan that knows the stream's map and costs its steps in time helps where the stream lies along the track and on the way. There it is faster on 27 scenarios against 11, by up to a quarter, and it rescued the two scenarios the reference ran out of time on. But in this family the stream touches the path in only about a quarter of scenarios, so most flights are identical and the registered median cannot move. It did not make the vessel safer (one more collision). **The directional solver works and is gated** (bit for bit the shared field in still water, the closed-form answers in a current, terminating). What it buys in this family is too rare to clear the bar.
+
+**Not checked, said plainly.**
+* The vessel reads the stream from a perfect map. The stream is steady and uniform in depth. The vessel is the PD autopilot's at the cruise speed.
+* The lowest-dist flow is not the time-optimal successor under a directional cost (Amendment 1).
+* A family where the stream crosses the track more often, or a verdict on the scenarios the stream touches, would be a new registration, not a re-reading of this one.
+
+### CORRECTION TO THE ITEM 2 PART 2 RESULT (2026-11-18, after the result was written; found by the review of the next round's draft)
+
+The RESULT said: "144 of the 194 are exact ties: the stream never touches the path either arm flies", and "in this family the stream touches the path in only about a quarter of scenarios". **BOTH ARE WRONG.** The straight start-to-waypoint segment enters the stream's band in 194 of the 200 HELD86 scenarios, and the centre line separates start from waypoint in 177. Every across-track stream separates them, and 85 of the 97 across-track scenarios both arms reached tie. The ties are scenarios where THE STREAM IS ON THE WAY AND THE TIME-AWARE PLAN PICKS THE SAME ROUTE. A band whose speed depends only on the distance from its centre line has to be crossed somewhere, and both arms cross it. They are not scenarios where the stream misses the path. The verdict (NOT SUPPORTED) and every registered number stand. Only that explanation was wrong, and I wrote it without checking.
+
+# ITEM 2, PART 3: WHEN THE PLAN CHANGES, IS IT FASTER? (backlog nav-current-in-field residue; Keith 2026-11-18, "We can keep working through the still open in the backlog items"; REGISTERED 2026-11-18 BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS REGISTERED SEEDS IS FLOWN)
+
+**What this replaces, said first.** My first draft for this residue was a family whose stream point sits on the track ("a family where the stream meets the track more often"). Two independent reviewers showed its premise false (the correction above). They also showed it would change almost nothing. **They prototyped it, and several variants, by flying hard-stream seeds 701 to 900 (in no set), so the following is KNOWN before this registration:**
+* The draft's family: 134 of 197 ties; median 1.0000 (0.9497 with ties dropped); along-track faster 49 to 8; across-track 84 of 90 ties.
+* Always adverse within 30 degrees of the track: median 0.9582.
+* Within 20 degrees, either sense: 0.9948.
+* **A field-only predicate fixed before flight, "the two arms' t = 0 aim chains differ", picked 62 of 200 on the draft's family. It caught 60 of the 63 scenarios whose flights differed and none of the 134 ties. On that subset, both reached 60, faster 52, slower 8, median 0.9446.**
+* The start-heading bite (Part 2's check 4) on Part 2's kind: 36 of 200; on that subset the median was 0.9649.
+
+**The question.** Part 2 asked whether the plan helps OVERALL; most of the time the plan does not change, so most flights tie. This part asks the CONDITIONAL question: **in the scenarios where the time-aware plan picks a different route from the still-water plan, is the vessel faster?** That is the quality of the route the solver picks, measured where it picks one.
+
+**NOTHING IN THE FAMILY, THE SOLVER OR THE ARMS CHANGES.**
+* Part 2's `hard-stream` kind, exactly.
+* The directional solver and the time-aware aim points.
+* The two arms, each planning once at t = 0, both crabbing on the estimate.
+* Only the READING changes: it is taken on a subset fixed before any flight.
+
+**THE SUBSET S (field only, computed before any HELD87 flight, and written in the output before the flights).** For each scenario, build both arms' t = 0 plans: the shared ladder with subFieldNav.aimOf for the reference, and the directional ladder in the stream's map with timedAimOf for the route. Walk each plan's AIM CHAIN from the start: p0 = the start; p(k+1) = the aim point of the cell holding p(k). Stop at the waypoint, at a cell with no aim point, or after 400 steps. **A scenario is in S iff the two chains differ:** a different number of points, or any point more than 1e-6 m from its counterpart.
+
+**Sets.**
+* **DEV = seeds 901 to 930 of hard-stream:** fresh, in no set, never prototyped. It is the chain-bite check and a sanity run. NOTHING IS CHOSEN ON DEV.
+* **HELD87 = seeds 9501 to 9700 of hard-stream: 200 scenarios, 400 flights, flown ONCE.** No navigation set names these seeds (9501 appears only as a sub-pilot training seed, a different generator).
+
+**The registered readings.**
+* **R1 TIME, on S.** Over the S scenarios both arms reach: FASTER iff the median ratio t(route) / t(reference) is at most 0.95 AND the exact two-sided sign test gives p <= 0.05. Ties (|r - 1| < 1e-9) are dropped from the sign test and kept in the median, as Part 2. The bar is Part 2's, not chosen on the surrogate.
+* **R2 REACH, on all 200.** gain = only the route reached minus only the reference; p from the exact sign test; collisions on all 200.
+* **THE VERDICT.**
+  * **SUPPORTED** iff R1 is FASTER on S AND gain >= 0 AND the route has no more collisions than the reference, on all 200.
+  * **PARTLY SUPPORTED** iff not SUPPORTED and one of these holds on S:
+    * FASTER (but a safety condition failed);
+    * the median is at most 0.98 with sign p <= 0.05;
+    * gain >= 5 with p <= 0.10, on all 200.
+  * **NOT SUPPORTED** otherwise.
+  * **HARMFUL** is printed beside the verdict iff gain <= -5.
+* **Reported, moving nothing.**
+  * the size of S;
+  * the complement: its tie count, its non-tied count and their median;
+  * R1 over all 200 (Part 2's reading);
+  * the ties-dropped median on S;
+  * the along/across split on S;
+  * the start-heading bite;
+  * the count of scenarios whose start or waypoint lies in the stream's band.
+
+**Checks (a failure: NOT WEIGHED).**
+1. **SAME SCENARIOS.** The exact HELD87 seed list, both arms.
+2. **STILL WATER IS THE SHARED PLAN.** On DEV seeds 901 to 903 with speed 0, the two arms fly the same flight to the digit, AND neither chain differs.
+3. **THE OLD FLIGHTS STAND** (as Part 2).
+4. **THE CHAIN BITES (on DEV, before HELD87):** at least 15 percent of the 30 DEV scenarios are in S. If not, HELD87 is NOT flown.
+5. **S IS LARGE ENOUGH:** at least 20 scenarios of S are reached by both arms. If not, the verdict is NOT WEIGHED.
+
+Checks 2, 3 and 4 run before any HELD87 flight.
+
+**CLOSED AFTER DEV.** No amendment after any DEV flight may change the kind, the sets, the arms, S's definition, a reading, a bar, the verdict rule or the tie rule. A defect found after DEV makes the round NOT WEIGHED, and a new attempt is a new registration on new seeds. Procedural fixes are allowed only before DEV is flown.
+
+**Expectations, written before any registered seed and in view of the surrogate above.**
+* J1: the chain bites on DEV, about 90 percent (31 percent on the surrogate; its 30-seed windows ran 7 to 14).
+* J2: at least 20 of S both reached, about 95 percent.
+* J3: FASTER on S, about 40 percent. The surrogate's S median was 0.9446, on the draft's family; on Part 2's kind, the start-heading subset gave 0.9649.
+* J4: SUPPORTED about 30, PARTLY about 50.
+* J5: at least 90 percent of the complement ties, about 85 percent.
+* J6: no more collisions for the route on all 200, about 50 percent.
+
+**What a result would not say.** How often the plan changes at sea; anything about a stream that must be sensed; a stream that varies in time or depth; the corner-angle margin. SUPPORTED says that when this solver's time-aware plan departs from the still-water plan, the vessel gets there faster.
+
+### AMENDMENT 1 TO ITEM 2 PART 3 (2026-11-18; after the code (73346178) was reviewed, BEFORE any DEV3 or HELD87 field or flight; procedural only, as the registration allows before DEV)
+
+The review (two lenses, each finding checked by a skeptic; seeds 1001 to 1200 only, in no set) found one major defect and minor ones. None touches the kind, the sets, the arms, S, a reading, a bar or the verdict rule.
+1. **Check 5 was applied to DEV** (30 scenarios, so S rarely holds 20). The DEV sanity run would have printed only NOT WEIGHED. DEV now prints its readings, no check 5, and NO VERDICT LINE ("nothing is chosen on DEV").
+2. **A refusal before flying** names every failed check with its consequence (NOT WEIGHED for check 2 or 3, NOT FLOWN for check 4) and exits 3.
+3. **The HELD87 flights are written the moment they exist**, before the extras and the report, so a later throw cannot lose them, and the file then refuses a second flight.
+4. **Check 1 holds the flown seeds to the literal HELD87 list.**
+5. **One tie test** (|r - 1| < 1e-9) now feeds the faster, slower and non-tied counts. Before, a ratio exactly 1e-9 from 1 fell between them.
+6. **A gate row ties S to the flight.** Each arm's t = 0 field built inside flyPlus equals planChains' field for that arm. planChains now also returns its fields.
+7. **The aim chain's "no progress" stop is not in the registration's wording.** It stops the walk when a cell's aim point is the point it stands on. It is inert: the only such point is the waypoint, where the registered stop ends the walk anyway (the gate logs removing the waypoint stop as an equivalent mutant for this reason). It is kept and said here.
+
+Said plainly, from the review: on seeds 1001 to 1200, S predicted flight differences one way. A few scenarios outside S still flew differently, through aim differences off the chain's vertices. The complement's non-ties are reported, as registered.
+
+**A defect in Amendment 1's own commit (2c4921e8), found and mended before any DEV3 or HELD87 flight.** Two edits left tools/ship/subNavRouteCondStudy.mjs unable to parse: a comment cut a one-line function in half, and a name was declared twice. Its gate died on import. My count of FAIL rows read that crash as green, and read the four sabotages of the amendment as red. The first DEV run exited on the syntax error before building anything. Mended, every touched gate was re-run requiring its own pass line, and the four sabotages were re-run counting only the FAIL rows of a gate that loaded (all red: 1, 1, 1, 2).
+
+## ITEM 2 PART 3, RESULT (2026-11-18; `node tools/ship/subNavRouteCondStudy.mjs --set dev3`, then `--set held87 --write`; HELD87 = seeds 9501 to 9700 of hard-stream, flown ONCE; 400 flights in brain/subNavRouteHeld87.jsonl): **PARTLY SUPPORTED**
+
+DEV (seeds 901 to 930) met check 4 (13 of 30 in S) and was a sanity run with no verdict. On HELD87, S was fixed from the fields and printed before any flight: **41 of 200 scenarios.** All five checks passed (40 of S reached by both arms).
+
+| arm | reached | collided | median t (s) |
+|---|---|---|---|
+| any+crab (reference) | 194/200 | 6 | 135.8 |
+| any+crab+route (designated) | 195/200 | 5 | 135.7 |
+
+* **R1 TIME ON S** (40 both reached): **the route faster on 31, slower on 8, 1 tie; exact sign p 0.0003; median ratio 0.9660.** Not FASTER: the median misses the 0.95 bar. It is inside the partial bar of 0.98 with p <= 0.05.
+* **R2 REACH** (all 200): 1 only the route, 0 only the reference; gain 1; **collisions 5 against 6**.
+* **VERDICT: PARTLY SUPPORTED.**
+* **Reported, moving nothing.**
+  * The complement of S: 154 both reached, 148 exact ties, 6 non-tied (4 faster, 2 slower).
+  * Over all 200 (Part 2's reading): faster 35, slower 10, 149 ties, median 1.0000, p 0.0002.
+  * On S with ties dropped: 0.9633.
+  * S with the stream along the track: 27 faster to 5 slower, p 0.0001, median 0.9582. Across it: 4 to 3, median 0.9911.
+  * 17 of 200 scenarios had start headings more than 5 degrees apart; 40 had the start or waypoint in the band.
+
+**Against the expectations (written before any registered seed, in view of the disclosed surrogate).**
+* J1, the chain bites on DEV: HELD (43 percent).
+* J2, at least 20 of S reached by both: HELD (40).
+* J3, FASTER on S (about 40): MISSED (0.966 against 0.95).
+* J4, SUPPORTED about 30, PARTLY about 50: PARTLY.
+* J5, at least 90 percent of the complement ties: HELD (148 of 154, 96 percent).
+* J6, no more collisions for the route: HELD (5 against 6).
+
+**What it says.** When this solver's time-aware plan departs from the still-water plan, the vessel gets there faster in the clear majority of cases (31 of 39 non-tied, p 0.0003). The typical saving is about 3 to 4 percent, not the 5 percent the bar asked for. It costs nothing in reach or collisions. The saving is in streams that lie along the track (27 to 5); across-track departures are a wash. Where the plans do not differ, 96 percent of flights are identical. So the plan changes rarely (S is a fifth of the set), and when it does, it is usually right, by a little. Together with Part 2 (NOT SUPPORTED overall), the directional solver is a sound but small improvement in this family, concentrated in the along-track case.
+
+**Not checked, said plainly.** The stream is read from a perfect map, steady and uniform in depth. The vessel is the PD autopilot's at the cruise. The lowest-dist flow is not the time-optimal successor. A few scenarios outside S flew differently through aim differences off the chain's vertices (6 non-tied in the complement).
+
+# ITEM 2, PART 4: THE TURN RADIUS IN THE MARGIN, RECORDED (no flight; Keith 2026-11-18, "keep going through the open items")
+
+**What was asked.** The residue of nav-current-in-field read "the turn radius (about 35 m) in the margin (a margin that depends on the corner angle)". Before designing a round, a census classified every collision and near miss in the SPENT navigation sets. It covered HELD4, HELD70, HELD71, HELD73, HELD86, HELD87 and their DEV sets: 3,110 unique flights, re-flown deterministically with a recording wrapper that matches every stored flight exactly. **No fresh seed was flown.** Three independent design proposals were then made from the census, and one was judged (the other two judges were cut off by a usage limit). Two proposals recommended no flight, and this record follows them. **SAID PLAINLY: like PART A of Part 2, this is a record of figures already seen on spent sets, not a test, and nothing in it is a result.** The figures below were re-run by me from the census's saved data and scripts, and agree with what it reported, except one count: near misses are 160, not 161.
+
+**What the collisions are.** 106 collisions; 101 of them in the current kinds.
+* **The heading the vessel flew at impact was the STRAIGHT BEARING TO THE WAYPOINT in 73 of the 101.** It was a blocked cell's flow in 22, and the plan's aim point in only 6.
+* In 95 of the 101, the vessel had drifted into the inflated zone (median 4.9 m off a leg that runs along the zone's edge). Blocked cells have no aim point, so the heading falls back. **At entry, the ground track already pointed into the obstacle in 95 of 95.** In 76 of them no 35 m turn could have cleared it (median shortfall 2.7 m).
+* The turn angle at the last aim switch does not separate the collisions. 10-20 deg: 31; 20-45 deg: 37; 45-90 deg: 5; 90 deg or more: 14; no switch: 14. Near misses fall in the same proportions.
+
+**The two bars a flown round would have needed (registered by the record's proposal before these figures were re-run; both FAIL):**
+* **RA, ADDED MARGIN: the median corner extra at least 4 m.** The extra is the 35 m fillet's inset, R(sec(theta/2) - 1), on the nearest shape (4 m is the m12-to-m16 step that HELD70 could not tell apart). The measured median was 1.95 m on hard-current (p90 3.18) and 0.68 m on hard-current-gap (p90 2.34). FAILS.
+* **RB, THE CORNER CARRIES THE COLLISIONS:** any+crab collisions more frequent in plans with a corner of 30 deg or more, Fisher p <= 0.05. Measured: 5 of 198 against 2 of 202, p 0.28 (hard-current 3/124 against 0/76; gap 2/74 against 2/126, p 0.63). FAILS.
+
+**One figure against the closure, said plainly.** NEAR MISSES under 3 m on hard-current DO lean toward sharp-corner plans: 8 of 124 against 0 of 76, p 0.025; both kinds pooled, 21 of 198 against 10 of 202, p 0.040. On hard-current-gap the lean is driven by the 6 m rung through the gap, not the corner. This is post hoc on a spent set, chosen from among several splits, so it is a lead and not a finding. It suggests sharp corners leave less room, not that a corner margin of about 2 m would save flights.
+
+**CLOSED: the corner-angle margin.** The term is too small where the collisions happen. The collisions come from the vessel LEAVING the plan, not from turning at its corners. A flown round could recover at most about 2 to 4 flights in 600 against a gain bar of 5.
+
+**OPENED: what the vessel does when it has left the plan.** A new backlog item, nav-zone-fallback-heading: inside a blocked cell the heading falls back to the straight bearing to the waypoint, which pointed into the obstacle in 73 of 101 collisions. A heading rule for the zone (steer to the nearest free cell's aim point, hold the last aim point, or steer away from the nearest shape) was never tried. Separately, all 6 collisions of any+crab+margin came from its 3 s replan clearing the vessel's own surroundings (OWN_CLEAR 15 m) and switching to a leg that grazes the obstacle.
+
+# ITEM 2, PART 5: WHEN THE VESSEL HAS LEFT THE PLAN, RECORDED AND CLOSED (no registered flight; backlog nav-zone-fallback-heading; 2026-11-18)
+
+**What was tried.** A drafted rule, `+zone`: every cell with no aim point aims at the centre of the nearest free cell that has one, within 10 cells. It was passed through flyPlus's aimOf option, with no shared file edited. Before registering it, two independent reviewers prototyped it, with each finding checked by a skeptic. **SAID PLAINLY: the prototype flew seeds 1201 to 1400 of hard-current, hard-current-gap and hard-stream (in no set), and the spent sets HELD71, HELD73, HELD86, HELD87 and DEV 1 to 30. The held set I had drafted, seeds 9701 to 10000, was NOT flown and stays unspent.** I re-checked none of the flights myself. The reviewers reproduced every stored any+crab flight exactly (200 of 200 on each spent set). Passing the stock aimOf through the option changed nothing (60 of 60), and every flight that never entered a cell without an aim point was identical between the arms (0 exceptions in 1,490).
+
+**The drafted rule is HARMFUL everywhere it was flown.**
+* Seeds 1201 to 1400 (600 scenarios): reference reached 585 and collided 15; `+zone` reached 565 and collided 34. Paired 0 against 20, gain -20, p about 2e-6. Each kind alone -6, -7, -7.
+* Clearance (C10, |d| > 0.25 m): 11 better against 74 worse.
+* The four spent held sets pooled (800): gain -23, collisions 16 to 37.
+
+**Why.** At zone entry the vessel is a median 3.8 s from impact. Its track already points into the obstacle (95 of 95 in the census), and it turns about 17 degrees before impact. The nearest free cell is usually the one just left, behind the vessel (the aim was more than 90 degrees off the track in 53 percent of zone ticks), so the rule commanded U-turns and oscillated at the zone's edge. The rule also replaced the cell-flow heading, which most no-aim ticks fly (64,901 against 8,649 on the straight bearing), and that is where most of the harm came from.
+
+**The variants, all on the same seeds, and none better than neutral:**
+
+| variant | gain | detail |
+|---|---|---|
+| fill only cells with zero flow | -3 | |
+| that, with the neighbour's aim point | -2 | |
+| the nearest free cell's AIM POINT instead of its centre | about 0 | +8/-11 pooled over 1,490, clearance leaning to harm, p 0.094 |
+| hold the last aim point | -19 | |
+| steer away from the nearest shape | -33 | |
+| slow when the command is far off the heading | -19 or -8 | at a 40 or 60 deg threshold |
+
+**THE ENTRY-TICK COUNTERFACTUAL closes it.** From the moment of zone entry, with any of 12 fixed headings at full or half speed, only 15 of 100 census collisions escape. **The heading the census found at impact (the straight bearing in 73 of 101) is a CORRELATE of being doomed, not a cause.** No rule acting after the vessel has left the plan can do much.
+
+**CLOSED: nav-zone-fallback-heading.** If anything is left, it is the APPROACH: legs that run along the edge of the inflated zone, where a 5 m drift costs the plan. That is what the margin does, and the HELD70 sweep could not tell a wider top rung from the incumbent (m16 against m12). The crab already counters the drift. So with this planner and autopilot, about 2 percent collisions in these current kinds is where the series stands, and I do not open a further item on it.
+
+# ITEM 2, PART 6: A STREAM THE VESSEL MUST SENSE, CLOSED BY ARGUMENT (no flight; Keith 2026-11-18, "Close it that way")
+
+**The residue.** Parts 2 and 3 gave the route plan the stream's MAP. The open question was a vessel that must SENSE the stream (from its own logs) and plan in what it has sensed.
+
+**Why it closes without a round.** The known map is the best a sensing vessel could have, since it has nothing to learn. With it, the plan changes the route in about a fifth of scenarios (41 of 200 on HELD87). There it saves a median 3.4 percent of the time (31 faster to 8 slower), and over all scenarios the median is unchanged (Part 2: NOT SUPPORTED; Part 3: PARTLY SUPPORTED). A sensing vessel learns a stream only where it has been: it meets the band when it enters it, and by then the way round it is mostly chosen. The saving in Part 3 came from along-track streams, avoided or ridden from the start, which is exactly what a vessel with no map cannot plan for. A sensed arm would also have to replan as it learns, and Part 2's review showed replanning is a confound of its own (any+crab+margin's collisions came from the 3 s replan). The expected effect is below the known map's small one. A round would spend a held set on a near-certain NOT SUPPORTED, and the design of a sensing model would be the larger part of its cost.
+
+**SAID PLAINLY: this is an argument, not a measurement.** Nothing was flown for it. It rests on Parts 2 and 3's held results, and on the fact that a sensing vessel cannot plan for what it has not met. A stream that persists along a route the vessel flies many times (a mission repeated, or a fleet sharing what it sensed) would change this, because the second pass has a map. That would be a different question.
+
+**CLOSED: the sensed stream.** With it, nav-current-in-field has no open residue: the uniform current in the cost (PART A, nothing to gain), the stream route (PARTS 2 and 3), the corner-angle margin (PART 4), the zone fallback (PART 5) and the sensed stream (this part).

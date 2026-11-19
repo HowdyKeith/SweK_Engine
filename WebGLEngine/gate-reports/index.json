@@ -1,5 +1,5 @@
 {
- "built": "2026-11-04",
+ "built": "2026-11-18",
  "reports": [
   "backendRouting-selfcheck.json",
   "brainStages-selfcheck.json",
@@ -85,10 +85,12 @@
   "registerDrift-selfcheck.json",
   "relativeBudget-selfcheck.json",
   "reportDoors-selfcheck.json",
+  "reservoirPilotGpu-selfcheck.json",
   "retroRaster-selfcheck.json",
   "rigidCouple-selfcheck.json",
   "rigidFloat-selfcheck.json",
   "rtPipeline-selfcheck.json",
+  "rtViewer-selfcheck.json",
   "runtimeGap-selfcheck.json",
   "shipDebris-selfcheck.json",
   "shipyard-selfcheck.json",

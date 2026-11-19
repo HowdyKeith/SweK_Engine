@@ -245,7 +245,7 @@ sec("7. THE COMMAND");
 sec("8. THE START (one real search per family at a throwaway recipe on the smoke sets)");
 {
     const sets = Object.fromEntries(Object.entries({ train: T.TRAIN_SMALL_SET, heldOut: T.HELD_OUT_SET, pool: T.POOL_SET }).map(([k, v]) => [k, v.filter((_, i) => i % 8 === 0)]));
-    const rule = T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), want = { train: T.evaluate(rule, sets.train, { gauge: T.GAUGE }), heldOut: T.evaluate(rule, sets.heldOut, { gauge: T.GAUGE }), pool: T.evaluate(rule, sets.pool, { gauge: T.GAUGE }) };
+    const rule = T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)), want = { train: T.evaluate(rule, sets.train, { gauge: T.GAUGE }), heldOut: T.evaluate(rule, sets.heldOut, { gauge: T.GAUGE }), pool: T.evaluate(rule, sets.pool, { gauge: T.GAUGE }) };
     const recs = D.FAMILIES.map((f) => D.runSearch({ family: f, index: 0 }, { sets, recipe: { iters: 2, pruneBudget: 2 }, smoke: true }));
     ok("!! the START of each family's record IS rule-low06's on the same sets (train, held-out, pool crushed): the untrained circuit is the rule", recs.every((r) => r.start.train === want.train.score && r.start.heldOut === want.heldOut.score && r.start.poolCrashed === want.pool.crashed), recs.map((r) => r.start.train.toFixed(4)).join(" ") + " vs " + want.train.score.toFixed(4));
     ok("!! the weight counts are 2,452 (cx), 2,452 (nostate), 2,443 (plain), and each record's weights fit them", J(recs.map((r) => r.weightCount)) === J([2452, 2452, 2443]) && recs.every((r) => r.weights.length === r.weightCount) && recs.every((r) => r.smoke === true));

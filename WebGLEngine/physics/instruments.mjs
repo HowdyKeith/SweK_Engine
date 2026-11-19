@@ -2671,6 +2671,10 @@ export const INSTRUMENTS = [
       measures: "Three families of four searches by rung 4a's recipe: the station-only plain net on the large and the small training set, and the full plain net with the fitness changed to the priced score and nothing else; the champion of a family is chosen by trainDecisionCircuit's championOf before any audit is touched.",
       key: "Twelve jobs (three families of four searches, search seeds 98100 + k, 98110 + k and 96520 + k), resumable; the held-out and pool readings are taken from the weights rounded to six decimals, so the champion that is flown is the champion that was chosen; the audit is not read here. (lifted from the module's own header)",
       gate: "tools/ship/trainStation-selfcheck.mjs" },
+    { id: "lesion-left-side", page: "instrument-bench.html", name: "THE LEFT-SIDE LESION ROUND (brain/LESION_LEFT_SIDE_WIP.md)", area: "brain",
+      measures: "The stateful fly with each of four left-side classes silenced (EPG_L, PEG_L by side; glomeruli L5, L7) beside 79 role-matched random sets of the same size each, on the switchboard's dropout task, ids sb-6001 to sb-6020; each class's cost ranked among its draws' and judged by Holm-Bonferroni over the four; the right mirrors reported, never weighed.",
+      key: "Checks first (IDS, WEIGHTS, DRAWS, COMPLETE, NO-OP); a failed check marks the verdict NOT WEIGHED. The draw seed is 20261117, and the smallest rank p 79 draws can give is 1/80 = Holm's first threshold. (lifted from the module's own header)",
+      gate: "tools/ship/lesionLeftSide-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

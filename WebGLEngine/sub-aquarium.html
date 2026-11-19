@@ -11,8 +11,8 @@
 
      THE STAND-IN, SAID PLAINLY: the network in every sub THIS PAGE FLIES is wired like the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses). A real zebrafish circuit IS vendored now -- the densest 34-neuron, 153-synapse core of the
      Fish1 TEN-analysis set (vendor/zebrafish/PROVENANCE.md; mostly inputs to the dorsal motor nucleus of the vagus, real wiring and not a circuit anyone has shown steers a body; the Mauthner escape circuit is not in it) -- and a pilot
-     wired to it exists (brain/pilotSubWeightsFishWip.json, 803 weights), so the chip can say live; but this page does not fly an 803-weight fish body yet (the tank validates the fly's 963), so the chip names where this is going and
-     the subs in the tank are still the fly's.
+     wired to it exists (brain/pilotSubWeightsFishWip.json, 803 weights), so the chip can say live. SINCE 2026-11-17 the tank flies that pilot as ONE KIND of sub (the "Zebrafish TEN-core pilot"
+     that "Offer my subs" adds; its line reads 'zebrafish'); every other sub in the tank is still the fly's.
 
      Nothing from the network is ever put in the page as markup: every name and address goes in with textContent. -->
 <html lang="en">
@@ -89,7 +89,9 @@
     <span title="v4912 -- the SURVEY: the selected sub is made a battery boat with a charge, given three stations in the tank and the survey seat (the twin planner of the needs-and-limits series) chooses the order it visits them in, rises to recharge and comes home by the end of 600 s. The profile is the planner's trade: standard (replan every 120 s), events (plan when it leaves the surface: the same gain for three quarters of the work), wide (five stations tried at a time), ensemble (plan against a charge a little high and a little low); and two SEATS of the decision-circuit rounds, not planners: rule (the tuned rule, nearest-first) and circuit (the plain net trained from the rule, digest c916e7f5; the audits found it within noise of the rule, so watch where the two differ, not which scores more: the tank's dynamics are not the task's). The stations are drawn amber, green once visited; the list line gives the score at the end. Press restore to end it."><button id="surveyBtn">survey</button> <select id="surveyProf" title="the planner's profile"><option value="standard">standard</option><option value="events">events</option><option value="wide">wide</option><option value="ensemble">ensemble</option><option value="rule">rule (nearest-first)</option><option value="circuit">circuit (trained net)</option></select></span>
     <button id="flyEstBtn" disabled title="The fly's heading-loop circuit as an estimator behind the autopilot, flown through the compass dropout (available once the page has loaded the circuit)">fly estimator</button> <button id="erEstBtn" disabled title="The best random wiring of the same size, fitted the same way, behind the autopilot (available once the page has loaded the circuit)">random-wiring estimator</button></span>
   <label title="Put a sea of islands, icebergs (with a keel: a sub passes beneath one that is shallower than it swims) and patrolling ships in the tank and send the subs to goals through it. The sub's own pilot flies; the guidance only replaces the wandering. Contact is counted, not punished. Standard 500 x 300 m tank only. 'plan ahead' is the arm that did best in the harder navigation test (brain/SUB_FIELD_NAV_WIP.md); 'straight' ignores the sea."><span>navigation</span> <select id="navSel"><option value="">off (wander)</option><option value="any+predict">plan ahead</option><option value="any+replan">re-plan</option><option value="any">plan once</option><option value="straight">straight at the goal</option></select></label> <button id="navSeaBtn" disabled title="Draw a new sea (the counters start again)">new sea</button>
+  <label title="A steady current the whole tank swims in: every sub feels it and its pilot is told it (the explorer cruises at 3 m/s). Off by default, which is the tank as it always was. The direction is as the plan view shows it."><span>current</span> <select id="curSpeed"><option value="0" selected>off</option><option value="0.3">0.3 m/s</option><option value="0.6">0.6 m/s</option><option value="1">1.0 m/s</option><option value="1.5">1.5 m/s</option></select> <select id="curDir"><option value="right">&rarr; right</option><option value="left">&larr; left</option><option value="down">&darr; down</option><option value="up">&uarr; up</option></select></label>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
+  <label title="Fly the fly-circuit subs with their reservoir and readout on this machine's GPU (WebGPU). The tank's tick cannot wait for the GPU, so each such sub flies the newest controls that have come back: one tick late or more, and the PD autopilot until the first lands. Measured on 500 dives: four ticks late costs nothing that matters (brain/RESERVOIR_GPU_WIP.md). Off by default; the CPU pilot stays the default."><input type="checkbox" id="gpuFly" disabled> <span>fly circuit on the GPU</span></label>
   <span id="msg" class="sub"></span>
 </div>
 <main>
@@ -135,6 +137,7 @@ import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
 import { needsLine } from "/render/needsView.mjs";
+import * as LBL from "/render/subAquariumLabel.mjs";   // 2026-11-17: what flies a sub, said in its row (a waiting or refused kind is named, not called the autopilot)
 import { CLASSES as NEEDS_CLASSES } from "/physics/mechanics/subNeeds.mjs";   // the menu's values are checked against the model's own class table
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
@@ -229,6 +232,14 @@ function applyNav() {
   } catch (e) { $("navSel").value = ""; $("navSeaBtn").disabled = true; $("msg").textContent = String((e && e.message) || e).slice(0, 110); }
 }
 $("navSel").onchange = applyNav;
+// 2026-11-17: the tank's steady current (render/subAquariumSim.mjs setCurrent), off by default. Plan-view directions: x grows to the right, y downward.
+const CUR_DIRS = { right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] };
+function applyCurrent() {
+  const v = Number($("curSpeed").value), d = CUR_DIRS[$("curDir").value] || CUR_DIRS.right;
+  try { tank.setCurrent(v > 0 ? [v * d[0], v * d[1]] : null); $("msg").textContent = v > 0 ? `a steady current of ${v} m/s (${$("curDir").selectedOptions[0].textContent.slice(2)}) in the whole tank` : "no current: still water"; }
+  catch (e) { $("curSpeed").value = "0"; tank.setCurrent(null); $("msg").textContent = String((e && e.message) || e).slice(0, 110); }
+}
+$("curSpeed").onchange = applyCurrent; $("curDir").onchange = applyCurrent;
 $("navSeaBtn").onclick = () => { navSeed++; try { tank.setScene(navSeed); $("msg").textContent = "a new sea (" + navSeed + "): counters start again"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 110); } };
 if (sizeKey !== "standard") { $("navSel").disabled = true; $("navSel").title = "The navigation sea is for the standard 500 x 300 m tank (larger tanks make the plan too costly to rebuild)."; }
 $("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
@@ -287,7 +298,7 @@ function updateStats(snap) {
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${s.kind === "flycx" ? "stateful" : s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${LBL.pilotLabel(s)} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -381,7 +392,7 @@ function render() {
     sg.strokeStyle = c; sg.lineWidth = 2; sg.beginPath(); sg.arc(q.x * dx, q.depth * dz, 4, 0, 6.2832); sg.stroke();
   }
   drawCompass(snap); drawBrain();
-  if (view3d) view3d.render(snap, performance.now() / 1000);
+  if (view3d) { view3d.setSea(tank.sceneNow()); view3d.render(snap, performance.now() / 1000); }   // 2026-11-17 (tank-nav-3d): the sea and the goals in 3D too
   updateStats(snap);
 }
 function frame(now) {
@@ -391,6 +402,29 @@ function frame(now) {
   render(); requestAnimationFrame(frame);
 }
 refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 5000); requestAnimationFrame(frame);
+// UNNUMBERED (PART B of "A TANK PILOT TYPE ON THE DEVICE, ONE TICK LATE", brain/RESERVOIR_GPU_WIP.md): the switch that flies the fly-circuit subs on the GPU, OFF by default.
+// A device that cannot be had leaves the CPU type in place and says so; the line says how late the subs on the device are.
+function mountGpuSwitch(circuit, cpuKind) {
+  const box = $("gpuFly"); let gpuKind = null, device = null, pilots = new Map(), timer = null;   // sub -> its device pilot: a sub re-seated frees its last one
+  box.disabled = !navigator.gpu;
+  // an absent navigator.gpu is often an insecure origin (a LAN address over http), not a browser without WebGPU: the shared probe says which (ui/webgpuProbe.mjs)
+  if (!navigator.gpu) import("/ui/webgpuProbe.mjs").then((P) => { const p = P.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location }); box.parentElement.title = (p.message || "WebGPU is not available to this page") + " -- the fly-circuit subs fly on the CPU."; if (p.reason === "insecure-origin") P.showOriginBanner(p); }).catch(() => {});
+  const report = () => {
+    const live = [...pilots.values()], late = live.map((p) => p.lateness).filter((v) => v !== null), bad = live.find((p) => p.failed);
+    $("msg").textContent = bad ? `the GPU refused (${String(bad.failed).slice(0, 80)}): those subs fly the autopilot` : `${live.length} fly-circuit sub${live.length === 1 ? "" : "s"} on the GPU, ${late.length ? `${Math.min(...late)} to ${Math.max(...late)} ticks late` + (Math.max(...late) > 4 ? " -- later than the 4 ticks that were measured to cost nothing, so what this costs is not known" : "") : "flying the autopilot until the first read lands"}`;
+  };
+  const off = (why) => { tank.registerPilotKind("flycx", cpuKind); if (gpuKind) gpuKind.destroy(); gpuKind = null; pilots = new Map(); clearInterval(timer); timer = null; box.checked = false; $("msg").textContent = why; };
+  box.onchange = async () => {
+    if (!box.checked) return off("the fly-circuit subs fly on the CPU again");
+    try {
+      if (!device) { const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no GPU adapter"); device = await adapter.requestDevice(); device.lost.then(() => { device = null; if (gpuKind) off("the GPU was lost: the fly-circuit subs fly on the CPU"); }); }
+      const G = await import("/render/subAquariumFlyCxGpu.mjs"), k = G.flyCxGpuKind(circuit, device);
+      if (!box.checked) return;
+      gpuKind = Object.freeze({ ...k, build(w, ctx = {}) { const p = k.build(w, ctx), key = ctx.sub || p, old = pilots.get(key); if (old) old.destroy(); pilots.set(key, p); return p; }, destroy: k.destroy });
+      tank.registerPilotKind("flycx", gpuKind); report(); timer = setInterval(report, 1000);
+    } catch (e) { off("the GPU is not available here (" + String((e && e.message) || e).slice(0, 80) + "): the fly-circuit subs fly on the CPU"); }
+  };
+}
 (async () => {   // the compass-dropout view (UNNUMBERED): mounted after the tank is running; a failure here leaves the tank alone
     const host = $("dropoutHost");
     try {
@@ -407,13 +441,19 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
             }
         } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
         try {   // UNNUMBERED (brain/TANK_PILOTS_WIP.md): the stateful fly pilot as a kind of sub the tank can fly -- the autopilot's laws plus a residual read from this circuit run with a memory (1,729 weights); registering re-seats any such sub already in the tank
-            const fx = await import("/render/subAquariumFlyCx.mjs");
-            tank.registerPilotKind(fx.CIRCUIT, fx.flyCxKind(circuit));
+            const fx = await import("/render/subAquariumFlyCx.mjs"), cpuKind = fx.flyCxKind(circuit);
+            tank.registerPilotKind(fx.CIRCUIT, cpuKind);
+            mountGpuSwitch(circuit, cpuKind);
         } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
+        try {   // 2026-11-17 (nextRounds fish-pilot-tank-kind): the zebrafish TEN-core pilot as a kind of sub the tank can fly (803 weights, no state; render/subAquariumFish.mjs says what seating it shows); its weights come with the sub
+            const fk = await import("/render/subAquariumFish.mjs");
+            tank.registerPilotKind(fk.CIRCUIT, fk.fishKind());
+        } catch (e) { $("msg").textContent = "the zebrafish pilot is not available here: its subs fly the autopilot"; }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>
 <p class="note">Names and addresses reach this page as text only. A sub is numbers; the code that flies it is the code this page already loaded.</p>
+<script type="module" src="/ui/originNotice.js"></script>
 <script type="module" src="/ui/pageNotesMount.mjs"></script>
 </body>
 </html>

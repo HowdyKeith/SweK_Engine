@@ -975,8 +975,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // the render upscaler switch -- one more, ui/upscalerSwitch-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2210 -> 2211, usesOk 2189 -> 2190, definesOk 2181 -> 2182, nameFirst 2071 -> 2072, read off the code's own report.
     // 2026-11-05 -- THE MERGE OF FOUR LINES AND THIS ROUND'S OWN GATES: 72 gates more than the last recorded tree (the 75 added since v4911 less three renamed or removed by the merges), each defining ok(n, c, d) once and naming first, read off the code's own report: gates 2211 -> 2283, usesOk 2190 -> 2262, definesOk 2182 -> 2254, nameFirst 2072 -> 2144; condFirst, distinctDefinitions and unknownSignature did not move.
     // 2026-11-08 -- THE MERGE OF TWO CHATS' BRANCHES (v4913): 62 gates more, each defining ok(n, c, d) once and naming first: gates 2283 -> 2345, usesOk 2262 -> 2324, definesOk 2254 -> 2316, nameFirst 2144 -> 2206, read off the code's own report (condFirst 99 and unknownSignature 19 did not move).
-    gates: 2345, usesOk: 2324, definesOk: 2316, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2206, condFirst: 99, unknownSignature: 19,
+    // v4922 -- five gates of this round (brain/lesion, brain/lesionFlyCx, brain/reservoirGpu, tools/ship/lesionLeftSide, tools/subReservoirV6), each defining ok(n, c, d) once and naming first: gates 2345 -> 2350, usesOk 2324 -> 2329, definesOk 2316 -> 2321, nameFirst 2206 -> 2211, read off the code's own census (condFirst 99, distinctDefinitions 49 and unknownSignature 19 did not move).
+    // v4926 -- 28 gates of this round (the route solver and studies, FOLLOW-UP 10, the GPU switch, the space and backlog items), each defining ok(n, c, d) once and naming first: gates 2350 -> 2378, usesOk 2329 -> 2357, definesOk 2321 -> 2349, nameFirst 2211 -> 2239, read off the code's own census (condFirst 99, distinctDefinitions 49 and unknownSignature 19 did not move).
+    gates: 2378, usesOk: 2357, definesOk: 2349, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2239, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

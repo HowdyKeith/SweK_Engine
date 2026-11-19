@@ -59,7 +59,7 @@ sec("2. THE PROFILES");
 
 sec("3. THE SEATS");
 {
-    const walk = (seat) => grid.map(({ st, obs }) => seat(st, obs)), ruleRef = walk(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf()));
+    const walk = (seat) => grid.map(({ st, obs }) => seat(st, obs)), ruleRef = walk(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)(ctxOf()));
     const rule = walk(C.circuitSeat("rule")(ctxOf())), circuit = walk(C.circuitSeat("circuit")(ctxOf()));
     const Pol = CS.createPlainPolicy(84, "plain"), netRef = walk(Pol.seatFor(Float32Array.from(W.PLAIN_CHAMPION.weights))(ctxOf())), untrained = walk(Pol.seatFor(Pol.handWeights())(ctxOf()));
     ok(`!! the rule profile decides exactly as the tuned rule at the survey seat's constants on all ${grid.length} observations of a grid walked in order (surfacing, cap, pump, repair and the station)`, grid.length === 64 && rule.every((d, i) => same(d, ruleRef[i])));
@@ -69,7 +69,7 @@ sec("3. THE SEATS");
     ok("!! every call of circuitSeat makes a seat of its own (two dives do not share a seat factory)", C.circuitSeat("circuit") !== C.circuitSeat("circuit") && C.circuitSeat("rule") !== C.circuitSeat("rule"));
     ok("!! an unknown profile is refused by its words naming the circuit profiles (a planner profile, a wrong case and nothing included)", msg(() => C.circuitSeat("standard")) === 'subAquariumCircuit.circuitSeat: unknown circuit profile "standard" (rule, circuit)' && msg(() => C.circuitSeat("Circuit")) === 'subAquariumCircuit.circuitSeat: unknown circuit profile "Circuit" (rule, circuit)' && msg(() => C.circuitSeat()) === "subAquariumCircuit.circuitSeat: unknown circuit profile undefined (rule, circuit)");
     ok("!! the policy is built once and shared (it is a pure function of its width), and a champion whose weights do not fit the net is refused by its words (2 weights against 2,443); the weights given are the ones used (the untrained net's weights seat the rule's decisions)", C.plainPolicy() === C.plainPolicy() && msg(() => C.circuitSeat("circuit", { ...W.PLAIN_CHAMPION, weights: [0.1, 0.2] })) === "subAquariumCircuit.circuitSeat: the champion has 2 weights and its net takes 2443" && (() => { const seat = C.circuitSeat("circuit", { ...W.PLAIN_CHAMPION, weights: Array.from(C.plainPolicy().handWeights()) })(ctxOf()); return grid.every(({ st, obs }, i) => same(seat(st, obs), ruleRef[i])); })());
-    ok("!! the rule profile does not depend on which bounds the rule is normalised against, for the survey constants (they lie inside both the default and the wide bounds), so `U.WIDE_BOUNDS` is the task's choice and not a hidden one", J(U.normalise(SV.SURVEY_CONSTANTS, U.BOUNDS)) === J(U.normalise(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)));
+    ok("!! the rule profile does not depend on which bounds the rule is normalised against, for the survey constants (they lie inside both the default and the wide bounds), so `U.WIDE_BOUNDS` is the task's choice and not a hidden one", J(U.normalise(SV.SURVEY_ROUND33, U.BOUNDS)) === J(U.normalise(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)));
     const a = C.circuitSeat("circuit")(ctxOf()), b = C.circuitSeat("circuit")(ctxOf());
     const wa = grid.map(({ st, obs }) => a(st, obs)), wb = grid.map(({ st, obs }, i) => (i === 0 ? b(st, { ...obs, r: { ...obs.r, frac: 0.1 } }) : b(st, obs)));
     ok("!! two seats of one profile are independent dives: feeding one a different first reading (a low charge) leaves the other's decisions as they were (the rule's filter of the gauge is per seat)", wa.every((d, i) => same(d, netRef[i])) && wb.some((d, i) => !same(d, netRef[i])));
@@ -79,7 +79,7 @@ sec("4. THE SEAT THE AUDITS FLEW");
 {
     const w = Float32Array.from(W.PLAIN_CHAMPION.weights), planned = D.familyPolicy("plain"), gauge = T.GAUGE, scenarios = [T.scenario(18001, "far"), T.scenario(18002, "both"), T.scenario(7, "plain")].map((s) => s);
     const flown = (seatOf, sc) => { const r = T.fly(T.flyDecision(seatOf), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; };
-    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit"), sc), a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS), sc) }));
+    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit"), sc), a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS), sc) }));
     ok("!! three real dives of the task (seeds of the DEV and spare ranges, 200 s): the circuit profile's seat gives the dive of the audited circuit-plain pilot (the same score and fingerprint), and the rule profile's the dive of the tuned rule's seat", rows.every((x) => J(x.c) === J(x.a) && J(x.r) === J(x.l)));
     ok("!! and the trained net is a different pilot from the rule on at least one of the three dives (the net acts)", rows.some((x) => J(x.c) !== J(x.r)));
 }

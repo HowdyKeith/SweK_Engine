@@ -225,6 +225,22 @@ Round 3's audits (51-62, 71-82, 91-102) have been read for the champions; **a se
 **Why this is not a tuned pass, and what it cannot claim.** The comparator was not searched for: GUARDED-FILTER is the reference Amendment 1 item 1 named and tuned on the baseline seeds (before any audit was read), and the only thing changed is which of the registered references the check names. But I chose the restatement AFTER seeing the registered form fail, and a reader should weigh the verdicts below knowing that. **Nothing else is changed:** the 12 circuits, the controls, the recipe, the three audits, the margin rules and the expectations stand. The verdicts of the first run, now readable and marked POST HOC: **WIRING IN BETWEEN** (cx wins against the strongest family on two or more audits but not every family on every audit), **RULE DOES NOT BEAT THE RULE** (cx against GUARDED on the audits: +0.046, -0.026, +0.045 against margins 0.076, 0.064, 0.087), cx beats NO STATE on two of three audits (0.082 and 0.062, not 0.012) and WITHHELD on one; the training line shows most controls had a champion in only 1 to 3 of 4 searches.
 **A second incident, recorded.** The first run's result file was lost on Keith's rig by a command sequence I gave (a copy to a protected folder failed, and the next command reset the file). The run is fully seeded, so it was rerun to rebuild the records; the rerun's report is compared with the numbers quoted here, and any difference is stated at the head of the rerun's reading.
 
+## Round 4, RESULT (WRITTEN 2026-11-18 FROM THE STORED RUN; the run was flown on Keith's 1080 and read at v4906, whose note says "read WIRING-CHIP FAIL for both advisors", but no result section was written here until now)
+
+**Said first: this is a write-up of an already-read run, not a new reading.** The report was regenerated from the stored file, with nothing flown: `node tools/ship/advisorChipStudyCmd.mjs report --in brain/rig-results/advisorChipStageA.noisy.jsonl` (12 circuits, the noisy gauge, fresh audits 111-122, 131-142, 151-162). The numbers below are that report's.
+
+**Checks: all passed.** STAGE A COMPLETE; IDENTITY (a null advisor, and an advisor that is a copy of the brain's own rule, change nothing); THE ADVISOR IS NOT TRIVIAL (GUARDED-FILTER minus SPIN on far and both: 0.300, 0.228, 0.231 against needs of 0.044, 0.034, 0.038).
+
+**Advisor GUARDED: the WIRING-CHIP VERDICT is FAIL** (against the strongest family, cx gains more on 0 of 3 audits). The BOTTOM LINE is MIXED: the chip neither helps nor hurts cx consistently. Its VETO effect on cx is -0.016, -0.031 and -0.108, and it HURTS or is MIXED for every circuit. Across the 12 circuits, the chip effect against the brain's own level gives r = -0.43.
+
+**Advisor GUARDED-FILTER: the WIRING-CHIP VERDICT is FAIL** (0 of 3). The BOTTOM LINE: any conservative nudge helps, and the advisor's content is not what mattered.
+* Its VETO effect on cx is +0.164, +0.119 and +0.165. It HELPS 11 of 12 circuits (degree:0 MIXED), and the controls gain as much as cx or more: NO STATE +0.178, +0.203, +0.196.
+* CONTENT (VETO minus the 30-decision STALE advisor): +0.008, -0.014, -0.003.
+* The brain does not add to the rule: VETO(cx) minus GUARDED-FILTER alone is -0.122, -0.181, -0.106.
+* r = 0.72 across the circuits.
+
+**Against the expectation recorded first** ("the chip's value tracks the champion's level, not the wiring; WIRING-CHIP PASS about 10 percent"): FAIL on both advisors, as expected. With GUARDED-FILTER the value tracked the brain's level (r 0.72); with GUARDED it ran the other way (r -0.43). Rounds 5 to 34 above built on this result.
+
 # Round 5 (UNNUMBERED): THE LANGUAGE-MODEL CHIP -- a local language model in the Round 4 socket, read against a fixed depth cap and the hand-written rules -- REGISTERED 2026-10-30 BEFORE ANY CODE FOR IT AND BEFORE ANY RESERVED SEED IS FLOWN (Keith, 2026-10-30: "lets do step 1"; nothing below has been built or run)
 
 Round 4 put a hand-written rule in the advisor socket. Keith's adapter, local-model tool and three practice runs since (2026-10-29, `brain/rig-results/livePractice*.jsonl`) have put a language model there on PRACTICE dives (seeds 501-508, kinds far and both, 16 dives, the brain `GUARDED-OBS`, the VETO combination). This round is the registered test the practice runs said the model would need.
@@ -1206,3 +1222,202 @@ Per arm, as Round 5 section 7: HELPS / HURTS / NO EFFECT (or MIXED) against ALON
 
 ## Round 14, AMENDMENT 2 (2026-11-03; made after the FIRST CALLS TO THE REAL MODEL and before any recording was completed or any audit seed was read as a result; the sections above and Amendment 1 are kept as written and this overrides them where it says so)
 **The station question is not asked when every station has been visited.** Section 3 says the station Choice offers "each unvisited station by index, or none". With every station visited that is one option, and the real model refuses it: `ValueError: choice criteria: a map of 2..255 options` (measured on `Mapika/decider-2b`, decider-ai 1.10.0, through `deciderServe.py`; the rig's first recording attempt stopped on it at its 9th call, with 8 answers saved, and the reason was found by reproducing the call). Decider's Choice needs 2 to 255 options, so the question is now asked only while at least one station is unvisited; with none left the question is absent, the decision's station is the neutral null (the brain's own), and the ask counts as fully answered without it. **What this does not change:** the arms, sets, thresholds, checks and verdicts. **What it does change:** the prompt text of the asks with no unvisited station (they have four questions, not five); the 8 answers already saved were all asks with a station question and their prompts are unchanged, so a resumed recording reuses them. I found this in the first run on the real model; the gate did not, because its stub model answered whatever it was asked. The stub now answers only the questions it is asked, and the gate holds that no choice with fewer than 2 options is ever asked in a real 600 s dive of each kind (and that the all-visited case occurs in those dives).
+
+# Round 34 -- gauge faults: does the slow filter, the Round 33 rule or the shipped seat fail when the gauge is WRONG rather than noisy (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Every round so far gave the charge gauge zero-mean noise (sd 0.10 to 0.30, refreshed at 1 Hz). Round 8 found that the rule's main lever is a slow filter (alpha 0.001, a time constant of about 33 s), and Round 31 found that constants tuned at one gauge condition can lose their gain and crush dives at another. A gauge that is wrong in a slow way -- an offset, a drift, a reading that sticks -- is the untested way the shipped seat could fail: no filter removes an offset, and a slow one may hold a stale reading longer. Every fault here is OPTIMISTIC (the reading high or stale), the direction that can strand or crush a boat. A pessimistic gauge costs score, not hull, and is not tested here.
+
+## 2. The faults (on top of the sd 0.10 noise at 1 Hz; the noise draws are REF's, draw for draw)
+- **REF:** no fault.
+- **BIAS:** +0.10 on every reading.
+- **DRIFT:** +0.15 x t / 600 s on every reading (0 at the start of the dive, +0.15 at its end).
+- **DROP:** the reading is not refreshed in the second half of every minute (t mod 60 s in [30, 60)); it holds its last value. The noise draw is still taken, so the stream stays aligned with REF's.
+Each reading is clipped to [0, 1] after the fault, as today.
+
+## 3. The arms (the same dives in every condition, paired)
+- **R8:** the tuned rule on the Round 8 constants (`surveySeat.SURVEY_R8`, alpha 0.001).
+- **R8-RAW:** the same constants with the filter taken out (alpha 1: the rule acts on each reading as it comes), flown with `WIDE_BOUNDS` whose alpha bound is widened to admit 1 and nothing else changed. The control for the filter.
+- **L06:** the tuned rule on the Round 33 constants (`SURVEY_CONSTANTS`, low -0.06).
+- **SEAT:** the shipped survey seat (`surveySeat.surveyPilot()`, the twin planner on the Round 33 constants, profile `standard`).
+
+## 4. The seeds
+**43001-43150, kinds far and both: 300 dives per arm and condition**, 4 arms x 4 conditions = 4,800 dives, 600 s each. Nothing in the tree uses these seeds. The gate flies only 43901-43902, on shortened dives, and nothing else ever reads them.
+
+## 5. Checks (run first; a failure is the first line of the report and the verdicts are then NOT WEIGHED)
+- **GENERATOR:** the scenarios are `needsTask.scenario`'s.
+- **NO FAULT, NO CHANGE:** with no fault, the changed `gaugeOf` returns the readings of the formula it had before this round, bit for bit, on the REF dives' sample (a frozen copy of the old formula in the library).
+- **SIZES and ALIGNED:** every arm has 300 dives in every condition, the same scenarios in the same order.
+- **THE FAULTS REACH THE PILOT:** in each fault condition, R8's dives differ from its REF dives (fingerprint) on at least one dive.
+
+## 6. The verdicts (the series' margin: A beats B iff the pooled paired difference exceeds max(0.02, 2 se); the hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), on crushed plus stranded dives)
+For each fault c in BIAS, DRIFT, DROP:
+- **V1, the filter:** `THE FILTER IS A LIABILITY UNDER <c>` iff R8-RAW beats R8 under c by the margin. Bottom line: `THE FILTER IS A LIABILITY UNDER <list>` or `THE FILTER IS NOT A LIABILITY UNDER ANY FAULT`.
+- **V2, the hull:** each arm's crushed plus stranded dives under c against its OWN under REF (the same dives) by the test. Bottom line for the shipped seat: `THE SEAT'S HULL HOLDS UNDER ALL THREE FAULTS` or `THE SEAT'S HULL PAYS MORE UNDER <list>`; the same line for each other arm, reported.
+- **V3, the seat's lead:** `THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER <c>` iff SEAT minus R8 under c is real (positive and above 2 se, the series' KEEPS); HURTS iff negative and beyond 2 se; LOSES otherwise.
+**REPORTED, NOT IN THE VERDICT:** each arm's mean score and crushed / stranded counts by condition; each arm's fault cost (c minus REF, paired over the same dives) with its se; L06 minus R8 in each condition.
+
+## 7. Expectations, recorded BEFORE any seed is flown
+- A +0.10 high gauge delays every surfacing by a tenth of the battery, against trip points of 0.32-0.38. **R8's hull pays more under BIAS: about 75 percent; under DRIFT (a mean +0.075, largest late, when the charge is low): about 60; under DROP: about 15.** The seat's hull pays more under BIAS: about 70; DRIFT: about 55; DROP: about 15.
+- **The filter is a liability under BIAS about 10 percent** (an offset passes through both arms alike), **DRIFT about 15** (a 33 s lag on a drift of 0.00025 a second is under 0.01), **DROP about 15.** The bottom line `NOT A LIABILITY UNDER ANY FAULT`: about 65.
+- **The seat keeps its lead over R8 under BIAS about 50 percent, DRIFT 60, DROP 75** (it kept it in all five of Round 33's conditions, at +0.012 to +0.033 over L06).
+- R8's fault cost under BIAS lies between -0.01 and -0.08: about 60.
+
+## 8. What will be built, in this order
+`brain/needsTask.mjs`: `gaugeOf` gains an optional `fault` ({ bias, driftPerS, dropEveryS, dropFromS }); absent, nothing changes (check 2 and a gate row). `tools/ship/gaugeFaults.mjs` (library), `tools/ship/gaugeFaultsCmd.mjs` (export-free: `run`, `report`; one worker per arm and condition, each writes its file), `tools/ship/gaugeFaults-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** pessimistic faults, other noise levels, DMG or STN5 with a fault, a fault-aware seat, changing or shipping any constant.
+
+## Round 34, RESULT (2026-11-16): THE FILTER IS NOT A LIABILITY UNDER ANY FAULT; THE SEAT'S HULL PAYS MORE UNDER BIAS (7 crushed of 300 against 0); THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER ALL THREE FAULTS
+
+**The run.** `node tools/ship/gaugeFaultsCmd.mjs run --jobs 4` in the sandbox, 32 jobs, all exit 0, 4,800 dives on seeds 43001-43150 (far and both), read once (`brain/rig-results/gauge-faults/`, `brain/rig-results/gauge-faults-report.json`). All five checks passed.
+
+| arm | REF | BIAS | DRIFT | DROP |
+|---|---|---|---|---|
+| R8 | 0.7900 (0/0) | 0.8117 (0/0) | 0.8247 (0/0) | 0.7902 (0/0) |
+| R8-RAW | 0.2055 (56/25) | 0.2850 (33/23) | 0.1940 (86/64) | 0.3371 (32/6) |
+| L06 | 0.8100 (0/0) | 0.8233 (8/0) | 0.8425 (0/0) | 0.8048 (2/0) |
+| SEAT | 0.8277 (0/0) | 0.8409 (7/0) | 0.8602 (0/0) | 0.8166 (2/0) |
+
+(mean score, crushed / stranded of 300.) The fault cost (fault minus REF, the same dives): R8 BIAS +0.0218 (se 0.0063), DRIFT +0.0347 (0.0047), DROP +0.0003 (0.0036); SEAT BIAS +0.0132 (0.0094), DRIFT +0.0325 (0.0043), DROP -0.0112 (0.0058). The seat's lead over R8: BIAS +0.0292 (se 0.0088), DRIFT +0.0355 (0.0056), DROP +0.0263 (0.0064), all KEEPS.
+All five registered bottom lines: `THE FILTER IS NOT A LIABILITY UNDER ANY FAULT`; `THE SEAT'S HULL PAYS MORE UNDER BIAS`; `THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER BIAS`, `... UNDER DRIFT`, `... UNDER DROP`. Reported: R8's hull holds under all three; L06's pays more under BIAS (8 against 0); R8-RAW's pays more under DRIFT (150 against 81).
+
+**Against the expectations of section 7 (written first).** R8's hull pays more under BIAS, about 75: **no** (0 against 0); under DRIFT, about 60: **no**; under DROP, about 15: held (it holds). The seat's hull pays more under BIAS, about 70: **held**; DRIFT, about 55: no; DROP, about 15: held (2 against 0 passes the test). Not a liability under any fault, about 65: **held**. The seat keeps its lead under BIAS (50), DRIFT (60), DROP (75): **held in all three.** R8's BIAS cost between -0.01 and -0.08, about 60: **no: it is a GAIN, +0.022.** My picture of the fault was wrong in its sign: I expected an optimistic gauge to cost score and strand boats. It raised every filtered arm's score under BIAS and DRIFT and stranded nothing; what it cost was hull, and only where the trip point was already lowered.
+
+**WHAT THIS MEANS and does not.**
+- **An optimistic gauge acts as a lower trip point.** A reading 0.10 high is, to the rule, a trip point 0.10 lower: the boat stays down longer and visits more, which is why the scores rise. On the Round 8 constants (low 0.38) that is still safe: 0 crushed. On the Round 33 constants (low 0.32) it is a low near 0.22, past the -0.08 to -0.12 shifts that Rounds 32-33 already saw crush: 8 (L06) and 7 (SEAT) of 300 crushed, every one a `both` dive (deep, damaged, start damage 0.21-0.40). **The -0.06 shift spent margin that a biased gauge then takes.** The shipped seat's hull is the one registered failure here.
+- **The filter is not a liability; but the control I registered is weaker than the verdict sounds.** R8-RAW is the Round 8 constants with alpha 1, and those constants were tuned WITH the filter: without it the rule chatters on noise sd 0.10 and crushes or strands 81 of 300 dives with a sound gauge. So "removing the filter from these constants is far worse under every fault" is shown (-0.45 to -0.63); "a filter-free rule tuned for itself would not do better under a fault" is not.
+- **DROP costs nothing measurable** for the rules and -0.011 (1.9 se) for the seat; a stale half-minute is short against how slowly the charge moves.
+- **Not shown:** why the BIAS failures are crushes and not strandings (not traced: the depth cap, the trip and the planner's rollouts all read the charge); a pessimistic gauge; a bias other than 0.10; BIAS with DMG or STN5; whether the seat at the Round 8 constants (no shift) would hold its hull under BIAS -- that arm was not flown, and is the obvious next question. Nothing is changed or shipped by this round.
+
+# Round 35 -- is the Round 33 shift what crushes the seat under a biased gauge: the shipped seat against the same seat on the Round 8 constants, +0.10 bias, fresh dives (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 34 found one registered failure: under a gauge reading +0.10 high, the shipped seat (twin planner, Round 33 constants, low -0.06) crushed 7 of 300 dives and the L06 rule 8, all deep-and-far, while the Round 8 rule crushed none. The reading offered was that an optimistic gauge acts as a lower trip point, and the -0.06 shift had already spent the margin. The arm that tests that reading -- the same seat on the Round 8 constants -- was not flown. If it holds its hull where the shipped seat does not, the shift is the cause, and what it buys (Round 33: +0.02 at a sound gauge) has a price in a biased one.
+
+## 2. The arms and conditions
+- **SEAT:** the shipped seat, `surveySeat.surveyPilot()` (twin planner, `SURVEY_CONSTANTS`, profile `standard`).
+- **SEAT-R8:** the same planner and profile on the Round 8 constants (`SURVEY_R8`, low 0.380), nothing else changed.
+- **REF:** noise sd 0.10 at 1 Hz. **BIAS:** the same plus +0.10 on every reading (Round 34's fault, `gaugeFaults.FAULTS.BIAS`).
+
+## 3. The seeds
+**45001-45300, kind `both` only (300 dives per arm and condition)**: every Round 34 crush was a `both` dive, so the round spends its dives there. Nothing in the tree uses these seeds. The gate flies only 45901-45902, on shortened dives.
+
+## 4. Checks (a failure: the verdicts are NOT WEIGHED)
+GENERATOR (needsTask.scenario); SIZES (300 each); ALIGNED (the same scenarios in the same order everywhere); THE FAULT REACHES THE PILOT (each arm's BIAS dives differ from its REF dives on at least one dive); THE ARMS DIFFER (SEAT and SEAT-R8 differ on at least one REF dive).
+
+## 5. The verdicts (the hull test is Round 33's, b - b0 <= 2 x sqrt(b + b0), on crushed plus stranded dives; the score margin is the series' 2 se)
+- **V1, replication:** `ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS` iff SEAT under BIAS fails the test against SEAT under REF; `... DOES NOT REPLICATE` otherwise.
+- **V2, the Round 8 constants:** `THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS` iff SEAT-R8 under BIAS passes the test against SEAT-R8 under REF; `... PAYS MORE UNDER BIAS` otherwise.
+- **V3, the cause:** `THE SHIFT IS WHAT CRUSHES` iff, under BIAS, SEAT's bad dives fail the test against SEAT-R8's (SEAT has more, beyond the test); `THE SHIFT IS NOT SHOWN TO CRUSH` otherwise.
+- **V4, the price of going back:** SEAT-R8 minus SEAT at REF, pooled and paired: `GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE` iff negative beyond 2 se; `... COSTS NO SCORE THE TEST CAN SEE` otherwise. Under BIAS the same difference is reported, not weighed.
+**REPORTED, NOT IN THE VERDICT:** each arm's mean and crushed / stranded count by condition, each arm's bias cost (BIAS minus REF, paired), the start damage of every crushed dive.
+
+## 6. Expectations, recorded BEFORE any seed is flown
+Round 34 crushed 7 of its 150 `both` dives under BIAS (4.7 percent), so about 14 of 300 are expected here. V1 replicates: about 80 percent. V2, the Round 8 seat holds: about 75. V3, the shift is what crushes: about 70. V4, going back costs score at REF (Round 33's rule gain was +0.024 and the twin's +0.016 on top): about 55.
+
+## 7. What will be built
+`tools/ship/gaugeShift.mjs` (library, on `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeShiftCmd.mjs` (export-free: `run`, `report`), `tools/ship/gaugeShift-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** shifts between 0 and -0.06, other biases, the rule arms, changing or shipping any constant.
+
+## Round 35, RESULT (2026-11-16): ROUND 34'S FAILURE REPLICATES; THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS; THE SHIFT IS WHAT CRUSHES; GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE
+
+**The run.** `node tools/ship/gaugeShiftCmd.mjs run --jobs 4` in the sandbox, 16 jobs, all exit 0, 1,200 dives on seeds 45001-45300 (`both`), read once (`brain/rig-results/gauge-shift/`, `brain/rig-results/gauge-shift-report.json`). All five checks passed.
+
+| arm | REF | BIAS (+0.10) | bias cost (paired) |
+|---|---|---|---|
+| SEAT (Round 33 constants, shipped) | 0.8185 (0 crushed) | 0.8433 (**9 crushed**) | +0.0247 (se 0.0095) |
+| SEAT-R8 (Round 8 constants) | 0.7895 (0) | 0.8360 (**0**) | +0.0465 (se 0.0062) |
+
+SEAT-R8 minus SEAT: **REF -0.0290 (se 0.0050; better 13, worse 66), weighed**; BIAS -0.0073 (se 0.0092), reported. The nine crushed dives started with damage 0.21-0.42. Nothing was stranded.
+All four registered bottom lines: `ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS` (0 -> 9); `THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS` (0 -> 0); `THE SHIFT IS WHAT CRUSHES` (9 against 0 under BIAS, beyond 2 x sqrt(9) = 6); `GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE` (-0.029, 5.8 se).
+
+**Against the expectations of section 6 (written first).** About 14 crushes expected: 9 came. V1 replicates, about 80: held. V2 the Round 8 seat holds, about 75: held. V3 the shift crushes, about 70: held. V4 going back costs score, about 55: held.
+
+**WHAT THIS MEANS and does not.** The Round 33 shift is a trade, and both sides of it are now measured on the same dives. **With a sound gauge it is worth +0.029 on deep-and-far dives; with a gauge reading 0.10 high it costs 9 crushed boats of 300 (3 percent), where the Round 8 constants lose none.** Because a crushed dive scores 0 and the score already counts it, the shifted seat still scores a little higher under bias (+0.007, not distinguishable from zero). So the score alone will never choose against the shift: whether 3 percent crushed under a faulty gauge is acceptable is the cost judgement the series has twice left to Keith (`hull-cost-of-a-crushed-boat`). This round does not change the shipped constants. Shifts between 0 and -0.06, other biases, and any gauge-health check that would let the seat know its gauge is wrong are not tested.
+
+# Round 36 -- the shift curve under a biased gauge: the seat at low 0, -0.02, -0.04 and -0.06, sound gauge and +0.10 bias, so that the hull-cost choice can be made on measured numbers (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 35 measured the two ends: the shipped shift (-0.06) is worth +0.029 at a sound gauge on deep-and-far dives and crushes 9 of 300 under a gauge reading +0.10 high; no shift crushes none. What a crushed boat is worth is Keith's call (`hull-cost-of-a-crushed-boat`), and it is easier to make on a curve than on two points. This round measures the two shifts between, with the two ends again, on one fresh set.
+
+## 2. The arms, conditions and seeds
+- **Arms:** the shipped seat's planner and profile (`plannerPerturbed.perturbedSeat`, profile `standard`) on the Round 8 constants with low moved by **0 (L0), -0.02 (L-0.02), -0.04 (L-0.04), -0.06 (L-0.06, the shipped seat)**, nothing else changed.
+- **Conditions:** REF (noise sd 0.10, 1 Hz) and BIAS (the same plus +0.10, Round 34's fault).
+- **Seeds:** **48001-48300, kind `both` (300 dives per arm and condition)**, unused anywhere in the tree; the gate flies only 48901-48902.
+
+## 3. Checks (a failure: the verdicts are NOT WEIGHED)
+GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT (every arm's BIAS differs from its REF on at least one dive); THE SHIFTS DIFFER (each pair of arms differs on at least one REF dive); L-0.06 IS THE SHIPPED SEAT (its pilot is `surveyPilot()` on two gate dives, fingerprint for fingerprint).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: the series' 2 se)
+- **Per shift, the hull:** `L-0.0x HOLDS ITS HULL UNDER BIAS` iff its BIAS count passes the test against its own REF count; `PAYS MORE UNDER BIAS` otherwise.
+- **Per shift, the gain:** its REF score minus L0's REF score, paired: KEEPS (positive beyond 2 se), LOSES or HURTS.
+- **The bottom line:** `THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.0x (+gain at a sound gauge)` -- the largest |shift| that both holds and KEEPS; `NO SHIFT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN` if none does.
+**REPORTED, NOT IN THE VERDICT, for Keith's choice:** each arm's mean and crushed / stranded count in both conditions; each shift's gain over L0 under BIAS; each shift's extra crushed dives under BIAS over L0's; and the break-even price per crushed boat at which the shift's sound-gauge gain equals its bias crushes, stated as score points per crushed boat (gain x 300 / extra crushes), with the plain warning that it assumes the gauge is biased on every dive.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+L-0.06 pays more under BIAS: about 90 (it did twice). L-0.04 pays more: about 50. L-0.02 pays more: about 20. L0 holds: about 95. Gains at REF: L-0.06 KEEPS about 90; L-0.04 KEEPS about 70; L-0.02 KEEPS about 40. The bottom line names L-0.04: about 35; L-0.02: about 30; none: about 25; L-0.06: about 10.
+
+## 6. What will be built
+`tools/ship/gaugeCurve.mjs` (on `gaugeShift.mjs`'s chunks and `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeCurveCmd.mjs` (`run`, `report`), `tools/ship/gaugeCurve-selfcheck.mjs` with a mutation pass; then the run once and the report read once. **NOT IN THIS ROUND:** choosing or shipping a shift (Keith's), other biases, the rule arms, other dive kinds.
+
+## Round 36, AMENDMENT 1 (2026-11-16; made while building the library, before any of its seeds was flown; a REPORTED figure only, no verdict changes)
+Section 4's break-even ("gain x 300 / extra crushes, assuming the gauge is biased on every dive") was wrong on its own terms: if every dive has the biased gauge, the sound-gauge gain is never earned. The figure is restated: the price P of one crushed boat (score points beyond its 0) at which a shift is worth exactly what L0 is, when a share f of dives has the biased gauge, solves (1 - f) x gain at REF + f x gain under BIAS = f x (extra crushes / 300) x P; it is reported for f = 0.05, 0.25 and 1, and the share is said to be unknown.
+
+## Round 36, RESULT (2026-11-16): THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE); -0.06 PAYS MORE UNDER BIAS (10 crushed of 300)
+
+**The run.** `node tools/ship/gaugeCurveCmd.mjs run --jobs 4` in the sandbox, 32 jobs, 2,400 dives on seeds 48001-48300 (`both`), read once (`brain/rig-results/gauge-curve/`). A container restart stopped the run after 24 jobs; the 24 whole files were committed unread and the run resumed the other 8 (the command skips a job whose file exists). All six checks passed, L-0.06 flown as the shipped `surveyPilot()`.
+
+| shift | REF (crushed) | BIAS (crushed) | hull under BIAS | gain over L0 at REF | gain over L0 under BIAS | break-even price per crushed boat (5 / 25 / 100 % biased) |
+|---|---|---|---|---|---|---|
+| L0 (Round 8) | 0.7898 (0) | 0.8308 (0) | holds | -- | -- | -- |
+| L-0.02 | 0.7968 (0) | 0.8438 (0) | holds | +0.0070 (se 0.0030) KEEPS | +0.0130 | no extra crush |
+| **L-0.04** | 0.8060 (0) | 0.8462 (**1**) | **holds** | **+0.0163 (se 0.0043) KEEPS** | +0.0154 | 97.3 / 19.3 / 4.6 |
+| L-0.06 (shipped) | 0.8183 (0) | 0.8349 (**10**) | **PAYS MORE** | +0.0285 (se 0.0053) KEEPS | +0.0042 | 16.4 / 2.7 / 0.13 |
+
+Nothing was stranded. Bottom lines: `L-0.02 HOLDS ITS HULL UNDER BIAS`; `L-0.04 HOLDS ITS HULL UNDER BIAS`; `L-0.06 PAYS MORE UNDER BIAS`; `THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE)`.
+
+**Against the expectations of section 5 (written first).** L-0.06 pays more, about 90: held (a third time). L-0.04 pays more, about 50: no (1 against 0). L-0.02 pays more, about 20: held (it holds). L0 holds, about 95: held. Gains KEEP: L-0.06 (90) held, L-0.04 (70) held, L-0.02 (40) held. The bottom line names L-0.04, about 35: it came.
+
+**WHAT THIS MEANS and does not.** The curve is not linear in the hull: -0.02 and -0.04 cost nothing measurable under the biased gauge (0 and 1 crushed), -0.06 costs 10. **-0.04 keeps 57 percent of the shipped shift's sound-gauge gain (+0.016 of +0.029) and gives up 9 of its 10 crushed boats.** The break-even prices say the same in money: the shipped -0.06 is worth less than L0 as soon as a crushed boat costs more than about 16 good dives' score with a gauge biased 5 percent of the time (2.7 at 25 percent); -0.04 needs a price above about 97 (19 at 25 percent) before L0 wins. **This round chooses nothing**: which shift the seat flies is Keith's decision (the hull cost), and a change would be a round of its own, registered, with the confirmation on fresh dives Round 33 used.
+
+# Round 37 -- the seat moved to low -0.04, Keith's decision, confirmed on fresh dives before it ships (REGISTERED 2026-11-17, before any code and before any of its seeds was flown)
+
+## 1. Why
+Keith, 2026-11-17, after Round 36: "move the seat to -0.04." Round 36 found -0.04 the largest shift that holds its hull under a +0.10 gauge bias and keeps a gain (+0.016 at a sound gauge, 1 crushed of 300 against the shipped -0.06's 10). Round 33 changed the shipped constants only after a confirmation on fresh dives across its conditions; this round is that confirmation for the move. **The decision is Keith's and is not re-made here.** The round can only stop it: if a check fails, or if the -0.04 seat's hull is worse than the shipped seat's in any condition, the constant is NOT changed and the finding goes back to Keith.
+
+## 2. The arms, conditions and seeds
+- **Arms:** **SEAT-04**, the seat's planner and profile (`standard`) on the Round 8 constants with low -0.04, nothing else changed; **SEAT-06**, the shipped `surveyPilot()` (low -0.06).
+- **Conditions** (Round 33's five by `plannerRobust.scenarioX`, and Round 34's bias): **REF** (3 stations, damage x1, sd 0.10), **DMG** (damage x1.6), **N20** (sd 0.20), **N30** (sd 0.30), **STN5** (5 stations), **BIAS** (sd 0.10 and +0.10 on every reading).
+- **Seeds, far and both, 150 of each (300 dives per arm and condition):** REF 49001-49150, DMG 49201-49350, N20 49401-49550, N30 49601-49750, STN5 49801-49950, BIAS 50201-50350. None is used by any needs-and-limits round; the gate flies only 50901-50902. 2 arms x 6 conditions x 300 = 3,600 dives.
+
+## 3. Checks (a failure: NOT WEIGHED, and the constant is not changed)
+GENERATOR (`scenarioX` at 3 stations and damage x1 equals `needsTask.scenario`); SIZES; ALIGNED; THE ARMS DIFFER (on at least one dive of every condition); SEAT-06 IS THE SHIPPED SEAT (its pilot is `surveyPilot()`, fingerprint for fingerprint, on the gate's dives).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: the series' 2 se)
+- **Per condition, the hull:** `SEAT-04'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S IN <c>` iff SEAT-04's count passes the test against SEAT-06's; `... IS WORSE IN <c>` otherwise.
+- **Per condition, the price:** SEAT-04 minus SEAT-06, pooled and paired: HURTS (negative beyond 2 se), LOSES (inside), KEEPS (positive beyond 2 se) -- REPORTED; the move is expected to cost a little score at a sound gauge and is not judged by it.
+- **The bottom line:** `THE MOVE IS CONFIRMED: SEAT-04'S HULL IS NO WORSE IN ANY CONDITION` -> the constant is changed (`SURVEY_LOW_SHIFT` -0.04); `THE MOVE IS HELD: SEAT-04'S HULL IS WORSE IN <list>` -> it is not, and Keith is told.
+**REPORTED:** each arm's mean and crushed / stranded count per condition, and the BIAS hull counts of both arms against Round 36's (1 and 10 of 300).
+
+## 5. Expectations, recorded BEFORE any seed is flown
+The move is confirmed: about 85 percent. SEAT-04's crushed plus stranded under BIAS is lower than SEAT-06's: about 85. The price HURTS at REF (about -0.012, Round 36's -0.0285 + 0.0163): about 55; in DMG it LOSES or KEEPS (fewer crushes on damaged hulls): about 70. N30: the two tie on the hull (both 0): about 80.
+
+## 6. What will be built, and what changes if the move is confirmed
+`tools/ship/seatMove.mjs`, `tools/ship/seatMoveCmd.mjs` (`run`, `report`), `tools/ship/seatMove-selfcheck.mjs` with a mutation pass; the run once, the report read once. **If confirmed:** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` becomes -0.04 (low 0.3403560726214647); every gate that pins the shipped constants is restated to the new value with its old value said in a dated line; the Round 34-36 libraries, which name what they FLEW, are frozen on the -0.06 constants by value rather than by import. **Not in this round:** any other constant, the rule arms, shipping a version.
+
+## Round 37, RESULT (2026-11-17): THE MOVE IS CONFIRMED -- SEAT-04'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S IN ANY CONDITION; the seat now flies low -0.04
+
+**The run.** `node tools/ship/seatMoveCmd.mjs run --jobs 4` in the sandbox, 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/seat-move/`, `brain/rig-results/seat-move-report.json`; the first 23 job files were committed unread while the last flew). All five checks passed, SEAT-06 flown as the shipped `surveyPilot()`.
+
+| condition | SEAT-04 (crushed) | SEAT-06 (crushed) | hull | price, SEAT-04 minus SEAT-06 (reported) |
+|---|---|---|---|---|
+| REF | 0.8267 (0) | 0.8315 (0) | no worse | -0.0047 (se 0.0037) LOSES |
+| DMG | 0.7977 (13) | 0.8000 (15) | no worse | -0.0023 (se 0.0056) LOSES |
+| N20 | 0.8217 (0) | 0.8297 (0) | no worse | -0.0080 (se 0.0032) HURTS |
+| N30 | 0.8406 (0) | 0.8489 (0) | no worse | -0.0082 (se 0.0035) HURTS |
+| STN5 | 0.7982 (0) | 0.8011 (0) | no worse | -0.0029 (se 0.0031) LOSES |
+| BIAS | 0.8535 (**0**) | 0.8442 (**6**) | no worse | +0.0093 (se 0.0074) LOSES |
+
+Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: SEAT-04'S HULL IS NO WORSE IN ANY CONDITION`.
+
+**Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (0 against 6). The price HURTS at REF, about 55: no (-0.0047, 1.3 se; it HURTS only under the two noisier gauges, -0.008). DMG LOSES or KEEPS, about 70: held (13 against 15 crushed, -0.0023). N30 ties on the hull, about 80: held.
+
+**What changed, as section 6 fixed it.** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` is -0.04 (low 0.3403560726214647); the gates that pinned the -0.06 constants are restated with a dated line; the Round 34-37 libraries name the constants they flew by value. **The price, said plainly:** the seat gives up 0.002 to 0.008 of score in five of six conditions (two of them beyond 2 se) and, with a gauge reading 0.10 high, crushes 0 boats in 300 where the old seat crushed 6 (Round 36: 10). That trade is Keith's decision of 2026-11-17.

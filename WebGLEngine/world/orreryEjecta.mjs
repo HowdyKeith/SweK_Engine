@@ -519,6 +519,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/subModels3d-selfcheck.mjs",
         "render/subModels3d.mjs",
         "render/subModelsPanel-selfcheck.mjs",
+        // v4926 -- TWO ARRIVED with this round (named by orreryEjecta-selfcheck): the 3D view's marks and nav gates import the vendored three to build the scene they check.
+        "render/subAquarium3dMarks-selfcheck.mjs",
+        "render/subAquarium3dNav-selfcheck.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -705,6 +708,19 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/headToHead4-selfcheck.mjs",
         "tools/ship/headToHead4Cmd.mjs",
         "tools/ship/headToHead8Cmd.mjs",
+        // v4922 -- NINE ARRIVED with this round (named by orreryEjecta-selfcheck): the switchboard page and its command load the stateful fly (brain/lesionFlyCx.mjs), the fly's lesion gate, the reservoir kernel's gate and rig command, the left-side lesion round's gate and command, rung 4a v6's gate, and the switchboard view's gate (it checks the page loads the circuit).
+        "brain/lesionFlyCx-selfcheck.mjs",
+        "brain/reservoirGpu-selfcheck.mjs",
+        "render/switchboardView-selfcheck.mjs",
+        "switchboard.html",
+        "tools/ship/lesionLeftSide-selfcheck.mjs",
+        "tools/ship/lesionLeftSideCmd.mjs",
+        "tools/ship/takeReservoirGpu.mjs",
+        "tools/ship/takeSwitchboard.mjs",
+        "tools/subReservoirV6-selfcheck.mjs",
+        // v4926 -- TWO ARRIVED with this round (named by orreryEjecta-selfcheck): the GPU reservoir pilot's gate and the lateness study each read the vendored heading loop (vendor/hemibrain/hemibrain-cx-heading-loop.json) to build the circuit they fly.
+        "brain/reservoirPilotGpu-selfcheck.mjs",
+        "tools/ship/latenessStudy.mjs",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
     // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.
