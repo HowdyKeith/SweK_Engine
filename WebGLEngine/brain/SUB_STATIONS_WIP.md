@@ -140,3 +140,29 @@ Its constants (the thrust cap's curve, the charge under which the weight goes ea
 **Gates, before HELD:** `brain/stationsTask-selfcheck.mjs` (the task, the verdict, the TRIAGE knobs, the crews; 24 mutants, 21 red and 3 equivalent, logged) and `brain/subStations-selfcheck.mjs` (round 1's, still green with TRIAGE added). Neither flies a HELD seed.
 
 **THE RUN:** every crew on the 96 HELD seeds, once, with `brain/stationsTask.mjs` (a short script writes one line a dive to `brain/stationsHeld.jsonl`). The file is committed unread, then read once with the registered verdict.
+
+## 9. ROUND 2 RESULT (2026-11-19; `brain/stationsHeld.jsonl`, 480 dives, committed unread at `9c94f3301`, then read ONCE)
+
+**VERDICT (registered): TRIAGE BEATS FIXED.** TRIAGE survives 75 of the 96 HELD dives and FIXED 62. Of the 17 dives where exactly one survives, 15 are TRIAGE's and 2 are FIXED's: exact one-sided sign test p = 0.0012, under the registered 0.05.
+
+| crew | survived (of 96) | reached the surface | dropped the weight | mean time of a crush |
+|---|---|---|---|---|
+| NONE | 0 | 0 | 0 | 156 s |
+| ENERGY | 0 | 2 | 0 | 110 s |
+| DAMAGE | 28 | 52 | 96 | 384 s |
+| FIXED | 62 | 64 | 96 | 319 s |
+| **TRIAGE** | **75** | **76** | 96 | 392 s |
+
+**Reported, not in the verdict.**
+* **Where both survive (60 dives), TRIAGE ends the dive charged and on the surface: mean charge 0.988, all 60 within 3 m.** FIXED ends at 0.477, with 3 of 60 on the surface. FIXED goes back down to its mission depth once the energy station is satisfied, with the leak still on. TRIAGE's breach latch keeps the boat up.
+* **Round 1's single-dive finding holds as a rate.** Energy alone is crushed sooner than no station in 83 of the 96 dives where both are crushed, and later in 8 (sign test p = 4e-17). Neither crew survives any dive. A station written for a sound boat makes a breached one worse.
+* **What TRIAGE still loses.** Its 21 losses all have a leak of 6.5 to 8.0 percent of the weight, against the 6 percent drop weight; no survivor has a leak above 7.0 percent. Past the weight's size the boat has only its thrust and its bottle, and the bottle is spent before the surface. That is the next limit, and it is the hull's, not the captain's.
+* **Against the expectation in section 7.** TRIAGE BEATS FIXED was put at about 55 percent; it happened.
+
+**What the result says, and does not.**
+* **A captain that knows what the stations' actions cost keeps more boats than one that only ranks them.** Every boat it saves over FIXED is saved by the same two moves: drop the weight at once instead of after the blow, and go up while there is charge. Both are free or cheap at the moment and expensive later.
+* **The thrust cap, the move Keith named, did not help.** On DEV it kept one boat more alone and none more beside T4, so it was left out; HELD did not test it. Full rescue thrust is not where the charge goes wrong. Holding depth for minutes before anyone decides to go up is.
+* **T4 was added after reading the DEV failures (section 8)** and so was tuned on DEV. The HELD result is its first test on dives it was not chosen on, and it holds there.
+* This is one task (a leak and a low battery), one vessel and a hand-written captain. It is not a claim about other pairs of problems, nor that a learned captain would do better or worse.
+
+**Status: round 2 CLOSED as registered.** Next, in the order the note proposed: TRIAGE into the Sub Aquarium (the tank runs one event at a time, so a flood and a battery need cannot meet there yet), then navigation and sonar as stations.
