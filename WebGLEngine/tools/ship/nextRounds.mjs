@@ -3449,9 +3449,9 @@ export const NEXT_ROUNDS = [
     {
         id: "circuits-next-from-open-data",
         blocker: "UPSTREAM",
-        what: "The next circuits from the open-data list (with the Liu 2022 licence text and circuits derived from CAVE).",
-        how: "Fetch and read the licence texts, then vendor the circuits the terms allow.",
-        why: "Upstream: the licence and CAVE terms decisions that are Keith's.",
+        what: "The next circuits from the open-data list. DONE 2026-11-19, what open data allows: (1) the fly's STEERING READOUT, vendor/hemibrain/hemibrain-cx-steering.json (tools/flyCx.mjs --circuit steering; 198 cells, the heading loop and PFL1-3 as the outputs; nothing trained on it yet), from the hemibrain export whose licence is now read from the project page ('Hemibrain is licensed under CC-BY.'); (2) the Liu 2022 licence text was already in vendor/zebrafish-vestibular/PROVENANCE.md (CC BY 4.0, quoted from the article's own XML); (3) the Fish1 open bucket holds no circuit not already vendored (TEN and HMI are; the rest is image volumes). LEFT: circuits derived from CAVE (the Mauthner escape circuit), which need Keith's token and his reading of the account's terms.",
+        how: "Run tools/fishCaveExport.py on Keith's machine with his token and upload the export; commit a CAVE-derived circuit only after Keith has read the account's terms. A round on the steering readout is a new registration.",
+        why: "Upstream: the CAVE terms decision is Keith's. Everything reachable without it is done.",
     },
     {
         id: "sub-glb-model-swap",
