@@ -16,6 +16,9 @@
 // FORECAST, for the record: with escorts and the cannon the gain LEADS, by about the mixed gunner's +0.15; with escorts and no cannon a small lead (the mixed gunner's -0.09 was its rest); against fighters LEADS by about the ships-sticky gunner's
 //   deficit to the plain ship (+0.15), or a little less if holding costs the hand's laying anything.
 // WHAT SHIPS: brain/seatFlyWired6WeightsDefault.json (policy seatFlyWired6, the gains -3) if the gain LEADS in at least one escort fleet and TRAILS in no fight. It would replace the ships-sticky gunner as the `flywired` hand on space-duel.html.
+// READ 2026-11-19 (brain/seatFlyWired6WeightsDefault.reading.json): the holding less the ships-sticky +0.350 (z 7.2) in escort fleets without the cannon, +0.368 (z 8.3) with it, +0.156 (z 18.7) against fighters. IT SHIPS: brain/seatFlyWired6WeightsDefault.json,
+//   the `flywired` hand on space-duel.html. Against the plain side it now LEADS in both escort fleets (+0.333, +0.121) and is level against fighters (+0.001), where the ships-sticky gunner trailed (-0.246 with the cannon, -0.154 against fighters).
+//   The forecast was under in both escort fleets: the gain is twice what the mixed gunner's was there, so its rest had been costing it with escorts too.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerHold/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets without escorts (the ships-sticky gunner to the bit), the trained 6DOF fighter pilot, escorts with other autopilots, a fighter told by anything but the aim radius.
 "use strict";

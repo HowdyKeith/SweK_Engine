@@ -65,7 +65,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (g, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${g}_${arm}.json`), "utf8")).leads, near = (s, v) => Math.abs(s.mean - v) < 5e-4, R = (g) => rd[g].reading, blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8"));
+    const re = Object.fromEntries(G.REGIMES.map((g) => [g, G.fightReadings({ ships: k(g, "ships"), hold: k(g, "hold") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT SHIPS: the holding less the ships-sticky is +0.350 (z 7.2) in escort fleets without the cannon, +0.368 (z 8.3) with it, +0.156 (z 18.7) against eight fighters; every fight LEADS", near(R("escorts").gain, 0.350) && near(R("escortsCannon").gain, 0.368) && near(R("fighters").gain, 0.156) && G.REGIMES.every((g) => rd[g].words.gain === "LEADS") && rd.verdict.ok
+        && G.REGIMES.every((g) => ["hold", "ships", "gain"].every((q) => Math.abs(re[g][q].mean - R(g)[q].mean) < 1e-12 && re[g][q].n === 300)), `${R("escorts").gain.mean.toFixed(3)} ${R("escortsCannon").gain.mean.toFixed(3)} ${R("fighters").gain.mean.toFixed(3)}`);
+    ok("!! against the plain side: the holding gunner +0.333 (LEADS) and the ships-sticky -0.017 in escort fleets without the cannon; +0.121 (LEADS) and -0.246 (TRAILS) with it; +0.001 (CANNOT BE TOLD) and -0.154 (TRAILS) against fighters. The forecast was right in direction everywhere and UNDER in both escort fleets (it said 0.15 and a small lead; the gain is twice that)", near(R("escorts").hold, 0.333) && rd.escorts.words.hold === "LEADS" && near(R("escorts").ships, -0.017) && near(R("escortsCannon").hold, 0.121) && rd.escortsCannon.words.hold === "LEADS" && near(R("escortsCannon").ships, -0.246) && near(R("fighters").hold, 0.001) && rd.fighters.words.hold === "CANNOT BE TOLD" && near(R("fighters").ships, -0.154));
+    ok("!! and the file: a seatFlyWired6 brain of the gains -3, seated with the holding library", PB.importBrain(PB.describePolicy(FT.POLICY_ID6, FT.mixedHold), blob).ok && Array.from(blob.weights).join() === "-3,-3" && blob.policy === "seatFlyWired6" && /with no target it HOLDS its gun/.test(blob.by));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

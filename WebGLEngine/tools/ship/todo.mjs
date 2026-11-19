@@ -531,10 +531,10 @@ export const TODO = [
     },
     {
         id: "fly-mixed-gunner-hold",
-        status: "open", size: "small", order: 31,
+        status: "done", size: "small", order: 31,
         title: "The mixed fly-wired gunner with the network's hold when it has no target",
         why: "tools/ship/takeFlyWiredGunnerMixed.mjs (read 2026-11-18): the gunner that hands fighters to the hand gunner LEADS the ships-sticky one with escorts and the cannon (+0.154, z 3.6) but TRAILS in fleets without escorts (-0.269, z -7.3), where all that differs is that its gun goes back to rest with no target. Keeping the hold there (handOn only where a fighter is the target) is one line in brain/seatTurretGunner.mjs and a fresh registered study.",
-        note: "Register before flying, fresh seeds; the same three fights. ALSO 2026-11-18, scratch (tools/ship/takeFlyWiredGunnerShips.mjs header): the ships-sticky gunner's cannon cost goes with ITS OWN SIDE carrying a cannon (-0.063 with only its cannon, +0.097 with only the enemy's, -0.266 with both).",
+        note: "DONE 2026-11-19 (tools/ship/takeFlyWiredGunnerHold.mjs, read once): the holding gunner leads the ships-sticky one by +0.350 and +0.368 in escort fleets without and with the cannon and by +0.156 against fighters; it shipped as brain/seatFlyWired6WeightsDefault.json, the page's `flywired` hand. Register before flying, fresh seeds; the same three fights. ALSO 2026-11-18, scratch (tools/ship/takeFlyWiredGunnerShips.mjs header): the ships-sticky gunner's cannon cost goes with ITS OWN SIDE carrying a cannon (-0.063 with only its cannon, +0.097 with only the enemy's, -0.266 with both).",
         evidence: "node tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs   # section 3 pins the reading",
     },
     {
