@@ -540,7 +540,8 @@ export const TODO = [
     },
     {
         id: "fly-hold-sees",
-        status: "open", size: "small", order: 32,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", size: "small", order: 32,
+        outcome: "SHIPPED: tools/ship/takeFlyWiredGunnerHoldSees.mjs, read once 2026-11-19 -- seatFlyWired8 less seatFlyWired6 +0.053 and +0.055 with escorts (cannot be told), +0.053 (z 2.5) and +0.116 (z 4.2) without; brain/seatFlyWired8WeightsDefault.json is the page's `flywired` hand. It still trails the plain side in fleets with the cannon and no escorts (-0.252).",
         title: "The holding mixed gunner with the slip from the target on ships",
         why: "Two fly-wired gunners shipped on 2026-11-19 and were never flown against each other: the holding mixed gunner (seatFlyWired6, the page's flywired hand: the hand on fighters, the network's hold with no target) and the gunner that sees its target move (seatFlyWired7: the cells driven at the bearing plus 0.1 s times the target's own bearing rate). In fleets the seeing gunner led the ships-sticky one by +0.10 to +0.11 and the holding one is the ships-sticky one to the bit there, so the combination (the slip on ships, the hand on fighters, the hold) should add the two. One library option and a fresh registered study against seatFlyWired6.",
         note: "Register before flying, fresh seeds; escort fleets with and without the cannon, fleets without escorts, fighters.",

@@ -14,6 +14,9 @@
 // REGISTERED 2026-11-19, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: the seeing holding gunner against the plain side; the holding gunner against the plain side; THE ONE LESS THE OTHER, pair by pair.
 // FORECAST, for the record: in the fleets without escorts the gain LEADS by about the seeing gunner's +0.10 and +0.11; with escorts LEADS by about as much, a little less (a fighter is the hand's either way).
 // WHAT SHIPS: brain/seatFlyWired8WeightsDefault.json (policy seatFlyWired8, the weights -3, -3, 0.1) if the gain LEADS in at least one fight and TRAILS in none. It would replace the holding gunner as the `flywired` hand on space-duel.html.
+// READ 2026-11-19 (brain/seatFlyWired8WeightsDefault.reading.json): the seeing holding gunner less the holding one +0.053 (z 1.5) and +0.055 (z 1.7) with escorts, without and with the cannon (CANNOT BE TOLD); +0.053 (z 2.5) and +0.116 (z 4.2)
+//   without escorts, with and without the cannon (LEADS). IT SHIPS: brain/seatFlyWired8WeightsDefault.json, the `flywired` hand on space-duel.html. Against the plain side it leads in three fights of four and still trails in fleets with the
+//   cannon and no escorts (-0.252): the own-cannon cost (tools/ship/takeFlyWiredGunnerShips.mjs) is still there.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerHoldSees/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship against fighters (seatFlyWired6 to the bit), one ship a side, other taus, the trained 6DOF pilot, rationed magazines.
 "use strict";
