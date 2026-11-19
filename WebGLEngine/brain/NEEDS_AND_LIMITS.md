@@ -1627,6 +1627,7 @@ Round 41 found that a circuit on the -0.04 RULE cannot match the shipped seat: t
 1. d = the planner seat's decision (it is called every tick: it advances its own filter and replan clock).
 2. The wrapper advances its own filter by the same formula and alpha (bitwise equal to the planner's).
 3. Every STEP_TICKS (30) ticks, the net steps on x = the 21 pilotNeedsCircuit.featuresOf features plus 3 one-hot of the planner's station index among the open feasible stations (index >= 3, or no station: all zero).
+   **CLARIFIED 2026-11-19, before any code used it:** "the planner's station index" is its position k in `obs.stations`, the list the 21 features' per-station block and circuitSeat.makeSeat's station residuals already index (k < 3). "Among the open feasible stations" in the line above was loose wording: the one-hot is set at k when the planner's station sits at k < 3, and is all zero otherwise. The override in step 4 uses the same k.
 4. Decide with the held residuals y:
    - station: the planner's station p scores y[1+p]; every other feasible open station k < 3 scores -1 + y[1+k]; the argmax wins (with y = 0, p wins strictly; a swing above 1 can override it);
    - surface: lastCall || !station || 10 (thresholdAt(q, depth) - ema) + y0 > 0 (SURFACE_GAIN);
@@ -1669,3 +1670,16 @@ Round 41's nine, adapted: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT
 
 ## 8. What will be built
 `brain/plannerCircuitSeat.mjs` (the seat and the 24-feature policy); `tools/ship/plannerCircuit.mjs` (the policy with the two-gauge seam, the resumable checkpointed search, the champion, the audit, the verdicts); `tools/ship/plannerCircuitCmd.mjs` (export-free: `train` for the rig, `audit`, `report`); `tools/ship/plannerCircuit-selfcheck.mjs` with a mutation pass. **Not in this round:** the look-ahead values as features (they are private to the planner's closure, and exposing them would edit plannerPerturbed.mjs), other net shapes, replacing the seat.
+
+## Round 42, BUILT (2026-11-19): the training is the rig's
+- **What was built:**
+  - `brain/plannerCircuitSeat.mjs`: the seat and the 24 -> 84 -> 7 policy, 2,695 weights.
+  - `tools/ship/plannerCircuit.mjs`: the resumable search, the record, the champion, the audit and the verdicts.
+  - `tools/ship/plannerCircuitCmd.mjs`: export-free.
+  - `tools/ship/plannerCircuit-selfcheck.mjs`: 20 mutants, all red. Its header logs the findings.
+- **What the gate proves on 56901-56902:** the untrained net is the shipped seat (eight full dives, both gauges, fingerprint and command for command). A search killed twice and resumed equals one run unbroken, line for line. Both equal Round 41's esWithCheckpoints, move for move.
+- **Two clarifications before any training, neither a change:** the one-hot indexes `obs.stations` (dated above). And on 56901 the +0.10 bias does not change a dive shorter than its full 600 s, so the gate flies its gauge check at full length.
+- **ON THE RIG, from WebGLEngine:** `node tools/ship/plannerCircuitCmd.mjs train --workers 4`.
+  - It writes `brain/rig-results/planner-circuit/ledger-K.jsonl` (a line every 50 children) and `search-K.json` (when a search is done).
+  - **A killed run is restarted with the same command.** Each search resumes from its last whole line, and loses at most 50 children.
+  - Send the four `search-K.json` and four `ledger-K.jsonl` files. They are committed before any audit seed is flown. The audit (about 48 CPU minutes) is flown here and read once.
