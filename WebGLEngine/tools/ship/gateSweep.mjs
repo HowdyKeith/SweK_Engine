@@ -16550,6 +16550,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the submarine duel series of claude/fish-vestibular-helper: 23 gates, each green on arrival and each carrying its sabotage log in its header (the survivors of every pass triaged: the real ones given rows, the rest argued equivalent one by one). tools/ship/takeEvadePingaway.mjs, round 10's command, had no gate and was removed at the ship rather than claimed here.",
     }),
+    since636: Object.freeze({
+        at: "v4928", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "tools/ship/circuitBias-selfcheck.mjs",
+            "tools/ship/circuitRetrain-selfcheck.mjs",
+            "tools/ship/ruleMove-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "needs rounds 38 to 40 (the aquarium's survey profiles under a biased gauge): 3 gates, each green on arrival, each registered before it was written, each with its mutation pass logged in its header (17, 16 and 17 mutants; four survivors on first passes, each fixed and re-run red) and a result section re-derived from the committed run.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
