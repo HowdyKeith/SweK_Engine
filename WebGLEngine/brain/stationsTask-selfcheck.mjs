@@ -117,6 +117,11 @@ guarded("section 4", () => {
     ok("the five crews in the registered order", J(T.CREWS) === '["NONE","ENERGY","DAMAGE","FIXED","TRIAGE"]');
 });
 
+sec("5. the registered constants");
+guarded("section 5", () => {
+    ok("SECONDS 600, CRUSH 60 m, SURFACE_BAND 3 m, SPEED 2 m/s, LEAK_BUILD 5 s, as registration A of round 2 has them", T.SECONDS === 600 && T.CRUSH === 60 && T.SURFACE_BAND === 3 && T.SPEED === 2 && T.LEAK_BUILD === 5);
+});
+
 finished = true;
 console.log(fails ? `\nstationsTask-selfcheck: ${fails} FAILED` : "\nstationsTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

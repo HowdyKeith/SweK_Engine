@@ -133,6 +133,13 @@ guarded("section 4", () => {
     ok("both stations acted in the one dive: energy held the con, damage control overrode the helm", caps.both.watch.con.energy > 0 && caps.both.watch.overrides.damage > 0, J(caps.both.watch));
 });
 
+sec("5. the later rounds' parts, named here (each is driven in its own round's gate)");
+guarded("section 5", () => {
+    ok("the parts of rounds 2 to 6 are exported functions: triageCaptain (brain/stationsTask-selfcheck), navigationStation, sonarStation, duelSide (brain/subStationsNavSonar-selfcheck), gatedStation (brain/duelStationsTask-selfcheck)",
+        [SS.triageCaptain, SS.navigationStation, SS.sonarStation, SS.duelSide, SS.gatedStation].every((f) => typeof f === "function"));
+    ok("TRIAGE_OFF is every knob off and frozen: with it the TRIAGE captain is the fixed one (brain/stationsTask-selfcheck flies the two side by side)", J(SS.TRIAGE_OFF) === '{"thrustFull":null,"thrustFloor":0,"earlyDropBelow":null,"unrationSink":null,"surfaceOnBreach":false}' && Object.isFrozen(SS.TRIAGE_OFF));
+});
+
 finished = true;
 console.log(fails ? `\nsubStations-selfcheck: ${fails} FAILED` : "\nsubStations-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

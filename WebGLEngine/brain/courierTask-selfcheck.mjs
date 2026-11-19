@@ -106,6 +106,9 @@ guarded("section 5", () => {
     ok("runs on different seeds are refused, by name", /not flown on the same seeds/.test(throws(() => T.verdict(L, F.slice(1))) || ""));
 });
 
+sec("6. the battery range");
+guarded("section 6", () => { ok("CHARGE is the registered 0.15 to 0.45 of capacity, frozen", J(T.CHARGE) === "[0.15,0.45]" && Object.isFrozen(T.CHARGE)); });
+
 finished = true;
 console.log(fails ? `\ncourierTask-selfcheck: ${fails} FAILED` : "\ncourierTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

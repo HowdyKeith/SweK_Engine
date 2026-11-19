@@ -132,6 +132,9 @@ guarded("section 6", () => {
     ok("the chart is BUILT, never written as markup (mountSvg with traceShapes; the name goes in as textContent)", /ADV\.mountSvg\(\$\("advTrace"\), ADV\.traceShapes\(pts\)\)/.test(ua) && /\$\("advWho"\)\.textContent = /.test(ua) && /\$\("advSum"\)\.textContent = ADV\.summaryLine\(pts\)/.test(ua) && !/innerHTML|outerHTML|insertAdjacentHTML/.test(ua));
 });
 
+sec("7. the cap");
+guarded("section 7", () => { ok("MAX_POINTS is 900 (300 s at a point a third of a second; record's default)", T.MAX_POINTS === 900); });
+
 finished = true;
 console.log(fails ? `\nadvisorTrace-selfcheck: ${fails} FAILED` : "\nadvisorTrace-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
