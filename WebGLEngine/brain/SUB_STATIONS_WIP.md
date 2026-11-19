@@ -181,3 +181,30 @@ Keith, 2026-11-19: "putting TRIAGE into the Sub Aquarium (where a flood and a ba
 **In the tank, one starting state, breached at 7 %** (pinned in the gate, section 4): no captain loses the boat in 25 s; FIXED keeps it 300 s near its depth (31.7 to 29.3 m); TRIAGE keeps it 300 s and climbs (31.7 to 16.0 m) with the con as "breach". One boat, one state, not a rate: the rate is section 9's.
 
 **Gate:** `render/subAquariumCaptain-selfcheck.mjs` (27 mutants, every one red; the log is in its header). The aquarium's other gates (`subAquariumSim`, `subAquariumEvents`, `subAquariumPage`, `advisorTrace`) are green with it.
+
+## 11. NAVIGATION AND SONAR AS STATIONS (2026-11-19; BUILT)
+
+Keith, 2026-11-19: "then navigation and sonar as stations".
+
+**NAVIGATION** (`navigationStation(nav, { clock, dt, fleet, avoidFleet })`). The Sub Aquarium's navigator (`brain/subTankNav.mjs`: a goal through islands, icebergs and ships) is a target station at the navigation priority (10). It is asked every tick whoever has the con, so its counters and plan follow the boat's real position.
+* **Alone it IS the tank's courier, bit for bit:** every command of 240 s identical, with the same counters (3 arrivals, 0 hits).
+* **Under a higher claim held for a whole minute** it is still stepped every tick, and its travel follows the boat.
+
+**SONAR AND WEAPONS** (`sonarStation()`, `duelSide({ tactics, helm, more })`). The duel's tactician (`brain/subDuel.mjs`: at each look it is handed the passive contacts, its echoes and the pings it heard; it fires, pings and picks a target) is the sonar station's brain. The duel keeps the look and acts on fire and ping. The station holds the target the duel hands the helm and claims it at the sonar priority (30: above navigation, below energy and damage control). `duelSide` puts a captain behind it with any other stations.
+* **Alone it IS the duel's side, bit for bit:** three whole training duels are identical record for record (the fingerprint, every event).
+* **The gate found a bug before any mutant ran.** The sonar station handed out the target it holds rather than a copy. It is a copy now.
+
+**THE FIRST SONAR CONFLICT** (the duel's 24 TRAINING duels; its audit set is marked unread). One side at 12 % of its battery. The energy station reads the charge the duel hands the tactician at each look. This is pinned in the gate, not a rate.
+
+| crew | won / lost / drawn | mean score | ran flat |
+|---|---|---|---|
+| sonar alone | 15 / 2 / 7 | 0.999 | 11 of 24 |
+| sonar + energy, fixed ranking | 7 / 0 / 17 | 0.544 | 0 |
+
+* **The fixed ranking puts energy above sonar, so a low boat breaks off the fight to go up for charge.** It loses no more duels (0 against 2), but it wins 8 fewer and scores 0.45 less a duel.
+* **A correction to what I first said:** I told Keith a 4-minute duel "never empties even a 12% battery". It does: 11 of 24 boats ran flat. Running flat cost them nothing the duel counts; breaking off cost wins.
+* **The same lesson as round 2, between other stations:** a captain that only ranks the stations pays for an action without asking what it costs. When the cost of the energy claim (the fight) is larger than the cost it prevents (running flat in a fight that ends in 4 minutes), the ranking is wrong. In section 4 it was the other way round, and the ranking was too slow to act.
+
+**Gate:** `brain/subStationsNavSonar-selfcheck.mjs` (14 mutants, every one red; the log is in its header). Round 1's, round 2's and the aquarium captain's gates are green beside it.
+
+**NEXT (proposed, NOT registered): round 3, a captain that weighs sonar against energy.** In the duel with needs: does a captain that lets the energy claim through only when the charge will not last the fight (a CHARGE-AT-RISK rule: the charge left against the draw at the current speed for the time left) keep the wins of sonar alone without being run flat? Registered first, with fresh duel seeds; the duel's own sets are used by other rounds. Then navigation against energy in the aquarium (a courier with a battery: does it reach more goals with a captain that times its charging between legs?).

@@ -21,7 +21,7 @@ import * as SP from "./surfacePilot.mjs";
 import { sanitize } from "../physics/mechanics/subModel6dof.mjs";   // the sanitize emergencyPilot.wrap uses, so a damage override is the wrapper's bit for bit
 
 export const KINDS = Object.freeze(["target", "command"]);
-export const PRIORITY = Object.freeze({ mission: 0, navigation: 10, energy: 50, damage: 90 });
+export const PRIORITY = Object.freeze({ mission: 0, navigation: 10, sonar: 30, energy: 50, damage: 90 });   // 2026-11-19: sonar between navigation and energy (brain/SUB_STATIONS_WIP.md section 11)
 
 const isFn = (f) => typeof f === "function";
 function check(st) {
@@ -139,5 +139,43 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
     Object.defineProperty(out, "aux", { get: () => run.aux });
     Object.defineProperty(out, "triage", { get: () => ({ ...counts }) });
     return out;
+}
+
+// ---- 2026-11-19: NAVIGATION AND SONAR AS STATIONS (brain/SUB_STATIONS_WIP.md section 11) -----------------------------------------------------------------------------------------------------------------
+
+/**
+ * NAVIGATION: the Sub Aquarium's navigator (brain/subTankNav.mjs createNavigator: a goal through a sea of islands, icebergs and ships) as a target station. It is STEPPED EVERY TICK whoever has the con -- it keeps its counters
+ * (arrivals, hits) and its plan from the boat's real position -- and claims the target it returns, at the navigation priority. `clock()` is the tank's time, `fleet()` the other subs as traffic (or null), `avoidFleet()` whether to
+ * treat them so. Alone under a captain it IS the tank's courier: the gate flies both and compares every command.
+ */
+export function navigationStation(nav, { clock, dt, fleet = () => null, avoidFleet = () => true, priority = PRIORITY.navigation } = {}) {
+    if (!nav || !isFn(nav.step)) throw new Error("subStations.navigationStation: a navigator (with step) is needed");
+    if (!isFn(clock) || !Number.isFinite(dt)) throw new Error("subStations.navigationStation: a clock() and a tick length dt are needed");
+    return check({ name: "navigation", kind: "target", priority, propose: ({ state }) => ({ claim: nav.step(state, clock(), dt, fleet(), avoidFleet()), aux: null, reason: "navigation: to the goal" }) });
+}
+
+/**
+ * SONAR AND WEAPONS: the duel's tactician (brain/subDuel.mjs: at each LOOK it is handed the passive contacts, its echoes and the pings it heard, and answers a depth, a heading, a speed, fire and ping) as a target station.
+ * The duel itself holds the look, clamps the answer into the boat's target and fires and pings; the station holds that target and claims it at the sonar priority, so another station (energy, damage control) can outrank it.
+ * `hold(target)` is called with the duel's target; `propose` claims it. Before the first look it claims nothing.
+ */
+export function sonarStation({ priority = PRIORITY.sonar } = {}) {
+    let held = null;
+    const st = check({ name: "sonar", kind: "target", priority, propose: () => (held ? { claim: { ...held }, aux: null, reason: "sonar: the tactician's target" } : { claim: null, aux: null, reason: null }) });
+    st.hold = (t) => { held = t ? { ...t } : null; };
+    return st;
+}
+
+/**
+ * A DUEL SIDE CREWED BY STATIONS: { tactics, pilot } for brain/subDuel.mjs's duel(). `tactics` is the tactician (passed through unchanged: the duel acts on its fire and ping); the pilot is a captain whose sonar station
+ * holds the target the duel hands the helm, beside any `stations` (made by `more(sonar)` so they can see it) under the helm `helm`. With no other station it is the plain side bit for bit (the gate compares whole duels).
+ */
+export function duelSide({ tactics, helm, more = () => [], captainOf = (h, stations) => captain({ helm: h, stations }) } = {}) {
+    if (!isFn(tactics) || !isFn(helm)) throw new Error("subStations.duelSide: a tactician and a helm are needed");
+    const sonar = sonarStation(), cap = captainOf(helm, [sonar, ...more(sonar)]);
+    const pilot = (state, target, current, aux) => { sonar.hold(target); return cap(state, target, current, aux); };
+    Object.defineProperty(pilot, "log", { get: () => cap.log });
+    Object.defineProperty(pilot, "watch", { get: () => cap.watch });
+    return { tactics, pilot, captain: cap, sonar };
 }
 
