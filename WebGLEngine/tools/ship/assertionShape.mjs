@@ -978,8 +978,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4922 -- five gates of this round (brain/lesion, brain/lesionFlyCx, brain/reservoirGpu, tools/ship/lesionLeftSide, tools/subReservoirV6), each defining ok(n, c, d) once and naming first: gates 2345 -> 2350, usesOk 2324 -> 2329, definesOk 2316 -> 2321, nameFirst 2206 -> 2211, read off the code's own census (condFirst 99, distinctDefinitions 49 and unknownSignature 19 did not move).
     // v4926 -- 28 gates of this round (the route solver and studies, FOLLOW-UP 10, the GPU switch, the space and backlog items), each defining ok(n, c, d) once and naming first: gates 2350 -> 2378, usesOk 2329 -> 2357, definesOk 2321 -> 2349, nameFirst 2211 -> 2239, read off the code's own census (condFirst 99, distinctDefinitions 49 and unknownSignature 19 did not move).
     // v4927 -- the submarine duel series of claude/fish-vestibular-helper: 23 gates, each defining ok(n, c, d) once and naming first: gates 2378 -> 2401, usesOk 2357 -> 2380, definesOk 2349 -> 2372, nameFirst 2239 -> 2262, read off the code's own census (condFirst 99, distinctDefinitions 49 and unknownSignature 19 did not move).
-    gates: 2401, usesOk: 2380, definesOk: 2372, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2262, condFirst: 99, unknownSignature: 19,
+    // 2026-11-19 -- one gate, tools/ship/circuitBias-selfcheck.mjs (Needs Round 38), defining ok(n, c, d) once and naming first: gates 2378 -> 2379, usesOk 2357 -> 2358, definesOk 2349 -> 2350, nameFirst 2239 -> 2240 on this branch before the v4927 merge, read off the code's own census (nothing else moved).
+    // 2026-11-19 -- two gates, tools/ship/ruleMove-selfcheck.mjs and circuitRetrain-selfcheck.mjs (Needs Rounds 39 and 40), each defining ok(n, c, d) once and naming first: gates 2379 -> 2381, usesOk 2358 -> 2360, definesOk 2350 -> 2352, nameFirst 2240 -> 2242, read off the code's own census (nothing else moved).
+    // v4928 -- MERGED with v4927 (23 gates): main's 2401 plus this branch's three (circuitBias, ruleMove, circuitRetrain) = 2404, usesOk 2383, definesOk 2375, nameFirst 2265, read off the code's own census.
+    gates: 2404, usesOk: 2383, definesOk: 2375, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2265, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

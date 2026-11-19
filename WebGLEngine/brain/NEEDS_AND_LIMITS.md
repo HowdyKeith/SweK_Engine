@@ -1421,3 +1421,144 @@ Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: SEAT-04'S HULL IS NO WORS
 **Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (0 against 6). The price HURTS at REF, about 55: no (-0.0047, 1.3 se; it HURTS only under the two noisier gauges, -0.008). DMG LOSES or KEEPS, about 70: held (13 against 15 crushed, -0.0023). N30 ties on the hull, about 80: held.
 
 **What changed, as section 6 fixed it.** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` is -0.04 (low 0.3403560726214647); the gates that pinned the -0.06 constants are restated with a dated line; the Round 34-37 libraries name the constants they flew by value. **The price, said plainly:** the seat gives up 0.002 to 0.008 of score in five of six conditions (two of them beyond 2 se) and, with a gauge reading 0.10 high, crushes 0 boats in 300 where the old seat crushed 6 (Round 36: 10). That trade is Keith's decision of 2026-11-17.
+
+# Round 38 -- the Sub Aquarium's decision-circuit profiles under a biased gauge: they still fly the -0.06 base the survey seat left (REGISTERED 2026-11-19, before any code and before any of its seeds was flown)
+
+## 1. Why
+Rounds 34 to 36 found the -0.06 shift crushes boats when the charge gauge reads +0.10 high (7, 9 and 10 of 300 for the seat; 8 for the plain rule at -0.06 in Round 34), and Round 37 moved the shipped survey seat to -0.04. Two survey profiles of the Sub Aquarium did not move with it: `render/subAquariumCircuit.mjs` `rule` (`brain/tunedRule.mjs` tunedSeat on `SURVEY_ROUND33`, low -0.06) and `circuit` (the plain-net champion of the decision-circuit round, `brain/circuitSeat.mjs` makeSeat, whose BASE_PARAMS is `SURVEY_ROUND33`). The net was trained and audited at a sound gauge only (sd 0.10; `brain/DECISION_CIRCUIT_VS_TWIN_WIP.md` D3), and its round read THE CIRCUIT IS THE RULE. This round asks whether those profiles crush under the biased gauge the way the -0.06 seat did, and whether the same trained net on the -0.04 base holds its hull, and at what score. **It changes nothing that ships.** A move of either profile would be Keith's decision and a confirmation round of its own, as Round 37 was.
+
+## 2. The arms, conditions and seeds
+- **C06:** the aquarium's `circuit` profile as it ships: the plain-net champion (`render/subAquariumCircuitWeights.mjs` PLAIN_CHAMPION) in `circuitSeat.makeSeat` on the Round 8 constants with low -0.06 (written BY VALUE in the library).
+- **C04:** the SAME weights and seat on the Round 8 constants with low -0.04 (by value), nothing else changed and nothing retrained.
+- **R06:** the aquarium's `rule` profile as it ships (tunedSeat on low -0.06, WIDE_BOUNDS): the circuit's zero-output base.
+- **SEAT-04:** the shipped survey seat (`surveySeat.surveyPilot()`, planner and profile `standard`, low -0.04): the reference the hull is compared against.
+- **Conditions:** REF (noise sd 0.10, 1 Hz) and BIAS (the same plus +0.10 on every reading, Round 34's fault), by `tools/ship/gaugeFaults.mjs` gaugeOfCond.
+- **Seeds:** **51001-51300, kind `both` (300 dives per arm and condition, the same dives in every cell)**, unused by any needs-and-limits round; the gate flies only 51901-51902. 4 arms x 2 conditions x 300 = 2,400 dives.
+
+## 3. Checks (a failure: the verdicts are NOT WEIGHED)
+GENERATOR (the scenarios are `needsTask.scenario`'s); SIZES; ALIGNED; THE FAULT REACHES THE PILOT (every arm's BIAS differs from its REF on at least one dive); THE ARMS DIFFER (every pair differs on at least one REF dive); **C06 IS THE AQUARIUM'S CIRCUIT PROFILE** and **R06 IS THE AQUARIUM'S RULE PROFILE** (the library's arms, built from the constants by value, against `subAquariumCircuit.circuitSeat("circuit")` and `("rule")` on the gate's two dives, fingerprint for fingerprint); **SEAT-04 IS THE SHIPPED SEAT** (against `surveyPilot()` the same way).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: the paired difference against 2 se, `gaugeFaults.keepsOf` as Rounds 36 and 37 applied it -- KEEPS above +2 se, HURTS below -2 se, LOSES between)
+- **V1, per arm, the hull under BIAS against its own REF:** `<arm> HOLDS ITS HULL UNDER BIAS` iff its BIAS count passes the test against its REF count; `<arm> PAYS MORE UNDER BIAS` otherwise.
+- **V2, the circuit profile against the shipped seat, under BIAS:** `C06'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S UNDER BIAS` iff C06's BIAS count passes the test against SEAT-04's BIAS count; `... IS WORSE` otherwise. The same for C04 (V2b).
+- **V3, the price of the move, at REF:** C04 minus C06, pooled and paired: KEEPS (positive beyond 2 se), LOSES (inside), HURTS (negative beyond 2 se).
+- **THE BOTTOM LINE, the first that applies:** (1) C06 HOLDS (V1) and V2 is NO WORSE -> `THE CIRCUIT PROFILE ON -0.06 HOLDS ITS HULL UNDER BIAS: NOTHING TO MOVE`. (2) otherwise, if C04 HOLDS (V1) and V2b is NO WORSE -> `THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON -0.06 AND HOLDS ON -0.04 (price at REF: <V3>)` -- for Keith's decision. (3) otherwise -> `THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON EITHER BASE`. **And a second line for the rule profile:** `THE RULE PROFILE ON -0.06 HOLDS ITS HULL UNDER BIAS` or `... PAYS MORE UNDER BIAS` (R06's V1).
+**REPORTED, NOT WEIGHED:** each arm's mean and crushed / stranded count in both conditions; C06 and C04 minus SEAT-04 at REF and under BIAS; R06's counts beside Round 34's L06 (8 of 300 crushed under BIAS).
+
+## 5. Expectations, recorded BEFORE any seed is flown
+R06 pays more under BIAS: about 85 (the plain -0.06 rule did in Round 34). C06 pays more under BIAS (V1): about 70 -- the net was read as its rule, and its rule pays. C04 holds (V1): about 75. V2 C06 worse than the shipped seat under BIAS: about 70; V2b C04 no worse: about 70. V3: HURTS about 40, LOSES about 55, KEEPS about 5. Bottom line (2) about 50, (1) about 25, (3) about 25.
+
+## 6. What will be built
+`tools/ship/circuitBias.mjs` (on `gaugeFaults.mjs`'s gauge, difference, KEEPS rule and hull test; `gaugeCurve.mjs`'s chunking), `tools/ship/circuitBiasCmd.mjs` (`run --jobs N`, `report`; a job whose file exists is skipped), `tools/ship/circuitBias-selfcheck.mjs` with a mutation pass; then the run once and the report read once. Results in `brain/rig-results/circuit-bias/`. **NOT IN THIS ROUND:** changing either aquarium profile or `circuitSeat.BASE_PARAMS`, retraining the net, other biases or conditions, the station-only net.
+
+## Round 38, RESULT (2026-11-19): THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON EITHER BASE (88 crushed of 300 on -0.06, 51 on -0.04, against the shipped seat's 1); THE RULE PROFILE ON -0.06 PAYS MORE UNDER BIAS (14)
+
+**The run.** `node tools/ship/circuitBiasCmd.mjs run --jobs 4` in the sandbox, 32 jobs, all exit 0, 2,400 dives on seeds 51001-51300 (`both`), read once (`brain/rig-results/circuit-bias/`, `brain/rig-results/circuit-bias-report.json`; the first 8 job files were committed unread while the rest flew). All seven checks passed: C06 and R06 flown as the aquarium's `circuit` and `rule` profiles and SEAT-04 as the shipped `surveyPilot()`, fingerprint for fingerprint.
+
+| arm | REF score (crushed) | BIAS score (crushed) | V1, hull under BIAS against its own REF | V2, against the shipped seat under BIAS |
+|---|---|---|---|---|
+| C06 (the aquarium's circuit profile, -0.06) | 0.8104 (1) | 0.6127 (**88**) | PAYS MORE | WORSE (88 against 1) |
+| C04 (the same weights on -0.04) | 0.8032 (1) | 0.7095 (**51**) | PAYS MORE | WORSE (51 against 1) |
+| R06 (the aquarium's rule profile, -0.06) | 0.8043 (0) | 0.8106 (**14**) | PAYS MORE | -- |
+| SEAT-04 (the shipped seat, -0.04) | 0.8050 (0) | 0.8432 (1) | HOLDS | -- |
+
+Nothing stranded. V3, the price of moving the circuit's base at REF (C04 minus C06): -0.0072 (se 0.0030), HURTS. Reported: C06 minus SEAT-04 at REF +0.0054 (se 0.0059), under BIAS -0.2305 (se 0.0217); C04 minus SEAT-04 at REF -0.0018 (se 0.0054), under BIAS -0.1337 (se 0.0180); R06 crushed 14 under BIAS against Round 34's L06 at 8 (other seeds). Bottom lines: `THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON EITHER BASE`; `THE RULE PROFILE ON -0.06 PAYS MORE UNDER BIAS`.
+
+**Against the expectations of section 5 (written first).** R06 pays more, about 85: held. C06 pays more, about 70: held, and far beyond anything forecast. C04 holds, about 75: NO (51 crushed). V2 C06 worse, about 70: held. V2b C04 no worse, about 70: NO. V3: HURTS, about 40: came. Bottom line (3), about 25: came. **My forecast treated the circuit as its rule ("the net was read as its rule, and its rule pays") and expected it to crush roughly what the -0.06 rule does. It crushed six times as many (88 against R06's 14), so that premise was wrong under a biased gauge:** the decision-circuit round read THE CIRCUIT IS THE RULE at a sound gauge only (its D3), and that reading does not carry to a gauge that reads high.
+
+**WHAT THIS MEANS and does not.** At a sound gauge the circuit profile is indistinguishable from the shipped seat (+0.0054, se 0.0059) and crushes 1 boat in 300. With the charge gauge reading 0.10 high it crushes **88 of 300 (29 percent)**, the -0.06 rule profile 14, the shipped seat 1. Moving the circuit's base to -0.04 without retraining halves it (51) and still leaves it 50 times the seat's; the net's learned residual, trained only at a sound gauge, is what spends the margin, not only its base. So: **both aquarium survey profiles that Round 37 did not move are hull risks under a biased gauge, the circuit profile by far the larger.** This round changes nothing (section 1). What to do -- leave them as watch-only profiles with a warning, move the rule profile to -0.04 (Round 36/37's numbers say that holds), retrain the net with a biased gauge in its training conditions, or withdraw the circuit profile -- is Keith's decision, and any change that ships is a registered round of its own. It does not say what the net would do under a gauge reading LOW, under drift or dropouts, or after retraining; it was not flown on those.
+
+# Round 39 -- the Sub Aquarium's rule profile moved to low -0.04, Keith's decision, confirmed on fresh dives before it ships (REGISTERED 2026-11-19, before any code and before any of its seeds was flown)
+
+## 1. Why
+Keith, 2026-11-19, after Round 38: "do (b) and (c)". Option (b) is moving the aquarium's `rule` profile (`render/subAquariumCircuit.mjs`, tunedSeat on low -0.06, which crushed 14 of 300 under the +0.10 bias in Round 38) to low -0.04, the value the shipped seat moved to at Round 37. As in Round 37, **the decision is Keith's and is not re-made here**; the round can only stop it: if a check fails or the -0.04 rule's hull is worse than the -0.06 rule's in any condition, the profile is NOT changed and the finding goes back to Keith.
+
+## 2. The arms, conditions and seeds
+- **Arms:** **R04**, `brain/tunedRule.mjs` tunedSeat on the Round 8 constants with low -0.04, WIDE_BOUNDS; **R06**, the same on low -0.06 (the aquarium's `rule` profile as it ships). Both constants written BY VALUE.
+- **Conditions:** Round 37's six (`plannerRobust.scenarioX`): **REF** (3 stations, damage x1, sd 0.10), **DMG** (damage x1.6), **N20** (sd 0.20), **N30** (sd 0.30), **STN5** (5 stations), **BIAS** (sd 0.10 and +0.10 on every reading).
+- **Seeds, far and both, 150 of each (300 dives per arm and condition):** REF 53001-53150, DMG 53201-53350, N20 53401-53550, N30 53601-53750, STN5 53801-53950, BIAS 54201-54350. Unused by any needs round; the gate flies only 54901-54902. 2 arms x 6 conditions x 300 = 3,600 dives.
+
+## 3. Checks (a failure: NOT WEIGHED, and the profile is not changed)
+GENERATOR (scenarioX at 3 stations and damage x1 equals `needsTask.scenario`); SIZES; ALIGNED; THE ARMS DIFFER (on at least one dive of every condition); **R06 IS THE AQUARIUM'S RULE PROFILE** (against `subAquariumCircuit.circuitSeat("rule")` on the gate's dives, fingerprint for fingerprint, flown before the profile is changed).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: `gaugeFaults.keepsOf`, the paired difference against 2 se)
+- **Per condition, the hull:** `R04'S HULL IS NO WORSE THAN R06'S IN <c>` iff R04's count passes the test against R06's; `... IS WORSE IN <c>` otherwise.
+- **Per condition, the price:** R04 minus R06, paired: HURTS, LOSES, KEEPS -- REPORTED, not judged.
+- **The bottom line:** `THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN ANY CONDITION` -> the aquarium's `rule` profile becomes tunedSeat on low -0.04 (the shipped seat's SURVEY_CONSTANTS); `THE MOVE IS HELD: R04'S HULL IS WORSE IN <list>` -> it is not, and Keith is told.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+Confirmed: about 85 percent. Fewer crushed under BIAS for R04 than R06: about 85. The price HURTS at REF: about 40 (Round 37's seat paid -0.0047 there, inside 2 se). DMG: both crush some (Round 37's seats 13 and 15), no worse: about 80.
+
+## 6. What will be built, and what changes if the move is confirmed
+`tools/ship/ruleMove.mjs`, `tools/ship/ruleMoveCmd.mjs` (`run`, `report`), `tools/ship/ruleMove-selfcheck.mjs` with a mutation pass; the run once, the report read once. **If confirmed:** `render/subAquariumCircuit.mjs`'s `rule` profile is tunedSeat(SURVEY_CONSTANTS, WIDE_BOUNDS); its gate is restated with a dated line. Round 38's library names what it flew by value and is not changed. **Not in this round:** the circuit profile (Round 40), any other constant, shipping a version.
+
+# Round 40 -- the decision-circuit net retrained with a biased gauge among its training conditions, on the -0.04 base, and audited against the shipped seat before it can replace the aquarium's circuit profile (REGISTERED 2026-11-19, before any code, any training and any of its seeds was flown)
+
+## 1. Why
+Keith, 2026-11-19: option (c), "retrain the net with a biased gauge in its training conditions". Round 38 found the aquarium's `circuit` profile -- the plain-net champion of the decision-circuit round, trained and audited only at a sound gauge -- crushes 88 of 300 with the gauge reading +0.10 high (51 on the -0.04 base without retraining), against the shipped seat's 1. This round trains the same net shape by the same recipe, on the shipped seat's base, with the biased gauge in its fitness, and audits the champion before it may replace the profile.
+
+## 2. The training (fixed now, before any search)
+- **Policy:** `brain/circuitSeat.mjs` createPlainPolicy(84) -- the same 21 -> 84 -> 7 relu net and features -- with its seat on the Round 8 constants with **low -0.04** (by value; the shipped seat's), WIDE_BOUNDS. Every readout starts at zero, so **the untrained pilot is R04** (Round 39's arm), decision for decision.
+- **Recipe:** `trainNeedsCircuit.RECIPE` unchanged (4 searches x 300 children, sigma 0.3, 1 to 4 weights a child, a prune toward the start with a budget of 60). Search seeds **97500-97503**.
+- **Fitness (the one change):** the mean survey score on TRAIN_SMALL (16 dives) flown **twice, once at the sound gauge (sd 0.10) and once with +0.10 bias**, 32 dives in all, through the policy's `evaluate` seam (the trainer is not edited). Held-out (HELD_OUT_SET) and pool (POOL_SET) are scored the same way, under both gauges.
+- **Champion:** ELIGIBLE = crushed in no more POOL dives (both gauges together) than the start; the best HELD-OUT of the eligible, ties to the lower k; none eligible -> the champion is the start (R04). Chosen from the training records BEFORE any audit seed is flown; the weights are kept to six decimals and the champion flown is the one chosen.
+
+## 3. The audit: arms, conditions and seeds
+- **Arms:** **NEW** (the champion on its -0.04 seat); **C06** (the aquarium's `circuit` profile as it ships, Round 38's arm); **SEAT-04** (the shipped seat, `surveyPilot()`).
+- **Conditions:** REF (sd 0.10) and BIAS (+0.10), `gaugeFaults.gaugeOfCond`.
+- **Seeds:** **52001-52300, kind `both`, 300 dives per arm and condition**, the same dives in every cell; unused anywhere; the gate flies only 52901-52902. 3 x 2 x 300 = 1,800 dives.
+
+## 4. Checks (a failure: NOT WEIGHED, and nothing is replaced)
+GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT; THE ARMS DIFFER; **THE LEDGER IS COMPLETE** (4 searches, one record each, one recipe, one start); **NEW'S START IS R04** (the untrained policy against tunedSeat on low -0.04, fingerprint for fingerprint on the gate's dives); **C06 IS THE AQUARIUM'S CIRCUIT PROFILE**; **SEAT-04 IS THE SHIPPED SEAT**.
+
+## 5. The verdicts (hull: Round 33's test; score: `keepsOf`, 2 se)
+- **V1:** `NEW'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S UNDER BIAS` iff NEW's BIAS count passes the test against SEAT-04's BIAS count; `... WORSE` otherwise.
+- **V2:** the same at REF.
+- **REPORTED, NOT WEIGHED:** NEW minus SEAT-04 at REF and under BIAS (KEEPS / LOSES / HURTS); NEW minus C06 under BIAS; each arm's mean and crushed / stranded count; whether the champion is the start.
+- **The bottom line:** V1 and V2 -> `THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE` (render/subAquariumCircuitWeights.mjs is regenerated from the champion's record, the circuit profile's seat moves to the -0.04 base, and its gate is restated with a dated line). Otherwise -> `THE RETRAINED CIRCUIT DOES NOT HOLD ITS HULL: NOTHING IS REPLACED` and the finding goes back to Keith.
+
+## 6. Expectations, recorded BEFORE any training
+A champion is eligible (not the start): about 75 percent. V1 holds: about 65 (the training sees the bias, but on 16 dives). V2 holds: about 90. The bottom line replaces: about 60. NEW minus SEAT-04 at REF LOSES (inside 2 se): about 70.
+
+## 7. What will be built
+`tools/ship/circuitRetrain.mjs` (the policy, the two-gauge evaluate seam, the search jobs through `trainNeedsCircuit.search`, the champion, the audit jobs and verdicts), `tools/ship/circuitRetrainCmd.mjs` (`train --workers N`, `audit --jobs N`, `report`), `tools/ship/circuitRetrain-selfcheck.mjs` with a mutation pass. The training ledger is committed before the audit is flown; the audit is flown once and read once. **Not in this round:** other gauge faults, other net shapes, the reservoir families, retraining more than once.
+
+## Round 38, CORRECTION (2026-11-19, found while Round 39 moved the rule profile; the result is unchanged)
+Check 6 of Round 38's report (`C06 AND R06 ARE THE AQUARIUM'S PROFILES`) is weaker than its words: `circuitBias.profilesSame` flies 60 s dives, on which the -0.04 and -0.06 bases fly the same, so it could not have told the bases apart and is still true after the move. What established C06 and R06 as the aquarium's profiles when the round flew is the gate's full-dive row (`tools/ship/circuitBias-selfcheck.mjs` section 4), which held then. The check is left as committed and the gate says so.
+
+## Round 39, RESULT (2026-11-19): THE MOVE IS CONFIRMED -- R04'S HULL IS NO WORSE THAN R06'S IN ANY CONDITION; the aquarium's rule profile now flies low -0.04
+
+**The run.** `node tools/ship/ruleMoveCmd.mjs run --jobs 2` in the sandbox (beside Round 40's training), 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/rule-move/`, `brain/rig-results/rule-move-report.json`). All five checks passed, R06 flown as the aquarium's `rule` profile on full dives before it changed.
+
+| condition | R04 (crushed) | R06 (crushed) | hull | price, R04 minus R06 (reported) |
+|---|---|---|---|---|
+| REF | 0.8047 (0) | 0.8087 (0) | no worse | -0.0040 (se 0.0031) LOSES |
+| DMG | 0.7628 (20) | 0.7592 (22) | no worse | +0.0037 (se 0.0045) LOSES |
+| N20 | 0.8245 (0) | 0.8310 (0) | no worse | -0.0065 (se 0.0031) HURTS |
+| N30 | 0.8207 (0) | 0.8334 (0) | no worse | -0.0127 (se 0.0032) HURTS |
+| STN5 | 0.7581 (0) | 0.7652 (0) | no worse | -0.0071 (se 0.0026) HURTS |
+| BIAS | 0.8482 (**1**) | 0.8387 (**7**) | no worse | +0.0095 (se 0.0070) LOSES |
+
+Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: R04'S HULL IS NO WORSE IN ANY CONDITION`.
+
+**Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (1 against 7). The price HURTS at REF, about 40: no (-0.0040, 1.3 se; it HURTS under N20, N30 and STN5). DMG no worse, about 80: held (20 against 22).
+
+**What changed, as section 6 fixed it.** `render/subAquariumCircuit.mjs`'s `rule` profile is tunedSeat(SURVEY_CONSTANTS, WIDE_BOUNDS), low -0.04; `render/subAquariumCircuit-selfcheck.mjs` is restated with dated lines; Round 38's gate holds R06 to what the profile WAS. **The price, said plainly:** the -0.04 rule gives up 0.004 to 0.013 of score in four of six conditions (three beyond 2 se) and, with the gauge reading 0.10 high, crushes 1 boat in 300 where the -0.06 rule crushed 7 (Round 38: 14). The same trade the seat made at Round 37, and Keith's decision of 2026-11-19.
+
+## Round 40, RESULT (2026-11-19): THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE -- at a price beyond 2 se in score
+
+**The training** (`node tools/ship/circuitRetrainCmd.mjs train --workers 4`, four searches of about 30 minutes; the ledger `brain/rig-results/circuit-retrain/search-*.json` committed before any audit seed was flown). Every search raised its training score (0.8594 at the start to 0.8922-0.9109) and **every search's held-out score came out BELOW the untrained start's 0.8913** (0.8502 to 0.8817): what the search found on its 16 training dives (32 with both gauges) did not carry to the held-out dives. Three of four were eligible (search 2 crushed one pool dive); the champion by the registered rule is **search 1 (seed 97501), held-out 0.8706** -- the rule asks the best eligible, not one that beats the start, and it was applied as written.
+
+**The audit** (`audit --jobs 4`, 24 jobs, all exit 0, 1,800 dives on 52001-52300 `both`, read once; `brain/rig-results/circuit-retrain-report.json`). All nine checks passed.
+
+| arm | REF score (crushed / stranded) | BIAS score (crushed / stranded) |
+|---|---|---|
+| NEW (the retrained champion, -0.04) | 0.7778 (0 / 0) | 0.8101 (4 / 1) |
+| C06 (the circuit profile as it shipped) | 0.8168 (0 / 0) | 0.6453 (**77** / 0) |
+| SEAT-04 (the shipped seat) | 0.8048 (0 / 0) | 0.8491 (2 / 0) |
+
+V1: NEW's hull under BIAS is no worse than the seat's (5 against 2: 3 <= 2 sqrt 7). V2: no worse at REF (0 against 0). Reported: NEW minus the seat **-0.0269 (se 0.0048) at REF and -0.0390 (se 0.0069) under BIAS, both HURTS**; NEW minus C06 under BIAS +0.1648 (se 0.0208), KEEPS. Bottom line: `THE RETRAINED CIRCUIT HOLDS ITS HULL: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE`.
+
+**Against the expectations of section 6 (written first).** A champion eligible, about 75: held (3 of 4). V1 holds, about 65: held. V2 holds, about 90: held. Replaces, about 60: came. NEW minus the seat at REF LOSES (inside 2 se), about 70: NO -- it HURTS, by 5.6 se.
+
+**WHAT THIS MEANS and does not.** The retrained net fixes the hull: under a gauge reading +0.10 high it loses 5 boats in 300 where the profile it replaces lost 77 (88 in Round 38). It is not a better pilot: it scores 0.027 below the shipped seat at a sound gauge and 0.039 below it under the bias, and its training did not generalise to its own held-out dives. By the rule registered first (the hull decides; the score is reported, not weighed) it replaces the profile, and it has: `render/subAquariumCircuitWeights.mjs` gains CIRCUIT_CHAMPION (generated from search-1.json, digest 0ec046a3), `render/subAquariumCircuit.mjs`'s `circuit` profile flies it on the -0.04 base, PLAIN_CHAMPION is kept as what Rounds 38 and 40 name as C06, and the gates that pinned the old profile are restated with dated lines. **The circuit profile is now a safe watch-only seat and a weaker one; whether a better-trained net (more training dives, more searches) is worth a round is Keith's call** -- this round retrained once, as registered, and does not retrain again.
