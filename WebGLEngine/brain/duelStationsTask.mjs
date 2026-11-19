@@ -11,9 +11,11 @@ import * as N from "../physics/mechanics/subNeeds.mjs";
 import { mulberry } from "./pilotSubPolicy.mjs";
 
 export const FIGHT = D.SECONDS, CHARGE = Object.freeze([0.05, 0.30]), RISK = Object.freeze({ minT: 10, reserve: 0.02 });
-export const CREWS = Object.freeze(["SONAR", "FIXED", "RISK"]);
+export const CREWS = Object.freeze(["SONAR", "FIXED", "RISK", "BLIND"]);   // BLIND: round 6 (section 17), RISK with a fixed 60 s look-ahead in place of the fight's time left
+export const BLIND = Object.freeze({ lookAhead: 60 });
 const set = (a, b) => Object.freeze(D.KINDS.flatMap((k) => Array.from({ length: b - a + 1 }, (_, i) => Object.freeze({ seed: a + i, kind: k }))));
 export const DEV_SET = set(171001, 171006), HELD_SET = set(173001, 173024);
+export const R6_DEV_SET = set(185001, 185006), R6_HELD_SET = set(187001, 187024);   // round 6's sets
 
 /** The battery of a duel seed: a fraction of capacity, U(0.05, 0.30). */
 export function chargeOf(seed) {
@@ -35,12 +37,12 @@ export function sideFor(crew, c0) {
     const charge = () => (last && Number.isFinite(last.self.charge) ? last.self.charge * c0 : c0);
     const read = () => ({ frac: charge(), depth: last ? last.self.depth : 20, refills: true, refillDepth: N.CLASSES.battery.refillDepth, flood: 0, damage: 0 });
     let gated = null;
-    const risk = () => !!last && atRisk(last.t, charge(), c0);
+    const risk = () => !!last && (crew === "BLIND" ? atRisk(last.t, charge(), c0, { fight: last.t + BLIND.lookAhead }) : atRisk(last.t, charge(), c0));   // BLIND asks only whether the charge lasts the next 60 s
     const more = () => {
         if (crew === "SONAR") return [];
         const e = SS.energyStation({ read });
         if (crew === "FIXED") return [e];
-        if (crew === "RISK") return [(gated = SS.gatedStation(e, () => risk()))];
+        if (crew === "RISK" || crew === "BLIND") return [(gated = SS.gatedStation(e, () => risk()))];
         throw new Error(`duelStationsTask.sideFor: no crew named ${JSON.stringify(crew)} (${CREWS.join(", ")})`);
     };
     const side = SS.duelSide({ tactics, helm: SS.helmOf(AS.pilot()), more });

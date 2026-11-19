@@ -6,6 +6,8 @@
 //   L06 charging counted as spent | L07 a decision every tick | L08 no first-tick decision | L09 no emergency | L10 never letting go | L11 charging to the need, not the need + 0.2 | L12 the distance to the start, not the goal |
 //   L13 the legs station below energy | C01 LEGS without the gated energy station | C02 LEGS with the energy claim open | C03 FIXED as NAV | C04 a battery to 0.5 | C05 HELD from 177002 | C06 a 600 s run | V01 a two-sided test |
 //   V02 ties as LEGS's | V03 p 0.1 | V04 the seeds unchecked. THREE ROWS OF MINE WERE MUDDLED and were rewritten before the mutants ran (one said the opposite of what it tested, one asked a question, one checked almost nothing).
+// ROUND 5 (ROUTE, section 3b): 6 more mutants, every one red by name: R01 the ROUTE crew built without the route | R02 the route asked at the start, not the boat | R03 the route used even when null | R04 the route for LEGS too |
+//   R05 round 5's HELD from 183002 | R06 a navigator with no routeLength throwing. R01 WENT 0 RED FIRST (the crew row checked only the stations' names); a row now flies one tick of each crew on a leg where the route matters.
 "use strict";
 import * as T from "./courierTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -59,6 +61,26 @@ guarded("section 3", () => {
     ok("a leg's need is LEARNT from what was spent: a boat that has spent nothing over 1,000 m needs only the 0.05 for a 500 m leg, and goes on at 0.20", p6.claim === null && L2.state.decisions === 1, J(L2.state));
     const L3 = T.legsStation({ read, nav: { snapshot: () => ({ arrivals: 3, goal: { x: 300, y: 400 }, travel: 10 }) }, pos: () => [0, 0] }); frac = 0.2; const p7 = L3.propose({ state: st, target: tg });
     ok("...while one with under 50 m of travel uses the prior: 0.001 x 500 m x 1.5 + 0.05 = 0.80, so at 0.20 it charges, to 0.95 (the cap)", p7.claim !== null && near(L3.state.chargeTo, 0.95), J(L3.state));
+});
+
+sec("3b. ROUTE (round 5): the planned route's length in place of the straight line");
+guarded("section 3b", () => {
+    const st = S.createState({ depth: 20, speed: 2, model: S.createSubModel(S.EXPLORER) }), tg = { depth: 20, heading: 0, speed: 2 };
+    const reading = (frac) => () => ({ frac, depth: 20, refills: true, refillDepth: 0.7, flood: 0, damage: 0 });
+    const seen = []; const nav = (route) => ({ snapshot: () => ({ arrivals: 0, goal: { x: 200, y: 0 }, travel: 0 }), routeLength: (x, y) => { seen.push([x, y]); return route; } });
+    // straight 200 m -> need 0.001 x 200 x 1.5 + 0.05 = 0.35; a planned 300 m -> 0.50. At 0.40: LEGS goes on, ROUTE charges (to 0.70)
+    const legs = T.legsStation({ read: reading(0.4), nav: nav(300), pos: () => [0, 0] }), route = T.legsStation({ read: reading(0.4), nav: nav(300), pos: () => [7, 9], route: true });
+    const pl = legs.propose({ state: st, target: tg }), pr = route.propose({ state: st, target: tg });
+    ok("at 0.40 with a 200 m straight leg whose PLANNED route is 300 m: LEGS goes on (need 0.35), ROUTE charges (need 0.50, to 0.70), asking the navigator at the boat's own position", pl.claim === null && pr.claim !== null && near(route.state.chargeTo, 0.7) && J(seen) === "[[7,9]]", J([route.state, seen]));
+    const none = T.legsStation({ read: reading(0.4), nav: nav(null), pos: () => [0, 0], route: true }); const pn = none.propose({ state: st, target: tg });
+    ok("with no plan (routeLength null) ROUTE falls back to the straight line: it goes on as LEGS does", pn.claim === null && none.state.chargeTo === null);
+    const plain = T.legsStation({ read: reading(0.4), nav: { snapshot: () => ({ arrivals: 0, goal: { x: 200, y: 0 }, travel: 0 }) }, pos: () => [0, 0], route: true });
+    ok("a navigator with no routeLength at all is the straight line too (no throw)", plain.propose({ state: st, target: tg }).claim === null);
+    const c2 = { read: reading(0.4), nav: nav(300), pos: () => [0, 0] }, rc = T.crew("ROUTE", c2), lc = T.crew("LEGS", c2); rc(st, tg, [0, 0, 0]); lc(st, tg, [0, 0, 0]);
+    ok("AS CREWS, on that leg: ROUTE's captain gives the legs station the con (it charges), LEGS's flies the mission", rc.log.con === "legs" && lc.log.con === "mission", J([rc.log.con, lc.log.con]));
+    const ctx = { read: reading(0.2), nav: { snapshot: () => ({ arrivals: 0, goal: { x: 0, y: 0 }, travel: 0 }), routeLength: () => null }, pos: () => [0, 0] };
+    ok("the ROUTE crew carries the legs station (route on) and the energy station gated shut, like LEGS; round 5's sets are 181001-181024 (DEV) and 183001-183096 (HELD)", J(Object.keys(T.crew("ROUTE", ctx).watch.con)) === '["mission","legs","energy"]' &&
+        T.R5_DEV_SET.length === 24 && T.R5_DEV_SET[0] === 181001 && T.R5_HELD_SET.length === 96 && T.R5_HELD_SET[0] === 183001 && T.R5_HELD_SET[95] === 183096 && J(T.CREWS) === '["NAV","FIXED","LEGS","ROUTE"]');
 });
 
 sec("4. the crews and a run");

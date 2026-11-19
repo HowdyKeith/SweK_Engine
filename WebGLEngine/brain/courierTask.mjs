@@ -17,8 +17,9 @@ import { mulberry } from "./pilotSubPolicy.mjs";
 
 export const SECONDS = 1200, START = Object.freeze({ x: 20, y: 150, depth: 20, speed: 2 }), CHARGE = Object.freeze([0.15, 0.45]), ARM = "any+predict";
 export const LEGS = Object.freeze({ priorPerM: 0.001, priorUntilM: 50, margin: 1.5, plus: 0.05, over: 0.2, cap: 0.95, emergency: 0.1 });
-export const CREWS = Object.freeze(["NAV", "FIXED", "LEGS"]);
+export const CREWS = Object.freeze(["NAV", "FIXED", "LEGS", "ROUTE"]);   // ROUTE: round 5 (section 16), LEGS with the navigator's planned route as the leg's length
 export const DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 175001 + i)), HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 177001 + i));
+export const R5_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 181001 + i)), R5_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 183001 + i));   // round 5's sets
 const MODEL = NT.model();
 
 /** The battery of a seed: a fraction of capacity, U(0.15, 0.45). */
@@ -37,13 +38,14 @@ export function legNeed(spent, travel, dist, k = LEGS) {
  * THE LEGS STATION: a target station at the energy priority. `read()` the needs readings, `nav` the navigator (its snapshot: arrivals, goal, travel), `pos()` the boat's [x, y]. It keeps the charge it has SPENT (the sum of every fall
  * of the reading; a rise is charging) and decides at each arrival -- and at the first tick -- whether to charge there; mid-leg only under `emergency`. `.state` is { chargeTo, decisions, emergencies }.
  */
-export function legsStation({ read, nav, pos, k = LEGS } = {}) {
+export function legsStation({ read, nav, pos, k = LEGS, route = false } = {}) {
     let chargeTo = null, seen = null, lastFrac = null, spent = 0, decisions = 0, emergencies = 0;
     const st = SS.gatedStation({ name: "legs", kind: "target", priority: SS.PRIORITY.energy, propose: ({ target }) => {
         const r = read(), sn = nav.snapshot();
         if (lastFrac !== null && r.frac < lastFrac) spent += lastFrac - r.frac;
         lastFrac = r.frac;
-        const [x, y] = pos(), dist = sn.goal ? Math.hypot(sn.goal.x - x, sn.goal.y - y) : 0, need = legNeed(spent, sn.travel, dist, k);
+        const [x, y] = pos(), straight = sn.goal ? Math.hypot(sn.goal.x - x, sn.goal.y - y) : 0, planned = route && typeof nav.routeLength === "function" ? nav.routeLength(x, y) : null;
+        const dist = planned === null ? straight : planned, need = legNeed(spent, sn.travel, dist, k);   // round 5 (ROUTE): the planned route's length where there is one, else the straight line
         if (sn.arrivals !== seen) { seen = sn.arrivals; decisions++; if (chargeTo === null && r.frac < need) chargeTo = Math.min(k.cap, need + k.over); }
         if (chargeTo === null && r.frac < k.emergency) { emergencies++; chargeTo = Math.min(k.cap, k.emergency + need + k.over); }
         if (chargeTo !== null && r.frac >= chargeTo) chargeTo = null;
@@ -60,6 +62,7 @@ export function crew(name, ctx) {
     if (name === "NAV") return SS.captain({ helm });
     if (name === "FIXED") return SS.captain({ helm, stations: [SS.energyStation({ read: ctx.read })] });
     if (name === "LEGS") return SS.captain({ helm, stations: [legsStation(ctx), SS.gatedStation(SS.energyStation({ read: ctx.read }), () => false)] });
+    if (name === "ROUTE") return SS.captain({ helm, stations: [legsStation({ ...ctx, route: true }), SS.gatedStation(SS.energyStation({ read: ctx.read }), () => false)] });
     throw new Error(`courierTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
 }
 
@@ -89,7 +92,7 @@ export function signTest(wins, losses) {
     return p / 2 ** n;
 }
 
-/** The registered verdict of LEGS against FIXED over paired runs (same seeds, same order). */
+/** The registered verdict of LEGS against FIXED over paired runs (same seeds, same order). Round 5 reads ROUTE against LEGS with the same function (its words name the first argument LEGS and the second FIXED: the caller says which is which). */
 export function verdict(legs, fixed) {
     if (legs.length !== fixed.length || legs.some((r, i) => r.seed !== fixed[i].seed)) throw new Error("courierTask.verdict: the crews were not flown on the same seeds in the same order");
     const mean = (xs) => xs.reduce((a, r) => a + r.goals, 0) / xs.length, mL = mean(legs), mF = mean(fixed);

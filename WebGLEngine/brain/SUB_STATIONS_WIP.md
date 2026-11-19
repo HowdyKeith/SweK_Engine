@@ -352,3 +352,9 @@ Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's pl
 * **Reported:** BLIND against RISK by the same sign test (what knowing the fight's length was worth); won, lost and drawn; ran flat; the ticks energy had the con.
 
 **EXPECTATION, recorded now.** A 60 s look-ahead fires LATER than "the rest of the fight" early in a duel (240 - t is larger than 60), and the same near the end. So BLIND lets the energy claim through less often than RISK and runs flat more, close to SONAR. V2 kept about 85 percent; V1 BLIND BEATS FIXED about 75 percent; BLIND against RISK no difference shown about 60 percent.
+
+**ROUNDS 5 AND 6, BUILT AND GATED BEFORE HELD (2026-11-19).**
+* ROUTE is one option of the legs station (`route: true`, using `routeLength` where there is a plan). BLIND is RISK's rule with the fight's end at the last look plus 60 s.
+* Both are gated in the round 3 and 4 gates (11 more mutants, every one red; the logs are in their headers).
+* **DEV is not degenerate in either.** Round 5: ROUTE and LEGS differ on 12 of 24 DEV runs; mean goals LEGS 4.00, ROUTE 3.92; runs with an empty battery LEGS 13, ROUTE 5. Round 6: BLIND and FIXED differ on 14 of 24 DEV duels; mean score FIXED 0.550, BLIND 0.933; BLIND ran flat in 2.
+* **Nothing was tuned.** HELD: round 5 flies FIXED, LEGS and ROUTE on the 96 seeds (`brain/routeHeld.<part>.jsonl`, four processes); round 6 flies SONAR, FIXED, RISK and BLIND on the 96 duels (`brain/blindHeld.jsonl`). Each is committed unread, then read once.

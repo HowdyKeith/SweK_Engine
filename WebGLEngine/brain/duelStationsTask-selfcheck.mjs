@@ -13,6 +13,9 @@
 // TWO WENT 0 RED ON THE FIRST PASS AND GOT ROWS: D09 and D10 (no row looked at what RISK reads; the side now hands out read() and risk(), and a hand-made look drives them). A THIRD, D12 (no unknown-crew refusal), pointed at a REDUNDANT
 //   line: duelSide asks for the stations, which refuses an unknown crew by itself; the line was deleted, not counted. AND THREE ROWS OF MINE WERE WRONG OR EMPTY: a verdict fixture whose 5-to-1 pairs give p 0.109 (it said BEATS), and two
 //   rows with an `||` that let them pass whatever happened; all three rewritten before the mutants ran.
+// ROUND 6 (BLIND, section 2b): 5 more mutants, every one red by name: B01 BLIND as RISK | B02 a 90 s look-ahead | B03 BLIND ungated | B04 round 6's HELD from 187002 | B05 the look-ahead counted from the fight's start.
+//   B03 WENT 0 RED FIRST (the crew row read a count that starts at 0 either way); a row now flies one tick of BLIND and FIXED on a look where the charge lasts the look-ahead. Two rows of mine sat EXACTLY on the 0.02 line and failed by
+//   floating point; their numbers were moved clear of it.
 "use strict";
 import * as T from "./duelStationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -51,6 +54,21 @@ guarded("section 2", () => {
     ok("near the end little is needed: spent 0.15 of 0.2 in 230 s, 10 s left needs 0.0065 -- safe at 0.05", T.atRisk(230, 0.05, 0.2) === false);
     ok("a charge that RISES (the boat is charging) is never at risk while above the reserve", T.atRisk(100, 0.25, 0.2) === false);
     ok("the fight's length is the rule's: with 480 s, the 0.02-in-100-s boat (0.18 left, 380 s to go needs 0.076) is still safe, and the 0.06-in-100-s boat is not", T.atRisk(100, 0.18, 0.2, { fight: 480 }) === false && T.atRisk(100, 0.14, 0.2, { fight: 480 }) === true && T.atRisk(100, 0.14, 0.2) === false);
+});
+
+sec("2b. BLIND (round 6): the same rule with a fixed 60 s look-ahead");
+guarded("section 2b", () => {
+    const probe = (crew, t, rel, c0 = 0.2) => { const p = T.sideFor(crew, c0); p.side.tactics({ t, self: { charge: rel, depth: 17, heading: 0, speed: 2, x: 0, y: 0, hp: 100, ammo: 4, ready: true }, contacts: [], echoes: [], pings: [] }); return p.risk(); };
+    // spent 0.05 of 0.2 in 30 s (rel 0.75: c 0.15): r 0.00167/s. RISK: 210 s left -> 0.35 needed: at risk. BLIND: 60 s -> 0.10: 0.05 left: safe
+    ok("EARLY, the look-ahead fires LATER: spent 0.05 of 0.2 in 30 s, RISK (210 s left need 0.35) is at risk; BLIND (60 s need 0.10, 0.05 left) is not", probe("RISK", 30, 0.75) === true && probe("BLIND", 30, 0.75) === false);
+    // at t 230 (10 s left): spent 0.15 in 230 s: r 0.00065; c 0.05. RISK: 10 s -> 0.0065: 0.0435 left: safe. BLIND: 60 s -> 0.039: 0.011 left, under 0.02: at risk
+    ok("LATE, it fires SOONER: spent 0.15 of 0.2 in 230 s, RISK (10 s left need 0.007) is safe; BLIND (60 s need 0.039) is at risk", probe("RISK", 230, 0.25) === false && probe("BLIND", 230, 0.25) === true);
+    ok("before 10 s neither is at risk; the look-ahead is the registered 60 s; round 6's sets are 185001-185006 and 187001-187024 x the four kinds", probe("BLIND", 9, 0.01) === false && T.BLIND.lookAhead === 60 && Object.isFrozen(T.BLIND) && T.R6_DEV_SET.length === 24 && T.R6_HELD_SET.length === 96 &&
+        Math.min(...T.R6_HELD_SET.map((d) => d.seed)) === 187001 && Math.max(...T.R6_HELD_SET.map((d) => d.seed)) === 187024 && Math.min(...T.R6_DEV_SET.map((d) => d.seed)) === 185001 && J(T.CREWS) === '["SONAR","FIXED","RISK","BLIND"]');
+    const bl = T.sideFor("BLIND", 0.2), fx = T.sideFor("FIXED", 0.2), look = { t: 30, self: { charge: 0.75, depth: 17, heading: 0, speed: 2, x: 0, y: 0, hp: 100, ammo: 4, ready: true }, contacts: [], echoes: [], pings: [] };
+    const st = S.createState({ depth: 17, speed: 2, model: S.createSubModel(S.EXPLORER) }), tg = { depth: 17, heading: 0, speed: 2 };
+    bl.side.tactics(look); fx.side.tactics(look); bl.side.pilot(st, tg, [0, 0, 0]); fx.side.pilot(st, tg, [0, 0, 0]);
+    ok("the BLIND crew HOLDS BACK the energy claim when the charge lasts the look-ahead (0.15 of capacity at 17 m, under the energy rule's line): FIXED gives energy the con, BLIND keeps sonar's", fx.side.pilot.log.con === "energy" && bl.side.pilot.log.con === "sonar" && bl.stats().blocked === 1, J([fx.side.pilot.log.con, bl.side.pilot.log.con, bl.stats()]));
 });
 
 sec("3. the gated station");
