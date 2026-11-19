@@ -358,3 +358,23 @@ Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's pl
 * Both are gated in the round 3 and 4 gates (11 more mutants, every one red; the logs are in their headers).
 * **DEV is not degenerate in either.** Round 5: ROUTE and LEGS differ on 12 of 24 DEV runs; mean goals LEGS 4.00, ROUTE 3.92; runs with an empty battery LEGS 13, ROUTE 5. Round 6: BLIND and FIXED differ on 14 of 24 DEV duels; mean score FIXED 0.550, BLIND 0.933; BLIND ran flat in 2.
 * **Nothing was tuned.** HELD: round 5 flies FIXED, LEGS and ROUTE on the 96 seeds (`brain/routeHeld.<part>.jsonl`, four processes); round 6 flies SONAR, FIXED, RISK and BLIND on the 96 duels (`brain/blindHeld.jsonl`). Each is committed unread, then read once.
+
+## 18. ROUND 6 RESULT (2026-11-19; `brain/blindHeld.jsonl`, 384 duels, committed unread at `b92c59fe7`, then read ONCE)
+
+**BOTTOM LINE (registered, BLIND in RISK's place): a captain that weighs the charge against the fight keeps the fight and beats the ranking, WITHOUT KNOWING HOW LONG THE FIGHT IS.**
+* **V1: BLIND BEATS FIXED.** Higher in 54 of the 96 HELD duels, lower in 14 (sign test p = 6e-7).
+* **V2: BLIND KEEPS SONAR'S FIGHT.** Mean 1.383 against SONAR's 1.418, inside the 0.05 line.
+
+| crew | mean score | won / lost / drawn | ran flat | duels in which energy had the con |
+|---|---|---|---|---|
+| SONAR | 1.418 | 75 / 1 / 20 | 15 | 0 |
+| FIXED | 0.828 | 43 / 1 / 52 | 0 | 96 |
+| RISK (knows 240 s) | 1.395 | 73 / 0 / 23 | 0 | 27 |
+| **BLIND (60 s look-ahead)** | **1.383** | 73 / 1 / 22 | **1** | 23 |
+
+**Reported, not in the verdict.**
+* **Knowing the fight's length was worth almost nothing:** BLIND and RISK score the same in 85 of 96 duels. BLIND is higher in 7 and lower in 4: no difference shown (p 0.27 one way, 0.89 the other).
+* **Round 3 replicates on these fresh duels:** RISK BEATS FIXED and KEEPS SONAR'S FIGHT again.
+* **Against the expectation in section 17.** V1 (put at about 75 percent), V2 (about 85) and "BLIND against RISK, no difference" (about 60) all happened. **I was wrong about running flat:** I wrote that BLIND would run flat more, close to SONAR. It ran flat once, against SONAR's 15. A 60 s look-ahead fires late early in a fight, but early enough: the battery that would go flat within a minute is the one that matters.
+
+**What it says.** The charge-at-risk rule does not need the fight's length, which a real boat would not know. A fixed one-minute look-ahead does as well. Round 3's caveat is answered.
