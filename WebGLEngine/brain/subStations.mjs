@@ -179,3 +179,20 @@ export function duelSide({ tactics, helm, more = () => [], captainOf = (h, stati
     return { tactics, pilot, captain: cap, sonar };
 }
 
+/**
+ * A GATED STATION (round 3, brain/SUB_STATIONS_WIP.md section 12): `station`'s claim passes only while `allow()` is true; its aux asks always pass (a pump is cheap; a change of course is what costs). The name, kind and priority are the
+ * station's, so the captain ranks it as before. `.blocked` counts the ticks a claim was held back.
+ */
+export function gatedStation(station, allow) {
+    check(station);
+    if (!isFn(allow)) throw new Error(`subStations.gatedStation: station ${station.name} needs an allow() function`);
+    let blocked = 0;
+    const g = check({ name: station.name, kind: station.kind, priority: station.priority, propose: (ctx) => {
+        const p = station.propose(ctx);
+        if (!p || !p.claim || allow()) return p;
+        blocked++; return { ...p, claim: null, reason: null };
+    } });
+    Object.defineProperty(g, "blocked", { get: () => blocked });
+    return g;
+}
+
