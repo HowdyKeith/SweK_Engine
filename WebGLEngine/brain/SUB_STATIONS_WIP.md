@@ -291,3 +291,26 @@ Keith, 2026-11-19: "a navigating courier with a battery, to see whether timing i
 **EXPECTATION, recorded now.** LEGS BEATS FIXED about 50 percent; NO DIFFERENCE about 40 percent (both charge about as often; where they charge may not matter much when a goal is about 150 s apart and a charge takes minutes); FIXED BEATS LEGS about 10 percent (LEGS's estimate of a leg is a straight line; the navigator's route around an island is longer, and LEGS may set out short).
 
 **BUILT AND GATED BEFORE HELD (2026-11-19).** `brain/courierTask.mjs` and its gate `brain/courierTask-selfcheck.mjs` (23 mutants, every one red; the log is in its header). **DEV (24 runs) is not degenerate:** the three crews never tie on all 24. **Nothing was tuned on DEV.** For the record, the DEV numbers, seen before HELD: NAV 0.88 goals (15 boats lost: a flat courier cannot hold its depth); FIXED 3.63 goals (0 lost, 18 s empty, 643 s charging); LEGS 3.67 goals (1 lost, 163 s empty, 588 s charging). LEGS's empty seconds are the risk section 14 named: its leg estimate is a straight line, and the route around an island is longer. The run: every crew on the 96 HELD seeds once, in four processes, one line a run to `brain/courierHeld.<part>.jsonl`, committed unread, then read once.
+
+## 15. ROUND 4 RESULT (2026-11-19; `brain/courierHeld.{0,1,2,3}.jsonl`, 288 runs, committed unread at `b62ed9456`, then read ONCE)
+
+**VERDICT (registered): LEGS BEATS FIXED.** LEGS reaches 3.69 goals a run against FIXED's 3.36. It reaches more on 45 of the 96 HELD runs and fewer on 22 (sign test p = 0.0034).
+
+| crew | mean goals | goals (runs) | boats lost | runs with an empty battery | mean empty s | mean charging s | hits |
+|---|---|---|---|---|---|---|---|
+| NAV | 0.93 | 0: 21, 1: 61, 2: 14 | **69** | 96 | 656 | 1 | 53 |
+| FIXED | 3.36 | 2: 5, 3: 57, 4: 28, 5: 6 | 0 | 43 | 14 | 643 | 207 |
+| **LEGS** | **3.69** | 0: 1, 1: 1, 2: 11, 3: 29, 4: 30, **5: 20, 6: 4** | 0 | 65 | 161 | 588 | 167 |
+
+**Reported, not in the verdict.**
+* **LEGS has the wider spread.** It reaches 5 or 6 goals in 24 runs against FIXED's 6, but only 0 to 2 in 13 against FIXED's 5. **In 21 of the 22 runs where LEGS reaches fewer, its battery ran empty.** That is the risk section 14 named: LEGS plans a leg as a straight line, and the route around an island is longer, so it sets out short and stalls. No LEGS boat was lost.
+* **LEGS charges less and hits less:** 588 s charging against 643, and 167 hits against 207. Its charging stops are at goals, in open water. FIXED goes up wherever the rule fires, sometimes among obstacles.
+* **NAV, which never charges, loses 69 of 96 boats:** a flat courier cannot hold its depth.
+* **Against the expectation in section 14:** LEGS BEATS FIXED was put at about 50 percent. It happened. "FIXED BEATS LEGS" was put at 10 percent, for the straight-line risk. That risk is real (the 22 runs), but it does not outweigh the gain.
+
+**What it says, and does not.**
+* **Charging between legs, when the next leg needs it, reaches more goals than charging wherever the rule fires.** That is the fourth pair of stations on which a captain that asks what an action costs (here, where and when a charging stop costs least) beats the fixed ranking.
+* **The obvious next step is named by the losses:** LEGS's leg estimate should be the navigator's planned route, not the straight line. That is a new registration, not a change to this one.
+* One sea generator, one navigator arm, one vessel, a battery of 15 to 45 percent, 20 minutes.
+
+**Status: rounds 3 and 4 CLOSED as registered.**
