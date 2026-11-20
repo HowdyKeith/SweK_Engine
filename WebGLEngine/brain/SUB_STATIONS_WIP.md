@@ -621,3 +621,24 @@ Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by 
 * A test of NEED that could reach the bar needs more dives (the bar is a count, and 2 of 24 differ). Or a vessel with a larger main ballast (`ballastRange` 0.25, the "real boat" spec `surfacePilot.mjs` names).
 
 **Built and kept, off by default:** `triageCaptain`'s `blowNeed` and `needWindowS`; `stationsTask`'s `scenario(seed, ranges)` (the other draws of a seed do not move; gated), HARD_LEAK, NEED_KNOBS, the NEED crew and round 12's sets. Gated in `brain/stationsTask-selfcheck.mjs` section 7 (8 mutants, every one red; logged).
+
+## 29. ROUND 10 RESULT (2026-11-20; `brain/condHeld.{0,1}.jsonl`, 384 runs, committed unread at `a44de8bc0`, then read ONCE)
+
+**VERDICT (registered): COND BEATS COMBINED.** COND has more goals than COMBINED on 75 of the 96 HELD runs and fewer on 1 (p = 1e-21). It is not shown worse on survival: 76 against 80; COMBINED keeps 5 boats COND loses and COND 1 that COMBINED loses (p = 0.11, over the line).
+
+| crew | survived (of 96) | mean goals | seconds on the surface after the breach |
+|---|---|---|---|
+| ROUTE+DC | 51 | 1.75 | 263 |
+| TRIAGE | 68 | 0.89 | 562 |
+| COMBINED (round 7's union) | **80** | 0.84 | 625 |
+| **COND** | 76 | **2.42** | 444 |
+
+**Reported:**
+* **COND keeps both parents' gains, round 7's question.** It beats ROUTE+DC on goals (43 runs to 10, p = 3e-6) and TRIAGE on survival (13 to 5, p = 0.048). Round 7's union interfered; with the latch made conditional, the union COMBINES.
+* **It is the best courier of every crew flown so far on a breached run** (2.42 goals, against ROUTE+DC's 1.75), while keeping 76 of 96 boats against ROUTE+DC's 51.
+* **The price is small and on record:** 4 boats fewer than COMBINED. Those are, plausibly, boats that could just hold depth and were caught by a later second sinking, the risk section 27 put at about 25 percent. It is not shown to be a loss at the registered line.
+* **Against the expectation in section 27:** COND BEATS COMBINED was put at about 65 percent; it happened.
+
+**What it says.** Rounds 7 and 10 together: two good rules put on one boat interfere when one of them assumes it is alone (TRIAGE's latch assumed a breached boat has no job left). Asking that rule one more question (CAN the boat go on?) made the union better than either part on its own measure. This is the captain the stations work set out to find, for these three stations.
+
+**Status: round 10 CLOSED as registered.**
