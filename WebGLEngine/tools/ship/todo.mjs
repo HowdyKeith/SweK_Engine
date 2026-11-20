@@ -548,6 +548,14 @@ export const TODO = [
         evidence: "node tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs && node tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs   # both readings pinned",
     },
     {
+        id: "bysize-sees-fighters",
+        status: "open", size: "small", order: 34,
+        title: "The by-size hand should also take the fly-wired gunner when fighters are about",
+        why: "tools/ship/takePresetsHard.mjs (read 2026-11-20): one ship against the trained pilot's fighters, under the cannon-aware helm, the fly-wired gunner leads the car's by +0.131 (z 8.0), but the by-size hand picks the car's gunner because there is one ship. A rule by ships AND escorts or fighters (the car's gunner only one ship a side with nothing else in the fight) would take it; one ship a side with escorts is the fight to fly.",
+        note: "Register before flying: the by-size hand against one that also counts escorts, one ship a side with escorts and one ship against fighters.",
+        evidence: "node tools/ship/takePresetsHard-selfcheck.mjs   # section 3 pins it",
+    },
+    {
         id: "fly-window-by-size",
         status: "open", size: "small", order: 33,
         title: "The held-trigger fly gunner with its hand window chosen by the fight's size",

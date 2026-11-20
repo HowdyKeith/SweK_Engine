@@ -81,7 +81,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ ship: k(f, "ship"), fleet: k(f, "fleet") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- BOTH LEAD THE PLAIN SHIP IN ALL THREE HARD FIGHTS (the car's gunner +1.550 rationed, +1.889 with pilot-flown escorts, +0.116 against the pilot's fighters; the fly-wired gunner +1.782, +2.198, +0.247), AND THE FLY-WIRED GUNNER LEADS THE CAR'S IN EVERY ONE: +0.232, +0.309, +0.131", near(R("rationed").ship, 1.550) && near(R("pilotEscorts").ship, 1.889) && near(R("pilotFighters").ship, 0.116) && near(R("rationed").fleet, 1.782) && near(R("pilotEscorts").fleet, 2.198) && near(R("pilotFighters").fleet, 0.247) && near(R("rationed").fleetOverShip, 0.232) && near(R("pilotEscorts").fleetOverShip, 0.309) && near(R("pilotFighters").fleetOverShip, 0.131) && G.FIGHTS.every((f) => ["ship", "fleet", "fleetOverShip"].every((q) => rd[f].words[q] === "LEADS"))
+        && G.FIGHTS.every((f) => ["ship", "fleet", "fleetOverShip"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! AND WHAT IT MEANS FOR THE BY-SIZE HAND, SAID: ONE SHIP AGAINST FIGHTERS it picks the car's gunner (one ship), which trails the fly-wired one there by 0.131 -- the size is not the whole of the rule; the forecast was right that both lead and UNDER against the pilot's fighters (it said about level)", near(R("pilotFighters").fleetOverShip, 0.131) && /against fighters/i.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

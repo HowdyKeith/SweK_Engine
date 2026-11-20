@@ -14,6 +14,8 @@
 //   (the helm turns the ship; the fly gunner gives fighters to the hand, the car's gunner holds the trigger on them). The fleet preset LEADS the ship preset with escorts, and is about level rationed.
 // AMENDED BEFORE ANY PAIR WAS FLOWN (2026-11-20, after tools/ship/takeBySizeLoadout.mjs was read): the best-ship preset now picks its gunner by the fight's size, so IN THESE FLEET FIGHTS IT CARRIES THE FLY-WIRED GUNNER -- the `fleet` arm reads both presets
 //   there, the `ship` arm (the car's gunner) what the best-ship preset was. Against the pilot's fighters (one ship) the `ship` arm is the best-ship preset still. The arms, fights and pairs are as registered.
+// READ 2026-11-20 (brain/presetsHard.reading.json): both lead the plain ship in all three fights -- the car's gunner under the helm +1.550 rationed, +1.889 with pilot-flown escorts, +0.116 against the pilot's fighters; the fly-wired gunner +1.782, +2.198,
+//   +0.247 -- and the fly-wired gunner leads the car's in every one (+0.232, +0.309, +0.131). So against fighters with one ship the by-size hand's choice of the car's gunner is the weaker one: a rule by ships alone does not see fighters.
 // Every arm's leads are kept (brain/rig-results/presetsHard/); the reading file (brain/presetsHard.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side, other rations, escorts flown by the pilot on one side only, the helm's gain search (tools/ship/takeFlyWiredHelmTune.mjs) -- the presets as they are shipped at registration.
 "use strict";
