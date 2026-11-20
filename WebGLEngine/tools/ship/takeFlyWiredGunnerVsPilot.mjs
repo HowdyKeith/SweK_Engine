@@ -13,6 +13,9 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain side; THE PAGE'S LESS THE SHIPS-STICKY, pair by pair.
 // FORECAST, for the record: against the pilot's fighters the page's gunner is about level with the plain ship (it is the hand's laying, holding with no target: +0.001 against the PD fighters) and leads the ships-sticky one by about the 0.31 it trailed;
 //   in the escort fleets it leads the plain side (as it does with PD escorts, +0.40 and +0.24), by less, the pilot's escorts being harder to shoot.
+// READ 2026-11-20 (brain/flyWiredGunnerVsPilot.reading.json): against the trained pilot's fighters the page's gunner (seatFlyWired8) is level with the plain ship (-0.003) and +0.316 over the ships-sticky one; with pilot-flown escorts it LEADS the plain side,
+//   +0.363 without the cannon and +0.258 with it (+0.253 and +0.398 over the ships-sticky one). The pilot does not undo it. The page's gunner has since become seatFlyWired9, which against fighters alone is seatFlyWired8 to the bit; its escort fleets
+//   with the pilot are not flown here.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerVsPilot/); the reading file (brain/flyWiredGunnerVsPilot.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts flown by the pilot on one side only, the cannon-aware helm, other pilots, rationed magazines.
 "use strict";

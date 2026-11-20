@@ -74,7 +74,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (g, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${g}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (g) => rd[g].reading;
+    const re = Object.fromEntries(G.REGIMES.map((g) => [g, G.fightReadings({ ships: k(g, "ships"), page: k(g, "page") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- AGAINST THE TRAINED PILOT THE PAGE'S GUNNER HOLDS UP: level with the plain ship against the pilot's fighters (-0.003, CANNOT BE TOLD), and it LEADS the plain side with pilot-flown escorts, +0.363 without the cannon and +0.258 with it; it leads the ships-sticky gunner by +0.316, +0.253 and +0.398", near(R("fighters").page, -0.003) && rd.fighters.words.page === "CANNOT BE TOLD" && near(R("escorts").page, 0.363) && near(R("escortsCannon").page, 0.258) && rd.escorts.words.page === "LEADS" && rd.escortsCannon.words.page === "LEADS" && near(R("fighters").gain, 0.316) && near(R("escorts").gain, 0.253) && near(R("escortsCannon").gain, 0.398) && G.REGIMES.every((g) => rd[g].words.gain === "LEADS")
+        && G.REGIMES.every((g) => ["page", "ships", "gain"].every((q) => Math.abs(re[g][q].mean - R(g)[q].mean) < 1e-12 && re[g][q].n === 300)));
+    ok("!! the ships-sticky gunner: -0.319 (TRAILS) against the pilot's fighters, as the pilot study had it (-0.31); +0.109 and -0.140 (TRAILS) with pilot-flown escorts. The forecast was right against the fighters and UNDER with escorts (it said a smaller lead than against PD escorts; it is about the same)", near(R("fighters").ships, -0.319) && rd.fighters.words.ships === "TRAILS" && near(R("escorts").ships, 0.109) && near(R("escortsCannon").ships, -0.140) && rd.escortsCannon.words.ships === "TRAILS");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
