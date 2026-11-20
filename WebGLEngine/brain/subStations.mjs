@@ -111,13 +111,16 @@ export function captain({ helm, stations = [] } = {}) {
 //   wrapper's rationing. Off with blowClimb null. Round 9 found the air a breached TRIAGE boat dies with: 5.53 of 6, never used.
 // v4930 (round 10) -- COND, latchOnSecond: the breach latch claims the surface only once damage control's TROUBLE TEST (emergencyPilot.stage's: 5 m past the target flown and still sinking) fires AGAIN after the weight is
 //   gone -- a leak bigger than the weight. Damage control itself is silent once the weight is gone (its stage reads 'gone'), so the latch asks the same test. Off by default.
-export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false });
+// v4930 (round 12) -- T5 by NEED, blowNeed: blow when, at the charge spent per second over the last needWindowS seconds, the battery would be empty before the current climb reaches blowAbove (a climb of 0 or less never
+//   arrives), on a breached boat whose weight is gone, deeper than blowAbove. Off by default.
+export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false, blowNeed: false, needWindowS: 10 });
 // v4930 (round 7) -- `more`: extra target stations asked FIRST (round 7's COMBINED puts ROUTE's legs station here); `energyAllow`: a gate on the energy station's surface claim (null: none; ROUTE shuts it). Both default to v4929's captain.
 export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {}, more = [], energyAllow = null } = {}) {
     if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
     const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyAllow ? gatedStation(energyStation({ read }), energyAllow) : energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
     const counts = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
     let breached = false, second = false, recovered = false;
+    const fracs = [], dtGuess = 1 / 30;   // the readings of the last needWindowS seconds, a tick each (the tick is the vessel's DT)
     const latched = () => (k.latchOnSecond ? second : breached);
     // the stations are asked through the same captain() so the log, the watch and the aux are kept the same way; T3 swaps the helm for the tick, T1 and T2 edit the commands after it
     let bare = false;
@@ -145,6 +148,13 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
             if (changed) cmd = sanitize(c);
         }
         if (k.blowClimb !== null && breached && state.tank && state.tank.released && -state.pos[2] > k.blowAbove && state.vel[2] < k.blowClimb && cmd.ballast > -1) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
+        if (k.blowNeed) {
+            const win = Math.round(k.needWindowS / dtGuess); fracs.push(r.frac); if (fracs.length > win + 1) fracs.shift();
+            if (breached && state.tank && state.tank.released && -state.pos[2] > k.blowAbove && fracs.length === win + 1 && cmd.ballast > -1) {
+                const rate = (fracs[0] - r.frac) / k.needWindowS, tEmpty = rate > 0 ? r.frac / rate : Infinity, tArrive = state.vel[2] > 0 ? (-state.pos[2] - k.blowAbove) / state.vel[2] : Infinity;
+                if (tEmpty < tArrive) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
+            }
+        }
         return cmd;
     };
     Object.defineProperty(out, "log", { get: () => run.log });

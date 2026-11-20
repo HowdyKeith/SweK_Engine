@@ -21,13 +21,18 @@ export const FROZEN_TRIAGE = Object.freeze({ thrustFull: null, thrustFloor: 0, e
 /** ROUND 9 (brain/SUB_STATIONS_WIP.md section 24): FROZEN_TRIAGE plus BLOW -- the main tank blown with stored air while a breached boat, its weight gone, climbs slower than 0.2 m/s deeper than 3 m. Its sets. */
 export const BLOW_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, blowClimb: 0.2, blowAbove: 3 });
 export const R9_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 196001 + i)), R9_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 197001 + i));
+/** ROUND 12 (section 27): the hard cases (a leak over the 6 % weight) and NEED -- FROZEN_TRIAGE plus blowing only when the charge would run out before the climb reaches 3 m. */
+export const HARD_LEAK = Object.freeze({ leak: Object.freeze([0.06, 0.08]) });
+export const NEED_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, blowNeed: true, blowAbove: 3, needWindowS: 10 });
+export const R12_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 203001 + i)), R12_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 204001 + i));
 const MODEL = NT.model();
 
-/** The scenario of a seed: { seed, depth, heading, frac, leak, leakAt }. */
-export function scenario(seed) {
+/** The scenario of a seed: { seed, depth, heading, frac, leak, leakAt }. `ranges` replaces any of RANGES (round 12 draws the leak from HARD_LEAK); the draws are made in the same order, so the other fields of a seed do not move. */
+export function scenario(seed, ranges = RANGES) {
     if (!Number.isInteger(seed) || seed < 0) throw new Error(`stationsTask.scenario: a seed is a whole number, got ${seed}`);
     const r = mulberry((seed * 2654435761) >>> 0), u = ([lo, hi]) => lo + (hi - lo) * r();
-    return Object.freeze({ seed, depth: u(RANGES.depth), heading: u([0, 2 * Math.PI]), frac: u(RANGES.frac), leak: u(RANGES.leak), leakAt: u(RANGES.leakAt) });
+    const R = { ...RANGES, ...ranges };
+    return Object.freeze({ seed, depth: u(R.depth), heading: u([0, 2 * Math.PI]), frac: u(R.frac), leak: u(R.leak), leakAt: u(R.leakAt) });
 }
 export const leakAt = (sc, t) => sc.leak * Math.min(1, Math.max(0, (t - sc.leakAt) / LEAK_BUILD));
 
@@ -40,7 +45,8 @@ export function crew(name, ctx, knobs = FROZEN_TRIAGE) {
         case "DAMAGE": return SS.captain({ helm, stations: [d()] });
         case "FIXED": return SS.captain({ helm, stations: [e(), d()] });
         case "TRIAGE": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs });
-        case "BLOW": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: BLOW_KNOBS });   // round 9; not in CREWS (round 2's registered five)
+        case "BLOW": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: BLOW_KNOBS });
+        case "NEED": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: NEED_KNOBS });   // round 12; not in CREWS   // round 9; not in CREWS (round 2's registered five)
         default: throw new Error(`stationsTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
     }
 }

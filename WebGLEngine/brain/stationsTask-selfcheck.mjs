@@ -16,6 +16,9 @@
 // v4930 -- BLOW (round 9, section 6): 6 mutants of subStations.mjs and stationsTask.mjs; 5 red by name, 1 EQUIVALENT (final pass): K1 blowing unbreached | K2 blowing with the weight aboard | K4 blowing at any climb | K5 0.3 m/s |
 //   K6 the BLOW crew as TRIAGE. K1 WENT 0 RED FIRST (every hand captain was breached on its first tick); a never-breached captain is asked now. K3 (blowing in the surface band) IS EQUIVALENT under this helm: above 3 m the
 //   surfacing wrapper is in its 'afloat' stage and blows the tank itself (ballast -1), so the rule's `cmd.ballast > -1` is already false there.
+// v4930 -- NEED (round 12, section 7): 8 mutants, every one red by name (final pass): N1 blowing whatever the need | N2 never blowing | N3 the window ignored | N4 the rate unsigned | N5 the arrival from the surface, a sinking boat
+//   counted as arrived | N6 HARD_LEAK from 5 % | N7 the other draws moved | N8 the NEED crew as TRIAGE. FOUR WENT 0 RED FIRST AND GOT ROWS: N3 (every fixture filled the window), N4 (no fixture charged), N5 (no fixture sank),
+//   N8 (the crew was checked by its label only; a DEV dive where the two differ is flown now). AND A ROW OF MINE argued with itself in its own text about a 2 m/s climber; it tests a 10 m/s one now.
 "use strict";
 import * as T from "./stationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -140,6 +143,29 @@ guarded("section 6", () => {
     const e = SS.triageCaptain({ pilot, model, read: reading, knobs: T.FROZEN_TRIAGE }); e(sink, mission); e(slow(30, 0.05), mission);
     ok("FROZEN_TRIAGE never blows (blowClimb is null in it); BLOW_KNOBS is FROZEN_TRIAGE with 0.2 m/s and 3 m, frozen", e.triage.T5 === 0 && T.BLOW_KNOBS.blowClimb === 0.2 && T.BLOW_KNOBS.blowAbove === 3 && T.BLOW_KNOBS.earlyDropBelow === Infinity && T.BLOW_KNOBS.surfaceOnBreach === true && Object.isFrozen(T.BLOW_KNOBS));
     ok("the BLOW crew flies the knobs (a DEV dive of round 9 differs from TRIAGE's on 196001) and round 9's sets are 196001-196024 and 197001-197096", T.fly(T.scenario(196001), "BLOW").survived !== T.fly(T.scenario(196001), "TRIAGE").survived && T.R9_DEV_SET[0] === 196001 && T.R9_HELD_SET.length === 96 && T.R9_HELD_SET[0] === 197001);
+});
+
+sec("7. NEED (round 12, stopped at DEV): the hard-case scenario and the need-gated blow");
+guarded("section 7", () => {
+    const sc = T.scenario(204001), hard = T.scenario(204001, T.HARD_LEAK);
+    ok("the hard-case scenario draws the leak from 6-8 % and moves nothing else of the seed (the draws are in the same order)", hard.leak >= 0.06 && hard.leak <= 0.08 && hard.depth === sc.depth && hard.frac === sc.frac && hard.leakAt === sc.leakAt && hard.heading === sc.heading && J(T.HARD_LEAK.leak) === "[0.06,0.08]");
+    ok("400 hard-case draws all lie in 6-8 %", Array.from({ length: 400 }, (_, i) => T.scenario(830000 + i, T.HARD_LEAK).leak).every((l) => l >= 0.06 && l <= 0.08));
+    const model = NT.model(), pilot = A.pilot(), mission = { depth: 20, heading: 0, speed: 2 }, sink = S.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5;
+    // a breached boat, weight gone, at 30 m: the charge falls 0.10 over the 10 s window (0.01/s); with 0.05 left it is empty in 5 s
+    const drive = (vz, fracs) => { let i = 0; const read = () => ({ cls: "battery", frac: fracs[Math.min(i, fracs.length - 1)], depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 });
+        const c = SS.triageCaptain({ pilot, model, read, knobs: T.NEED_KNOBS }); c(sink, mission); const st = S.createState({ depth: 30, speed: 2, model }); st.vel[2] = vz; st.tank = { ...(st.tank || {}), released: true };
+        let last = null; for (i = 1; i < fracs.length; i++) last = c(st, mission); return { c, last }; };
+    const falling = Array.from({ length: 302 }, (_, i) => 0.15 - (0.10 * i) / 300), steady = Array.from({ length: 302 }, () => 0.5);
+    const a = drive(0.05, falling), b = drive(0.05, steady), d = drive(10, falling);
+    ok("A BOAT THAT WOULD RUN OUT ON THE WAY UP BLOWS: at 0.05 m/s from 30 m (540 s to 3 m) with the battery empty in about 5 s, ballast -1 and T5 counts it", a.last.ballast === -1 && a.c.triage.T5 > 0, J([a.last.ballast, a.c.triage]));
+    ok("...a boat whose charge holds does NOT (no spend: never empty), and nor does one climbing fast enough to arrive first (10 m/s: 2.7 s to 3 m, before the 5 s of charge runs out)", b.c.triage.T5 === 0 && d.c.triage.T5 === 0, J([b.c.triage.T5, d.c.triage.T5]));
+    const early = drive(0.05, falling.slice(0, 50)), rising = drive(0.05, Array.from({ length: 302 }, (_, i) => 0.05 + (0.10 * i) / 300)), sinkingStill = drive(-0.1, Array.from({ length: 302 }, (_, i) => 0.5 - 1e-6 * i));
+    ok("...nor before its 10 s window is full (50 ticks), nor while the battery CHARGES (a rising reading is never running out)", early.c.triage.T5 === 0 && rising.c.triage.T5 === 0, J([early.c.triage.T5, rising.c.triage.T5]));
+    ok("...and a boat still SINKING never arrives: with any spend at all (here a millionth over the window) it blows", sinkingStill.c.triage.T5 > 0, J(sinkingStill.c.triage));
+    ok("THE NEED CREW FLIES THE RULE: on DEV 203010 (a hard-case leak) NEED keeps the boat TRIAGE loses", T.fly(T.scenario(203010, T.HARD_LEAK), "NEED").survived === true && T.fly(T.scenario(203010, T.HARD_LEAK), "TRIAGE").survived === false);
+    ok("FROZEN_TRIAGE never blows by need; NEED_KNOBS is FROZEN_TRIAGE with blowNeed, 3 m and a 10 s window; the NEED crew flies them; round 12's sets are 203001-203024 and 204001-204096",
+        T.NEED_KNOBS.blowNeed === true && T.NEED_KNOBS.blowAbove === 3 && T.NEED_KNOBS.needWindowS === 10 && T.NEED_KNOBS.earlyDropBelow === Infinity && Object.isFrozen(T.NEED_KNOBS) && T.R12_DEV_SET[0] === 203001 && T.R12_HELD_SET.length === 96 && T.R12_HELD_SET[0] === 204001 &&
+        T.fly(T.scenario(203001, T.HARD_LEAK), "NEED", { seconds: 120 }).crew === "NEED");
 });
 
 finished = true;

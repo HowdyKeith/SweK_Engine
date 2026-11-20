@@ -606,3 +606,18 @@ Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by 
 * After the fix, DEV: COND and COMBINED differ on 22 of 24; survived 22 and 22, mean goals 2.67 against 0.92. **Nothing was tuned.**
 * Gated in `brain/breachCourierTask-selfcheck.mjs` section 7 (9 mutants, every one red; logged).
 * HELD: COND, COMBINED, ROUTE+DC and TRIAGE on 199001 to 199096, to `brain/condHeld.<part>.jsonl`, committed unread, then read once.
+
+## 28. ROUND 12: STOPPED AT DEV, AS REGISTERED (2026-11-20)
+
+**The registered check failed:** on round 12's 24 DEV dives (leaks of 6 to 8 %) NEED and TRIAGE differ on 2, under the 3 required. **HELD is not flown;** 204001 to 204096 stay unread.
+
+**What DEV showed, recorded because it was seen** (DEV only, not a result):
+* **On leaks over the weight both crews lose most boats:** TRIAGE keeps 7 of 24, NEED 9.
+* **Both dives where they differ are NEED's** (203010 and 203012: TRIAGE crushed at 349 s and 525 s, NEED kept both). **Unlike round 9's fixed gate, the need gate cost no boat TRIAGE kept.** But it saved too few to clear the bar on 24 dives.
+
+**What it suggests, for a later registration, not a result:**
+* On these leaks the main tank's 3 % is not enough to matter often. A boat whose leak is 2 % over its weight, with the tank blown, has 1 % to spare at best, and less as the bottle empties.
+* The limit is the hull's (its ballast range and its drop weight), as section 9 said before it guessed wrongly about the bottle.
+* A test of NEED that could reach the bar needs more dives (the bar is a count, and 2 of 24 differ). Or a vessel with a larger main ballast (`ballastRange` 0.25, the "real boat" spec `surfacePilot.mjs` names).
+
+**Built and kept, off by default:** `triageCaptain`'s `blowNeed` and `needWindowS`; `stationsTask`'s `scenario(seed, ranges)` (the other draws of a seed do not move; gated), HARD_LEAK, NEED_KNOBS, the NEED crew and round 12's sets. Gated in `brain/stationsTask-selfcheck.mjs` section 7 (8 mutants, every one red; logged).
