@@ -15,6 +15,7 @@
 // FORECAST, for the record: LEADS in fleets of three (about +0.18) and with escorts (about +0.34), as the third loadout study read on other pairs; fleets of two between one ship and three, about +0.05, perhaps CANNOT BE TOLD.
 // WHAT SHIPS: if the gain LEADS in at least one fight and TRAILS in none, the page gets a hand `bysize` (the car's gunner when a side has one ship, the fly-wired gunner when it has more) and the best-ship button carries it. Nothing is written but the
 //   reading; the page is changed by hand in render/spaceDuelCore.mjs and its gate pins the reading.
+// READ 2026-11-20 (brain/bySizeLoadout.reading.json): by size less the button +0.157 (z 5.3) in fleets of two, +0.241 (z 7.2) of three, +0.374 (z 9.8) with escorts. IT SHIPS: render/spaceDuelCore.mjs's `bysize` hand, which the best-ship button carries.
 // Every arm's leads are kept (brain/rig-results/bySizeLoadout/); the reading file (brain/bySizeLoadout.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side (the button to the bit), fleets of four or more, fights without the cannon, the bow-on rule (it trailed both helmed arms everywhere).
 "use strict";

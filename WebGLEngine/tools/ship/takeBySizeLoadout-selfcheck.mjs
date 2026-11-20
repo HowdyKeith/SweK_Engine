@@ -78,7 +78,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ button: k(f, "button"), bySize: k(f, "bySize") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT SHIPS: by size less the button is +0.157 (z 5.3) in fleets of two, +0.241 (z 7.2) in fleets of three, +0.374 (z 9.8) with six escorts a side; every fight LEADS", near(R("twoCannon").gain, 0.157) && near(R("fleetCannon").gain, 0.241) && near(R("escortsCannon").gain, 0.374) && G.FIGHTS.every((f) => rd[f].words.gain === "LEADS") && rd.verdict.ok
+        && G.FIGHTS.every((f) => ["button", "bySize", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! against the plain ship by size +1.796, +1.749, +2.126 and the button +1.638, +1.508, +1.752; the forecast was right with three ships and escorts and UNDER with two (it said about +0.05)", near(R("twoCannon").bySize, 1.796) && near(R("fleetCannon").bySize, 1.749) && near(R("escortsCannon").bySize, 2.126) && near(R("twoCannon").button, 1.638));
+    ok("!! AND THE PAGE CARRIES IT: the best-ship preset is the `bysize` hand under the cannon-aware helm", JSON.stringify(C.presetOf("best").choice) === '{"hand":"bysize","helm":"flywired","cannon":true}' && C.HANDS.find((h) => h.id === "bysize").bySize.one === "car-big" && C.HANDS.find((h) => h.id === "bysize").bySize.fleet === "flywired");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
