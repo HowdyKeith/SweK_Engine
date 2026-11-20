@@ -47,8 +47,8 @@ await section(async () => {
     const blob = G.blobOf(r), back = PB.importBrain(PB.describePolicy(FT.POLICY_ID2, FT.sticky), blob);
     ok("!! the blob is a seatFlyWired2 brain of the gains -3 that battleshipDuel seats with the STICKY library, and its `by` says what the sight does, that one ship a side it is the shipped gunner, and every reading of the three fights", back.ok && Array.from(back.weights).join() === "-3,-3" && D.sideFromBrains("s", [blob]).side.seatNetworks["main-a"].module === FT.sticky && /behind a STICKY SIGHT/.test(blob.by) && /one ship a side it is that gunner to the bit/.test(blob.by) && /FLEETS OF THREE, NO CANNON .*sticky less shipped \+0\.\d{3}/.test(blob.by) && /ONE SHIP AGAINST EIGHT FIGHTERS \(300 attacks, seeds 151001-\)/.test(blob.by) && /NOTHING INSIDE THE CIRCUIT IS LEARNED/.test(blob.by));
     const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gunfix-")), out = path.join(tmp, "w.json"); fs.writeFileSync(out.replace(/\.json$/, ".reading.json"), "{}");
-    const bad = run("--speed", "1"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
-    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
+    const bad = run("--speed", "1", "--out", path.join(tmp, "bad.json"), "--kept", path.join(tmp, "kept-bad"))   /* everything the command could write goes to the scratch folder: a mutant that lets the option by must not fly into the real kept flights (2026-11-20) */, again = run("--out", out, "--kept", path.join(tmp, "kept"));
+    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")) && !fs.existsSync(path.join(tmp, "kept-bad")));
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 

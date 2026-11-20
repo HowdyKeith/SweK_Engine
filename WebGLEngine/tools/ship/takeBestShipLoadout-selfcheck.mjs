@@ -57,8 +57,8 @@ await section(async () => {
     ok("!! WHAT IS DECIDED: a challenger takes the preset if it LEADS somewhere (z 2) and TRAILS nowhere (z -2 trails); none qualifying keeps the hand; of two qualifying, the larger mean of its three gains", q(2, 0, 0, 0, 0, 0).winner === "carBig" && q(1.99, 1.99, 1.99, 0, 0, 0).winner === "hand" && q(5, 5, -2, 0, 0, 0).winner === "hand" && q(5, 5, -1.99, 0, 0, 0).winner === "carBig" && q(0, 0, 0, 0, 3, 0).winner === "ships"
         && q(3, 3, 3, 3, 3, 3, [0.1, 0.1, 0.1, 0.2, 0.2, 0.2]).winner === "ships" && q(3, 3, 3, 3, 3, 3, [0.3, 0.3, 0.3, 0.2, 0.2, 0.2]).winner === "carBig" && q(3, 3, 3, 3, 3, 3).qualified.join() === "carBig,ships");
     const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "loadout-")), rf = path.join(tmp, "r.reading.json"); fs.writeFileSync(rf, "{}");
-    const bad = run("--speed", "1"), again = run("--reading", rf, "--kept", path.join(tmp, "kept"));
-    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
+    const bad = run("--speed", "1", "--reading", path.join(tmp, "bad.reading.json"), "--kept", path.join(tmp, "kept-bad"))   /* everything the command could write goes to the scratch folder: a mutant that lets the option by must not fly into the real kept flights (2026-11-20) */, again = run("--reading", rf, "--kept", path.join(tmp, "kept"));
+    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")) && !fs.existsSync(path.join(tmp, "kept-bad")));
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 

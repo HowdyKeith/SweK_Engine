@@ -53,8 +53,8 @@ await section(async () => {
     const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "pilot-shipped-")), BR = fileURLToPath(new URL("../../brain/", import.meta.url)); for (const f2 of ["helmFlyWired3WeightsDefault.json", "seatFlyWired3WeightsDefault.json"]) fs.copyFileSync(path.join(BR, f2), path.join(tmp2, f2)); fs.copyFileSync(path.join(BR, "seatFlyWired3WeightsDefault.json"), path.join(tmp2, P.PILOT_FILE));
     ok("a shipped file that is not a brain for its policy is REFUSED by name (the gunner's file where the pilot's should be)", throwsWith(() => P.shipped(tmp2), /pilot6dofWeightsDefault-d18\.json is refused: /)); fs.rmSync(tmp2, { recursive: true, force: true });
     const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pilot-")), out = path.join(tmp, "r.json"); fs.writeFileSync(out, "{}");
-    const bad = run("--write"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
-    ok("!! THE COMMAND SHIPS NOTHING (--write is refused) and refuses A SECOND READ before it flies anything", bad.status === 2 && /unknown option --write/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
+    const bad = run("--write", "--out", path.join(tmp, "bad.json"), "--kept", path.join(tmp, "kept-bad"))   /* everything the command could write goes to the scratch folder: a mutant that lets the option by must not fly into the real kept flights (2026-11-20) */, again = run("--out", out, "--kept", path.join(tmp, "kept"));
+    ok("!! THE COMMAND SHIPS NOTHING (--write is refused) and refuses A SECOND READ before it flies anything", bad.status === 2 && /unknown option --write/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")) && !fs.existsSync(path.join(tmp, "kept-bad")));
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 

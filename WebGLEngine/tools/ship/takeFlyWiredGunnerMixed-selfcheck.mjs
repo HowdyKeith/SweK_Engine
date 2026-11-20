@@ -54,8 +54,8 @@ await section(async () => {
     const blob = G.blobOf(r), back = PB.importBrain(PB.describePolicy(FT.POLICY_ID4, FT.mixed), blob);
     ok("!! the blob is a seatFlyWired4 brain of the gains -3, seated with the mixed library, and its `by` says what the seat does on a fighter, what it is to the bit, and all three fights' readings", back.ok && Array.from(back.weights).join() === "-3,-3" && blob.policy === "seatFlyWired4" && D.sideFromBrains("s", [blob]).side.seatNetworks["main-a"].module === FT.mixed && /LAYING THE GUN ITSELF ONLY ON A SHIP/.test(blob.by) && /plain ship to the bit/.test(blob.by) && /NO CANNON: it .*THE CANNON ON: it .*NO ESCORTS, NO CANNON: it /.test(blob.by) && blob.score === Number(r.escorts.reading.mixed.mean.toFixed(3)), blob.by.slice(0, 80));
     const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gunmixed-")), out = path.join(tmp, "w.json"); fs.writeFileSync(out.replace(/\.json$/, ".reading.json"), "{}");
-    const bad = run("--speed", "1"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
-    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
+    const bad = run("--speed", "1", "--out", path.join(tmp, "bad.json"), "--kept", path.join(tmp, "kept-bad"))   /* everything the command could write goes to the scratch folder: a mutant that lets the option by must not fly into the real kept flights (2026-11-20) */, again = run("--out", out, "--kept", path.join(tmp, "kept"));
+    ok("!! THE COMMAND REFUSES an option it does not know and A SECOND READ before it flies anything", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")) && !fs.existsSync(path.join(tmp, "kept-bad")));
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 

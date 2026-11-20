@@ -47,8 +47,8 @@ await section(async () => {
     const sc = P.scrambledOf([[1, 2, 3], [3, 2, 1], [2, 5, -1]]), r = P.readings({ "fly:medial": [3, 3, 3], "fly:lateral": [2, 3, 1], "scrambled:4242": [1, 2, 3], "scrambled:1": [3, 2, 1], "scrambled:2": [2, 5, -1], flat: [0, 0, 0] });
     ok("scrambledOf() and readings() alone: the mean over the scrambles pair by pair ([2, 3, 1]), P1 = [1, 0, 2] (mean 1), P2 = [0, 0, 0] (CANNOT BE TOLD), P3 = [2, 3, 1] (mean 2)", sc.join() === "2,3,1" && r.reading.P1.mean === 1 && r.reading.P2.mean === 0 && r.words.P2 === "CANNOT BE TOLD" && r.reading.P3.mean === 2);
     const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "places-")), out = path.join(tmp, "r.json"); fs.writeFileSync(out, "{}");
-    const bad = run("--write"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
-    ok("!! THE COMMAND SHIPS NOTHING (it has no --write: the option is refused as unknown) and refuses A SECOND READ OF THE AUDIT before it flies anything", bad.status === 2 && /unknown option --write/.test(bad.stderr) && again.status === 1 && /THE AUDIT HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
+    const bad = run("--write", "--out", path.join(tmp, "bad.json"), "--kept", path.join(tmp, "kept-bad"))   /* everything the command could write goes to the scratch folder: a mutant that lets the option by must not fly into the real kept flights (2026-11-20) */, again = run("--out", out, "--kept", path.join(tmp, "kept"));
+    ok("!! THE COMMAND SHIPS NOTHING (it has no --write: the option is refused as unknown) and refuses A SECOND READ OF THE AUDIT before it flies anything", bad.status === 2 && /unknown option --write/.test(bad.stderr) && again.status === 1 && /THE AUDIT HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")) && !fs.existsSync(path.join(tmp, "kept-bad")));
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 
