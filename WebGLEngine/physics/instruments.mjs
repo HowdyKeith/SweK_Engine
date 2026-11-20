@@ -2744,6 +2744,10 @@ export const INSTRUMENTS = [
       measures: "is the evade response (evadeSpeed, evadeTime, evadeTurn; then the turn alone) what makes the five named finders beat generation 0 -- SUFFICIENT (put on generation 0 it finds) and NECESSARY (taken off the finder it stops finding)? (lifted from the module's own header)",
       key: "the HELD read on geometries 99001 to 99024, flown ONCE: refuses without a recorded DEV that replicates, refuses without --write, refuses if brain/subEvadeHeld.json exists; nothing is searched or tuned (lifted from the module's own header)",
       gate: "tools/ship/takeEvadeTurn-selfcheck.mjs" },
+    { id: "space-doctrine", page: "instrument-bench.html", name: "THE SPACE APPROACH DOCTRINE (brain/SPACE_DOCTRINE_WIP.md)", area: "brain",
+      measures: "does a fighter that cuts its thrust whenever its closing speed to the capital ship reaches a cap beat today's full-throttle, no-brake approach, under each gunner preset? R = the damage on the ship if it survives, else 1500 + (120 - the time it died), paired by (seed, kind) with the exact sign test",
+      key: "DEV (space seeds 1901-1930 x 4 kinds) fixes the cap from {6, 9, 12, 15, 20, 25}; HELD89 (2401-2460) is flown ONCE at it. v4930: DEV chose 12 and check 3 (the cap holds within +2) failed, 14.05 against 14, so the round is NOT WEIGHED and the command refuses to fly HELD89",
+      gate: "tools/ship/spaceDoctrineStudy-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

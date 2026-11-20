@@ -16,9 +16,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as S from "./spaceDoctrineStudy.mjs";
 import * as MLP from "../../brain/seatGunnerMlp.mjs";
+import { parseOrExit } from "./cliArgs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
-const argv = process.argv.slice(2), mode = argv[0], arg = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
+// v4930: through cliArgs.parseOrExit -- an option the command does not know is refused (exit 2) before anything is flown, never ignored on the way past
+const cli = parseOrExit("space-doctrine", { values: { "--preset": "string", "--dir": "path" }, flags: ["--network"], positional: true });
+const mode = cli.rest[0], arg = (k) => cli.values[k] ?? null;
 const DIR = path.resolve(arg("--dir") || path.join(ENG, "brain", "rig-results", "space-doctrine"));
 const out = (name) => path.join(DIR, name);
 const readJson = (name) => JSON.parse(fs.readFileSync(out(name), "utf8"));
@@ -57,7 +60,7 @@ if (mode === "dev") {
     write("dev-report.json", { cap, means, identity: { ok: identityOk, n: identity.length }, checks, cpuSeconds: all.reduce((a, f) => a + f.seconds, 0) });
 } else if (mode === "held") {
     if (S.CAP_CHOSEN === null) { console.error("[space-doctrine] REFUSED: CAP_CHOSEN is null -- fly and read DEV, then commit the cap in spaceDoctrineStudy.mjs and the note, before any HELD89 seed"); process.exit(2); }
-    const net = argv.includes("--network"), preset = net ? "green" : presetArg(), name = net ? "held-green-mlp.json" : `held-${preset}.json`; refuse(name);
+    const net = cli.flags.has("--network"), preset = net ? "green" : presetArg(), name = net ? "held-green-mlp.json" : `held-${preset}.json`; refuse(name);
     const network = net ? S.networkOf(MLP, JSON.parse(fs.readFileSync(path.join(ENG, S.MLP_WEIGHTS), "utf8"))) : null;
     const t0 = Date.now(), rows = [];
     for (const { seed, kind } of S.scenariosOf(S.HELD89_SEEDS)) {
