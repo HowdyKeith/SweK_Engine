@@ -108,16 +108,17 @@ export function captain({ helm, stations = [] } = {}) {
  * `pilot` is the bare pilot, `model` the vessel, `read` the needs readings. Returns a pilot with the same log, watch and aux as captain(), and `.triage` counting the ticks each of T1 to T3 changed something.
  */
 export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false });
-export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {} } = {}) {
+// v4930 (round 7) -- `more`: extra target stations asked FIRST (round 7's COMBINED puts ROUTE's legs station here); `energyAllow`: a gate on the energy station's surface claim (null: none; ROUTE shuts it). Both default to v4929's captain.
+export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {}, more = [], energyAllow = null } = {}) {
     if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
-    const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
+    const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyAllow ? gatedStation(energyStation({ read }), energyAllow) : energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
     const counts = { T1: 0, T2: 0, T3: 0, T4: 0 };
     let breached = false;
     // the stations are asked through the same captain() so the log, the watch and the aux are kept the same way; T3 swaps the helm for the tick, T1 and T2 edit the commands after it
     let bare = false;
     const swapHelm = (state, target, current, aux) => (bare ? pilot(state, { ...target, depth: SD }, current, aux) : helm(state, target, current, aux));
     const breach = check({ name: "breach", kind: "target", priority: PRIORITY.energy, propose: ({ target }) => (breached ? { claim: AV.surfaceTarget(target, read()), aux: null, reason: "breached: up while there is charge" } : { claim: null, aux: null, reason: null }) });
-    const run = captain({ helm: swapHelm, stations: k.surfaceOnBreach ? [energy, breach, damage] : [energy, damage] });
+    const run = captain({ helm: swapHelm, stations: [...more, ...(k.surfaceOnBreach ? [energy, breach, damage] : [energy, damage])] });
     const out = (state, mission, current = [0, 0, 0], aux) => {
         const r = read(), sinking = k.unrationSink !== null && state.vel[2] < -k.unrationSink;
         bare = false;

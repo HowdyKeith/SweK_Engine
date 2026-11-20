@@ -424,3 +424,9 @@ Keith, 2026-11-20: "Let's do all 4 items on 'Next rounds on the stations line:' 
 * Reported: every crew on both outcomes, and each pair by the same test.
 
 **EXPECTATION, recorded now.** TRIAGE's latch keeps a breached courier on the surface for the rest of the run, so it delivers nothing after the breach. So: COMBINED INTERFERES ON GOALS about 65 percent; COMBINES about 30 percent (if the breach comes late, or the boat that stays deep is lost anyway). COMBINED beats FIXED on survival about 70 percent, and on goals about 40 percent.
+
+**BUILT AND GATED BEFORE HELD (2026-11-20).**
+* `brain/breachCourierTask.mjs`, and `triageCaptain`'s two options (`more`, `energyAllow`; inert at their defaults, compared over a whole breached dive). The gate `brain/breachCourierTask-selfcheck.mjs` (16 mutants, every one red; the log is in its header).
+* **DEV (24) is not degenerate:** COMBINED and FIXED match on both outcomes in only 9. **Nothing was tuned.**
+* For the record, the DEV numbers seen before HELD (survived of 24, mean goals): FIXED 16, 1.83; ROUTE+DC 10, 2.21; TRIAGE 18, 1.13; COMBINED 19, 1.42.
+* The run: the four crews on the 96 HELD seeds once, in four processes, to `brain/breachCourierHeld.<part>.jsonl`, committed unread, then read once.
