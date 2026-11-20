@@ -2540,7 +2540,10 @@
   "brain/subStations-selfcheck.mjs": 1347,
   "brain/subStationsNavSonar-selfcheck.mjs": 4798,
   "render/advisorTrace-selfcheck.mjs": 324,
-  "render/subAquariumCaptain-selfcheck.mjs": 1481
+  "render/subAquariumCaptain-selfcheck.mjs": 1481,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 26946,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": 2604,
+  "tools/ship/plannerCircuit-selfcheck.mjs": 22516
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4957,7 +4960,10 @@
   "brain/subStations-selfcheck.mjs": 0,
   "brain/subStationsNavSonar-selfcheck.mjs": 0,
   "render/advisorTrace-selfcheck.mjs": 0,
-  "render/subAquariumCaptain-selfcheck.mjs": 0
+  "render/subAquariumCaptain-selfcheck.mjs": 0,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 0,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": 0,
+  "tools/ship/plannerCircuit-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-19T23:48:07.668Z",
@@ -7374,7 +7380,10 @@
   "brain/subStations-selfcheck.mjs": "2026-11-19T23:48:07.668Z",
   "brain/subStationsNavSonar-selfcheck.mjs": "2026-11-19T22:30:32.312Z",
   "render/advisorTrace-selfcheck.mjs": "2026-11-19T23:48:07.668Z",
-  "render/subAquariumCaptain-selfcheck.mjs": "2026-11-19T23:48:07.668Z"
+  "render/subAquariumCaptain-selfcheck.mjs": "2026-11-19T23:48:07.668Z",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "2026-11-20T02:25:00.495Z",
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": "2026-11-20T02:25:03.248Z",
+  "tools/ship/plannerCircuit-selfcheck.mjs": "2026-11-20T02:25:45.982Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -9766,7 +9775,10 @@
   "brain/subStations-selfcheck.mjs": 20000,
   "brain/subStationsNavSonar-selfcheck.mjs": 20000,
   "render/advisorTrace-selfcheck.mjs": 20000,
-  "render/subAquariumCaptain-selfcheck.mjs": 20000
+  "render/subAquariumCaptain-selfcheck.mjs": 20000,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 120000,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": 20000,
+  "tools/ship/plannerCircuit-selfcheck.mjs": 120000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -12178,7 +12190,10 @@
   "brain/subStations-selfcheck.mjs": true,
   "brain/subStationsNavSonar-selfcheck.mjs": true,
   "render/advisorTrace-selfcheck.mjs": true,
-  "render/subAquariumCaptain-selfcheck.mjs": true
+  "render/subAquariumCaptain-selfcheck.mjs": true,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": true,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": true,
+  "tools/ship/plannerCircuit-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -14764,7 +14779,10 @@
   "brain/duelStationsTask-selfcheck.mjs": 358,
   "brain/subStations-selfcheck.mjs": 538,
   "render/advisorTrace-selfcheck.mjs": 143,
-  "render/subAquariumCaptain-selfcheck.mjs": 437
+  "render/subAquariumCaptain-selfcheck.mjs": 437,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": 26946,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": 2604,
+  "tools/ship/plannerCircuit-selfcheck.mjs": 22516
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-19T16:15:55.741Z",
@@ -17072,7 +17090,10 @@
   "brain/duelStationsTask-selfcheck.mjs": "2026-11-19T22:11:37.304Z",
   "brain/subStations-selfcheck.mjs": "2026-11-19T22:11:37.304Z",
   "render/advisorTrace-selfcheck.mjs": "2026-11-19T22:11:37.304Z",
-  "render/subAquariumCaptain-selfcheck.mjs": "2026-11-19T22:11:37.304Z"
+  "render/subAquariumCaptain-selfcheck.mjs": "2026-11-19T22:11:37.304Z",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "2026-11-20T02:25:00.495Z",
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": "2026-11-20T02:25:03.248Z",
+  "tools/ship/plannerCircuit-selfcheck.mjs": "2026-11-20T02:25:45.982Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -28352,6 +28373,15 @@
   ],
   "render/subAquariumCaptain-selfcheck.mjs": [
    437
+  ],
+  "tools/ship/circuitRetrain2-selfcheck.mjs": [
+   26946
+  ],
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": [
+   2604
+  ],
+  "tools/ship/plannerCircuit-selfcheck.mjs": [
+   22516
   ]
  },
  "contended": {
@@ -30660,7 +30690,10 @@
   "brain/subStations-selfcheck.mjs": true,
   "brain/subStationsNavSonar-selfcheck.mjs": false,
   "render/advisorTrace-selfcheck.mjs": true,
-  "render/subAquariumCaptain-selfcheck.mjs": true
+  "render/subAquariumCaptain-selfcheck.mjs": true,
+  "tools/ship/circuitRetrain2-selfcheck.mjs": false,
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": false,
+  "tools/ship/plannerCircuit-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -33077,7 +33110,10 @@
   "brain/subStations-selfcheck.mjs": "loaded",
   "brain/subStationsNavSonar-selfcheck.mjs": "alone",
   "render/advisorTrace-selfcheck.mjs": "loaded",
-  "render/subAquariumCaptain-selfcheck.mjs": "loaded"
+  "render/subAquariumCaptain-selfcheck.mjs": "loaded",
+  "tools/ship/circuitRetrain2-selfcheck.mjs": "alone",
+  "tools/ship/spaceDoctrineStudy-selfcheck.mjs": "alone",
+  "tools/ship/plannerCircuit-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T14:18:38.040Z": {
