@@ -202,6 +202,13 @@ export function nearTunableOver(name) {
 export const wiringOf10 = nearTunableOver;
 /** THE PAGE'S GUNNER HOLDING THE TRIGGER (`seatFlyWired11`, 2026-11-20): seatFlyWired10 but with a target the trigger is held, on the circuit's ticks and the hand's -- the race car's trained gunner's one trick (tools/ship/trainTurretSeatBig.mjs). Same five weights. */
 export const POLICY_ID11 = "seatFlyWired11", nearAlways = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding, the trigger held", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true });
+const ALWAYS_OVER = new Map();
+/** THE PAGE'S HELD-TRIGGER GUNNER OVER ANOTHER WIRING (2026-11-20; for the sine twins, tools/ship/takeSineTwins.mjs): seatFlyWired11 with its read-out taken from wiringOf(name); "fly"/"fly:medial" is seatFlyWired11 itself. */
+export function nearAlwaysOver(name) {
+    if (name === "fly" || name === "fly:medial") return nearAlways;
+    if (!ALWAYS_OVER.has(name)) { const w = wiringOf(name); ALWAYS_OVER.set(name, libraryOf(`${nearAlways.name}, over ${name}`, w.raw, w.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true })); }
+    return ALWAYS_OVER.get(name);
+}
 /** The fly's circuit (fly:medial) asked about SEVERAL bearings at once, read the odd way: half of (all the bearings) less (all of them mirrored). Its sign is the side the circuit turns to (negative: the positive side, as S). */
 export const oddMany = (es) => (FLY_M.rawMany(es) - FLY_M.rawMany(es.map((e) => -e))) / 2;
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
