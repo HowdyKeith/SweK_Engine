@@ -16,6 +16,9 @@
 //   if 30, the audit gain is small (under 0.1) and may not be told.
 // WHAT SHIPS: brain/seatFlyWired10WeightsDefault.json (policy seatFlyWired10, [-3, -3, 0.1, 0.2, the winning window in radians]) if the audit gain LEADS in at least one fight and TRAILS in none. It would replace seatFlyWired9 as the `flywired` hand.
 // If the winner is 20, or it fails held out, NOTHING is audited and the shipped window stands.
+// READ 2026-11-20 (brain/seatFlyWired10WeightsDefault.reading.json): the train scores are nearly flat (0.224 at 20 degrees to 0.259 at 45); 45 won, held out by a hair (+0.009, z 0.4), and in the audit led 20 in one fight (+0.052, z 2.5, fleets with
+//   neither escorts nor the cannon) and was level in three (+0.020, +0.026, -0.001). IT SHIPS by the rule: brain/seatFlyWired10WeightsDefault.json is the page's `flywired` hand. THE FINDING IS THAT THE WINDOW BARELY MATTERS between 10 and 60 degrees;
+//   the forecast (a peak at 20-30, a fall by 60) was wrong.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerTune/); the reading file (brain/seatFlyWired10WeightsDefault.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the gains (the circuit now makes only the big swings, where its command is near full slew), tau and the smoothing (they change nothing), escorts in the train set, one ship a side.
 "use strict";

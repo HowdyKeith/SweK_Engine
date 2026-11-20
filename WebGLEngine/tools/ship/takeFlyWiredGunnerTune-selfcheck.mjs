@@ -78,7 +78,14 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (st, f, d) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${st}_${f}_${d}.json`), "utf8")).leads, near = (x, v) => Math.abs(x - v) < 5e-4, blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8"));
+    const sc = Object.fromEntries(G.WINDOWS.map((d) => { const all = G.TRAIN_FIGHTS.flatMap((f) => k("train", f, d)); return [d, all.reduce((x, y) => x + y, 0) / all.length]; }));
+    ok("!! AS KEPT AND RE-DERIVED -- THE TRAIN SCORES ARE NEARLY FLAT (0.237, 0.232, 0.224, 0.239, 0.259, 0.254 for 10 to 60 degrees: the window hardly matters there) AND 45 WINS", G.WINDOWS.every((d) => Math.abs(sc[d] - rd.scores[d]) < 1e-12) && near(sc[10], 0.237) && near(sc[20], 0.224) && near(sc[45], 0.259) && near(sc[60], 0.254) && rd.winner === 45 && G.pick(sc) === 45);
+    const h45 = G.TRAIN_FIGHTS.flatMap((f) => k("held", f, 45)), h20 = G.TRAIN_FIGHTS.flatMap((f) => k("held", f, 20)), hg = h45.map((v, i) => v - h20[i]).reduce((x, y) => x + y, 0) / h45.length;
+    ok("!! HELD OUT, 45 LESS 20 IS +0.009 (z 0.4, CANNOT BE TOLD) -- above 0 and no trail, so it goes on, BY A HAIR", Math.abs(hg - rd.held.mean) < 1e-12 && near(rd.held.mean, 0.009) && G.holds(rd.held));
+    ok("!! THE AUDIT, READ ONCE -- IT SHIPS, BY ONE FIGHT: 45 less 20 is +0.020 and +0.026 with escorts (CANNOT BE TOLD), -0.001 with the cannon and no escorts (CANNOT BE TOLD), and +0.052 (z 2.5, LEADS) with neither; it trails nowhere. A SMALL GAIN: what the window search found is that the window barely matters", near(rd.audit.escorts.gain.mean, 0.020) && near(rd.audit.escortsCannon.gain.mean, 0.026) && near(rd.audit.fleetCannon.gain.mean, -0.001) && near(rd.audit.fleetNoCannon.gain.mean, 0.052) && rd.audit.fleetNoCannon.gain.z >= 2 && G.AUDIT_FIGHTS.every((g) => rd.audit[g].gain.z > -2) && rd.verdict.ok
+        && G.AUDIT_FIGHTS.every((g) => { const a = k("audit", g, 45), b = k("audit", g, 20); return Math.abs(a.map((v, i) => v - b[i]).reduce((x, y) => x + y, 0) / 300 - rd.audit[g].gain.mean) < 1e-12; }));
+    ok("!! and the file: a seatFlyWired10 brain at [-3, -3, 0.1, 0.2, 45 degrees], the page's `flywired` hand", PB.importBrain(PB.describePolicy(FT.POLICY_ID10, FT.nearTunable), blob).ok && Math.abs(blob.weights[4] - Math.PI / 4) < 1e-6 && blob.policy === "seatFlyWired10");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
