@@ -13,6 +13,9 @@
 //   a charged one are asked now), K11 (a crushed record was checked for its status only; its final depth is checked to be the crush's). THREE ARE EQUIVALENT: R04 (T2 after the weight has gone: T2 runs only inside a damage override, and
 //   damage control is silent once the weight is gone), R06 (T4 below damage's priority: when the breach and energy claims compete they claim the SAME target, surfaceTarget(mission, read())), K07 (the verdict without the survival count:
 //   p <= 0.05 one-sided needs more TRIAGE-only than FIXED-only pairs, and that difference IS the survival difference).
+// v4930 -- BLOW (round 9, section 6): 6 mutants of subStations.mjs and stationsTask.mjs; 5 red by name, 1 EQUIVALENT (final pass): K1 blowing unbreached | K2 blowing with the weight aboard | K4 blowing at any climb | K5 0.3 m/s |
+//   K6 the BLOW crew as TRIAGE. K1 WENT 0 RED FIRST (every hand captain was breached on its first tick); a never-breached captain is asked now. K3 (blowing in the surface band) IS EQUIVALENT under this helm: above 3 m the
+//   surfacing wrapper is in its 'afloat' stage and blows the tank itself (ballast -1), so the rule's `cmd.ballast > -1` is already false there.
 "use strict";
 import * as T from "./stationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -120,6 +123,23 @@ guarded("section 4", () => {
 sec("5. the registered constants");
 guarded("section 5", () => {
     ok("SECONDS 600, CRUSH 60 m, SURFACE_BAND 3 m, SPEED 2 m/s, LEAK_BUILD 5 s, as registration A of round 2 has them", T.SECONDS === 600 && T.CRUSH === 60 && T.SURFACE_BAND === 3 && T.SPEED === 2 && T.LEAK_BUILD === 5);
+});
+
+sec("6. BLOW (round 9, stopped at DEV): the knob and the crew");
+guarded("section 6", () => {
+    const model = NT.model(), pilot = A.pilot(), reading = () => ({ cls: "battery", frac: 0.4, depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 }), mission = { depth: 20, heading: 0, speed: 2 };
+    const sink = S.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5;
+    const slow = (depth, vz, released = true) => { const st = S.createState({ depth, speed: 2, model }); st.vel[2] = vz; st.tank = { ...(st.tank || {}), released }; return st; };
+    const cap = () => { const c = SS.triageCaptain({ pilot, model, read: reading, knobs: T.BLOW_KNOBS }); c(sink, mission); return c; };   // breached by the first tick
+    const a = cap(), ca = a(slow(30, 0.05), mission);
+    ok("BREACHED, the weight gone, deeper than 3 m and climbing at 0.05 m/s: the commands carry ballast -1 (the tank blown with stored air) and T5 counts it", ca.ballast === -1 && a.triage.T5 >= 1, J([ca.ballast, a.triage]));
+    const b = cap(), cb = b(slow(30, 0.3), mission), c = cap(), cc = c(slow(2, 0.05), mission), d = cap(), cd = d(slow(30, 0.05, false), mission);
+    ok("...and not when it climbs at 0.3 m/s, nor at 2 m (the surface band), nor with the weight still aboard", b.triage.T5 === 0 && c.triage.T5 === 0 && d.triage.T5 === 0, J([b.triage.T5, c.triage.T5, d.triage.T5]));
+    const nb = SS.triageCaptain({ pilot, model, read: reading, knobs: T.BLOW_KNOBS }); nb(slow(30, 0.05), mission);
+    ok("...nor on a boat that was never breached (damage control has not acted), however slowly it climbs", nb.triage.T5 === 0, J(nb.triage));
+    const e = SS.triageCaptain({ pilot, model, read: reading, knobs: T.FROZEN_TRIAGE }); e(sink, mission); e(slow(30, 0.05), mission);
+    ok("FROZEN_TRIAGE never blows (blowClimb is null in it); BLOW_KNOBS is FROZEN_TRIAGE with 0.2 m/s and 3 m, frozen", e.triage.T5 === 0 && T.BLOW_KNOBS.blowClimb === 0.2 && T.BLOW_KNOBS.blowAbove === 3 && T.BLOW_KNOBS.earlyDropBelow === Infinity && T.BLOW_KNOBS.surfaceOnBreach === true && Object.isFrozen(T.BLOW_KNOBS));
+    ok("the BLOW crew flies the knobs (a DEV dive of round 9 differs from TRIAGE's on 196001) and round 9's sets are 196001-196024 and 197001-197096", T.fly(T.scenario(196001), "BLOW").survived !== T.fly(T.scenario(196001), "TRIAGE").survived && T.R9_DEV_SET[0] === 196001 && T.R9_HELD_SET.length === 96 && T.R9_HELD_SET[0] === 197001);
 });
 
 finished = true;

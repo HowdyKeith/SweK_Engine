@@ -18,6 +18,9 @@ export const DEV_SET = Object.freeze(Array.from({ length: 48 }, (_, i) => 160001
 export const CREWS = Object.freeze(["NONE", "ENERGY", "DAMAGE", "FIXED", "TRIAGE"]);
 /** TRIAGE AS FROZEN IN REGISTRATION B (brain/SUB_STATIONS_WIP.md section 8), chosen on DEV from 12 variants: once breached, drop the weight at once (T2 at any charge) and go up while there is charge (T4). T1 and T3 did not help on DEV and are off. */
 export const FROZEN_TRIAGE = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: Infinity, unrationSink: null, surfaceOnBreach: true });
+/** ROUND 9 (brain/SUB_STATIONS_WIP.md section 24): FROZEN_TRIAGE plus BLOW -- the main tank blown with stored air while a breached boat, its weight gone, climbs slower than 0.2 m/s deeper than 3 m. Its sets. */
+export const BLOW_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, blowClimb: 0.2, blowAbove: 3 });
+export const R9_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 196001 + i)), R9_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 197001 + i));
 const MODEL = NT.model();
 
 /** The scenario of a seed: { seed, depth, heading, frac, leak, leakAt }. */
@@ -37,6 +40,7 @@ export function crew(name, ctx, knobs = FROZEN_TRIAGE) {
         case "DAMAGE": return SS.captain({ helm, stations: [d()] });
         case "FIXED": return SS.captain({ helm, stations: [e(), d()] });
         case "TRIAGE": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs });
+        case "BLOW": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: BLOW_KNOBS });   // round 9; not in CREWS (round 2's registered five)
         default: throw new Error(`stationsTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
     }
 }

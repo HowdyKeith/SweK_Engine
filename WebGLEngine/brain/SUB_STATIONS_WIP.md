@@ -509,3 +509,18 @@ All ten of TRIAGE's DEV losses have a leak of 7.0 to 8.0 %, past the 6 % weight.
 **THE VERDICT (HELD, flown once).** BLOW BEATS TRIAGE iff BLOW survives more HELD dives and the exact one-sided sign test on the discordant dives gives p at most 0.05. TRIAGE BEATS BLOW by the same rule. Otherwise NO DIFFERENCE SHOWN. Reported: the leak of each loss, the air left at the end, and FIXED on the same dives.
 
 **EXPECTATION, recorded now.** If the trace is typical, most of TRIAGE's losses are this one: BLOW BEATS TRIAGE about 75 percent. NO DIFFERENCE about 20 percent (the main tank's 3 % may not be enough with an 8 % leak once the weight's 6 % is gone, or the bottle may empty on the way). TRIAGE BEATS BLOW about 5 percent.
+
+## 25. ROUND 9: STOPPED AT DEV, AS REGISTERED (2026-11-20)
+
+**The registered check failed, and the round stops there.** On round 9's 24 DEV dives TRIAGE keeps all 24 and BLOW keeps 23: they differ on 1, under the 3 section 24 required. **HELD is not flown.** The 96 HELD seeds stay unread for a later registration.
+
+**What DEV showed, recorded because it was seen** (DEV only, not a result):
+* **This DEV draw has almost no hard cases:** TRIAGE loses none of the 24.
+* **The one dive where the crews differ is one BLOW LOSES:** seed 196001, a 6.7 % leak at 17 m with 23 % charge. BLOW blew for about 300 s and the boat was crushed at 477 s, where TRIAGE kept it.
+* **On round 2's ten DEV losses** (leaks of 7.0 to 8.0 %, all lost by TRIAGE), **BLOW saves 6.** The stored air does reach the hard cases, as the trace suggested.
+
+**So the rule helps where TRIAGE fails, and can hurt where TRIAGE succeeds.** Blowing the tank on a boat that would have made it anyway can cost it. A fair test needs the hard cases in numbers, and a rule that leaves the easy cases alone. Both are a new registration:
+* a task drawn to leaks over the drop weight (6 to 8 %);
+* and BLOW gated on what the boat could not do without it, such as climbing too slowly to reach the surface before the charge runs out, rather than on a fixed 0.2 m/s.
+
+**Built and kept, off by default:** the BLOW knob of `triageCaptain` (`blowClimb`, `blowAbove`; `TRIAGE_OFF` and `FROZEN_TRIAGE` have it off), `stationsTask`'s BLOW_KNOBS, the BLOW crew and round 9's sets. Gated in `brain/stationsTask-selfcheck.mjs` section 6 (6 mutants, 5 red, 1 equivalent; logged).
