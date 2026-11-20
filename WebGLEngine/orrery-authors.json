@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-11-03",
+ "built": "2026-11-20",
  "bodies": [
   {
    "name": "box3d",
@@ -121,7 +121,7 @@
    "upstreamFile": "PROVENANCE.md",
    "alsoHolders": [],
    "upstream": {
-    "url": "https://storage.googleapis.com/hemibrain/v1.2/exported-traced-adjacencies-v1.2.tar.gz`",
+    "url": "https://www.janelia.org/project-team/flyem/hemibrain,",
     "owner": null,
     "repo": null
    },
