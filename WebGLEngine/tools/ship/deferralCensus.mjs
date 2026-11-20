@@ -204,10 +204,10 @@ export const CENSUS_AT_V4479 = Object.freeze({
     history: 58,        // inside a shipped round note -- the changelog is not a backlog
     substring: 3,       // v4884: 2 -> 3 at the merge (main's tree grew since v4479). "its own roundING": the phrase is not there at all
     negated: 2,         // "rather than in its own round": says the opposite
-    satisfied: 21,      // after v4928: 8 -> 21, the thirteen notes the deferral tranche settled (SETTLED_TRANCHE_AFTER_V4928 below, each held against a declaration). v4884: 5 -> 8 at the merge. marked SETTLED adjacent to the claim -- 2 before this round, 5 after
+    satisfied: 26,      // after v4930: 21 -> 26, the second tranche's five (SETTLED_TRANCHE_TWO below). after v4928: 8 -> 21, the thirteen notes the deferral tranche settled (SETTLED_TRANCHE_AFTER_V4928 below, each held against a declaration). v4884: 5 -> 8 at the merge. marked SETTLED adjacent to the claim -- 2 before this round, 5 after
     antidote: 5,        // an ANTIDOTE block: a deferral that IS watched, which is the state to want more of
-    undecided: 204,     // after v4928: 217 -> 204, the same thirteen, re-derived from the gate's own reading. v4906: 214 -> 217, three more undecided phrases in this round's tool and registration prose (what the Round 5 audit and the browser-gates installer do not do yet), re-derived from the gate's own reading. v4896: 215 -> 214, the sixdof-retrain-at-damage-6 entry closed (an open "may want re-weighting" became a stated NOT CHECKED), re-derived from the gate's own reading. v4895: 214 -> 215, one more undecided phrase in this round's notes (the 6DOF page's balance comment or a module header naming what is not done), re-derived. v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
-    undecidedFiles: 163,   // after v4928: 175 -> 163, twelve files left the undecided class; render/aiPresenceOrbTsl.mjs keeps another undecided hit. v4906: 173 -> 175, the same three hits sit in two new files. v4896: 174 -> 173, the same closed entry (its file no longer holds an undecided phrase)
+    undecided: 199,     // after v4930: 204 -> 199, the same five. after v4928: 217 -> 204, the same thirteen, re-derived from the gate's own reading. v4906: 214 -> 217, three more undecided phrases in this round's tool and registration prose (what the Round 5 audit and the browser-gates installer do not do yet), re-derived from the gate's own reading. v4896: 215 -> 214, the sixdof-retrain-at-damage-6 entry closed (an open "may want re-weighting" became a stated NOT CHECKED), re-derived from the gate's own reading. v4895: 214 -> 215, one more undecided phrase in this round's notes (the 6DOF page's balance comment or a module header naming what is not done), re-derived. v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
+    undecidedFiles: 160,   // after v4930: 163 -> 160, three files left the class (tools/ship/fsrContent-selfcheck.mjs and tools/ship/depthProject-selfcheck.mjs keep other undecided hits). after v4928: 175 -> 163, twelve files left the undecided class; render/aiPresenceOrbTsl.mjs keeps another undecided hit. v4906: 173 -> 175, the same three hits sit in two new files. v4896: 174 -> 173, the same closed entry (its file no longer holds an undecided phrase)
     // *** WHAT THE ROUND FOUND BY HAND, WHICH IS WHY THE UNDECIDED NUMBER MATTERS. *** Two files were opened
     // and THREE stale notes came out, two of them in one paragraph. Each was settled within four rounds of
     // being written and went on advertising itself for sixty-six versions. Checked against EXPORTS, never
@@ -245,4 +245,18 @@ export const SETTLED_TRANCHE_AFTER_V4928 = Object.freeze([
     ["tools/ship/copypartyRegistry-selfcheck.mjs", "v3175", [["ai-bridge/chunkVerify.mjs", "export function chunkAudit\\b"], ["ai-bridge/chunkVerify.mjs", "export function resumePlan\\b"]]],
     ["world/fluidSystem.js", "v4563", [["world/fluidSystem.js", "_dry\\(p\\)"]]],
     ["ui/demoChrome.js", "v885", [["face/miniAvatar.js", "export (async )?function mountMiniAvatar\\b"]]],
+].map(([file, settledAt, decl]) => Object.freeze({ file, settledAt, decl: Object.freeze(decl.map((d) => Object.freeze(d))) })));
+
+/**
+ * THE SECOND TRANCHE, AFTER v4930 (Keith 2026-11-20): thirty more undecided notes read, none of them in the first tranche. Five were settled, each held
+ * here against a declaration; a sixth (simulation/lbm/onsetTrend-selfcheck.mjs, the perturbation test) was answered by withdrawing its premise rather than
+ * by the test it deferred, and is LEFT undecided. Twelve were not deferrals at all (narration, a heading, a quotation); eleven are still open. Named
+ * without a version so it is not a frozen-record census entry: the counts it moves are the census's own, re-derived by the gate.
+ */
+export const SETTLED_TRANCHE_TWO = Object.freeze([
+    ["physics/instruments.mjs", "v4555", [["world/chunk.js", "inBounds\\(x, y, z\\) \\{"], ["world/chunk.js", "if \\(!this\\.inBounds\\(x, y, z\\)\\) return 0;"]]],
+    ["tools/roundhouse/knobPromotions-selfcheck.mjs", "v3514", [["tools/roundhouse/escTolKnob-selfcheck.mjs", "for \\(const escTol of \\[1e-4, 1e-5, 1e-6\\]\\)"], ["tools/roundhouse/blackHoleBind.mjs", "cfg\\.escTol = Math\\.min\\("]]],
+    ["tools/ship/advisorLive.mjs", "v4907", [["tools/ship/advisorLlmAudit.mjs", "export function flyAudits\\("]]],
+    ["tools/ship/depthProject-selfcheck.mjs", "v3064", [["render/voxelRaymarchShader.js", "export const FRAG_SRC_DEPTH\\b"], ["render/voxelRaymarchShader.js", "gl_FragDepth ?= ?"]]],
+    ["tools/ship/fsrContent-selfcheck.mjs", "v4699", [["tools/ship/genGateFolds.mjs", "export const RESULT = \"tools/ship/genGate-folds7-result\\.json\";"]]],
 ].map(([file, settledAt, decl]) => Object.freeze({ file, settledAt, decl: Object.freeze(decl.map((d) => Object.freeze(d))) })));

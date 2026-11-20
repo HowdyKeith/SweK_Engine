@@ -6,7 +6,7 @@
 // GATES render/depthProject.js -- the ANSWER KEY for compositing, built before the compositing.
 //
 // v3045 said the ray marcher does not composite with the raster pass and called that "its own round with its own
-// answer key". This is the answer key. The round that wires gl_FragDepth can then be checked against a number
+// answer key" (SETTLED at v3064: render/voxelRaymarchShader.js FRAG_SRC_DEPTH writes gl_FragDepth). This is the answer key. The round that wires gl_FragDepth can then be checked against a number
 // instead of against whether voxels LOOK correctly buried in terrain, which is not a check -- the classic bug
 // here renders, and looks almost right.
 //

@@ -10,7 +10,7 @@
 // this gate measures whether they are what those grounds claim.
 //
 // *** NOTHING HERE MEASURES FRAME GENERATION. *** No learned pass, no gate, no PSNR. This round widens the
-// population and says what the population is; using it is a later round's business and owes a fresh
+// population and says what the population is; using it is a later round's business (SETTLED at v4699: tools/ship/genGateFolds.mjs, pre-registered) and owes a fresh
 // pre-registration. Measuring the content and testing a hypothesis on it in the same round would make the
 // content's properties answerable to the hypothesis.
 "use strict";
