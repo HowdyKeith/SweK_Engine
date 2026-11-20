@@ -642,3 +642,29 @@ Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by 
 **What it says.** Rounds 7 and 10 together: two good rules put on one boat interfere when one of them assumes it is alone (TRIAGE's latch assumed a breached boat has no job left). Asking that rule one more question (CAN the boat go on?) made the union better than either part on its own measure. This is the captain the stations work set out to find, for these three stations.
 
 **Status: round 10 CLOSED as registered.**
+
+## 30. ROUND 11 RESULT (2026-11-20; `brain/learnedCourier.json` frozen at `76e80c269` before HELD; `brain/learnedCourierHeld.{0,1,2,3}.jsonl`, 384 runs, committed unread at `507fcb1b3`, then read ONCE)
+
+**VERDICT (registered), split as section 27 allowed:**
+* **COND BEATS LEARNED ON GOALS:** 85 runs to 0 (p = 3e-26).
+* **LEARNED BEATS COND ON SURVIVAL:** 15 runs to 0 (p = 3e-5).
+
+| crew | survived (of 96) | mean goals | seconds on the surface after the breach |
+|---|---|---|---|
+| ROUTE+DC | 61 | 1.83 | 328 |
+| COMBINED | 80 | 0.95 | 606 |
+| **COND** | 76 | **2.28** | 437 |
+| **LEARNED** | **91** | 0.46 | 664 |
+
+**What it learned** (from the weights; training fitness 58.20, selection 55.06):
+* **The SURFACE unit's constant is +1.64,** with positive terms for being breached (+1.25), a goal just reached (+1.22) and the next leg costing more than the charge (+1.11). Its largest negative term is a sinking boat (-2.63 on the vertical speed: a boat going down does not claim the surface, and damage control has it).
+* **The DROP unit fires on being breached** (+3.25) and on the weight being gone (+2.68, which then does nothing). It does not drop at the start, unlike round 8's learner.
+* **It surfaces at most opportunities** and spends 664 s of the run on the surface after the breach. It delivers 0.46 goals a run (against COND's 2.28) and keeps 91 boats, more than any crew flown.
+
+**What it says.**
+* **The learner chose the trade its fitness priced:** a boat kept counts 2 goals, so staying up most of the time, and losing about 1.8 goals a run against COND, buys about 15 boats in 96. Unlike round 8 it is not exploiting a hole: it delivers, and its drop waits for the breach. But its answer is set by a number written into the registration (the 2). A different price on a boat would draw a different captain.
+* **Neither dominates.** COND is the far better courier and keeps 76 boats. LEARNED is the safest crew and delivers little. Which is "better" is a question about the mission's values, not about the captains.
+* **Against the expectation in section 27:** "COND BEATS LEARNED on goals" was put at about 45 percent; it happened. I did not expect the learner to win survival outright.
+* **One more learning round would need the price set first,** from what the boat is for (for example, a lost boat costs the goals it would have delivered for the rest of the run), and registered before training.
+
+**Status: round 11 CLOSED as registered.**
