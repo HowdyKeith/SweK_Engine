@@ -66,6 +66,15 @@ export function missionValue(r) {
     if (!Number.isFinite(r.lostAt)) throw new Error("learnedCourier.missionValue: a lost run needs its lostAt");
     return r.goals - PRICE.rate * Math.max(0, CT.SECONDS - r.lostAt);
 }
+/** ROUND 15'S REGISTERED VERDICT over paired runs (breachCourierTask.run records, the same seeds in the same order): PRICED against COND on the MISSION VALUE by the exact one-sided sign test; goals and survival reported the same way. */
+export function verdict15({ PRICED, COND }) {
+    const withValue = (rs) => rs.map((r) => ({ ...r, value: missionValue(r) })), P = withValue(PRICED), C = withValue(COND);
+    const v = BC.compare(P, C, "value"), g = BC.compare(P, C, "goals"), sv = BC.compare(P, C, "survived");
+    const word = (x, a, b) => (x.pA <= 0.05 && x.aMore > x.bMore ? `${a} BEATS ${b}` : x.pB <= 0.05 && x.bMore > x.aMore ? `${b} BEATS ${a}` : "NO DIFFERENCE SHOWN");
+    const mean = (rs, f) => rs.reduce((t, r) => t + f(r), 0) / rs.length;
+    return { verdict: word(v, "PRICED", "COND"), goals: word(g, "PRICED", "COND"), survival: word(sv, "PRICED", "COND"), pairs: { value: v, goals: g, survived: sv },
+        means: { PRICED: { value: mean(P, (r) => r.value), goals: mean(P, (r) => r.goals), survived: P.filter((r) => r.survived).length }, COND: { value: mean(C, (r) => r.value), goals: mean(C, (r) => r.goals), survived: C.filter((r) => r.survived).length } }, n: P.length };
+}
 /** Round 15's fitness over a set: the mission value summed. */
 export function fitnessPriced(theta, seeds, opts = {}) { let f = 0; for (const s of seeds) f += missionValue(runLearned(s, theta, opts)); return f; }
 

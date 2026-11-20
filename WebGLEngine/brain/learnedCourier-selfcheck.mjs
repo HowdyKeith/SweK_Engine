@@ -7,7 +7,7 @@
 //   M03 a 10 s goal window | M04 a goal never noted | M05 charging counted as spent | M06 breached never latched | M07 DROP from the SURFACE weights | M08 the fitness without survival | M09 the seed 9010 |
 //   M10 the choice by training fitness | M11 HELD from 205002 | M12 `make` ignored. M05 WENT 0 RED FIRST (no row had the battery rise); a fall then a charge is asked now.
 // 2026-11-20 -- ROUND 15 (section 6): 9 mutants of learnedCourier.mjs, every one red by name (final pass): P01 the price at 2 a boat | P02 the time left from 600 s | P03 a lost boat free | P04 a kept boat +2 | P05 round 11's
-//   fitness | P06 ES15 at 9009 | P07 24 generations | P08 HELD on round 11's | P09 no lostAt accepted. P05 WENT 0 RED FIRST (the row's 60 s run kept its boat, where the value IS the goals); a lost run (DEV 189001) is asked now.
+//   fitness | P06 ES15 at 9009 | P07 24 generations | P08 HELD on round 11's | P09 no lostAt accepted; and round 15's verdict, 4 more, every one red: V01 the verdict on goals | V02 p 0.1 | V03 the value not computed | V04 the sides swapped. P05 WENT 0 RED FIRST (the row's 60 s run kept its boat, where the value IS the goals); a lost run (DEV 189001) is asked now.
 //   AND A ROW OF MINE CLAIMED TOO MUCH: it said the stub ES's best climbs. A (mu, lambda) ES keeps no parents, and on this stub the best falls after generation 0; the claim is gone and the comment says why.
 "use strict";
 import fs from "node:fs";
@@ -119,6 +119,15 @@ await (async () => {
         const fp15 = (await L.train({ seeds: [], es: { ...L.ES15, generations: 3 }, fit })).parents.map((p) => p.fit.toFixed(6)).join(",");
         ok("...and it draws other children than round 11's (the stub's fingerprint at 9015 is not 9009's)", fp15 !== FP, fp15);
         ok("round 15's sets: TRAIN 210001-210016, SELECTION 210501-210516, HELD 211001-211096, disjoint from round 11's", L.R15_TRAIN_SET.length === 16 && L.R15_TRAIN_SET[0] === 210001 && L.R15_SELECTION_SET[15] === 210516 && L.R15_HELD_SET.length === 96 && L.R15_HELD_SET[0] === 211001 && !L.R15_HELD_SET.some((x) => L.HELD_SET.includes(x)));
+        const run = (seed, goals, survived, lostAt = null) => ({ seed, goals, survived, lostAt });
+        const C6 = [1, 2, 3, 4, 5, 6].map((i) => run(i, 2, true)), P6 = [1, 2, 3, 4, 5, 6].map((i) => run(i, 3, true));
+        const v1 = L.verdict15({ PRICED: P6, COND: C6 });
+        ok("THE VERDICT: PRICED with more mission value on 6 of 6 runs (p = 1/64) BEATS COND, and goals and survival are reported beside it", v1.verdict === "PRICED BEATS COND" && v1.goals === "PRICED BEATS COND" && v1.survival === "NO DIFFERENCE SHOWN" && v1.n === 6, J(v1.pairs.value));
+        const P6b = [1, 2, 3, 4, 5, 6].map((i) => run(i, 3, false, 0));   // one more goal each, but every boat lost at 0 s: 3 - 2.42 = 0.58 < 2
+        const v2 = L.verdict15({ PRICED: P6b, COND: C6 });
+        ok("...the VALUE decides, not the goals: one goal more on every run but every boat lost at 0 s (worth 0.58 each against COND's 2) is COND BEATS PRICED, while PRICED still wins goals", v2.verdict === "COND BEATS PRICED" && v2.goals === "PRICED BEATS COND" && v2.survival === "COND BEATS PRICED", J(v2.means));
+        const P4 = [1, 2, 3, 4, 5, 6].map((i) => run(i, i <= 4 ? 3 : 2, true));
+        ok("...4 to 0 is p = 1/16 > 0.05: NO DIFFERENCE SHOWN; and runs on different seeds are refused", L.verdict15({ PRICED: P4, COND: C6 }).verdict === "NO DIFFERENCE SHOWN" && /not flown on the same seeds/.test(throws(() => L.verdict15({ PRICED: P6.slice(1), COND: C6 })) || ""));
         const f = new URL("./learnedCourierPriced.json", import.meta.url);
         if (!fs.existsSync(f)) { console.log("  NOT YET  brain/learnedCourierPriced.json is written by the training (tools/ship/trainLearnedCourier.mjs --round 15 --write) and committed before HELD is flown"); return; }
         const j = JSON.parse(fs.readFileSync(f, "utf8"));

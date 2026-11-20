@@ -2875,8 +2875,8 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-20 -- the stations line after rounds 7 to 12 (brain/SUB_STATIONS_WIP.md sections 20-30). Written so another chat can pick any one up; none is registered yet.
     {
         id: "stations-cond-in-aquarium",
-        blocker: "OPEN",
-        what: "Put round 10's winner, COND (brain/breachCourierTask.mjs COND_KNOBS: TRIAGE with ROUTE's legs station, energy claim shut, the surface latch only on a SECOND sinking after the weight is gone), in the Sub Aquarium captain menu beside off/fixed/triage/route.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-20: DONE. sub-aquarium.html's captain menu has 'cond (courier)'; render/subAquariumSim.mjs setCaptain(id, 'cond') builds round 10's COND over the courier's navigator (through the same proxy as ROUTE); the list line names its breach latch ('breached once: the mission goes on', then 'SANK AGAIN: up for good'); gated in render/subAquariumCaptain-selfcheck.mjs section 4c (10 mutants, all red). WAS: Put round 10's winner, COND (brain/breachCourierTask.mjs COND_KNOBS: TRIAGE with ROUTE's legs station, energy claim shut, the surface latch only on a SECOND sinking after the weight is gone), in the Sub Aquarium captain menu beside off/fixed/triage/route.",
         how: "render/subAquariumSim.mjs setCaptain(id, 'cond'): build it as 'route' is built (it needs a courier, through navProxy) with SS.triageCaptain({ knobs: COND_KNOBS, more: [legsStation], energyAllow: shut }); add the option to sub-aquarium.html and a CON word in render/needsView.mjs for the latch state. Gate rows in render/subAquariumCaptain-selfcheck.mjs: a breached courier under 'cond' keeps delivering after one rescue, latches after a second, and 'cond' on a non-courier is refused, each with a mutant. No registration needed (a page change, no claim).",
         why: "COND is the best breached courier flown (2.42 goals, 76 of 96 kept) and is not yet visible anywhere a person can watch it.",
     },
