@@ -75,9 +75,15 @@ export function checksOf(res, { dives = DIVES, profiles = true, shipped = true }
     rows.push({ name: "SEAT-04 IS THE SHIPPED SEAT", ok: shipped, text: `the SEAT-04 arm against surveyPilot() on the gate's two dives, fingerprint for fingerprint: ${shipped}` });
     return rows;
 }
-/** Checks 6 and 7, flown: the library's arms against the shipped seats on the gate's two dives (60 s, BIAS). `circuitSeatOf` is subAquariumCircuit.circuitSeat, passed in so this library does not import the render tree twice. */
+/**
+ * Checks 6 and 7, flown: the library's arms against the shipped seats on the gate's two dives (BIAS). `circuitSeatOf` is subAquariumCircuit.circuitSeat, passed in so this library does not import the render tree twice.
+ * 2026-11-20: check 6 (profilesSame) now flies FULL dives. It flew 60 s dives, on which the -0.06 and -0.04 rules fly the same (measured on the gate's two dives), so it could never tell
+ * the two bases apart and stayed true after Round 39 moved the rule profile. Round 38's result does not change: what established C06 and R06 then was the gate's full-dive row.
+ * Against TODAY's aquarium the check is false (Rounds 39 and 40 moved both profiles); against the profiles as Round 38 flew them it is true. Full dives cost about 0.7 s here.
+ * Check 7 (shippedSame) keeps 60 s: SEAT-04 is surveyPilot() by construction, and the planner's dives are the expensive ones.
+ */
 export function profilesSame(circuitSeatOf) {
-    const set = T.setOf([KIND], GATE_SEEDS[0], GATE_SEEDS[1]), g = { gauge: gaugeOfCond("BIAS"), seconds: 60 }, fp = (p) => T.evaluate(p, set, g).runs.map((r) => r.fingerprint).join("|");
+    const set = T.setOf([KIND], GATE_SEEDS[0], GATE_SEEDS[1]), g = { gauge: gaugeOfCond("BIAS") }, fp = (p) => T.evaluate(p, set, g).runs.map((r) => r.fingerprint).join("|");
     return fp(pilotOf("C06")) === fp(T.flyDecision(circuitSeatOf("circuit"))) && fp(pilotOf("R06")) === fp(T.flyDecision(circuitSeatOf("rule")));
 }
 export function shippedSame() {

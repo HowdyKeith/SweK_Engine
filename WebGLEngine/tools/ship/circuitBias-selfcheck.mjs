@@ -91,12 +91,19 @@ sec("4. FLIGHT (the gate's two seeds; full dives for the circuit arms, 60 s for 
     // The row now holds C06 to the circuit profile and R06 to what the rule profile was, on FULL dives. *** FOUND WHILE RESTATING IT: the library's check 6 (profilesSame) flies
     // 60 s dives, on which low -0.04 and -0.06 fly the same, so it is still true after the move and could never have told the two bases apart. What established C06 and R06 as the
     // aquarium's profiles when Round 38 flew is this gate's full-dive row (it held then); check 6 in the committed report is the weaker statement and is said to be so here.
+    // 2026-11-20: FIXED -- profilesSame now flies full dives (the row after the next one holds it). Round 38's committed report keeps its 60 s reading as history.
     const rep38 = fs.readFileSync(new URL("../../brain/rig-results/circuit-bias-report.json", import.meta.url), "utf8");
     // 2026-11-19, Round 40: the circuit profile now flies the retrained net on -0.04, so C06 is what the profile WAS (circuitSeat("circuit", PLAIN_CHAMPION) on its BASE_PARAMS) and is not it now
     ok("!! C06 and R06 WERE the aquarium's profiles when Round 38 flew (full BIAS dives; the committed report says PASS): C06 is the decision-circuit champion on -0.06 and R06 the -0.06 rule; since Rounds 39 and 40 neither is",
         c06 === fps(T.flyDecision(CS.createPlainPolicy(84, "plain").seatFor(Float32Array.from(PLAIN_CHAMPION.weights))), bias) && c06 !== fps(T.flyDecision(circuitSeat("circuit")), bias) &&
         r06 === fps(T.flyDecision(U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS)), bias) && r06 !== fps(T.flyDecision(circuitSeat("rule")), bias) &&
         /PASS C06 AND R06 ARE THE AQUARIUM'S PROFILES/.test(rep38));
+    // 2026-11-20: check 6 flies FULL dives, so it can tell the bases apart. The probe that shows it: the profiles as Round 38 flew them (true), today's (false), and a
+    // MIXED set -- the old circuit with TODAY's -0.04 rule -- which a 60 s check passes (the two rules fly the same for 60 s) and a full-length check must fail.
+    const wasCircuit = () => CS.makeSeat(CS.createPlainPolicy(84, "plain").stepper(Float32Array.from(PLAIN_CHAMPION.weights))), wasRule = U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS);
+    const asWas = (p) => (p === "circuit" ? wasCircuit : wasRule), mixed = (p) => (p === "circuit" ? wasCircuit : circuitSeat("rule"));
+    ok("!! check 6 (profilesSame) flies FULL dives, so it tells the bases apart: true for the profiles as Round 38 flew them, false for today's, and false for the old circuit with today's -0.04 rule (a 60 s check passed that)",
+        X.profilesSame(asWas) && !X.profilesSame(circuitSeat) && !X.profilesSame(mixed));
     const w = Float32Array.from(PLAIN_CHAMPION.weights), pol = CS.createPlainPolicy(PLAIN_CHAMPION.hidden, "plain");
     ok("!! C04 is the SAME weights on the -0.04 base (built here independently), and it differs from C06 on these dives",
         c04 === fps(T.flyDecision(() => CS.makeSeat(pol.stepper(w), { params: { ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.04 }, bounds: U.WIDE_BOUNDS })), bias) && c04 !== c06);
@@ -145,3 +152,5 @@ process.exitCode = fails ? 1 : 0;
 //   *** 2 WENT 0 RED ON THE FIRST PASS ***: M7 (V2 read off C06's REF) -- the fixture's 7 and 9 both fail against the seat's 0, so REF and BIAS gave one answer; the fixture is now
 //   3 and 6 (V1 holds, V2 fails, REF would hold): 1 red. M17 (the rule profile's line reading C06) -- every fixture moved C06 and R06 together; a fixture with only R06 paying
 //   was added: 1 red. Both re-run with the other fifteen: 17 of 17 red.
+// 2026-11-20 (check 6 flies FULL dives): 2 sabotages in tools/ship/circuitBias.mjs, each restored byte-identical: the 60 s put back -> 1 red (the full-dive row:
+//   the mixed probe -- the old circuit with today's -0.04 rule -- passes at 60 s); the rule comparison dropped -> 1 red (the same row, the same probe).

@@ -1526,6 +1526,12 @@ A champion is eligible (not the start): about 75 percent. V1 holds: about 65 (th
 ## Round 38, CORRECTION (2026-11-19, found while Round 39 moved the rule profile; the result is unchanged)
 Check 6 of Round 38's report (`C06 AND R06 ARE THE AQUARIUM'S PROFILES`) is weaker than its words: `circuitBias.profilesSame` flies 60 s dives, on which the -0.04 and -0.06 bases fly the same, so it could not have told the bases apart and is still true after the move. What established C06 and R06 as the aquarium's profiles when the round flew is the gate's full-dive row (`tools/ship/circuitBias-selfcheck.mjs` section 4), which held then. The check is left as committed and the gate says so.
 
+**FIXED 2026-11-20 (tool hygiene; Round 38's result does not change).** `profilesSame` now flies full dives, at about 0.7 s for the check. Measured on the gate's two dives:
+- At 60 s the -0.06 rule (R06) is indistinguishable from today's -0.04 rule profile. At full length they differ.
+- Against the profiles as Round 38 flew them, the check is true. Against today's aquarium it is false, because Rounds 39 and 40 moved both profiles. So re-running `circuitBiasCmd.mjs report` now prints check 6 as FAIL, and that is correct: C06 and R06 are no longer the aquarium's profiles.
+- The committed Round 38 report keeps its 60 s reading as history.
+- A gate row holds all three cases, including the probe a 60 s check passed: the old circuit with today's -0.04 rule. Two sabotages, both red.
+
 ## Round 39, RESULT (2026-11-19): THE MOVE IS CONFIRMED -- R04'S HULL IS NO WORSE THAN R06'S IN ANY CONDITION; the aquarium's rule profile now flies low -0.04
 
 **The run.** `node tools/ship/ruleMoveCmd.mjs run --jobs 2` in the sandbox (beside Round 40's training), 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/rule-move/`, `brain/rig-results/rule-move-report.json`). All five checks passed, R06 flown as the aquarium's `rule` profile on full dives before it changed.
