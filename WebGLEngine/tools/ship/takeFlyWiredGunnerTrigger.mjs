@@ -13,6 +13,8 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain side; THE HELD TRIGGER LESS THE PAGE'S, pair by pair.
 // FORECAST, for the record: LEADS in every fleet fight, by about the scratch pairs' 0.5 to 0.8 (perhaps less: one draw of 24); rationed LEADS by less; with escorts LEADS; against fighters a small lead (about 0.02) or CANNOT BE TOLD.
 // WHAT SHIPS: brain/seatFlyWired11WeightsDefault.json (policy seatFlyWired11) if the gain LEADS in at least one fight and TRAILS in none. It would replace seatFlyWired10 as the `flywired` hand on space-duel.html.
+// READ 2026-11-20 (brain/seatFlyWired11WeightsDefault.reading.json): the held trigger less the page's +0.467 (cannon), +0.886 (none), +0.415 (rationed to a quarter), +1.147 (escorts), +0.022 (fighters), z 8 to 20. IT SHIPS: brain/seatFlyWired11WeightsDefault.json,
+//   the `flywired` hand on space-duel.html. It now leads the plain side in every fight, fighters included. Rationed it gains as much as with whole magazines: at a quarter, holding the trigger still does not run the guns dry enough to cost.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerTrigger/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other rations, one ship a side (tools/ship/takeFlyWiredGunnerControl.mjs flies the page's gunner there), the trained pilot, the cannon-aware helm (the loadout study's question).
 "use strict";
