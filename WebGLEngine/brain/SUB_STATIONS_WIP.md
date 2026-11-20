@@ -398,3 +398,29 @@ Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's pl
 **What it says.** A courier that times its charging by the leg it is about to fly, measured as the route it will fly, reaches the most goals of any crew. The fix was the one the round-4 losses named.
 
 **Status: rounds 5 and 6 CLOSED as registered.** Across six rounds and four pairs of stations (damage and energy, sonar and energy, navigation and energy, twice each for the last two), every captain that weighs what an action costs has beaten the fixed ranking on HELD. The two refinements the losses named (the route, no fight clock) held up on fresh seeds.
+
+## 20. ROUND 7, REGISTRATION (2026-11-20, written and committed before any code for it and before any run of its sets)
+
+Keith, 2026-11-20: "Let's do all 4 items on 'Next rounds on the stations line:' items, in the order you suggest." The first: one captain over all stations, on combined emergencies.
+
+**THE QUESTION.** Each cost-aware rule beat the fixed ranking on its own pair of stations. On a boat with three of its problems at once, do the winners still win when put together, or do they interfere? The boat is a courier with a battery that is breached mid-run: navigation, energy and damage control.
+
+**THE TASK (`brain/breachCourierTask.mjs`, to be built).** Round 4's courier, unchanged: the sea, the navigator (which supplies the mission every tick), the vessel, the start, the battery U(0.15, 0.45) and 1,200 s. **Plus a breach drawn from the seed:** a leak of U(0.03, 0.08) of the weight, starting at U(60, 600) s, built over 5 s, never mended (round 2's leak). Damage control rescues at the open sea's depths (5 m and 10 m past the target, `emergencyPilot` defaults), as in round 2.
+
+**THE CREWS** (the navigator's mission; the helm `helmOf(autopilot)`).
+* FIXED: the energy and damage stations by rank.
+* ROUTE+DC: round 5's ROUTE (the legs station with the planned route; the energy station gated shut), plus the damage station.
+* TRIAGE: round 2's frozen TRIAGE captain (`FROZEN_TRIAGE`: once breached, drop the weight at once and go up while there is charge).
+* **COMBINED: the naive union.** The TRIAGE captain with ROUTE's legs station added and its energy station gated shut, as in ROUTE. The legs station decides charging until the breach. After it, TRIAGE's latch claims the surface for the rest of the run. Nothing is tuned and nothing is added; this is the two winners put on one boat as they were written.
+* **NOT TESTED, said now:** BLIND (sonar against energy). The duel has no leak model, so sonar does not meet damage control anywhere in this tree.
+
+**THE OUTCOMES.** SURVIVED (not lost in 1,200 s) and GOALS (the navigator's arrivals). Reported beside them: the time of a loss, the empty-battery seconds, the time on the surface after the breach, and the weight dropped.
+
+**THE SETS.** DEV: seeds 189001 to 189024, only to check that the four crews differ. If COMBINED and FIXED are the same on more than 20 of 24 in both outcomes, the leak range is amended on DEV before HELD; nothing of a crew changes. HELD: seeds 191001 to 191096. No file in the tree uses a seed from 189000 to 191999 (grep, 2026-11-20).
+
+**THE VERDICT (HELD, flown once).** The tests are exact one-sided sign tests over the runs where the two differ, at p at most 0.05.
+* **(V1) Against the ranking:** COMBINED BEATS FIXED ON SURVIVAL, and separately ON GOALS, each by the test.
+* **(V2) THE QUESTION:** **COMBINED COMBINES** iff it is not shown worse than TRIAGE on SURVIVAL AND not shown worse than ROUTE+DC on GOALS. Otherwise **COMBINED INTERFERES**, naming which parent's gain it loses.
+* Reported: every crew on both outcomes, and each pair by the same test.
+
+**EXPECTATION, recorded now.** TRIAGE's latch keeps a breached courier on the surface for the rest of the run, so it delivers nothing after the breach. So: COMBINED INTERFERES ON GOALS about 65 percent; COMBINES about 30 percent (if the breach comes late, or the boat that stays deep is lost anyway). COMBINED beats FIXED on survival about 70 percent, and on goals about 40 percent.
