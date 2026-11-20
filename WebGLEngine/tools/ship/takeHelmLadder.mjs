@@ -14,6 +14,8 @@
 // FORECAST, for the record: flywired first in both (it alone knows the cannon is aboard; the others were trained to correct the rule with the hand gunner); steer and compass next, ahead of trained (as they were over the rule: +0.64 and +0.20 over trained
 //   on 600 pairs); face last.
 // WHAT IS DECIDED: nothing ships. The page's helm notes say each helm's place, and any helm that LEADS the fly-wired one in a fight is said there (and would be a candidate for the buttons in another study).
+// READ 2026-11-20 (brain/helmLadder.reading.json): one ship a side flywired 0.835 > steer 0.152 > compass -0.139 > trained -0.217 > face -0.631; in fleets flywired 1.074 > steer 0.092 > trained -0.218 > compass -0.240 > face -0.708. The fly-wired helm leads every
+//   other in every match (0.63 to 1.37): no other helm is a candidate for the buttons. The forecast was right. The page's helm notes say each place.
 // Every match's leads are kept (brain/rig-results/helmLadder/); the reading file (brain/helmLadder.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the broadside rule, the first fly-wired helms, escorts, no cannon, the car's gunner.
 "use strict";

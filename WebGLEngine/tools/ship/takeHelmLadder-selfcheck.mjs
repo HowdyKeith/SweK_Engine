@@ -91,7 +91,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), b = G.brainsOf(), k = (f, m) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${m}.json`), "utf8")).leads, near = (x, v) => Math.abs(x - v) < 5e-4;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.matchesOf(f, b).map((m) => [m.join("~"), k(f, m.join("~"))])))]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE CANNON-AWARE FLY-WIRED HELM IS FIRST, FAR AHEAD, IN BOTH: one ship a side flywired 0.835 > steer 0.152 > compass -0.139 > trained -0.217 > face -0.631; in fleets flywired 1.074 > steer 0.092 > trained -0.218 > compass -0.240 > face -0.708; it LEADS every other helm in every match (by 0.63 to 1.37), so no other helm is a candidate for the buttons", rd.one.order.join() === "flywired,steer,compass,trained,face" && rd.fleet3.order.join() === "flywired,steer,trained,compass,face" && near(rd.one.score.flywired, 0.835) && near(rd.fleet3.score.flywired, 1.074) && G.FIGHTS.every((f) => ["trained", "steer", "compass", "face"].every((o) => rd[f].words[`flywired~${o}`] === "LEADS" && rd[f].matches[`flywired~${o}`].mean > 0.6))
+        && G.FIGHTS.every((f) => Object.keys(re[f].matches).every((m) => Math.abs(re[f].matches[m].mean - rd[f].matches[m].mean) < 1e-12)));
+    ok("!! the rest as forecast but for trained and compass, which cannot be told apart (-0.127 and -0.090); steer is second in both (+0.38 and +0.21 over compass); the forecast was right; AND THE PAGE SAYS EACH HELM'S PLACE", rd.one.words["trained~compass"] === "CANNOT BE TOLD" && rd.fleet3.words["trained~compass"] === "CANNOT BE TOLD" && rd.one.order[1] === "steer" && rd.fleet3.order[1] === "steer" && ["flywired", "steer", "compass", "trained", "face"].every((id) => /helm ladder/i.test(C.HELMS.find((h) => h.id === id).note)));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
