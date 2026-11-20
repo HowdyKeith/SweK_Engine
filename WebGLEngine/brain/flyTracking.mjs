@@ -173,6 +173,15 @@ export const POLICY_ID9 = "seatFlyWired9", holdNear = holdSeesNear(NEAR);
  *  For tools/ship/takeFlyWiredGunnerTune.mjs's search; nothing inside the circuit is learned. */
 export const POLICY_ID10 = "seatFlyWired10", nearTunable = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding -- its tau, smoothing and window as weights", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true });
 export const SHIPPED9 = Object.freeze([-3, -3, 0.1, 0.2, NEAR]);
+/** THE PAGE'S GUNNER OVER ANOTHER WIRING (2026-11-20; for tools/ship/takeFlyWiredGunnerControl.mjs): seatFlyWired10 with its read-out S taken from wiringOf(name) -- "shuffled:<seed>", "scrambled:<seed>", "flat", "sine" or "fly:medial" (the gunner itself) -- and every
+ *  other choice the same. The question it asks: once the hand lays the last degrees and every fighter, does the FLY'S wiring still do anything? */
+const NEAR_OVER = new Map();
+export function nearTunableOver(name) {
+    if (name === "fly" || name === "fly:medial") return nearTunable;
+    if (!NEAR_OVER.has(name)) { const w = wiringOf(name); NEAR_OVER.set(name, libraryOf(`${nearTunable.name}, over ${name}`, w.raw, w.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true })); }
+    return NEAR_OVER.get(name);
+}
+export const wiringOf10 = nearTunableOver;
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });

@@ -25,7 +25,7 @@ import * as FS from "../../brain/flySteering.mjs";
 import * as FT from "../../brain/flyTracking.mjs";
 
 /** The policies whose network can be flown over another wiring (`wiring: "control:<seed>"`), each with the module whose wiringOf() names it. */
-export const WIRED = Object.freeze({ gunnerPolicy: TC, helmSteerPolicy: HS, helmCompassPolicy: HC, seatTrackGunner: SK, helmFlyWired: FS, seatFlyWired: FT });
+export const WIRED = Object.freeze({ gunnerPolicy: TC, helmSteerPolicy: HS, helmCompassPolicy: HC, seatTrackGunner: SK, helmFlyWired: FS, seatFlyWired: FT, seatFlyWired10: Object.freeze({ wiringOf: FT.nearTunableOver }) });   // seatFlyWired10 over another wiring (2026-11-20)
 
 /** A side from its plain description (see the header). A policy this fight does not seat is refused by name. */
 export function sideOf(spec) {
