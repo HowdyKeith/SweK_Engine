@@ -451,3 +451,26 @@ The second of the four: **a learned captain against the hand rules.**
 **THE VERDICT (HELD, flown once):** LEARNED BEATS TRIAGE iff LEARNED survives more HELD dives and the exact one-sided sign test on the discordant dives gives p at most 0.05. TRIAGE BEATS LEARNED by the same rule. Otherwise NO DIFFERENCE SHOWN. Reported: FIXED on the same dives (and LEARNED against it), and what the learned weights do (when each choice fires).
 
 **EXPECTATION, recorded now.** TRIAGE's two moves are simple thresholds that a logistic unit can represent: drop at once when breached, and go up when breached. So NO DIFFERENCE about 55 percent; LEARNED BEATS TRIAGE about 20 percent (it can learn to drop BEFORE damage control acts, from the sink rate); TRIAGE BEATS LEARNED about 25 percent (32 training dives may not find the latch).
+
+## 22. ROUND 7 RESULT (2026-11-20; `brain/breachCourierHeld.{0,1,2,3}.jsonl`, 384 runs, committed unread at `d5bc9448b`, then read ONCE)
+
+**VERDICT (registered):**
+* **(V1)** COMBINED BEATS FIXED ON SURVIVAL: 34 runs to 9 (p = 9e-5). **FIXED BEATS COMBINED ON GOALS:** 47 runs to 11 (p = 1e-6).
+* **(V2) COMBINED INTERFERES: it loses ROUTE's goals.** COMBINED has fewer goals than ROUTE+DC on 60 runs and more on 8 (p = 3e-11). It does not lose TRIAGE's survival. **It BEATS it:** 13 runs to 4 (p = 0.025).
+
+| crew | survived (of 96) | mean goals | goals of the survivors | seconds on the surface after the breach | empty-battery seconds |
+|---|---|---|---|---|---|
+| FIXED | 49 | 1.57 | 1.96 | 273 | 129 |
+| ROUTE+DC | 48 | **1.90** | 2.50 | 253 | 120 |
+| TRIAGE | 65 | 0.84 | 0.74 | 517 | 49 |
+| **COMBINED** | **74** | 0.91 | 0.88 | 569 | 33 |
+
+**What it says.**
+* **The two winners do not add up: they trade.** TRIAGE's latch was written for a boat whose job is to stay alive. On a courier it does exactly that: once breached, the boat goes up and stays up for the rest of the run, and delivers nothing more (569 s on the surface after the breach on average, against ROUTE+DC's 253). So COMBINED keeps the most boats and loses ROUTE's deliveries.
+* **On survival, the union is better than either parent** (74 against TRIAGE's 65 and ROUTE+DC's 48). Before the breach, the legs station keeps the battery up (33 empty seconds against TRIAGE's 49), so the boat meets the breach with charge.
+* **ROUTE+DC is the best courier but saves no more boats than the ranking** (48 against FIXED's 49; ROUTE beats FIXED on goals again, 33 to 19, p = 0.035).
+* **Against the expectation in section 20:** "COMBINED INTERFERES ON GOALS" was put at about 65 percent; it happened. I did not expect COMBINED to beat TRIAGE on survival.
+* **What a real combined captain needs, named by the losses:** TRIAGE's latch has to know whether the boat CAN go on. A leak under the drop weight, once the weight is gone, is a boat that can still deliver; a leak over it is not. That is a new rule (a conditional latch), and so a new registration, not a change to this round.
+* **NOT TESTED, as section 20 said:** sonar's rule. The duel has no leak.
+
+**Status: round 7 CLOSED as registered.**
