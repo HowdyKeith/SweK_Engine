@@ -49,6 +49,8 @@ guarded("section 1", () => {
     ok("without a planned route the need falls back to the straight line (100 m: 0.20 - 0.4 = -0.20)", (() => { const h = L.learnedCourierCaptain(ctxOf({ route: null }), new Array(20).fill(0)); h(s0, mission); return Math.abs(h.features[7] - (-0.2)) < 1e-9; })());
 });
 
+guarded("section 1b", () => { ok("GOAL_WINDOW is the registered 5 s", L.GOAL_WINDOW === 5); });
+
 sec("2. the two units on hand-made ticks");
 guarded("section 2", () => {
     const st = S.createState({ depth: 30, speed: 2, model: MODEL }), mission = { depth: 30, heading: 0, speed: 2 }, th = (surf, drop) => { const t = new Array(20).fill(0); t[9] = surf; t[19] = drop; return t; };

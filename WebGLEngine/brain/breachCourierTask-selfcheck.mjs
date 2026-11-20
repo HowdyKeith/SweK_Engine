@@ -131,6 +131,9 @@ guarded("section 7", () => {
     ok("level goals: COND DOES NOT BEAT COMBINED", T.condVerdict({ COND: K, COMBINED: K, "ROUTE+DC": R, TRIAGE: Tr }).verdict === "COND DOES NOT BEAT COMBINED");
 });
 
+sec("8. the constants");
+guarded("section 8", () => { ok("SURFACE_BAND is 3 m (the band that counts as on the surface after the breach), and signTest is courierTask's own (P(X >= 5 | 5) = 1/32)", T.SURFACE_BAND === 3 && T.signTest === CT.signTest && Math.abs(T.signTest(5, 0) - 1 / 32) < 1e-15); });
+
 finished = true;
 console.log(fails ? `\nbreachCourierTask-selfcheck: ${fails} FAILED` : "\nbreachCourierTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

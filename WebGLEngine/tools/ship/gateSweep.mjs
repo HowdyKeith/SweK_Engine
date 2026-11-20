@@ -16587,6 +16587,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "needs rounds 41 and 42 and the space approach doctrine round: 3 gates, each registered before it was written and green on arrival, each with its mutation pass in its header (18, 20 and 17 + 5 + 1 mutants, all red; the 0-red mutants found on the way -- circuitRetrain2 M12, spaceDoctrine's two strafe readings, plannerCircuit's merge crash -- were fixed and re-run). No register was widened.",
     }),
+    since639: Object.freeze({
+        at: "v4931", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "brain/breachCourierTask-selfcheck.mjs",
+            "brain/learnedCaptain-selfcheck.mjs",
+            "brain/learnedCourier-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "submarine stations rounds 7 to 12 (brain/SUB_STATIONS_WIP.md sections 20-30, each registered before it was flown): 3 gates, each green on arrival and each carrying its mutation pass in its header (16 + 9, 17 and 12 mutants; every survivor of a first pass given a row or argued equivalent by name)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
