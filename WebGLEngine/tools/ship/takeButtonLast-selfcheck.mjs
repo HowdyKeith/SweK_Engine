@@ -8,6 +8,8 @@
 //   2  THE STUDY             against a stand-in: six arms, each once; the gain pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
+// READ 2026-11-20: THE PICK HOLDS. The button's less the car's: +0.013 against eight PD fighters under the cannon-aware helm (z 6.8, LEADS); +0.023 one ship a side under the bow-on rule (z 0.75, CANNOT BE TOLD); +0.345 in fleets of three under it (z 7.5, LEADS).
+//
 // SABOTAGE LOG: 14 mutants of tools/ship/takeButtonLast.mjs, each a copy of the study with this gate (and the command rows) pointed at it, before the study was registered: ALL 14 RED the first time
 //   (the seeds moved, a pair short; no helm against fighters, a helm under the bow-on rule, the wrong pick one ship a side and in a fleet, a fleet of one, the cannon on one side; the gain's sign, a trail at exactly -2 let by;
 //   a file unchecked; the second read and an unknown option let through; one arm's leads for both). No mutant flew into the real folders.
@@ -89,7 +91,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ car: k(f, "car"), button: k(f, "button") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE BUTTON'S PICK HOLDS: the button's less the car's is +0.013 against eight PD fighters (LEADS), +0.023 one ship a side under the bow-on rule (CANNOT BE TOLD), +0.345 in fleets of three under it (LEADS); it trails nowhere", near(R("fighters").gain, 0.013) && near(R("oneFace").gain, 0.023) && near(R("fleetFace").gain, 0.345)
+        && rd.fighters.words.gain === "LEADS" && rd.oneFace.words.gain === "CANNOT BE TOLD" && rd.fleetFace.words.gain === "LEADS" && rd.verdict.ok && near(R("fleetFace").car, 0.323) && near(R("oneFace").button, 0.873)
+        && G.FIGHTS.every((f) => ["car", "button", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! AND THE BY-SIZE NOTE NO LONGER SAYS IT WAS NOT FLOWN THERE", !/NOT flown/.test(C.HANDS.find((h) => h.id === "bysize").note) && /takeButtonLast/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
