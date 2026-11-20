@@ -8,7 +8,7 @@
 //   const leads = await pool.leads(jobs);            // jobs: [{ x, y, kind, seed, opts }] -> a lead for each, in the jobs' order
 //   await pool.close();
 //
-//   A SIDE crosses to a worker as plain data (`sideSpec`): { id, gunners, helmRule, cannon, network: { policy, weights } | null, helmNet: { policy, weights } | null } -- the network's MODULE is named by its policy id and looked up in battleshipDuel.PEER_POLICIES on the other side, so nothing but numbers and names is sent.
+//   A SIDE crosses to a worker as plain data (`sideSpec`): { id, gunners, helmRule, cannon, network: { policy, weights } | null, helmNet: { policy, weights } | null, pilotNet: { policy, weights } | null (the side's escorts' pilot) } -- the network's MODULE is named by its policy id and looked up in battleshipDuel.PEER_POLICIES on the other side, so nothing but numbers and names is sent.
 //   sideOf(spec) builds the side; leadOf(job) flies the pair. THE POOL'S ANSWER IS leadOf's, TO THE BIT, whatever the number of workers and whatever order the workers finish in (the gate flies the same jobs serially and on one, two and four workers and compares).
 //   A CONTROL WIRING: a turret-seat network's spec may carry `wiring: "control:<seed>"`; the weights are then flown over brain/seatTurretCircuit.mjs's random circuit of that seed and not over the fly's. A steering helm's spec (helmSteerPolicy) may carry one too: brain/helmSteerPolicy.mjs's wiringOf.
 //   WHAT IS NOT HERE: seatNetworks (a different network per seat), escort pilots and fleets (the pair is one ship a side unless `opts` says more; the options cross as they are), a GPU, and any machine but this one -- the rig and the peers are reached by running this same file there.
@@ -37,7 +37,7 @@ export function sideOf(spec) {
         if (other && !family) throw new Error(`pairPool.sideOf: only ${Object.keys(WIRED).join(", ")} have another wiring to fly (got ${n.policy} with wiring ${n.wiring})`);
         return { module: other ? family.wiringOf(n.wiring) : kind.mod, weights: n.weights instanceof Float32Array ? n.weights : Float32Array.from(n.weights) };   // `wiring`: "control:<seed>" flies the same weights over a random circuit (brain/seatTurretCircuit.mjs)
     };
-    return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm") });
+    return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm"), pilot: net(spec.pilotNet, "pilot") });   // `pilotNet` (2026-11-20): the brain that flies the side's ESCORTS (null: the PD autopilot)
 }
 /** A fight against fighters in numbers: the share of the raiders destroyed, less the share of the ship side's hit points lost. In [-1, 1]; a ship that downs all eight and takes nothing scores 1. */
 export const fighterScore = (t, fighters = BF.FIGHTERS) => t.killed / fighters - t.damageOnShips / (1500 * t.ships.length);
