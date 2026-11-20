@@ -31,6 +31,7 @@ const MODEL = NT.model();
 export const HIGH_RIDER_SPEC = Object.freeze({ ...NT.SPEC, ...HULLS.SPECS.highRider, name: "explorer-survey-highRider" });
 let HR = null;
 export const highRiderModel = () => HR || (HR = S.createSubModel(HIGH_RIDER_SPEC));
+export const R13_DEV_SET = Object.freeze(Array.from({ length: 48 }, (_, i) => 206001 + i)), R13_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 207001 + i));   // round 13 (stopped at DEV: HELD never flown)
 
 /** The scenario of a seed: { seed, depth, heading, frac, leak, leakAt }. `ranges` replaces any of RANGES (round 12 draws the leak from HARD_LEAK); the draws are made in the same order, so the other fields of a seed do not move. */
 export function scenario(seed, ranges = RANGES) {

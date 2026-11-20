@@ -728,3 +728,24 @@ Keith, 2026-11-20: "Let's do all, those as you suggested, and also item 5" -- th
 **EXPECTATION.** A lost boat now costs at most 2.42 goals and usually less, so the learner should trade some boats for deliveries. COND BEATS PRICED about 55 percent (the hand rule reads the planned route, the learner one feature of it); NO DIFFERENCE about 35; PRICED BEATS COND about 10.
 
 **No file among the stations' tasks, captains or notes uses a seed from 206000 to 211999** (grep of `brain/stationsTask.mjs`, `duelStationsTask.mjs`, `courierTask.mjs`, `breachCourierTask.mjs`, `learnedC*.mjs` and this note, 2026-11-20). Elsewhere in the tree those numbers appear only in unrelated records (physics results, the universe, notes); no stations code reads them.
+
+## 32. ROUND 13: STOPPED AT DEV, BOTH VERDICTS (2026-11-20)
+
+**Both registered checks failed** on the 48 DEV dives (206001 to 206048, leaks of 6 to 8 %):
+* **V1 (the hull):** TRIAGE keeps 20 boats on the high rider and 19 on the default vessel; they differ on 1 dive, under the 3 required.
+* **V2 (the captain):** NEED and TRIAGE on the high rider keep the same 20 and differ on none.
+**HELD is not flown;** 207001 to 207096 stay unread.
+
+**Why, measured on DEV (not a result; every tick watched, `brain/stationsTask-selfcheck.mjs` section 8 holds both as rows):**
+* **The bigger tank is never used, by either captain.** On the high rider, all 28 lost boats are crushed with the weight dropped.
+* **TRIAGE never commands the main ballast.** No tick has ballast at -1. Its tank dips only under damage control's emergency blow (to -0.05 on dive 206003, -0.25 on 206001) and is flooded back, at 0 again by 150 s. The helm (the surfacing wrapper) does not blow the main tank while it climbs. Section 9's guess (round 2) said the limit is the hull; it is the helm's use of it.
+* **NEED's gate flickers.** On 206003 its command flips between blowing and not 101 times, and between blows the helm floods the tank back. So the bottle's 6 levels are gone at 138 s while the tank sits above -0.1. The same holds on 206001 (276 flips, empty at 148 s) and 206009 (108, 138 s).
+* **A crew that never commands the tank flies the high rider exactly as the default vessel** (gated: the main ballast acts only through the tank's level).
+
+**What it suggests, for a later registration, not a result:**
+* The question "does a bigger tank save the hard leaks?" can only be asked with a helm that USES the tank: a rule that, once it blows, HOLDS the tank blown (a latch, not a gate re-read every tick), so the air buys lift once instead of being spent flooding and blowing.
+* NEED's flicker is also a fact about round 12: on the default vessel it was spending its air the same way. That may be why round 12's NEED saved only 2 of 24.
+
+**Built and kept:** `stationsTask`'s `model` option (the default unchanged, gated field for field), `HIGH_RIDER_SPEC`, `highRiderModel()` and round 13's sets. Gated in section 8 (7 mutants, 6 red, 1 equivalent; logged).
+
+**Status: round 13 CLOSED, STOPPED AT DEV as registered.**

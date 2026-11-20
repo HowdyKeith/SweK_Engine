@@ -19,6 +19,9 @@
 // v4930 -- NEED (round 12, section 7): 8 mutants, every one red by name (final pass): N1 blowing whatever the need | N2 never blowing | N3 the window ignored | N4 the rate unsigned | N5 the arrival from the surface, a sinking boat
 //   counted as arrived | N6 HARD_LEAK from 5 % | N7 the other draws moved | N8 the NEED crew as TRIAGE. FOUR WENT 0 RED FIRST AND GOT ROWS: N3 (every fixture filled the window), N4 (no fixture charged), N5 (no fixture sank),
 //   N8 (the crew was checked by its label only; a DEV dive where the two differ is flown now). AND A ROW OF MINE argued with itself in its own text about a 2 m/s climber; it tests a 10 m/s one now.
+// 2026-11-20 -- THE HIGH RIDER (round 13, section 8): 7 mutants of stationsTask.mjs; 6 red by name, 1 EQUIVALENT (final pass): H1 the vessel not given to the state | H2 not given to the step | H3 the main ballast left at 3 % |
+//   H4 a second field changed | H5 the model rebuilt each call | H6 round 13's HELD from 207002 | H7 the crews given the default vessel. H7 WENT 0 RED FIRST and got a row (the vessel reaches the crew only as its surfaced
+//   depth, 0.30 m against 0.56 m). H1 is EQUIVALENT: createState reads the vessel's mass and inertia, and the two vessels differ only in the main ballast.
 "use strict";
 import * as T from "./stationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -166,6 +169,30 @@ guarded("section 7", () => {
     ok("FROZEN_TRIAGE never blows by need; NEED_KNOBS is FROZEN_TRIAGE with blowNeed, 3 m and a 10 s window; the NEED crew flies them; round 12's sets are 203001-203024 and 204001-204096",
         T.NEED_KNOBS.blowNeed === true && T.NEED_KNOBS.blowAbove === 3 && T.NEED_KNOBS.needWindowS === 10 && T.NEED_KNOBS.earlyDropBelow === Infinity && Object.isFrozen(T.NEED_KNOBS) && T.R12_DEV_SET[0] === 203001 && T.R12_HELD_SET.length === 96 && T.R12_HELD_SET[0] === 204001 &&
         T.fly(T.scenario(203001, T.HARD_LEAK), "NEED", { seconds: 120 }).crew === "NEED");
+});
+
+sec("8. the HIGH RIDER (round 13, section 31; stopped at DEV, section 32): the vessel option, and the DEV finding");
+guarded("section 8", () => {
+    const sc = T.scenario(990001), dry = { ...sc, leak: 0 }, HR = T.highRiderModel();
+    ok("with no model given, fly() is the needs-task vessel's flight, field for field (the option changes nothing it is not given)", J(T.fly(sc, "TRIAGE", { seconds: 120 })) === J(T.fly(sc, "TRIAGE", { seconds: 120, model: NT.model() })));
+    const diff = Object.keys(T.HIGH_RIDER_SPEC).filter((k) => k !== "name" && J(T.HIGH_RIDER_SPEC[k]) !== J(NT.SPEC[k]));
+    ok("HIGH_RIDER_SPEC is the needs-task vessel with ONLY its main ballast changed, to a quarter of the weight (subHulls' highRider), frozen; the model is built once", J(diff) === '["ballastRange"]' && T.HIGH_RIDER_SPEC.ballastRange === 0.25 && Object.keys(T.HIGH_RIDER_SPEC).length === Object.keys(NT.SPEC).length && Object.isFrozen(T.HIGH_RIDER_SPEC) && T.highRiderModel() === HR, J(diff));
+    // a helm that only BLOWS (ballast -1, the screw stopped, planes level) for 15 s from 30 m: what the bigger tank is for
+    const blower = () => (st, tg) => ({ pitch: 0, yaw: 0, thrust: 0, ballast: -1 });
+    const up = (m) => { const r = T.fly({ ...dry, depth: 30 }, "NONE", { seconds: 15, make: () => { const f = blower(); Object.defineProperty(f, "aux", { get: () => null }); return f; }, ...(m ? { model: m } : {}) }); return 30 - r.finalDepth; };
+    const rHR = up(HR), rEX = up(null), none = T.fly(dry, "NONE", { model: HR, seconds: 300 }), noneEx = T.fly(dry, "NONE", { seconds: 300 });
+    ok("THE VESSEL IS FLOWN: blowing for 15 s from 30 m with the screw stopped, the high rider climbs more than three times as far as the default vessel; and a crew that never commands the tank flies it EXACTLY as the default (seed 990001, no leak: the main ballast only acts through the tank)", rHR > 3 * rEX && rEX > 0 && J(none) === J(noneEx), J({ rHR, rEX }));
+    const fl = T.fly(dry, "TRIAGE", { model: HR, seconds: 300 }), flEx = T.fly(dry, "TRIAGE", { seconds: 300 });
+    ok("THE CREW IS GIVEN THE VESSEL: TRIAGE, surfaced for charge, floats at the HIGH RIDER's own surfaced depth (0.30 m: blown to the stop it rides higher) where the default vessel floats at 0.56 m", Math.abs(fl.finalDepth - 0.30) < 0.05 && Math.abs(flEx.finalDepth - 0.564) < 0.05, J([fl.finalDepth, flEx.finalDepth]));
+    // the finding of round 13's DEV (section 32), on dive 206003, every tick watched: neither captain uses the bigger tank
+    const watch = (crew) => { let lo = 0, after = null, airOut = null, blows = 0, switches = 0, prev = null, t = 0;
+        T.fly(T.scenario(206003, T.HARD_LEAK), crew, { model: HR, seconds: 200, make: (ctx) => { const c = T.crew(crew, ctx); const f = (st, tg, cur, aux) => { t++; const cmd = c(st, tg, cur, aux); const b = cmd.ballast <= -0.999; if (b) blows++; if (prev !== null && b !== prev) switches++; prev = b;
+            if (st.tank) { lo = Math.min(lo, st.tank.level); if (t === 150 * 30) after = st.tank.level; if (airOut === null && st.tank.air <= 0) airOut = t / 30; } return cmd; }; Object.defineProperty(f, "aux", { get: () => c.aux }); return f; } });
+        return { lo, after, airOut, blows, switches }; };
+    const tr = watch("TRIAGE"), nd = watch("NEED");
+    ok("THE DEV FINDING, 1: TRIAGE on the high rider NEVER commands the main ballast (no tick at -1); its tank dips only under damage control's emergency blow and is flooded back -- at 0 again by 150 s", tr.blows === 0 && tr.switches === 0 && tr.lo < 0 && tr.after === 0, J(tr));
+    ok("THE DEV FINDING, 2: NEED's command flips between blowing and not more than 50 times, the bottle (6 levels) is empty before 160 s, and the tank is above -0.1 at 150 s: between blows the helm floods it back", nd.switches > 50 && nd.airOut !== null && nd.airOut < 160 && nd.after > -0.1, J(nd));
+    ok("round 13's sets are 206001-206048 (DEV) and 207001-207096 (HELD, never flown)", T.R13_DEV_SET.length === 48 && T.R13_DEV_SET[0] === 206001 && T.R13_HELD_SET.length === 96 && T.R13_HELD_SET[0] === 207001);
 });
 
 finished = true;
