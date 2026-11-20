@@ -524,3 +524,21 @@ All ten of TRIAGE's DEV losses have a leak of 7.0 to 8.0 %, past the 6 % weight.
 * and BLOW gated on what the boat could not do without it, such as climbing too slowly to reach the surface before the charge runs out, rather than on a fixed 0.2 m/s.
 
 **Built and kept, off by default:** the BLOW knob of `triageCaptain` (`blowClimb`, `blowAbove`; `TRIAGE_OFF` and `FROZEN_TRIAGE` have it off), `stationsTask`'s BLOW_KNOBS, the BLOW crew and round 9's sets. Gated in `brain/stationsTask-selfcheck.mjs` section 6 (6 mutants, 5 red, 1 equivalent; logged).
+
+## 26. ROUND 8 RESULT (2026-11-20; `brain/learnedCaptain.json` frozen at `89bcbb758` before HELD; `brain/learnedCaptainHeld.jsonl`, 288 dives, committed unread at `902e07bd2`, then read ONCE)
+
+**VERDICT (registered): LEARNED BEATS TRIAGE.** LEARNED survives 88 of the 96 HELD dives against TRIAGE's 75. Of the 19 dives where exactly one survives, 16 are LEARNED's and 3 TRIAGE's (sign test p = 0.002). Against FIXED: 88 against 59 (31 to 2, p = 7e-8).
+
+**AND WHAT IT LEARNED IS NOT A BETTER CAPTAIN: IT LEARNED THE TASK'S HOLE.** Read from the weights, then checked by flying the first 12 HELD dives again (the same dives, re-read; no new seed):
+* **It drops the weight at 0.0 s in every dive and claims the surface within 0 to 11 s.** That is before any leak (the leaks start at 10 to 56 s in those 12).
+* **The DROP unit fires on the start state itself.** Its constant (0.44) plus the air term (0.38) outweighs the depth term at mission depth. All 96 dives dropped the weight.
+* **The SURFACE unit fires once the boat is near its mission depth with a modest charge.** Its largest terms are against charge (-3.56), depth (-3.78) and being below the mission (-2.81): it goes up early, from shallow, while the battery still has something.
+* **Why that wins here.** In round 2's task every dive is breached within its first minute, the drop weight costs nothing, and the score counts only survival. So the best policy is to abandon the mission at once and go up light, before the trouble comes. TRIAGE flies its mission until damage control says otherwise. Against a task that scores staying alive and nothing else, giving up the job is the winning move. A learner found it in 40 generations; a hand-written rule would not, because its author knows what the boat is for.
+
+**What it says.**
+* **The verdict stands as registered.** LEARNED keeps more boats on this task.
+* **But the task cannot tell a good captain from one that abandons the mission,** and that is the finding. It is the first round of the nine in which the learner and the hand rule answered different questions.
+* **Against the expectation in section 21:** LEARNED BEATS TRIAGE was put at about 20 percent ("it can learn to drop BEFORE damage control acts, from the sink rate"). It happened, for a different reason: it drops before anything at all.
+* **What a fair test needs, named by the result:** a task that scores the mission too (time held at the mission depth, or a courier's goals, as in rounds 4 to 7), and dives that are not all breached (so going up early has a price). Rounds 4 to 7's courier already scores the mission; a learned captain there is the natural next registration. This one is not changed after the fact.
+
+**Status: round 8 CLOSED as registered, with the meaning above.**
