@@ -295,8 +295,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4929.movedSince4475;   // v4929: the newest record (v4912's moves, hemibrain's arrival extended)
-    const arrived = F.COMMIT_BELT_DRIFT_V4929.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4932.movedSince4475;   // v4932: the newest record (v4912's moves, hemibrain's arrival extended at v4929, male-cns's and zebrafish's at v4932)
+    const arrived = F.COMMIT_BELT_DRIFT_V4932.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -506,6 +506,15 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            changed.join(",") === "hemibrain" && O.at === "v4912" && N.at === "v4929" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
            N.arrivedSince4475.hemibrain.now[0] === "3ca013f5" && N.arrivedSince4475.hemibrain.now.slice(1).join() === O.arrivedSince4475.hemibrain.now.join(),
            `arrived ${changed.join(", ")}; hemibrain ${O.arrivedSince4475.hemibrain.now.length} -> ${N.arrivedSince4475.hemibrain.now.length} commits`);
+    }
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4929, N = F.COMMIT_BELT_DRIFT_V4932;
+        const changed = Object.keys(O.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]).sort();
+        ok("!! the v4932 belt record is v4929's with TWO arrived bodies extended (male-cns: a1ecad48 and e5b750b6; zebrafish: 68c43c85; each in front of what it had); its moves are v4929's own object",
+           changed.join(",") === "male-cns,zebrafish" && O.at === "v4929" && N.at === "v4932" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
+           N.arrivedSince4475["male-cns"].now.slice(0, 2).join() === "a1ecad48,e5b750b6" && N.arrivedSince4475["male-cns"].now.slice(2).join() === O.arrivedSince4475["male-cns"].now.join() &&
+           N.arrivedSince4475.zebrafish.now[0] === "68c43c85" && N.arrivedSince4475.zebrafish.now.slice(1).join() === O.arrivedSince4475.zebrafish.now.join(),
+           `arrived ${changed.join(", ")}`);
     }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still

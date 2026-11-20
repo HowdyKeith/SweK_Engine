@@ -764,3 +764,20 @@ export const COMMIT_BELT_DRIFT_V4929 = Object.freeze({
             why: COMMIT_BELT_DRIFT_V4912.arrivedSince4475.hemibrain.why + "; v4929 then vendored the steering readout (the heading loop and PFL1-3, 198 neurons) beside it and re-read the licence from the hemibrain project page" }),
     }),
 });
+
+/**
+ * v4932 -- male-cns and zebrafish GAINED COMMITS with the merge of claude/inspiring-mayer-9mdcut: the fly's Giant Fiber visual inputs (e5b750b6, vendor/male-cns/giant-fiber-visual-circuit.json)
+ * and their retinotopy (a1ecad48, giant-fiber-visual-retinotopy.json), and the Fish1 Mauthner candidates' signed top-30 circuit (68c43c85, vendor/zebrafish/fish1-escape-top30.json), each in front of what
+ * the body had. Everything else is v4929's own object.
+ */
+export const COMMIT_BELT_DRIFT_V4932 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4929,
+    at: "v4932",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475,
+        "male-cns": Object.freeze({ now: Object.freeze(["a1ecad48", "e5b750b6", ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475["male-cns"].now]),
+            why: COMMIT_BELT_DRIFT_V4929.arrivedSince4475["male-cns"].why + "; v4932 then merged the stealth line's reads of the Giant Fiber's visual inputs (LC4 and LPLC2 as wired cells) and their retinotopy" }),
+        "zebrafish": Object.freeze({ now: Object.freeze(["68c43c85", ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475["zebrafish"].now]),
+            why: COMMIT_BELT_DRIFT_V4929.arrivedSince4475["zebrafish"].why + "; v4932 then merged the Fish1 read of the two Mauthner candidates' inputs and its signed top-30 circuit file" }),
+    }),
+});
