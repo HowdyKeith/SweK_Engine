@@ -84,7 +84,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading, blob = JSON.parse(fs.readFileSync(G.OUT, "utf8"));
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ car: k(f, "car"), fly0: k(f, "fly0") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT SHIPS: one ship a side the fly-wired gunner with no hand window less the car's is +0.018 (CANNOT BE TOLD) with the cannon and +0.145 (z 3.9, LEADS) without; it trails nowhere", near(R("oneCannon").gain, 0.018) && rd.oneCannon.words.gain === "CANNOT BE TOLD" && near(R("oneNoCannon").gain, 0.145) && rd.oneNoCannon.words.gain === "LEADS" && rd.verdict.ok
+        && G.FIGHTS.every((f) => ["car", "fly0", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! against the plain ship: the car's +1.785 and +1.216, no window +1.802 and +1.361; the forecast was right with the cannon and UNDER without (it said about the same); AND THE FILE AND THE PAGE: a seatFlyWired11 brain with the window 0, which the by-size hand takes one ship a side", near(R("oneCannon").car, 1.785) && near(R("oneNoCannon").fly0, 1.361) && blob.policy === "seatFlyWired11" && blob.weights[4] === 0 && C.FILES["seat-flywired-one"].path.endsWith("seatFlyWired11WeightsOne.json") && C.HANDS.find((h) => h.id === "bysize").bySize.one === "flywired-one");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

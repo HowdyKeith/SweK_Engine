@@ -13,6 +13,8 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain ship; NO WINDOW LESS THE CAR'S, pair by pair.
 // FORECAST, for the record: CANNOT BE TOLD with the cannon (the scratch pairs' +0.03), and without it about the same.
 // WHAT SHIPS: brain/seatFlyWired11WeightsOne.json (policy seatFlyWired11, the window 0) if the gain LEADS in at least one fight and TRAILS in none; the button's by-size hand then takes it one ship a side.
+// READ 2026-11-20 (brain/seatFlyWired11WeightsOne.reading.json): no window less the car's +0.018 (cannot be told) with the cannon, +0.145 (z 3.9) without. IT SHIPS: brain/seatFlyWired11WeightsOne.json, the page's `flywired-one` hand, which the by-size hand
+//   takes one ship a side: THE BEST-SHIP BUTTON IS FLY-WIRED AT EVERY SIZE.
 // Every arm's leads are kept (brain/rig-results/flyWiredOneWindow/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets (the 45-degree window's), one ship a side with escorts or against fighters (tools/ship/takeBySightLoadout.mjs's question), other windows.
 "use strict";

@@ -549,7 +549,7 @@ export const TODO = [
     },
     {
         id: "bysize-sees-fighters",
-        status: "open", size: "small", order: 34,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "SHIPPED: tools/ship/takeBySightLoadout.mjs, read once 2026-11-20 -- the rule that also sees escorts cannot be told from the by-size rule one ship a side with escorts (-0.032, +0.053) and leads it against PD fighters (+0.010, z 4.5); the page's bysize hand takes the fly-wired gunner with escorts.", size: "small", order: 34,
         title: "The by-size hand should also take the fly-wired gunner when fighters are about",
         why: "tools/ship/takePresetsHard.mjs (read 2026-11-20): one ship against the trained pilot's fighters, under the cannon-aware helm, the fly-wired gunner leads the car's by +0.131 (z 8.0), but the by-size hand picks the car's gunner because there is one ship. A rule by ships AND escorts or fighters (the car's gunner only one ship a side with nothing else in the fight) would take it; one ship a side with escorts is the fight to fly.",
         note: "Register before flying: the by-size hand against one that also counts escorts, one ship a side with escorts and one ship against fighters.",
@@ -557,7 +557,7 @@ export const TODO = [
     },
     {
         id: "fly-window-by-size",
-        status: "open", size: "small", order: 33,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "SHIPPED: tools/ship/takeFlyWiredOneWindow.mjs, read once 2026-11-20 -- one ship a side the fly-wired gunner with no hand window is level with the car's gunner with the cannon (+0.018) and leads it without (+0.145, z 3.9); it is the page's flywired-one hand, which the by-size hand takes one ship a side.", size: "small", order: 33,
         title: "The held-trigger fly gunner with its hand window chosen by the fight's size",
         why: "Scratch, 2026-11-20 (brain/flyTracking.mjs's header): one ship a side under the cannon-aware helm, seatFlyWired11 with no hand window leads by +1.796 (the car's gunner +1.768, the 45-degree window +1.495) -- the hand lays at the sight's shaking aim; in fleets under the helm no window trails 45 degrees (-0.176). A gunner with window 0 one ship a side and 45 in fleets would be one fly-wired gunner as good as the car's everywhere; tools/ship/takeBySizeLoadout.mjs already does the switch with the car's gunner.",
         note: "If wanted: a seat option for the window by the side's ship count, and a registered study against the by-size button.",
