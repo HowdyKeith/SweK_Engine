@@ -14,6 +14,8 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings: each match's lead (the first-named less the second), a mean with a word at |z| >= 2; each entrant's SCORE in a fight, the mean of its leads over the other four (a match not flown counts 0).
 // FORECAST, for the record: one ship a side best > fleet ~ oldBest > faceFly > plain; in fleets best = fleet > oldBest > faceFly > plain; every helmed entrant leads every bow-on one by about a point.
 // WHAT IS DECIDED: nothing ships. The page's notes say the ladder (each preset's place, and any match a preset LOSES).
+// READ 2026-11-20 (brain/ladder.reading.json): one ship a side best 0.799 > oldBest 0.775 > fleet 0.678 > faceFly -0.701 > plain -1.550 (best less oldBest +0.030, cannot be told; fleet less oldBest -0.137, TRAILS); in fleets best = fleet 0.831 > oldBest 0.453 >
+//   faceFly -0.731 > plain -1.383 (best less oldBest +0.307). Every helmed entrant leads every bow-on one by more than a point. The forecast was right but one ship a side, where best and oldBest cannot be told. The presets' notes say their places.
 // Every match's leads are kept (brain/rig-results/ladder/); the reading file (brain/ladder.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other hands and helms, escorts, no cannon, rationed magazines.
 "use strict";

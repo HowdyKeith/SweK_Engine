@@ -86,7 +86,13 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), b = G.brainsOf(), k = (f, m) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${m}.json`), "utf8")).leads, near = (x, v) => Math.abs(x - v) < 5e-4;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.matchesOf(f, b).map((m) => [m.join("~"), k(f, m.join("~"))])))]));
+    ok("!! AS KEPT AND RE-DERIVED -- BEST SHIP IS AT THE TOP OF BOTH LADDERS: one ship a side best 0.799 > oldBest 0.775 > fleet 0.678 > faceFly -0.701 > plain -1.550; in fleets best = fleet 0.831 > oldBest 0.453 > faceFly -0.731 > plain -1.383", rd.one.order.join() === "best,oldBest,fleet,faceFly,plain" && rd.fleet3.order[2] === "oldBest" && rd.fleet3.order.slice(3).join() === "faceFly,plain" && near(rd.one.score.best, 0.799) && near(rd.one.score.oldBest, 0.775) && near(rd.fleet3.score.best, 0.831) && near(rd.fleet3.score.fleet, 0.831) && near(rd.fleet3.score.oldBest, 0.453)
+        && G.FIGHTS.every((f) => Object.keys(re[f].matches).every((m) => Math.abs(re[f].matches[m].mean - rd[f].matches[m].mean) < 1e-12) && G.ENTRANTS.every((e) => Math.abs(re[f].score[e] - rd[f].score[e]) < 1e-12)));
+    ok("!! THE MATCHES THAT SAY MOST: one ship a side best against oldBest +0.030 (CANNOT BE TOLD) and fleet against oldBest -0.137 (TRAILS: the best-fleet preset is not for one ship a side, as its note says); in fleets best against oldBest +0.307 (LEADS); every helmed entrant leads every bow-on one by more than a point", near(rd.one.matches["best~oldBest"].mean, 0.030) && rd.one.words["best~oldBest"] === "CANNOT BE TOLD" && near(rd.one.matches["fleet~oldBest"].mean, -0.137) && rd.one.words["fleet~oldBest"] === "TRAILS" && near(rd.fleet3.matches["best~oldBest"].mean, 0.307) && rd.fleet3.words["best~oldBest"] === "LEADS"
+        && G.FIGHTS.every((f) => ["best", "fleet", "oldBest"].every((h) => ["faceFly", "plain"].every((o) => rd[f].matches[`${h}~${o}`] && rd[f].matches[`${h}~${o}`].mean > 0.9))));
+    ok("!! AND THE PAGE SAYS IT: each preset's note gives its place on the ladder", /ON THE LADDER.*first one ship a side and in fleets/.test(C.presetOf("best").note) && /ladder/.test(C.presetOf("fleet").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
