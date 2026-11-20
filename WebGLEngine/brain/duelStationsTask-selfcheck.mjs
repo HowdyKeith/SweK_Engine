@@ -16,10 +16,19 @@
 // ROUND 6 (BLIND, section 2b): 5 more mutants, every one red by name: B01 BLIND as RISK | B02 a 90 s look-ahead | B03 BLIND ungated | B04 round 6's HELD from 187002 | B05 the look-ahead counted from the fight's start.
 //   B03 WENT 0 RED FIRST (the crew row read a count that starts at 0 either way); a row now flies one tick of BLIND and FIXED on a look where the charge lasts the look-ahead. Two rows of mine sat EXACTLY on the 0.02 line and failed by
 //   floating point; their numbers were moved clear of it.
+// 2026-11-20 -- ROUND 14 (section 6): 17 mutants of brain/subDuel.mjs and duelStationsTask.mjs; 16 red by name, 1 EQUIVALENT (final pass): L01 the leak to both sides | L02 the vessel to both sides | L03 the leak not stepped |
+//   L04 side A's vessel ignored at creation | L05 the leak 3-10 % | L06 the breach from 0 s | L07 the breach on the battery's generator | L08 no build-up | L09 COND-D flying TRIAGE | L10 DC without damage control |
+//   L11 DC's energy ungated | L12 the verdict at p 0.1 | L13 survival ignored | L14 survived = not sunk | L15 HELD from 209002 | L16 no crew refusal | L17 the breach fixture ignored. FIVE WENT 0 RED FIRST AND GOT ROWS: L01 and
+//   L02 (the drone's own track is compared now, with it ordered down so its ballast works), L11 (a look before 10 s at 0.01 of capacity), L14 (a boat lost to its own leak, through the new `breach` fixture), and L17
+//   (that fixture's own row). L04 is EQUIVALENT: createState reads mass and inertia, the same on both vessels.
 "use strict";
 import * as T from "./duelStationsTask.mjs";
 import * as SS from "./subStations.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
+import * as D from "./subDuel.mjs";
+import * as NT from "./needsTask.mjs";
+import * as AS from "./autopilotSub.mjs";
+import * as N from "../physics/mechanics/subNeeds.mjs";
 
 let fails = 0, finished = false;
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
@@ -114,6 +123,47 @@ guarded("section 5", () => {
     const back = T.verdict(sonar, risk, fixed);
     ok("the other way round is FIXED BEATS RISK", back.v1 === "FIXED BEATS RISK" && back.bottom === "reported as it is");
     ok("crews flown on different duels are refused, by name", /not flown on the same duels/.test(throws(() => T.verdict(sonar, fixed.slice(1), risk)) || "") && /not flown on the same duels/.test(throws(() => T.verdict(sonar, fixed, risk.map((x) => ({ ...x, kind: "quiet" })))) || ""));
+});
+
+sec("6. ROUND 14 (section 31): the duel with a leak -- side A's vessel and leak, the breach per seed, the three crews, the verdict");
+guarded("section 6", () => {
+    const duel0 = { seed: 990011, kind: "patrol" }, c0 = T.chargeOf(990011), sc = D.scenario(990011, "patrol"), needs = { cls: "battery", energyJ: N.CLASSES.battery.capacityJ * c0 };
+    const plain = D.duel(T.sideFor("RISK", c0).side, sc, { needs }), nulls = D.duel(T.sideFor("RISK", c0).side, sc, { needs, modelA: null, leakA: null });
+    ok("with no vessel and no leak for side A the duel is the one it was, bit for bit (the same fingerprint, score and fates)", J(plain) === J(nulls) && plain.fingerprint === nulls.fingerprint, plain.fingerprint);
+    const sunk = D.duel(T.sideFor("RISK", c0).side, sc, { needs, modelA: NT.model(), leakA: () => 0.5 }), dry = D.duel(T.sideFor("RISK", c0).side, sc, { needs, modelA: NT.model(), leakA: () => 0 });
+    ok("the leak reaches SIDE A ONLY: half its weight and it is lost, while the drone is afloat; with a leak of 0 on the same vessel it is afloat", sunk.fates[0] !== "afloat" && sunk.fates[1] === "afloat" && dry.fates[0] === "afloat", J([sunk.fates, dry.fates]));
+    // both boats passive (no orders, the plain autopilot): the drone's own track, frame by frame, must not move when ONLY side A is given a vessel and a leak
+    const passive = () => ({ tactics: () => ({}), pilot: AS.pilot() }), track = (opts) => { const tr = []; D.duel(passive(), sc, { ...opts, opponent: { tactics: () => ({ depth: 40 }), pilot: AS.pilot() }, trace: tr, seconds: 60 }); return J(tr.map((f) => f.boats.find((x) => x.id === 2))); };   // the drone ordered down to 40 m, so its ballast works
+    const aTrack = (opts) => { const tr = []; D.duel(passive(), sc, { ...opts, opponent: passive(), trace: tr, seconds: 60 }); return J(tr.map((f) => f.boats.find((x) => x.id === 1))); };
+    ok("THE DRONE IS UNTOUCHED: with side A passive and the drone diving to 40 m, giving side A the needs-task vessel and a 5 % leak leaves the drone's track the same, frame for frame, while side A's own track changes", track({}) === track({ modelA: NT.model(), leakA: () => 0.05 }) && aTrack({}) !== aTrack({ modelA: NT.model(), leakA: () => 0.05 }));
+    ok("side A's vessel is its own: on the needs-task vessel with no leak the duel is not the duel's vessel's (the fingerprints differ)", dry.fingerprint !== plain.fingerprint);
+    const bs = Array.from({ length: 400 }, (_, i) => T.breach14(820000 + i));
+    ok("the breach: a leak of 3-8 % from 20-120 s, filling both ranges over 400 seeds; the same for a seed every time; not the battery's generator", bs.every((b) => b.leak >= 0.03 && b.leak <= 0.08 && b.at >= 20 && b.at <= 120) && Math.min(...bs.map((b) => b.leak)) < 0.035 && Math.max(...bs.map((b) => b.at)) > 115
+        && J(T.breach14(209001)) === J(T.breach14(209001)) && T.breach14(209001).leak !== T.breach14(209002).leak && Math.abs((T.breach14(209001).leak - 0.03) / 0.05 - (T.chargeOf(209001) - 0.05) / 0.25) > 1e-9);
+    const b = { leak: 0.06, at: 50 };
+    ok("the leak builds over 5 s and then holds: 0 at 50 s, half at 52.5 s, all of it from 55 s", T.leak14At(b, 50) === 0 && Math.abs(T.leak14At(b, 52.5) - 0.03) < 1e-12 && T.leak14At(b, 55) === 0.06 && T.leak14At(b, 200) === 0.06);
+    ok("an unknown crew is refused, by name", /^duelStationsTask\.sideFor14: no crew named "SONAR"/.test(throws(() => T.sideFor14("SONAR", 0.2)) || ""));
+    const dc = T.fight14(duel0, "DC"), tri = T.fight14(duel0, "TRIAGE-D"), cond = T.fight14(duel0, "COND-D");
+    ok("ON A LEAK SMALLER THAN THE WEIGHT (seed 990011: 3.1 %), all three crews act on the breach; TRIAGE-D's latch closes and COND-D's does not (it fights on); DC has no latch", dc.breached && tri.breached && cond.breached && tri.latched === true && cond.latched === false && dc.latched === null, J([dc.leak, tri.latched, cond.latched]));
+    const w = T.sideFor14("DC", 0.2).side.pilot; w(S.createState({ depth: 30, speed: 2, model: NT.model() }), { depth: 30, heading: 0, speed: 2 }, [0, 0, 0]);
+    ok("DC carries sonar, the energy station (gated by RISK) and damage control, by rank", J(Object.keys(w.watch.con)) === '["mission","sonar","energy"]' && J(Object.keys(w.watch.overrides)) === '["damage"]', J(w.watch));
+    const lost = T.fight14(duel0, "DC", { breach: { leak: 0.5, at: 0 } });
+    ok("SURVIVED IS AFLOAT AT THE END: a boat lost to the leak itself (half its weight from the start, so not sunk by the drone) is not a survivor", lost.survived === false && lost.fate !== "sunk" && lost.fate !== "afloat", lost.fate);
+    // a look before 10 s (RISK is never at risk then) with the charge at 0.01 of capacity: the energy rule claims, the gate holds it back, and DC keeps sonar's course
+    const dcs = T.sideFor14("DC", 0.2).side, look = { t: 5, self: { charge: 0.05, depth: 17, heading: 0, speed: 2, x: 0, y: 0, hp: 100, ammo: 4, ready: true }, contacts: [], echoes: [], pings: [] };
+    const reads = { frac: 0.01, depth: 17, refills: true, refillDepth: N.CLASSES.battery.refillDepth, flood: 0, damage: 0 }, st17 = S.createState({ depth: 17, speed: 2, model: NT.model() }), tg17 = { depth: 17, heading: 0, speed: 2 };
+    dcs.tactics(look); dcs.pilot(st17, tg17, [0, 0, 0]);
+    ok("DC's ENERGY CLAIM IS GATED BY RISK: at 0.01 of capacity before 10 s the energy rule claims the surface, and DC does not give it the con", !!SS.energyStation({ read: () => reads }).propose({ state: st17, target: tg17 }).claim && dcs.pilot.log.con !== "energy", dcs.pilot.log.con);
+    ok("a duel record carries the crew, the battery, the breach, the score, survival and the fate", dc.crew === "DC" && dc.c0 === c0 && dc.leak === T.breach14(990011).leak && typeof dc.score === "number" && typeof dc.survived === "boolean" && typeof dc.fate === "string");
+    const rec = (i, score, survived) => ({ seed: i, kind: "patrol", score, survived });
+    const six = (f) => Array.from({ length: 6 }, (_, i) => f(i));
+    const base = six((i) => rec(i, 0, true)), up = six((i) => rec(i, 1, true)), upLost = six((i) => rec(i, 1, false));
+    ok("THE VERDICT: COND-D higher on 6 of 6 duels (p = 1/64) and not worse on survival BEATS TRIAGE-D", T.verdict14({ DC: base, "TRIAGE-D": base, "COND-D": up }).verdict === "COND-D BEATS TRIAGE-D");
+    ok("...higher on all six but losing all six boats TRIAGE-D kept WINS THE FIGHT BUT LOSES BOATS", T.verdict14({ DC: base, "TRIAGE-D": base, "COND-D": upLost }).verdict === "COND-D WINS THE FIGHT BUT LOSES BOATS");
+    const four = [...six((i) => rec(i, i < 4 ? 1 : 0, true))];
+    ok("...4 to 0 is p = 1/16 > 0.05: COND-D DOES NOT BEAT TRIAGE-D; and crews flown on different duels are refused", T.verdict14({ DC: base, "TRIAGE-D": base, "COND-D": four }).verdict === "COND-D DOES NOT BEAT TRIAGE-D" && /not flown on the same duels/.test(throws(() => T.verdict14({ DC: base, "TRIAGE-D": base, "COND-D": up.slice(1) })) || ""));
+    const kinds = (set) => J([...new Set(set.map((d) => d.kind))]);
+    ok("round 14's DEV is 208001-208006 x the four kinds (24), HELD 209001-209024 x the four kinds (96)", T.R14_DEV_SET.length === 24 && T.R14_HELD_SET.length === 96 && T.R14_DEV_SET[0].seed === 208001 && T.R14_HELD_SET[95].seed === 209024 && kinds(T.R14_HELD_SET) === kinds(T.HELD_SET));
 });
 
 finished = true;

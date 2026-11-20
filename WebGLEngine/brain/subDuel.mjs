@@ -51,9 +51,11 @@ const duelModel = () => MODEL || (MODEL = S.createSubModel());
  * PD autopilot. Options: { seconds, dt, actuators (a rate set: both boats), model, opponent (a { tactics, pilot } that replaces the drone: a test, or self-play), needs (null: speed is free; else { cls, energyJ } -- each boat starts with energyJ joules of that class of subNeeds.mjs and flies through its stepNeeds, so a dead battery kills the screw; brain/SUB_ENERGY_WIP.md), seeker (null: the torpedoes' seeker is the old one; else subTorpedo.stepTorpedo's `eccm`, handed to every torpedo of the duel, brain/SUB_ECCM_WIP.md), trace (an array that is pushed a frame every TRACE_EVERY ticks: { tick, boats: [{ id, x, y, depth, heading, pitch, hp, alive, ammo }], torps: [{ id, owner, x, y, depth }] }; the fight is the same with or without it) }. Returns { score, winner ("A" | "B" | "draw"), hp: [A, B], damage: [dealt by A, dealt by B], fired: [A, B], hits: [A, B],
  * pings: [A, B], fates: [A, B] ("afloat" | "sunk" | "grounded" | "broached" | "crushed" | "lost"), ticks, events (what happened: { tick, type: "fire" | "ping" | "hit" | "loss", boat, ... }), fingerprint }. Deterministic.
  */
-export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null, trace = null, seeker = null, needs = null } = {}) {
-    const total = Math.round(seconds / dt), seed = sc.seed, events = [];
-    const mk = (id, start, tactics, pilot) => ({ id, state: S.createState({ depth: start.depth, pos: start.pos ? [start.pos[0], start.pos[1], -start.depth] : [0, 0, -start.depth], speed: start.speed, heading: start.heading, model }), tactics, pilot, act: actuators ? createActuators(actuators) : null,
+// 2026-11-20 (submarine stations round 14, brain/SUB_STATIONS_WIP.md section 31) -- SIDE A ALONE may fly its own vessel (`modelA`, default the duel's) and take a leak (`leakA(t)`: a fraction of its weight at time t, default none);
+//   with a leak, side A's pilot's `.aux` (its stations' pump and repair asks) goes to its needs step as well. With neither given the duel is the one it was, bit for bit (brain/duelStationsTask-selfcheck.mjs).
+export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null, trace = null, seeker = null, needs = null, modelA = null, leakA = null } = {}) {
+    const total = Math.round(seconds / dt), seed = sc.seed, events = [], vesselOf = (id) => (id === 1 && modelA ? modelA : model);
+    const mk = (id, start, tactics, pilot) => ({ id, state: S.createState({ depth: start.depth, pos: start.pos ? [start.pos[0], start.pos[1], -start.depth] : [0, 0, -start.depth], speed: start.speed, heading: start.heading, model: vesselOf(id) }), tactics, pilot, act: actuators ? createActuators(actuators) : null,
         hp: HP, ammo: AMMO, cooldown: 0, needs: needs ? { ...N.initialNeeds(needs.cls || "battery"), energy: Math.min(needs.energyJ, N.CLASSES[needs.cls || "battery"].capacityJ) } : null, charge0: needs ? Math.min(needs.energyJ, N.CLASSES[needs.cls || "battery"].capacityJ) : 0, deadAt: null, target: { depth: start.depth, heading: start.heading, speed: start.speed }, alive: true, fate: "afloat", echoes: [], pings: [], dealt: 0, fired: 0, hits: 0, pinged: 0 });
     const A = mk(1, sc.a, side.tactics, side.pilot), B = mk(2, sc.b, opponent ? opponent.tactics : TA.scripted(sc.kind, { drift: sc.drift }), opponent ? opponent.pilot : AS.pilot()), boats = [A, B], torps = [];
     let nextTorp = 1, h = 0x811c9dc5, flown = 0;
@@ -86,7 +88,8 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
         // ---- the hulls ----
         for (const b of boats) {
             if (!b.alive) continue;
-            const ctl = b.pilot(b.state, b.target, [0, 0, 0]), res = b.needs ? N.stepNeeds(model, b.state, b.needs, b.act ? b.act.step(ctl, dt) : ctl, dt) : S.stepSub(model, b.state, b.act ? b.act.step(ctl, dt) : ctl, dt);
+            const m = vesselOf(b.id), leak = b.id === 1 && leakA ? leakA(tick * dt) : 0, ctl = b.pilot(b.state, b.target, [0, 0, 0]), c2 = b.act ? b.act.step(ctl, dt) : ctl;
+            const res = b.needs ? (b.id === 1 && leakA ? N.stepNeeds(m, b.state, b.needs, c2, dt, [0, 0, 0], leak, b.pilot.aux || null) : N.stepNeeds(m, b.state, b.needs, c2, dt)) : S.stepSub(m, b.state, c2, dt, [0, 0, 0], leak);
             b.state = res.state; if (b.needs) { b.needs = res.needs; if (b.deadAt === null && b.needs.energy <= 0) b.deadAt = tick; } if (b.cooldown > 0) b.cooldown--;
             if (res.status !== "submerged") { b.alive = false; b.fate = res.status; events.push({ tick, type: "loss", boat: b.id, why: res.status }); }
         }
