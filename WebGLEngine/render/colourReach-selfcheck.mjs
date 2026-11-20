@@ -10,6 +10,9 @@
 // sentence a claim about drawing rather than about colours.
 "use strict";
 
+// 2026-11-20 (backlog colour-reach-literal-predicate): the accumulator refused. SABOTAGED twice, restored byte-identical: the w: refusal dropped -> 2 red
+// (the census count, 89 -> 90, and the predicate row); the digit guard dropped, so a decimal channel backtracks past the w: -> 1 red (the predicate row).
+import fs from "node:fs";
 import * as R from "./colourReach.mjs";
 import { SOURCES } from "./fireColour.mjs";
 
@@ -100,6 +103,16 @@ const both = rows.filter((r) => r.draw && r.literal);
         /reads words, not behaviour/.test(
             (await import("node:fs")).readFileSync(new URL("./colourReach.mjs", import.meta.url), "utf8")),
         "it counts a file that merely mentions fire and misses one that draws a flame without naming it");
+}
+
+// ---- 2026-11-20 (backlog colour-reach-literal-predicate): THE ACCUMULATOR IS NOT A COLOUR ------------------------------
+{
+    const L = R.KINDS.literalColour, fsr = fs.readFileSync(new URL("../fx/fsr/fsr.js", import.meta.url), "utf8");
+    ok("!! the literal-colour predicate refuses an r, g, b triple followed by w: (EASU's tap accumulator) and still counts real colours -- integer, decimal, and with alpha",
+        !L("const a = { r: 0, g: 0, b: 0, w: 0 };") && !L("const s = { r: 0.25, g: 0.5, b: 1.0, w: 2 };") &&
+        L("const c = { r: 1, g: 0.5, b: 0 };") && L("tint({ r: 0.25, g: 0.5, b: 1.0, a: 0.8 })") && L("x = { r: 12, g: 34, b: 56 }") && L("{ color: [1, 0, 0] }") &&
+        !L(fsr) && /\{ r: 0, g: 0, b: 0, w: 0 \}/.test(fsr),
+        "fx/fsr/fsr.js still holds the accumulator and is no longer counted; a decimal channel does not backtrack to shed its last digit");
 }
 
 console.log("colourReach-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

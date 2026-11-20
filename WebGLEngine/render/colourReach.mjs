@@ -86,7 +86,9 @@ export const KINDS = Object.freeze({
     // A file that blends additively itself -- it owns its draw call.
     drawSite: (src) => /blendFunc\([^)]*gl\.ONE\)/.test(src),
     // A file that names a literal colour for something else to draw. Both spellings the tree actually uses.
-    literalColour: (src) => /color: \[[0-9]/.test(src) || /[^a-zA-Z]r: [0-9.]+, ?g: [0-9.]+, ?b: [0-9.]+/.test(src),
+    // 2026-11-20 (backlog colour-reach-literal-predicate): an r, g, b triple followed by a `w:` field is an ACCUMULATOR (EASU's tap sums in fx/fsr/fsr.js,
+    // the weight beside them is the tell), not a chosen colour, and is refused. The lookahead also stops the number backtracking to shed its last digit.
+    literalColour: (src) => /color: \[[0-9]/.test(src) || /[^a-zA-Z]r: [0-9.]+, ?g: [0-9.]+, ?b: [0-9.]+(?![0-9.]|, ?w:)/.test(src),
     // A file that talks about a HOT effect. Crude and says so: it reads words, not behaviour, so it counts a
     // file that merely mentions fire and misses one that draws a flame without naming it.
     hot: (src) => (src.match(/fire|plasma|lightning|firework|spark|ember|explosion|flame/gi) || []).length >= 4,
@@ -213,7 +215,8 @@ export const HOT_UNREGISTERED = Object.freeze([
  * predicate, which this file's own comment already calls crude. What it matched is EASU's tap accumulator,
  * `const a = { r: 0, g: 0, b: 0, w: 0 }` -- four running sums, not a colour anybody chose; the `w` beside them is the
  * weight total, which is the tell. The predicate reads a SHAPE (r:, g:, b: adjacent) and cannot see that. THE PREDICATE IS
- * NOT CHANGED HERE: narrowing it moves this census and the hot one with it, and that is a round of its own. The count is
+ * NOT CHANGED HERE: narrowing it moves this census and the hot one with it, and that is a round of its own. 2026-11-20: CHANGED -- the
+ * predicate refuses the accumulator shape (a w: after the triple); literalColourFiles 90 -> 89, the hot census unmoved. The count is
  * re-taken because it is a true count of what the detector detects, and the detector is described accurately.
  * *** AND IT WAS RED IN THE TREE FOR TWO ROUNDS BEFORE ANYONE LOOKED. *** ff463a60 landed on 2026-09-09; v4569 and v4570
  * both shipped after it with this gate red, because those rounds' verify sweeps ran the arc they were working in rather
@@ -227,7 +230,7 @@ export const MEASURED_AT_V4424 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    literalColourFiles: 90,   // v4910: 89 -> 90 for render/subModels3d.mjs (the sub .glb model swap: the depth tint of a boat's model names its colour ramp as literals; it draws nothing additively, so the overlap stays 0). BEFORE: 89, v4895: 88 -> 89 for world/ocean/seaMain.mjs (the generated, patched sea: the vendored web-ocean sea names its sky and water colours as literals; not additive). BEFORE THAT, RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
+    literalColourFiles: 89,   // 2026-11-20: 90 -> 89, fx/fsr/fsr.js LEAVES -- the predicate now refuses an r, g, b triple followed by a w: field (EASU's tap accumulator), measured over the tree to move that file and nothing else that draws. v4910: 89 -> 90 for render/subModels3d.mjs (the sub .glb model swap: the depth tint of a boat's model names its colour ramp as literals; it draws nothing additively, so the overlap stays 0). BEFORE: 89, v4895: 88 -> 89 for world/ocean/seaMain.mjs (the generated, patched sea: the vendored web-ocean sea names its sky and water colours as literals; not additive). BEFORE THAT, RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

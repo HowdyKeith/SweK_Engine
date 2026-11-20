@@ -3588,10 +3588,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "colour-reach-literal-predicate",
-        blocker: "OPEN",
-        what: "Read after v4928: still open. render/colourReach.mjs l.216 defers narrowing the literalColour predicate (l.89) so it stops matching EASU's tap accumulator in fx/fsr/fsr.js (l.114); the census still counts fsr.js as a known false positive.",
-        how: "Narrow the predicate (e.g. require a colour context), re-take literalColourFiles and name what left.",
-        why: "A census counts a file it knows is a false positive.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-20: render/colourReach.mjs's literalColour predicate refuses an r, g, b triple followed by a w: field (an accumulator, not a chosen colour), with a digit guard so a decimal channel cannot backtrack past it. Measured over the tree: fx/fsr/fsr.js leaves the count and nothing else moves; literalColourFiles 90 -> 89; the hot census is unmoved. render/colourReach-selfcheck.mjs holds it (2 sabotages, both red). WAS: render/colourReach.mjs l.216 deferred the narrowing.",
+        how: "Done.",
+        why: "A census counted a file it knew was a false positive.",
     },
     {
         id: "optical-flow-gpu-pyramid",
