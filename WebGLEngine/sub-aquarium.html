@@ -298,6 +298,7 @@ function renderList() {
     if (s.local) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank"; x.style.marginLeft = "auto"; x.onclick = async (e) => { e.stopPropagation(); await post("/subaquarium/remove", { id: s.id }); refresh(); }; row.appendChild(x); }
     box.appendChild(row);
   }
+  fillRows(snap);
 }
 const advTraces = new Map(); let advDrawn = "";   // 2026-11-19: every advised sub's last 300 s; the panel draws the selected one's, at most when its newest point changes
 function updateAdvisor(snap) {
@@ -312,6 +313,11 @@ function updateAdvisor(snap) {
 function updateStats(snap) {
   updateAdvisor(snap);
   { const me = snap.find((x) => x.id === selected), on = !!(me && me.needs); const adv = !!(on && me.needs.advisor && me.needs.advisor.on); $("advChk").disabled = !on; $("advChk").checked = adv; $("captainSel").disabled = $("breachBtn").disabled = !on; $("captainSel").value = on && me.needs.captain ? me.needs.captain.kind : ""; $("pumpChk").disabled = $("repairChk").disabled = !on || adv; if (on) { $("pumpChk").checked = me.needs.pump > 0; $("repairChk").checked = me.needs.repair > 0; } else $("pumpChk").checked = $("repairChk").checked = false; }   // v4905: the boxes show the selected sub's own state
+  fillRows(snap);
+}
+// 2026-11-20 -- each row's three lines, from a snapshot. renderList fills them AS IT BUILDS THE ROWS: it used to leave them empty until the next frame, so every 3 s refresh blanked every row for a frame
+//   (a flicker, and the page gate's one-run-in-four flake: a read that landed in that frame saw a row with no stats)
+function fillRows(snap) {
   for (const s of snap) {
     const cm = document.getElementById("c_" + s.id);
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
