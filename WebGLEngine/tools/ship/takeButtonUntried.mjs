@@ -11,6 +11,7 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain ship; THE BUTTON'S LESS THE CAR'S, pair by pair.
 // FORECAST, for the record: the button's pick LEADS in fleets of four with the cannon (as in fleets of three, about +0.2) and in all three without the cannon (the fly-wired gunner led the car's without the cannon one ship a side, +0.145); so it holds.
 // WHAT IS DECIDED: the button's pick HOLDS if it TRAILS the car's gunner in no fight; if it trails somewhere, the by-size hand's note says where (and a change to the rule would be another study). Nothing is written but the reading.
+// READ 2026-11-20 (brain/buttonUntried.reading.json): THE PICK HOLDS -- +0.269 (fleets of four, the cannon), +0.543 (four, none), +0.522 (three, none), -0.015 one ship a side with escorts and no cannon (cannot be told). The by-size hand's note says so.
 // Every arm's leads are kept (brain/rig-results/buttonUntried/); the reading file (brain/buttonUntried.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side with nothing else (the no-window gunner's, tools/ship/takeFlyWiredOneWindow.mjs), the trained pilot, rationed magazines (tools/ship/takePresetsHard.mjs).
 "use strict";

@@ -83,7 +83,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ car: k(f, "car"), button: k(f, "button") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE BUTTON'S PICK HOLDS: the button's less the car's is +0.269 (fleets of four, the cannon), +0.543 (four, none), +0.522 (three, none) -- all LEAD -- and -0.015 (CANNOT BE TOLD) one ship a side with four escorts and no cannon; it trails nowhere", near(R("fleet4Cannon").gain, 0.269) && near(R("fleet4NoCannon").gain, 0.543) && near(R("fleet3NoCannon").gain, 0.522) && near(R("oneEscortsNoCannon").gain, -0.015) && ["fleet4Cannon", "fleet4NoCannon", "fleet3NoCannon"].every((f) => rd[f].words.gain === "LEADS") && rd.oneEscortsNoCannon.words.gain === "CANNOT BE TOLD" && rd.verdict.ok
+        && G.FIGHTS.every((f) => ["car", "button", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! the forecast was right in fleets (it said leads) and UNDER without the cannon (+0.5 against a forecast like one ship a side's +0.15), and wrong one ship a side with escorts (level); AND THE BY-SIZE NOTE NO LONGER SAYS IT WAS NOT FLOWN IN FLEETS OF FOUR", near(R("fleet4NoCannon").button, 1.035) && near(R("oneEscortsNoCannon").car, 1.622) && !/NOT flown in fleets of four or more/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
