@@ -11,6 +11,7 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, a mean with a word at |z| >= 2: THE BEST-SHIP LOADOUT LESS ITS SINE TWIN, pair by pair (side X the loadout, side Y the twin).
 // FORECAST, for the record: CANNOT BE TOLD in both (each control alone was within 0.06).
 // WHAT IS DECIDED (nothing ships): the fly's wiring is CREDITED if the loadout LEADS its twin somewhere and trails it nowhere; the twin goes on the page as a CONTROL PRESET (`sine twin`) if it TRAILS the loadout in no fight.
+// READ 2026-11-20 (brain/sineTwins.reading.json): the loadout less its sine twin -0.072 one ship a side (cannot be told), -0.082 in fleets (z -2.2): the fly's wiring is NOT credited; the twin is the page's `sine twin` preset, a control.
 // Every fight's leads are kept (brain/rig-results/sineTwins/); the reading file (brain/sineTwins.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, no cannon, the twin of the best-fleet preset alone (in a fleet it is this loadout), other comparators.
 "use strict";

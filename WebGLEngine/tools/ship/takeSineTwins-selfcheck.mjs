@@ -88,7 +88,9 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    ok("!! AS KEPT AND RE-DERIVED -- THE FLY'S WIRING IS NOT CREDITED: the best-ship loadout less its sine twin is -0.072 one ship a side (CANNOT BE TOLD) and -0.082 in fleets (z -2.2, TRAILS); the twin goes on the page as a control; the forecast (cannot be told in both) was right one ship a side and a little off in fleets", near(R("one").flyOverSine, -0.072) && rd.one.words.flyOverSine === "CANNOT BE TOLD" && near(R("fleet3").flyOverSine, -0.082) && rd.fleet3.words.flyOverSine === "TRAILS" && !rd.verdict.flyCredited && rd.verdict.twinOnPage && G.FIGHTS.every((f) => Math.abs(G.fightReadings(k(f)).reading.flyOverSine.mean - R(f).flyOverSine.mean) < 1e-12));
+    ok("!! AND THE PAGE HAS IT: the `sine twin` preset, the cannon-aware helm's sine twin and the by-the-fight hand's", JSON.stringify(C.presetOf("sine").choice) === '{"hand":"bysize-sine","helm":"sine","cannon":true}' && C.HELMS.some((h) => h.id === "sine") && C.HANDS.some((h) => h.id === "bysize-sine"));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
