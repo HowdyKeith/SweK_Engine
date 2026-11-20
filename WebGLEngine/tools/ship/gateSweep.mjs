@@ -16483,8 +16483,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck holds the GPU's bounce paths to the CPU's bounce by bounce and against a rounding-sized control, and the row that called sixteen instances' disagreement rounding is rewritten (173 to 175 rows); tools/ship/rtViewer-selfcheck holds a second mesh, the alpha rule and the capture sky through placements and holes (137 to 161); tools/ship/gitEconomy-selfcheck holds the GPU orrery's panel passing the pointer through and folding (28 to 31); sixteen sabotages, two 0 red at first and fixed; tools/roundhouse/orientationStep-selfcheck, red since 2026-11-07 and found by this round's rotation, names the two study libraries that import the first-order step under registered amendments (Keith's choice), three sabotages red; no register widened",
     }),
+    // v4932 -- TWO OF since634's GATES WERE REMOVED by the merge of claude/inspiring-mayer-9mdcut (Keith: take the branch's Sub Aquarium where the two overlap): render/subAquarium3dNav-selfcheck.mjs with
+    //   main's navStore (the branch's render/subAquarium3dMarks.mjs draws the obstacles and goals now) and render/subAquariumLabel-selfcheck.mjs with main's label module (render/subAquariumKinds.mjs's pilotLabel now).
+    //   As since568 did for its removed gate, the names come out of `added` and the count comes down: 28 -> 26. They were green when they went.
     since634: Object.freeze({
-        at: "v4926", swept: 28, green: 28, red: 0,
+        at: "v4926", swept: 26, green: 26, red: 0,
         added: Object.freeze([
             "brain/flowfieldDirectional-selfcheck.mjs",
             "brain/navBudget-selfcheck.mjs",
@@ -16497,11 +16500,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "brain/subTrafficDive-selfcheck.mjs",
             "brain/subTurnSweep-selfcheck.mjs",
             "render/subAquarium3dMarks-selfcheck.mjs",
-            "render/subAquarium3dNav-selfcheck.mjs",
             "render/subAquariumCurrent-selfcheck.mjs",
             "render/subAquariumFleet-selfcheck.mjs",
             "render/subAquariumFlyCxGpu-selfcheck.mjs",
-            "render/subAquariumLabel-selfcheck.mjs",
             "tools/ship/gaugeCurve-selfcheck.mjs",
             "tools/ship/gaugeFaults-selfcheck.mjs",
             "tools/ship/gaugeShift-selfcheck.mjs",
@@ -16597,6 +16598,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
         verdict: "submarine stations rounds 7 to 12 (brain/SUB_STATIONS_WIP.md sections 20-30, each registered before it was flown): 3 gates, each green on arrival and each carrying its mutation pass in its header (16 + 9, 17 and 12 mutants; every survivor of a first pass given a row or argued equivalent by name)",
+    }),
+    since640: Object.freeze({
+        at: "v4932", swept: 9, green: 9, red: 0,
+        added: Object.freeze([
+            "brain/crabMlg1-selfcheck.mjs",
+            "brain/flyEmdLplc2Gf-selfcheck.mjs",
+            "brain/flyGfLoomModel-selfcheck.mjs",
+            "brain/gfGain-selfcheck.mjs",
+            "brain/oppLoom-selfcheck.mjs",
+            "brain/stealthLoomStimuli-selfcheck.mjs",
+            "brain/stealthMotion-selfcheck.mjs",
+            "render/subAquarium3dDark-selfcheck.mjs",
+            "render/subAquariumKinds-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the merge of claude/inspiring-mayer-9mdcut (stealth and crab looming rounds 15-29, each registered before it was run; the Fish1 Mauthner inputs) and this line's stations rounds 13-15: 9 gates, each run alone and green on the merged tree on 2026-11-20 (the branch's seven carry their mutation passes in their headers; render/subAquarium3dDark-selfcheck.mjs holds main's dark-compass rows moved out of the old subAquarium3dMarks gate, its 5 carried mutants re-run and red; render/subAquariumKinds-selfcheck.mjs is the branch's). Two gates went out with the code they held (since634's note).",
     }),
 });
 

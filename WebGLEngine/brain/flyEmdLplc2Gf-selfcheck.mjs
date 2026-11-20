@@ -202,6 +202,12 @@ console.log("\n7. THE SOURCE");
     ok("!! pure: no Math.random, no clock, no DOM, no file or network, no import", !/Math\.random|Date\.now|performance\.now|document\.|window\.|fetch\(|node:|readFileSync|^import\s/m.test(src));
 }
 
+// 2026-11-20 (the v4932 merge) -- loomSidePx was the one export of this module no gate named (tools/ship/definitionGates-selfcheck.mjs); it is the looming square's side on the screen, so it is held to the geometry:
+//   the angular size is 2 atan(rv / -t), and on a w-pixel screen of a given field of view the side is w tan(theta / 2) / tan(fov / 2) = w (rv / -t) / tan(fov / 2).
+ok("loomSidePx: the looming square's side in pixels is w x (rv / -t) / tan(fov / 2): 20 px at rv 0.04, t -0.4 s on a 200 px, 90-degree screen; the whole screen when the object fills the field (t = -rv at 90 degrees); it doubles when the time to contact halves",
+    Math.abs(M.loomSidePx(0.04, -0.4, 200, 90) - 20) < 1e-9 && Math.abs(M.loomSidePx(0.04, -0.04, 200, 90) - 200) < 1e-9 && Math.abs(M.loomSidePx(0.04, -0.2) / M.loomSidePx(0.04, -0.4) - 2) < 1e-12,
+    [M.loomSidePx(0.04, -0.4, 200, 90), M.loomSidePx(0.04, -0.04, 200, 90)].join(", "));
+
 finished = true;
 console.log(fails ? `\n${fails} check(s) FAILED` : "\nall checks pass");
 if (fails) process.exit(1);

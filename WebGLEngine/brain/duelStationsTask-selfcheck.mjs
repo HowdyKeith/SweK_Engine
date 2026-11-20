@@ -142,6 +142,7 @@ guarded("section 6", () => {
         && J(T.breach14(209001)) === J(T.breach14(209001)) && T.breach14(209001).leak !== T.breach14(209002).leak && Math.abs((T.breach14(209001).leak - 0.03) / 0.05 - (T.chargeOf(209001) - 0.05) / 0.25) > 1e-9);
     const b = { leak: 0.06, at: 50 };
     ok("the leak builds over 5 s and then holds: 0 at 50 s, half at 52.5 s, all of it from 55 s", T.leak14At(b, 50) === 0 && Math.abs(T.leak14At(b, 52.5) - 0.03) < 1e-12 && T.leak14At(b, 55) === 0.06 && T.leak14At(b, 200) === 0.06);
+    ok("the registered constants: the crews are DC, TRIAGE-D and COND-D in that order, and the breach is 3-8 % from 20-120 s built over 5 s, all frozen", J(T.CREWS14) === '["DC","TRIAGE-D","COND-D"]' && Object.isFrozen(T.CREWS14) && J(T.LEAK14) === '{"leak":[0.03,0.08],"at":[20,120],"build":5}' && Object.isFrozen(T.LEAK14) && Object.isFrozen(T.LEAK14.leak));
     ok("an unknown crew is refused, by name", /^duelStationsTask\.sideFor14: no crew named "SONAR"/.test(throws(() => T.sideFor14("SONAR", 0.2)) || ""));
     const dc = T.fight14(duel0, "DC"), tri = T.fight14(duel0, "TRIAGE-D"), cond = T.fight14(duel0, "COND-D");
     ok("ON A LEAK SMALLER THAN THE WEIGHT (seed 990011: 3.1 %), all three crews act on the breach; TRIAGE-D's latch closes and COND-D's does not (it fights on); DC has no latch", dc.breached && tri.breached && cond.breached && tri.latched === true && cond.latched === false && dc.latched === null, J([dc.leak, tri.latched, cond.latched]));

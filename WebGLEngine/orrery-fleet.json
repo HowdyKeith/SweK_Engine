@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7eee8ab713d71a218623f84b269adce3f60bebba",
+ "head": "c7afabbbd7f030597600f79d955d460d58f1a41f",
  "bodies": {
   "box3d": [
    {
@@ -369,8 +369,13 @@
     "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
+    "path": "render/subAquariumKinds-selfcheck.mjs",
+    "bytes": 10878,
+    "sha": "0b432755f177e35f59ae0d57de0f2f34a6a4da4c"
+   },
+   {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 57463,
+    "bytes": 57753,
     "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
    },
    {
@@ -380,8 +385,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 60216,
-    "sha": "075f58f3aea94d54a09b6722e50dfa24702a58cd"
+    "bytes": 61813,
+    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
    },
    {
     "path": "switchboard.html",
@@ -608,9 +613,24 @@
     "sha": "e336692128303e452c50f7fe9c9f385cc47c81b2"
    },
    {
+    "path": "brain/flyEmdLplc2Gf-selfcheck.mjs",
+    "bytes": 39533,
+    "sha": "b3487645eb0cec86bee8a3f9d5785fcf8999b7cd"
+   },
+   {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
     "bytes": 40686,
     "sha": "caf901a66f7fbb39120fe93ab294af676736a7cb"
+   },
+   {
+    "path": "brain/openItems1-run.mjs",
+    "bytes": 2286,
+    "sha": "12fac7508f2e8f519baf016fc19eb0a1eace2998"
+   },
+   {
+    "path": "brain/stealthRound3-run.mjs",
+    "bytes": 2133,
+    "sha": "418ca94cd6a99ac157e10383700b93523853f1fb"
    },
    {
     "path": "fly-connectome.html",
@@ -980,8 +1000,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3821715,
-    "sha": "6a3cfa4d62bdc3cc3a08caf86548ba1d7f7ded9b"
+    "bytes": 3825103,
+    "sha": "34a779f469c006f94b161497cfe07a367dbc1835"
    },
    {
     "path": "mpm3d.html",
@@ -1025,18 +1045,18 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 29448,
+    "bytes": 25349,
     "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
    },
    {
-    "path": "render/subAquarium3dMarks-selfcheck.mjs",
-    "bytes": 6731,
-    "sha": "5fd137be3c15f6b629dff50e9471e426abb7f503"
+    "path": "render/subAquarium3dDark-selfcheck.mjs",
+    "bytes": 5727,
+    "sha": "c7afabbbd7f030597600f79d955d460d58f1a41f"
    },
    {
-    "path": "render/subAquarium3dNav-selfcheck.mjs",
-    "bytes": 7811,
-    "sha": "87dffb9353f61fd1666586230a407a08df4c6fb5"
+    "path": "render/subAquarium3dMarks-selfcheck.mjs",
+    "bytes": 16484,
+    "sha": "5fd137be3c15f6b629dff50e9471e426abb7f503"
    },
    {
     "path": "render/subBallastCues-selfcheck.mjs",
@@ -1120,8 +1140,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 60216,
-    "sha": "075f58f3aea94d54a09b6722e50dfa24702a58cd"
+    "bytes": 61813,
+    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
    },
    {
     "path": "svg-forge.html",
