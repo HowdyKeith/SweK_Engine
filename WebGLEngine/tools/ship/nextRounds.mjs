@@ -3595,10 +3595,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "optical-flow-gpu-pyramid",
-        blocker: "OPEN",
-        what: "Read after v4928: still open, possibly overtaken. render/opticalFlowGPU.mjs l.32 defers feeding render/luminancePyramidGPU.mjs into OpticalFlowGPU; flow() still builds both pyramids with luminancePyramidCPU. render/opticalFlowTsl.mjs (v4740) builds its pyramids on the device, and the graveyard lists opticalFlowGPU as a runner the TSL ports replaced.",
-        how: "Either wire the GPU pyramid or close this as overtaken by opticalFlowTsl.mjs, saying which in the file.",
-        why: "The note advertises work the TSL path may have made moot.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-20 as overtaken: render/opticalFlowTsl.mjs (v4740) builds its pyramids on the device (makeLumaPyramid) and is the runtime path (fx/fsr/fsrFrameGenTsl.mjs, fsr-three.html). render/opticalFlowGPU.mjs survives as a parity runner whose CPU pyramids are deliberate (its parity row must tell a flow defect from a pyramid one; opticalFlowTsl-selfcheck says the same), so wiring the device pyramid into it would remove the reason it exists. Its note is marked SETTLED at v4740 and held in deferralCensus (SETTLED_BY_BACKLOG).",
+        how: "None: overtaken by render/opticalFlowTsl.mjs.",
+        why: "The note advertised work the TSL path had already done.",
     },
     {
         id: "staleness-demos-code",
