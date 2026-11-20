@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubPolicy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubPolicy-selfcheck.mjs      (~25 s)
+// Run: node brain/pilotSubPolicy-selfcheck.mjs      (~12 s)
 //
 // THE CONNECTOME-WIRED SUBMARINE PILOT: "THE WEIGHTS ARE THE AUTOPILOT" AND "THE NETWORK IS THE CIRCUIT" -- AND THE CIRCUIT IS A PARAMETER. brain/pilotSubPolicy.mjs is brain/pilotFlightPolicy.mjs with the topology passed in;
 // this gate asks of it what the flight gate asks of that, with an independent restatement of the network written HERE, and one thing more: that a SECOND circuit (a synthetic ring) makes the same pilot, which is what lets

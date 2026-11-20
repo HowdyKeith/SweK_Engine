@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gunsPageLinks-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/gunsPageLinks-selfcheck.mjs      (~0.1 s)
+// Run: node tools/ship/gunsPageLinks-selfcheck.mjs      (~35-100 ms -- 0.1 s at writing; 45 ms in the v4922 sweep and 39 ms alone on linux-x64-4c-16gb-142c0d)
 //
 // THE LINKS BETWEEN THE GUNS LINE'S PAGES ARE REAL, AND NOTHING ELSE IN THEM POINTS AT A FILE THAT IS NOT THERE.
 // The backlog said the link from es-box3d-6dof.html to the space battleship would be "made at ship time", and the ship did not make it: a page

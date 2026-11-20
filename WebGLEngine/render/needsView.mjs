@@ -18,5 +18,8 @@ export function needsLine(row) {
     const adv = n.advisor && n.advisor.on ? ` · ADVISOR (surfaces under ${pct(n.advisor.threshold)}%)` : "", trip = n.refilling ? " · REFILLING" : "", on = n.charging ? ` · charging${n.exposed ? " (exposed)" : ""}` : "";
     // v4905 -- the pump and the repair, only when they are asked for: the repair waits for the surface and a near stop, and says so
     const pump = n.pump > 0 ? ` · pump ${pct(n.pump)}%` : "", repair = n.repair > 0 ? ` · repair ${pct(n.repair)}%${n.repairing ? "" : " (waits for the surface)"}` : "";
-    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${adv}${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}${survey ? ` · ${survey}` : ""}`;
+    // 2026-11-19 -- a captain over the stations (brain/subStations.mjs) and who has the con; a breached hull and its leak now
+    const CON = { mission: "the mission", energy: "energy (going up for charge)", breach: "breach (going up while there is charge)", legs: "legs (charging for the next leg)" };
+    const cap = n.captain ? ` · CAPTAIN ${n.captain.kind}: ${CON[n.captain.con] || n.captain.con}${n.captain.overrides && n.captain.overrides.length ? ", damage control acting" : ""}${n.captain.kind === "cond" && n.captain.latch && n.captain.latch.breached ? (n.captain.latch.latched ? ", SANK AGAIN: up for good" : ", breached once: the mission goes on") : ""}` : "", brk = n.leak > 0 ? ` · BREACHED (leak ${(n.leak * 100).toFixed(1)}%)` : "";
+    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${adv}${cap}${brk}${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}${survey ? ` · ${survey}` : ""}`;
 }

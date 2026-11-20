@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/orreryAuthor-selfcheck.mjs
 //
-// Run: node tools/ship/orreryAuthor-selfcheck.mjs   (~2.2s MEASURED (gate-timings.json), was ~6s; browser section included)
+// Run: node tools/ship/orreryAuthor-selfcheck.mjs   (~5 s MEASURED by the sweep at v4931, 4.9-5.1 s on a 4-core box; was ~2.2s; browser section included)
 //
 // v4414 -- *** PAPERED IS NOT ATTRIBUTED, AND THE ORRERY HAS ONLY EVER KNOWN THE FIRST. ***
 //

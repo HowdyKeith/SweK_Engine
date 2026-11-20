@@ -1,0 +1,18 @@
+r/v 0.05: R_down at the frame of the raw peak, and its range over frames where the raw count is over half its peak
+  plain  peak 1300 at frame 94, R at peak -0.000, R over the active frames -0.000 to 0.000
+  static peak 1150 at frame 94, R at peak -0.151, R over the active frames -0.151 to -0.143
+  down   peak 983 at frame 94, R at peak -0.083, R over the active frames -0.083 to 0.091
+  up     peak 1173 at frame 94, R at peak -0.194, R over the active frames -0.269 to -0.194
+r/v 0.1: R_down at the frame of the raw peak, and its range over frames where the raw count is over half its peak
+  plain  peak 1820 at frame 188, R at peak -0.000, R over the active frames -0.000 to 0.000
+  static peak 1738 at frame 188, R at peak -0.123, R over the active frames -0.169 to -0.098
+  down   peak 1820 at frame 188, R at peak 0.093, R over the active frames 0.093 to 0.295
+  up     peak 1808 at frame 188, R at peak -0.282, R over the active frames -0.386 to -0.282
+
+rho sweep, global gate: ratio of the moving-DOWN peak to the plain peak, and the plain peak against ungated (r/v 50 / 100 ms)
+rho 0.5: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 1.000 up 0.993 static 0.955 plain kept 1.000
+rho 0.3: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 1.000 up 0.993 static 0.955 plain kept 1.000
+rho 0.2: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 1.000 up 0.993 static 0.955 plain kept 1.000
+rho 0.1: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 1.000 up 0.993 static 0.955 plain kept 1.000
+rho 0.05: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 0.000 up 0.993 static 0.955 plain kept 1.000
+rho 0.02: r/v 0.05: down 0.756 up 0.902 static 0.885 plain kept 1.000 | r/v 0.1: down 0.000 up 0.993 static 0.955 plain kept 1.000

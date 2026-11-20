@@ -383,7 +383,7 @@ if (!skip) {
         const rms = (a) => { let q = 0; for (let i = 0; i < DS3 * DS3; i++) for (let c = 0; c < 3; c++) q += (a[i * 4 + c] - truth[i * 4 + c]) ** 2; return Math.sqrt(q / (DS3 * DS3 * 3)); };
         const eAcc = rms(up(o.conv.acc, DS3)), eOne = rms(up(o.conv.first, DS3));
         // the SAME renders replayed on the CPU without the neighbourhood clamp -- what the clamp costs on detail finer
-        // than the render resolution, which is the question FSR2's locks answer (render/temporalLock.mjs; a later round)
+        // than the render resolution, which is the question FSR2's locks answer (render/temporalLock.mjs; a later round -- SETTLED at v4732: render/temporalLockTsl.mjs makeLockLife)
         const mo = new Float32Array(up(o.conv.motion, DS3));
         let hNo = null; o.conv.colour.forEach((c, k) => { const cur = resolveJitterAwareCPU({ src: new Float32Array(up(c, RS3)), rw: RS3, rh: RS3, dw: DS3, dh: DS3, jitter: o.conv.jitter[k] }).data;
             hNo = rectifiedAccumulateCPU({ current: cur, history: hNo, motion: mo, w: DS3, h: DS3, alpha: 1 / (k + 1), space: "ycocg", clampToNeighbourhood: false }).data; });

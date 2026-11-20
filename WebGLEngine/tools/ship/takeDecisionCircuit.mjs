@@ -62,7 +62,7 @@ export function flyArm(armId, records, { range = RANGE, kinds = KINDS, seconds =
 }
 /** The START rows: the untrained cx, nostate and plain pilots against rule-low06 on 24 baseline dives (seeds 501-506 of the four kinds, the noisy gauge): score and fingerprint of each. */
 export function startRows(seconds = null) {
-    const rule = T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), fam = Object.fromEntries(D.FAMILIES.map((f) => [f, D.familyPolicy(f)])), rows = [];
+    const rule = T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)),   /* 2026-11-17: the round measured against the -0.06 rule */ fam = Object.fromEntries(D.FAMILIES.map((f) => [f, D.familyPolicy(f)])), rows = [];
     for (const kind of START_KINDS) for (let seed = START_SEEDS.from; seed <= START_SEEDS.to; seed++) {
         const c = T.scenario(seed, kind), o = { gauge: T.GAUGE, ...(seconds ? { seconds } : {}) }, one = (p) => { const r = T.fly(p, c, o); return { score: r.score, fingerprint: r.fingerprint }; };
         rows.push({ key: `${kind}:${seed}`, rule: one(rule), ...Object.fromEntries(D.FAMILIES.map((f) => [f, one(fam[f].pilotFor(fam[f].handWeights()))])) });

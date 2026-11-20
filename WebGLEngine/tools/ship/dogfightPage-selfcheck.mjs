@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/dogfightPage-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/dogfightPage-selfcheck.mjs      (~6 s: a real browser, software rendering, eight full fights of 60 s)
+// Run: node tools/ship/dogfightPage-selfcheck.mjs      (~11-13 s MEASURED by the sweep at v4931: a real browser, software rendering, eight full fights of 60 s)
 //
 // THE PAGE-WIRING GATE for dogfight.html. Everything the page WIRES TOGETHER -- brain/dogfightArena.mjs (held to dogfightTask.duel() to the bit), render/flightViews.mjs (the cameras, the projection, the sight, the bars, the overview),
 // brain/dogfightTask.mjs, the two flight networks and their shipped files -- is gated on its own; this file proves the WIRING in a real browser: the page boots with no error and fights the fight it says, the pilots the roster offers are the

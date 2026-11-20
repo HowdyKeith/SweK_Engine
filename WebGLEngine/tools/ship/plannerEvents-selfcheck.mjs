@@ -13,6 +13,7 @@
 //   8 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: whether events help (that is the experiment).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-16 -- the planner costs this gate pins (rollout seconds, plan counts) were measured under the first-order orientation step, so it flies that step (see that file); RK4's default missed it and it sat red, outside the quick sweep
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };

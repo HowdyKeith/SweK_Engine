@@ -46,7 +46,7 @@ import { evaluateGuards } from "../ui/guards.mjs";
 // return values alone. DungeonAI.js's much larger flee/melee/ranged/chase chain is a confirmed second candidate,
 // deliberately deferred: it drives real combat side effects (damage, projectiles, entity movement) stacked with
 // several brain-hook patches, and deserves its own round the way CSBomb.js got one after BossPhaseManager.js proved
-// the FSM utility on a simpler case first.
+// the FSM utility on a simpler case first. SETTLED at v4609: DungeonAI.js now runs on ui/guards.mjs (DUNGEON_GUARDS).
 //
 // Preserved exactly: submerged overrides everything, checked first; "no layout, no rooms, no camera, or the
 // player isn't inside any room" all collapse to the SAME "normal" result the original produced from two separate

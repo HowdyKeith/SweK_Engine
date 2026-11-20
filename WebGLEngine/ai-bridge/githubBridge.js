@@ -347,7 +347,23 @@ async function publishVersion({ repo, tag, name, body, assetPath, draft, prerele
     if (!cr.ok) return cr;
     let asset = null;
     if (assetPath) asset = await uploadAsset({ repo, releaseId: cr.id, uploadUrl: cr.uploadUrl, filePath: assetPath });
-    return { ok: true, release: cr, asset };
+    return _publishOutcome(cr, asset, assetPath);
+}
+
+// *** v4926 -- A RELEASE WITH NO ZIP WAS REPORTED AS A PUBLISH THAT WORKED. *** This returned ok:true whenever the
+// release was CREATED, and the upload's own result went into `asset`, where nothing that printed OK looked: the
+// verified-clone chain printed "[chain] publish OK" from pub.ok alone. v4926 went out that way on 2026-11-19 -- tag
+// and release made, asset list empty, so releases/latest was a release fetchEngineBuild refuses ("has no .zip
+// asset") until the zip was attached by hand eleven minutes later. When a zip was asked for and did not arrive,
+// the publish FAILED: the release exists, and the message says so and names its id, because a release without
+// its asset is the one state a retry must not paper over by creating a second release.
+function _publishOutcome(cr, asset, assetPath) {
+    if (!assetPath) return { ok: true, release: cr, asset: null };
+    if (asset && asset.ok) return { ok: true, release: cr, asset };
+    return { ok: false, releaseCreated: true, release: cr, asset,
+             error: "release " + (cr && cr.tag) + " was CREATED but its zip did not upload: " + ((asset && asset.error) || "no upload result") +
+                    " -- THE RELEASE EXISTS AND HAS NO ASSET. Attach the zip with uploadAsset({ releaseId: " + (cr && cr.id) +
+                    " }) or on the release page; do not publish the tag again." };
 }
 
 // v1129 — one click: auto-tag from the running engine version, build the Gmail-safe
@@ -1080,10 +1096,14 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
 // script from here would hand it an ANONYMOUS request and the 60/hour unauthenticated rate limit. The parse
 // (rowsFrom) and the merge (ledgerUpdate) are imported from that file so there is ONE definition of what the
 // ledger records; only the fetch is this file's, because the credential is.
-async function _allReleasesRaw(repo) {
+// 2026-11-17 -- READ UNTIL TWO PASSES AGREE. The v4921 refresh from this panel ran two seconds after v4921 was published:
+// page 1 was read before it showed and page 2 after, so the ledger held v3961 twice and no v4921 (releaseLedger-selfcheck's
+// newest-first row went red). Up to three whole passes; the first two that are the same ids in the same order are used
+// (refreshReleases.mjs stableRead, the same test the CLI uses), and if none agree nothing is written.
+async function _onePass(repo, readPage) {
     const out = [];
     for (let page = 1; page <= 10; page++) {
-        const r = await _apiReadPublic(_repoPath(repo) + "/releases?per_page=100&page=" + page);
+        const r = await readPage(_repoPath(repo) + "/releases?per_page=100&page=" + page);
         if (!r.ok) return { ok: false, status: r.status, error: r.error || ("HTTP " + r.status) };
         const j = r.data;
         if (!Array.isArray(j) || !j.length) break;
@@ -1091,6 +1111,17 @@ async function _allReleasesRaw(repo) {
         if (j.length < 100) break;
     }
     return { ok: true, raw: out };
+}
+async function _allReleasesRaw(repo, readPage = _apiReadPublic) {
+    const { stableRead } = await import("../tools/ship/refreshReleases.mjs");
+    let prev = null;
+    for (let pass = 1; pass <= 3; pass++) {
+        const got = await _onePass(repo, readPage);
+        if (!got.ok) return got;
+        if (prev && stableRead(got.raw, prev)) return got;
+        prev = got.raw;
+    }
+    return { ok: false, error: "the releases list changed between three reads (a release being published?); run it again in a minute" };
 }
 
 /** Rewrite tools/ship/releases.json from the live releases page. `write:false` is the dry run the CLI has. */
@@ -1167,4 +1198,4 @@ function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
 const AUTH_FAIL = /could not read Username|Authentication failed|invalid username or password|(?:returned error|HTTP(?:\/[\d.]+)?)[: ]+40[13]\b/i;
 function _authFailed(err) { return AUTH_FAIL.test(String(err || "")); }
 
-module.exports = { _authFailed, _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _publishOutcome, _allReleasesRaw, _authFailed, _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

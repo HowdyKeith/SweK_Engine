@@ -20,7 +20,7 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
 //   └───────────────────────────────┘
 //
 // R1 SCOPE (this round): the scaffold only.
-//   - Avatar stamp = a tinted placeholder tile (live GLB is a later round).
+//   - Avatar stamp = a tinted placeholder tile (live GLB is a later round; SETTLED at v885: liveStamp below).
 //   - Gauges = SVG rings with STATIC placeholder values (no providers yet;
 //     R2 wires battery / CPU / RAM / email). The chosen `source` is stored
 //     and shown as the gauge label, but the % is a placeholder.

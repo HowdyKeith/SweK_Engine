@@ -24,20 +24,22 @@ const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
 import * as T from "./needsTask.mjs";
 import * as U from "./tunedRule.mjs";
+import * as MV from "../tools/ship/seatMove.mjs";
 import * as Q from "./plannerPerturbed.mjs";
 import * as S from "./surveySeat.mjs";
 import * as C from "../tools/ship/plannerChoose.mjs";
 console.log("surveySeat-selfcheck -- the survey seat\n");
 const code = fs.readFileSync(new URL("./surveySeat.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
 const head = fs.readFileSync(new URL("./surveySeat.mjs", import.meta.url), "utf8").split("\n").filter((l) => /^\s*\/\//.test(l)).join("\n");
-const R8 = JSON.parse(fs.readFileSync(new URL("./rig-results/tune-report.json", import.meta.url), "utf8")).params, P6 = { ...R8, low: R8.low - 0.06 };
+const R8 = JSON.parse(fs.readFileSync(new URL("./rig-results/tune-report.json", import.meta.url), "utf8")).params, P6 = { ...R8, low: R8.low - 0.06 }, P4 = { ...R8, low: R8.low - 0.04 };   // 2026-11-17: the seat moved from P6 (Round 33) to P4 (Round 37)
 const thr = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
 
 sec("1. CONSTANTS");
 {
     ok("!! SURVEY_R8 is the Round 8 numbers in tune-report.json to the last digit (alpha, low, high, ramp, cap), nothing more, and frozen", J(S.SURVEY_R8) === J({ alpha: R8.alpha, low: R8.low, high: R8.high, ramp: R8.ramp, cap: R8.cap }) && Object.isFrozen(S.SURVEY_R8) && S.SURVEY_R8.low === 0.3803560726214647 && S.SURVEY_R8.cap === 0.8861494767879255);
-    ok("!! SURVEY_CONSTANTS are the Round 8 constants with low moved by -0.06 and nothing else (alpha, high, ramp, cap identical; low 0.3203560726214647), frozen, the shift named SURVEY_LOW_SHIFT -0.06", S.SURVEY_LOW_SHIFT === -0.06 && J(S.SURVEY_CONSTANTS) === J({ ...R8, low: R8.low - 0.06 }) && Math.abs(S.SURVEY_CONSTANTS.low - 0.3203560726214647) < 1e-15 && Object.isFrozen(S.SURVEY_CONSTANTS) && S.SURVEY_CONSTANTS.high === R8.high && S.SURVEY_CONSTANTS.cap === R8.cap && S.SURVEY_CONSTANTS.ramp === R8.ramp && S.SURVEY_CONSTANTS.alpha === R8.alpha);
-    ok("!! they are not the tuned rule's defaults, not the Round 8 constants and not the Round 31 shift -0.12 (low is 0.3204: between 0.32 and 0.321)", J(S.SURVEY_CONSTANTS) !== J(U.DEFAULTS) && J(S.SURVEY_CONSTANTS) !== J(S.SURVEY_R8) && S.SURVEY_CONSTANTS.low > 0.32 && S.SURVEY_CONSTANTS.low < 0.321);
+    ok("!! SURVEY_CONSTANTS are the Round 8 constants with low moved by -0.04 and nothing else (alpha, high, ramp, cap identical; low 0.3403560726214647), frozen, the shift named SURVEY_LOW_SHIFT -0.04 (Round 37, 2026-11-17; it was -0.06, low 0.3203560726214647)", S.SURVEY_LOW_SHIFT === -0.04 && J(S.SURVEY_CONSTANTS) === J(P4) && Math.abs(S.SURVEY_CONSTANTS.low - 0.3403560726214647) < 1e-15 && Object.isFrozen(S.SURVEY_CONSTANTS) && S.SURVEY_CONSTANTS.high === R8.high && S.SURVEY_CONSTANTS.cap === R8.cap && S.SURVEY_CONSTANTS.ramp === R8.ramp && S.SURVEY_CONSTANTS.alpha === R8.alpha);
+    ok("!! they are not the tuned rule's defaults, not the Round 8 constants and not Round 33's (low is 0.3404: between 0.34 and 0.341)", J(S.SURVEY_CONSTANTS) !== J(U.DEFAULTS) && J(S.SURVEY_CONSTANTS) !== J(S.SURVEY_R8) && J(S.SURVEY_CONSTANTS) !== J(S.SURVEY_ROUND33) && S.SURVEY_CONSTANTS.low > 0.34 && S.SURVEY_CONSTANTS.low < 0.341);
+    ok("!! SURVEY_ROUND33 is the Round 33 constants (low -0.06, 0.3203560726214647), frozen: the base the trained circuits keep", J(S.SURVEY_ROUND33) === J(P6) && Object.isFrozen(S.SURVEY_ROUND33) && Math.abs(S.SURVEY_ROUND33.low - 0.3203560726214647) < 1e-15);
 }
 sec("2. PROFILES");
 {
@@ -52,19 +54,17 @@ sec("3. SEAT");
     const set = T.setOf(["far", "both"], 1344, 1346), opts = { gauge: T.GAUGE, seconds: 200 };
     const fly = (profile) => { const ss = []; const r = T.evaluate(T.flyDecision((c) => { const s = S.surveySeat({ profile, overrides: { seconds: 200 } })(c); ss.push(s); return s; }), set, opts); return { r, ss, plans: ss.reduce((a, s) => a + s.stats.plans, 0), cost: ss.reduce((a, s) => a + s.stats.rolloutSeconds, 0), ticks: ss.reduce((a, s) => a + s.stats.ticks, 0) }; };
     const std = fly("standard"), ev = fly("events"), wide = fly("wide"), ens = fly("ensemble");
-    const direct = T.evaluate(T.flyDecision(Q.perturbedSeat(P6, {}, { seconds: 200 })), set, opts);
-    ok("!! the standard seat is plannerPerturbed's seat on the Round 33 constants (low -0.06) with the default plan, dive for dive (six dives, 200 s: fingerprint and score)", std.r.runs.length === 6 && std.r.runs.every((r, i) => r.fingerprint === direct.runs[i].fingerprint && r.score === direct.runs[i].score));
-    C.setFlight({ seconds: 200 });
-    const twin = (k) => C.flyConfirm("TWIN-WIN", "L-0.06", R8, "REF", k, { range: [1344, 1346] });
+    const direct = T.evaluate(T.flyDecision(Q.perturbedSeat(P4, {}, { seconds: 200 })), set, opts);
+    ok("!! the standard seat is plannerPerturbed's seat on the Round 37 constants (low -0.04) with the default plan, dive for dive (six dives, 200 s: fingerprint and score)", std.r.runs.length === 6 && std.r.runs.every((r, i) => r.fingerprint === direct.runs[i].fingerprint && r.score === direct.runs[i].score));
+    const twin = (k) => T.evaluate(MV.pilotOf("SEAT-04", { seconds: 200 }), T.setOf([k], 1344, 1346), opts);
     const far = twin("far"), both = twin("both");
-    C.setFlight({});
-    ok("!! and it is the measured pilot: plannerChoose's TWIN-WIN on L-0.06 (the arm Round 33 confirmed on 1,500 dives) flies the same dives, far then both (reference noise, seeds 1344-1346)", [...far.runs, ...both.runs].every((r, i) => r.fingerprint === std.r.runs[i].fingerprint));
+    ok("!! and it is the measured pilot: Round 37's SEAT-04 (tools/ship/seatMove.mjs, confirmed on 3,600 dives; until 2026-11-17 the row held plannerChoose's TWIN-WIN on L-0.06) flies the same dives, far then both (reference noise, seeds 1344-1346)", [...far.runs, ...both.runs].every((r, i) => r.fingerprint === std.r.runs[i].fingerprint));
     ok("!! the standard seat counts its work: plans and ticks per dive are positive (the seat has `stats`), and the scheduled rollout seconds are positive", std.ss.length === 6 && std.ss.every((s) => s.stats.plans >= 1 && s.stats.ticks > 0 && s.stats.rolloutSeconds > 0));
     ok("!! the events profile plans less often than the standard (fewer plans, fewer scheduled rollout seconds) and still flies six dives", ev.r.runs.length === 6 && ev.plans < std.plans && ev.cost < std.cost, `${ev.plans} / ${std.plans} plans, ${Math.round(ev.cost)} / ${Math.round(std.cost)} s`);
     ok("!! the wide profile never costs less than the standard (three-station dives have nothing to add: equal), the ensemble more than twice as much", wide.r.runs.length === 6 && wide.cost >= std.cost && ens.cost > std.cost * 2, `wide ${Math.round(wide.cost)}, ens ${Math.round(ens.cost)}, std ${Math.round(std.cost)}`);
     ok("!! the ensemble profile changes a dive the standard seat flies (a different plan on at least one dive, fingerprint) -- the profile reaches the planner", ens.r.runs.some((r, i) => r.fingerprint !== std.r.runs[i].fingerprint) || ens.cost > 2 * std.cost);
-    ok("!! the events profile is the plannerPerturbed seat with replanS Infinity and onDive: dive for dive", (() => { const d = T.evaluate(T.flyDecision(Q.perturbedSeat(P6, {}, { replanS: Infinity, onDive: true, seconds: 200 })), set, opts); return ev.r.runs.every((r, i) => r.fingerprint === d.runs[i].fingerprint); })());
-    ok("!! the wide and ensemble profiles are the plannerPerturbed seat with maxStations 5 and with the ensemble [-0.05, 0, 0.05]: dive for dive", (() => { const w = T.evaluate(T.flyDecision(Q.perturbedSeat(P6, {}, { maxStations: 5, seconds: 200 })), set, opts), e = T.evaluate(T.flyDecision(Q.perturbedSeat(P6, {}, { ensemble: [-0.05, 0, 0.05], seconds: 200 })), set, opts); return wide.r.runs.every((r, i) => r.fingerprint === w.runs[i].fingerprint) && ens.r.runs.every((r, i) => r.fingerprint === e.runs[i].fingerprint); })());
+    ok("!! the events profile is the plannerPerturbed seat with replanS Infinity and onDive: dive for dive", (() => { const d = T.evaluate(T.flyDecision(Q.perturbedSeat(P4, {}, { replanS: Infinity, onDive: true, seconds: 200 })), set, opts); return ev.r.runs.every((r, i) => r.fingerprint === d.runs[i].fingerprint); })());
+    ok("!! the wide and ensemble profiles are the plannerPerturbed seat with maxStations 5 and with the ensemble [-0.05, 0, 0.05]: dive for dive", (() => { const w = T.evaluate(T.flyDecision(Q.perturbedSeat(P4, {}, { maxStations: 5, seconds: 200 })), set, opts), e = T.evaluate(T.flyDecision(Q.perturbedSeat(P4, {}, { ensemble: [-0.05, 0, 0.05], seconds: 200 })), set, opts); return wide.r.runs.every((r, i) => r.fingerprint === w.runs[i].fingerprint) && ens.r.runs.every((r, i) => r.fingerprint === e.runs[i].fingerprint); })());
 }
 sec("4. PILOT");
 {

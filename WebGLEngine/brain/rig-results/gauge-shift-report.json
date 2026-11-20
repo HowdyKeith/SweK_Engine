@@ -1,0 +1,20 @@
+{
+ "report": [
+  "ROUND 35: the shipped seat against the seat on the Round 8 constants, REF and +0.10 BIAS; seeds 45001-45300, both",
+  "  PASS GENERATOR: the scenarios are needsTask.scenario's on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in both conditions: true",
+  "  PASS ALIGNED: every arm and condition flies the same scenarios in the same order: true",
+  "  PASS THE FAULT REACHES THE PILOT: each arm's BIAS dives differ from its REF dives on at least one dive: true",
+  "  PASS THE ARMS DIFFER: SEAT and SEAT-R8 differ on at least one REF dive: true",
+  "  SEAT     REF 0.8185 (0/0)   BIAS 0.8433 (9/0)   bias cost +0.0247 (se 0.0095; better 94, worse 21)",
+  "  SEAT-R8  REF 0.7895 (0/0)   BIAS 0.8360 (0/0)   bias cost +0.0465 (se 0.0062; better 106, worse 22)",
+  "hull (crushed+stranded): SEAT 0 -> 9; SEAT-R8 0 -> 0",
+  "SEAT-R8 minus SEAT: REF -0.0290 (se 0.0050; better 13, worse 66) (weighed); BIAS -0.0073 (se 0.0092; better 10, worse 53) (reported)",
+  "  SEAT crushed under BIAS, start damage: 0.27, 0.21, 0.29, 0.28, 0.26, 0.31, 0.27, 0.42, 0.24",
+  "  SEAT-R8 crushed under BIAS, start damage: none",
+  "BOTTOM LINE: ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS",
+  "BOTTOM LINE: THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS",
+  "BOTTOM LINE: THE SHIFT IS WHAT CRUSHES",
+  "BOTTOM LINE: GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE"
+ ]
+}

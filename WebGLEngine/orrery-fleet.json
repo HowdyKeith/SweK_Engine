@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7e7ab7102816b88949c80757cf36bd513b49cf9a",
+ "head": "c7afabbbd7f030597600f79d955d460d58f1a41f",
  "bodies": {
   "box3d": [
    {
@@ -187,8 +187,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "slug-curved.html",
@@ -335,13 +335,28 @@
   "hemibrain": [
    {
     "path": "ai-bridge/subAquariumCore-selfcheck.mjs",
-    "bytes": 28463,
-    "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
+    "bytes": 28981,
+    "sha": "a14cd3e543a51a89bc198107f3ac7bb2e757965f"
+   },
+   {
+    "path": "brain/lesionFlyCx-selfcheck.mjs",
+    "bytes": 19536,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
+   },
+   {
+    "path": "brain/reservoirGpu-selfcheck.mjs",
+    "bytes": 16972,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "brain/reservoirPilotGpu-selfcheck.mjs",
+    "bytes": 26527,
+    "sha": "f4a4f2fc5d36190c42ce6c63484429b32056cef9"
    },
    {
     "path": "render/brainPanel-selfcheck.mjs",
@@ -354,19 +369,39 @@
     "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
+    "path": "render/subAquariumKinds-selfcheck.mjs",
+    "bytes": 10878,
+    "sha": "0b432755f177e35f59ae0d57de0f2f34a6a4da4c"
+   },
+   {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 56655,
-    "sha": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb"
+    "bytes": 57753,
+    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+   },
+   {
+    "path": "render/switchboardView-selfcheck.mjs",
+    "bytes": 14222,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 50634,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 61813,
+    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
    },
    {
-    "path": "tools/flyCx.mjs",
-    "bytes": 6499,
-    "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
+    "path": "switchboard.html",
+    "bytes": 17395,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "tools/flyCx-selfcheck.mjs",
+    "bytes": 31144,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
+   },
+   {
+    "path": "tools/flyCxLib.mjs",
+    "bytes": 10103,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
    },
    {
     "path": "tools/ship/flyCxPilotFile-selfcheck.mjs",
@@ -394,6 +429,31 @@
     "sha": "f56f08f95fa766ecacceb62742eda6fce9fa2f7c"
    },
    {
+    "path": "tools/ship/latenessStudy.mjs",
+    "bytes": 7183,
+    "sha": "9bf85c6297e31eebd546581ac5515903878adec1"
+   },
+   {
+    "path": "tools/ship/lesionLeftSide-selfcheck.mjs",
+    "bytes": 13371,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "tools/ship/lesionLeftSideCmd.mjs",
+    "bytes": 3189,
+    "sha": "6f50c3a6913121b34c41bcfe71faae96ddb7a86c"
+   },
+   {
+    "path": "tools/ship/takeReservoirGpu.mjs",
+    "bytes": 6561,
+    "sha": "7781aea0987370e472803910700cf8799ed8949e"
+   },
+   {
+    "path": "tools/ship/takeSwitchboard.mjs",
+    "bytes": 4028,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "tools/ship/trainNeedsCircuit.mjs",
     "bytes": 33594,
     "sha": "c1ec0cb0c471b04d1bfdcc8687c04f77a95f2617"
@@ -407,6 +467,11 @@
     "path": "tools/ship/trainSubState.mjs",
     "bytes": 25084,
     "sha": "d66beb17f067dff0e9bc21ff7ccb44e7d7f1576d"
+   },
+   {
+    "path": "tools/subReservoirV6-selfcheck.mjs",
+    "bytes": 15368,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "tools/tankFlyCxBench.mjs",
@@ -461,13 +526,13 @@
   "kenney-city": [
    {
     "path": "rtx-viewer.html",
-    "bytes": 15443,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "bytes": 19609,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 131378,
-    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
+    "bytes": 178380,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -539,8 +604,8 @@
   "male-cns": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29890,
-    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
+    "bytes": 30089,
+    "sha": "523672b4140f443d2e9c15050bdf4eabf18b3293"
    },
    {
     "path": "ai-bridge/subAquariumBridge.js",
@@ -548,9 +613,24 @@
     "sha": "e336692128303e452c50f7fe9c9f385cc47c81b2"
    },
    {
+    "path": "brain/flyEmdLplc2Gf-selfcheck.mjs",
+    "bytes": 39533,
+    "sha": "b3487645eb0cec86bee8a3f9d5785fcf8999b7cd"
+   },
+   {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
     "bytes": 40686,
     "sha": "caf901a66f7fbb39120fe93ab294af676736a7cb"
+   },
+   {
+    "path": "brain/openItems1-run.mjs",
+    "bytes": 2286,
+    "sha": "12fac7508f2e8f519baf016fc19eb0a1eace2998"
+   },
+   {
+    "path": "brain/stealthRound3-run.mjs",
+    "bytes": 2133,
+    "sha": "418ca94cd6a99ac157e10383700b93523853f1fb"
    },
    {
     "path": "fly-connectome.html",
@@ -676,8 +756,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 159167,
-    "sha": "7d423e172187a6c68e46843700f01ba9de3ddb22"
+    "bytes": 161481,
+    "sha": "735eddf2263f9548dd2e5400993ead89ea62f721"
    }
   ],
   "taichi-js": [
@@ -920,8 +1000,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3750970,
-    "sha": "e399472c310adfaa09f38066e3eeb7108ee6c25e"
+    "bytes": 3825103,
+    "sha": "34a779f469c006f94b161497cfe07a367dbc1835"
    },
    {
     "path": "mpm3d.html",
@@ -950,13 +1030,13 @@
    },
    {
     "path": "render/seaPicker-selfcheck.mjs",
-    "bytes": 17420,
-    "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
+    "bytes": 18881,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "render/seaThree-selfcheck.mjs",
-    "bytes": 12601,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "bytes": 13105,
+    "sha": "1756d6a67c1d556c686010636198ed878628cf2b"
    },
    {
     "path": "render/skyBake-selfcheck.mjs",
@@ -965,8 +1045,18 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 22770,
-    "sha": "8964284314deb31910ce6f27836f215cba4c90a0"
+    "bytes": 25349,
+    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+   },
+   {
+    "path": "render/subAquarium3dDark-selfcheck.mjs",
+    "bytes": 5727,
+    "sha": "c7afabbbd7f030597600f79d955d460d58f1a41f"
+   },
+   {
+    "path": "render/subAquarium3dMarks-selfcheck.mjs",
+    "bytes": 16484,
+    "sha": "5fd137be3c15f6b629dff50e9471e426abb7f503"
    },
    {
     "path": "render/subBallastCues-selfcheck.mjs",
@@ -1050,8 +1140,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 50634,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 61813,
+    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
    },
    {
     "path": "svg-forge.html",
@@ -1357,8 +1447,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",
@@ -1412,8 +1502,8 @@
    },
    {
     "path": "render/temporalTsl-selfcheck.mjs",
-    "bytes": 46135,
-    "sha": "79b92373c5ea3d067c9c44fd341f66dfaca6995d"
+    "bytes": 46196,
+    "sha": "c7c159f3a0588e5aa371c1462aa570e27ec3ac98"
    },
    {
     "path": "render/temporalTslCompute-selfcheck.mjs",
@@ -1697,8 +1787,8 @@
   "zebrafish": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29890,
-    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
+    "bytes": 30089,
+    "sha": "523672b4140f443d2e9c15050bdf4eabf18b3293"
    },
    {
     "path": "brain/pilotSubCircuit-selfcheck.mjs",

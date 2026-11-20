@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/skillbook-selfcheck.mjs — v3395
 //
-// Run: node tools/roundhouse/skillbook-selfcheck.mjs   (~0.1s — MEASURED individually)
+// Run: node tools/roundhouse/skillbook-selfcheck.mjs   (~33-47ms — MEASURED alone, five runs, v4929; the header said 0.1s, more than 2x the 45 ms the shared record took once v4929's rotation re-timed it)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The idea is ACE's (kayba-ai/agentic-context-engine, arXiv 2510.04618). Not adopted as a dependency -- uv,

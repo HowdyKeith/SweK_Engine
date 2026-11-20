@@ -1,0 +1,20 @@
+
+global lum255 g 10: spikes gray/static/moving by contrast: 0.2: 27/35/24  0.4: 28/40/24  0.6: 32/41/24  0.8: 32/43/24  1: 33/48/24; up at 1: 26
+  moving/gray: 0.2: 0.89  0.4: 0.86  0.6: 0.75  0.8: 0.75  1: 0.73 (animal 0.33 at 0.2, 0.98 at 0.4, 0.81, 0.70, 0.725)
+  static/gray: 0.2: 1.30  0.4: 1.43  0.6: 1.28  0.8: 1.34  1: 1.45 (animal 0.33, 0.85, 0.97, 1.00, 0.99)
+  P1 static kept false | P2 held-out contrasts true | P3 low contrast not reproduced (255) false / reproduced (5) false | P4 up less inhibited true | ordering C1 true C2 false C3 false C4 true score 2/4
+
+global lum5 g 100: spikes gray/static/moving by contrast: 0.2: 5/11/0  0.4: 8/14/4  0.6: 13/21/10  0.8: 15/25/11  1: 18/26/13; up at 1: 23
+  moving/gray: 0.2: 0.00  0.4: 0.50  0.6: 0.77  0.8: 0.73  1: 0.72 (animal 0.33 at 0.2, 0.98 at 0.4, 0.81, 0.70, 0.725)
+  static/gray: 0.2: 2.20  0.4: 1.75  0.6: 1.62  0.8: 1.67  1: 1.44 (animal 0.33, 0.85, 0.97, 1.00, 0.99)
+  P1 static kept false | P2 held-out contrasts true | P3 low contrast not reproduced (255) false / reproduced (5) false | P4 up less inhibited true | ordering C1 true C2 false C3 false C4 true score 2/4
+
+local lum255 g 10: spikes gray/static/moving by contrast: 0.2: 25/38/22  0.4: 28/41/22  0.6: 30/45/22  0.8: 30/46/22  1: 32/48/22; up at 1: 26
+  moving/gray: 0.2: 0.88  0.4: 0.79  0.6: 0.73  0.8: 0.73  1: 0.69 (animal 0.33 at 0.2, 0.98 at 0.4, 0.81, 0.70, 0.725)
+  static/gray: 0.2: 1.52  0.4: 1.46  0.6: 1.50  0.8: 1.53  1: 1.50 (animal 0.33, 0.85, 0.97, 1.00, 0.99)
+  P1 static kept false | P2 held-out contrasts true | P3 low contrast not reproduced (255) false / reproduced (5) false | P4 up less inhibited true | ordering C1 true C2 false C3 false C4 true score 2/4
+
+local lum5 g 30: spikes gray/static/moving by contrast: 0.2: 5/10/0  0.4: 8/14/7  0.6: 13/18/11  0.8: 15/22/13  1: 18/25/13; up at 1: 23
+  moving/gray: 0.2: 0.00  0.4: 0.88  0.6: 0.85  0.8: 0.87  1: 0.72 (animal 0.33 at 0.2, 0.98 at 0.4, 0.81, 0.70, 0.725)
+  static/gray: 0.2: 2.00  0.4: 1.75  0.6: 1.38  0.8: 1.47  1: 1.39 (animal 0.33, 0.85, 0.97, 1.00, 0.99)
+  P1 static kept false | P2 held-out contrasts false | P3 low contrast not reproduced (255) false / reproduced (5) false | P4 up less inhibited true | ordering C1 true C2 false C3 false C4 false score 1/4

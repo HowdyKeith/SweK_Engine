@@ -25,6 +25,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import { coveredBy, classify, readCensus, trackedSets, ignoredSet, runCensus, compactCensus, budgetIsOwn } from "./strandCensus.mjs";
 import { TRANSIENT_FIXTURES, TRANSIENT_DIRS, TRANSIENT_PATHS, reclaimTransientPaths } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
@@ -52,6 +53,20 @@ console.log("1. THE CLASSIFIER, ON FIXTURES");
     const ig = ignoredSet(["ai-bridge/apks/x.apk", "ai-bridge/swek_loop_scope.flag", "main.js", "zz-not-ignored.txt"], ENG);
     ok(ig.has("ai-bridge/apks/x.apk") && ig.has("ai-bridge/swek_loop_scope.flag") && !ig.has("main.js") && !ig.has("zz-not-ignored.txt"),
        "...and that state is IGNORED by git, so it is reported as a box's output and never as litter", [...ig].join(", "));
+}
+
+// v4921 -- the directory-only rule, asked about a directory that is NOT on the disk: a scratch repository, so the answer
+// cannot depend on what this box happens to hold. SABOTAGE: ignoredSet asking each path once, as written -> 1 red, here.
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "strand-ign-"));
+    try {
+        execFileSync("git", ["init", "-q"], { cwd: tmp });
+        fs.writeFileSync(path.join(tmp, ".gitignore"), "box/apks/\nlog.txt\n");
+        fs.mkdirSync(path.join(tmp, "box", "here"), { recursive: true });
+        const got = ignoredSet(["box/apks", "box/apks/x.apk", "box/here", "log.txt", "kept.txt"], tmp);
+        ok(got.has("box/apks") && got.has("box/apks/x.apk") && got.has("log.txt") && !got.has("box/here") && !got.has("kept.txt") && !fs.existsSync(path.join(tmp, "box", "apks")),
+           "...and a directory-only rule ignores its directory WHETHER OR NOT THAT DIRECTORY EXISTS on this box -- the rig's fresh clone had none", [...got].join(", "));
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
 const census = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "strand-census.json"), "utf8"));

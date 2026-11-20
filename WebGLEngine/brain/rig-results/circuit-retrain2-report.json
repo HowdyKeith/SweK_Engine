@@ -1,0 +1,28 @@
+{
+ "report": [
+  "ROUND 41 TRAINING: 4 searches on TRAIN_SET (both gauges), checkpointed every 50 children, chosen on HELD_OUT_SET",
+  "  search 0 (seed 97600): held-out by checkpoint 0.8913 0.8800 0.8781 0.8762 0.8631 0.8819 0.8762; chose child 0 (held-out 0.8913, start 0.8913); pool crushed 0 (start 0) ELIGIBLE",
+  "  search 1 (seed 97601): held-out by checkpoint 0.8913 0.8612 0.8698 0.8717 0.8786 0.8517 0.8623; chose child 0 (held-out 0.8913, start 0.8913); pool crushed 0 (start 0) ELIGIBLE",
+  "  search 2 (seed 97602): held-out by checkpoint 0.8913 0.8593 0.8537 0.8538 0.8519 0.8669 0.8677; chose child 0 (held-out 0.8913, start 0.8913); pool crushed 0 (start 0) ELIGIBLE",
+  "  search 3 (seed 97603): held-out by checkpoint 0.8913 0.8753 0.8931 0.8816 0.8816 0.8913 0.8894; chose child 100 (held-out 0.8931, start 0.8913); pool crushed 0 (start 0) ELIGIBLE",
+  "CHAMPION: search 3, child 100 (held-out 0.8931), 4 of 4 eligible",
+  "ROUND 41 AUDIT: NEW, CUR, SEAT-04 under REF and +0.10 BIAS; seeds 55001-55300, both",
+  "  PASS GENERATOR: the scenarios are needsTask.scenario's on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in both conditions: true",
+  "  PASS ALIGNED: every arm and condition flies the same scenarios in the same order: true",
+  "  PASS THE FAULT REACHES THE PILOT: every arm's BIAS dives differ from its REF dives on at least one dive: true",
+  "  PASS THE ARMS DIFFER: every pair of arms differs on at least one REF dive: true",
+  "  PASS THE LEDGER IS COMPLETE: 4 searches of 7 checkpoints, one recipe, one start",
+  "  PASS NEW'S START IS R04: the untrained policy against tunedSeat on low -0.04 on the gate's dives, fingerprint for fingerprint: true",
+  "  PASS CUR IS THE AQUARIUM'S CIRCUIT PROFILE: CUR against subAquariumCircuit.circuitSeat(\"circuit\") on the gate's dives (full BIAS dives): true",
+  "  PASS SEAT-04 IS THE SHIPPED SEAT: SEAT-04 against surveyPilot() on the gate's dives: true",
+  "  NEW      REF 0.7890 (0/0)  BIAS 0.8193 (0/0)",
+  "  CUR      REF 0.7778 (0/0)  BIAS 0.8055 (4/0)",
+  "  SEAT-04  REF 0.8003 (0/0)  BIAS 0.8444 (1/0)",
+  "  V1 NEW'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S UNDER BIAS (0 against 1)",
+  "  V2 NEW'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S AT REF (0 against 0)",
+  "  V3 THE SCORE LINE: NEW minus SEAT-04 at REF -0.0112 (se 0.0043) HURTS MISSES; under BIAS -0.0252 (se 0.0055) HURTS MISSES",
+  "REPORTED, NOT WEIGHED: NEW minus CUR at REF +0.0112 (se 0.0054) KEEPS, under BIAS +0.0137 (se 0.0079) LOSES",
+  "BOTTOM LINE: THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3 the score at REF; V3 the score under BIAS): NOTHING IS REPLACED"
+ ]
+}

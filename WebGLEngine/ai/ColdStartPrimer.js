@@ -28,6 +28,7 @@
 //              via the auto-start IIFE; the slow part is Trellis2LoadModel
 //              which only loads when a workflow runs. Trellis warmup would
 //              mean posting a real workflow JSON — belongs in its own round.
+//              SETTLED at v3845 at the latest: primeTrellis below (Round 202). Git starts at the v3845 mirror, so the earlier date is not recoverable.
 //
 // Public API:
 //   primeOllamaModels(models, opts?)

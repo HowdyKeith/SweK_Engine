@@ -25,7 +25,7 @@ import * as S from "./surveySeat.mjs";
 import { mulberry } from "./pilotSubPolicy.mjs";
 import { STATE_INIT } from "./pilotSubCircuitState.mjs";
 
-export const BASE_PARAMS = S.SURVEY_CONSTANTS, BASE_BOUNDS = U.WIDE_BOUNDS;
+export const BASE_PARAMS = S.SURVEY_ROUND33, BASE_BOUNDS = U.WIDE_BOUNDS;   // 2026-11-17: the Round 33 constants by name -- the circuit was trained on this base, and the seat moving to -0.04 does not move it
 export const FEATURES = P.FEATURES, OUTPUTS = P.OUTPUTS, STEP_TICKS = P.STEP_TICKS;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const fin = (v) => (Number.isFinite(v) ? v : 0);

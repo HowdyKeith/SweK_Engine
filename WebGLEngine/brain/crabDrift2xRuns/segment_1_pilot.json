@@ -1,0 +1,1 @@
+{"scope":"segment","g":1,"which":"pilot","cells":[{"nm":"plain","framesPos":0,"mean":0,"max":0},{"nm":"static","framesPos":118,"mean":0.007810578431390927,"max":0.14701963537473678},{"nm":"down","framesPos":124,"mean":0.17754920393854356,"max":0.461304993706532},{"nm":"up","framesPos":62,"mean":0.08627309529095353,"max":0.33801939875690973}]}

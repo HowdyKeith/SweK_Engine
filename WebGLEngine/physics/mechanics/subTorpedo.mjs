@@ -66,19 +66,29 @@ export function screenLoss(from, to, screens) {
 /** The torpedo as a sonar source: a platform { pos, heading, speed } that is LOUD (the arena adds subSonar.SONAR.torpedoSL). */
 export const platformOf = (t) => ({ pos: t.pos, heading: t.heading, speed: t.speed });
 
+/** Does torpedo `torpedoId` recognise the noisemaker `sourceId` as a decoy? A draw that depends on the arena's seed, the two ids and nothing else (so it is made once, not at every look), true with probability `p`. */
+function recognisesDecoy(seed, torpedoId, sourceId, p) {
+    if (!(p > 0)) return false;
+    let a = (Math.imul(seed + 31, 0x9E3779B1) ^ Math.imul(torpedoId + 1, 0x85EBCA6B) ^ Math.imul(sourceId + 7, 0xC2B2AE35)) >>> 0;
+    a = (a + 0x6D2B79F5) >>> 0; let x = a; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296 < p;
+}
+
 /**
  * One tick. `targets` is a list of { id, pos, heading, speed } (anything that can be homed on and hit; the torpedo's OWNER is skipped). Returns { torpedo (a new frozen state), event } where event is null or
  * { type: "hit", target: id, damage, distance }. A torpedo that has ended (hit, expired, lost) is returned unchanged. `tick` and `seed` feed the sonar luck; `floor` is the seabed depth (m); `seeker: false` is a DUMB torpedo (it runs straight and only the fuse works: the gate's way to test the fuse alone).
+ * `eccm` (null: the seeker is exactly the old one; brain/SUB_ECCM_WIP.md) is { lockMemory, classifyReject, stats }: LOCK MEMORY keeps the source the seeker homed on at its last look while that source is still heard, even when a louder one is in the cone; CLASSIFY REJECT is the chance, drawn once for each torpedo and each noisemaker from the arena's seed (a source that declares its own `sl`), that the seeker recognises it as a decoy and never chooses it; `stats` (optional) counts `rejected` and `held` looks.
  */
-export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor = TORPEDO.maxDepth, seeker = true, params = null, screens = null } = {}) {
+export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor = TORPEDO.maxDepth, seeker = true, params = null, screens = null, eccm = null } = {}) {
     if (t.status !== "running") return { torpedo: t, event: null };
     const T = params ? { ...TORPEDO, ...params } : TORPEDO, mine = targets.filter((x) => x.id !== t.owner);
-    let { heading, pitch, locked, sinceLook, lastLos, cmd } = t;
+    let { heading, pitch, locked, sinceLook, lastLos, cmd } = t, lockId = eccm && t.lockId !== undefined ? t.lockId : null;
     let rate = t.rate;
     // ---- the seeker: a look every `lookEvery` ticks, on the loudest target inside the cone and above the threshold ----
     if (seeker && t.ticks % T.lookEvery === 0) {
-        const f = forward(heading, pitch); let best = null;
+        const f = forward(heading, pitch); let best = null, held = null;
         for (const x of mine) {
+            if (eccm && eccm.classifyReject > 0 && Number.isFinite(x.sl) && recognisesDecoy(seed, t.id, x.id, eccm.classifyReject)) { if (eccm.stats) eccm.stats.rejected = (eccm.stats.rejected || 0) + 1; continue; }
             const dx = x.pos[0] - t.pos[0], dy = x.pos[1] - t.pos[1], dz = x.pos[2] - t.pos[2], range = Math.hypot(dx, dy, dz);
             if (range < 1e-9) continue;
             const cos = (dx * f[0] + dy * f[1] + dz * f[2]) / range;
@@ -86,8 +96,11 @@ export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor
             const snr = seekerSNR(Number.isFinite(x.sl) ? x.sl : K.sourceLevel(x.speed), range) - (screens && screens.length ? screenLoss(t.pos, x.pos, screens) : 0) + K.SONAR.luckSd * K.luck(seed, tick, 4 * (x.id + 1) + 900 + 7 * t.id);
             if (snr < K.SONAR.dt) continue;
             if (!best || snr > best.snr) best = { x, snr, dx, dy, dz, range };
+            if (eccm && eccm.lockMemory && t.lockId !== undefined && t.lockId !== null && x.id === t.lockId) held = { x, snr, dx, dy, dz, range };
         }
+        if (held && best && held.x.id !== best.x.id) { if (eccm.stats) eccm.stats.held = (eccm.stats.held || 0) + 1; best = held; }
         if (best) {
+            if (eccm) lockId = best.x.id;
             const sd = Math.max(K.SONAR.bearingSdFloor, K.SONAR.bearingSdAtThreshold * 10 ** (-(best.snr - K.SONAR.dt) / 20)), nz = (c) => K.luck(seed, tick, 3000 + 5 * t.id + c);
             const losH = Math.atan2(-best.dy, best.dx) + sd * nz(0), losP = Math.atan2(best.dz, Math.hypot(best.dx, best.dy)) + K.SONAR.elevationFactor * sd * nz(1), dtLook = T.lookEvery * dt;
             // the line-of-sight RATE is a difference of two noisy angles 0.2 s apart: unfiltered it swamps the command (the first smoke test saw +-2.8 rad/s of pitch command), so it is low-passed
@@ -95,7 +108,7 @@ export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor
             rate = Object.freeze({ h: (rate ? (1 - a) * rate.h : 0) + a * rawH, p: (rate ? (1 - a) * rate.p : 0) + a * rawP });
             cmd = Object.freeze({ heading: T.navN * rate.h + T.pursuitGain * wrap(losH - heading), pitch: T.navN * rate.p + T.pursuitGain * (losP - pitch) });
             lastLos = Object.freeze({ h: losH, p: losP }); locked = true; sinceLook = 0;
-        } else { sinceLook += T.lookEvery; if (locked && sinceLook >= T.loseLockAfter) { locked = false; cmd = Object.freeze({ heading: 0, pitch: 0 }); lastLos = null; rate = null; } }
+        } else { sinceLook += T.lookEvery; if (locked && sinceLook >= T.loseLockAfter) { locked = false; cmd = Object.freeze({ heading: 0, pitch: 0 }); lastLos = null; rate = null; lockId = null; } }
     }
     // ---- the body: rate-limited turns, a speed ramp, a straight step ----
     heading = wrap(heading + clamp(cmd.heading, -T.turnRate, T.turnRate) * dt);
@@ -117,7 +130,7 @@ export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor
         }
     }
     if (status === "running") { if (age >= T.endurance) status = "expired"; else if (-pos[2] < T.minDepth || -pos[2] > Math.min(floor, T.maxDepth)) status = "lost"; }
-    return { torpedo: Object.freeze({ ...t, pos, heading, pitch, speed, age, run, armed, locked, sinceLook, lastLos, cmd, rate, prev, status, ticks: t.ticks + 1 }), event };
+    return { torpedo: Object.freeze({ ...t, pos, heading, pitch, speed, age, run, armed, locked, sinceLook, lastLos, cmd, rate, prev, status, ticks: t.ticks + 1, ...(eccm ? { lockId } : {}) }), event };
 }
 
 export function reportLines() {

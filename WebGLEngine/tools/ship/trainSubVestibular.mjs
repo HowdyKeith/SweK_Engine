@@ -25,6 +25,7 @@ import * as H from "../subVestibularTasks.mjs";
 import * as F from "../fishVestibularCircuit.mjs";
 import { mulberry } from "../../brain/pilotSubPolicy.mjs";
 import { meanOf, sdOf, beats, spearman, readRecords, MIN_EDGE, SD_FACTOR, MIN_CONTROLS } from "./trainSubCircuits.mjs";
+import { setOrientationDefault } from "../../physics/mechanics/rigidBody6dof.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export { MIN_EDGE, SD_FACTOR, MIN_CONTROLS };
@@ -76,6 +77,17 @@ export const GEN_SPECS = Object.freeze(Object.fromEntries(Object.values(GENS).ma
 export const GEN_STUDY = Object.freeze(Object.fromEntries(Object.entries(GEN_SPECS).map(([g, v]) => [g, v.join(",")])));
 /** Which generation's audits and references a family belongs to: 1 for Addenda 10 and 11 (replicate: true), 2 or 3 for the later ones, 0 for none. */
 export const replGenOf = (family) => (isRepl(family) ? 1 : genOf(family));
+// 2026-11-17 (brain/FISH_WIRING_RANK_WIP.md section 9): THE ORIENTATION STEP OF EACH GENERATION, MEASURED BY RE-FLYING ITS OWN FILE. RK4 became the engine default on 2026-11-04; this
+// trainer never named a step, so a generation flew whichever was the default on the day. Re-flown under both steps: Gen2 (refs, qns, qdg), Gen4 (refs, tt1) and Gen5 (tt4, tt11) reproduce
+// under the first-order step only (to 1e-7, the 6-decimal rounding of the stored weights; RK4 moves them at 1e-3); Gen6 (refs, fns) under RK4 only. Stage A and the replicates (2026-10-29/30)
+// predate the switch. Generation 7 is written INTO Gen2's file and ranked against its records, so it flies first-order. A run whose specs need two steps is refused.
+export const STEP_OF_GEN = Object.freeze({ 6: "rk4" }), STEP_DEFAULT = "euler";
+export const stepOfFamily = (family) => STEP_OF_GEN[replGenOf(family)] || STEP_DEFAULT;
+export function stepOfSpecs(specs) {
+    const steps = [...new Set(specs.map((s) => stepOfFamily(s.family)))];
+    if (steps.length !== 1) throw new Error(`the specs need ${steps.length ? "two orientation steps (" + steps.join(", ") + "): run each generation on its own" : "a spec"}`);
+    return steps[0];
+}
 export const ALIGNED = Object.freeze({ P: "B", E: "E" }), CROSS_OF = Object.freeze({ P: "E", E: "B" });
 export const STAGE_A_CELL = "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3", STAGE_B_CELL = "er:10-19,class:10-19,degree:10-19";
 export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`), ...DENSE_FAMILIES.map((f) => `${DENSE_CELL}/${f}`)].join(",");
@@ -515,14 +527,22 @@ export async function command(argv, io = {}) {
         if (records.some((r) => r.smoke) && !o.allowSmoke) { err("trainSubVestibular: the file holds smoke records (a throwaway recipe on a few dives): pass --allow-smoke to read them anyway"); return 1; }
         for (const l of reportLines(records)) out(l); return 0;
     }
+    let step; try { step = stepOfSpecs(parseSpecs(o.one || o.specs)); } catch (e) { err("trainSubVestibular: " + e.message); return 1; }
+    const was = (io.setStep || setOrientationDefault)(step);   // said by name, and carried to the worker processes (setOrientationDefault sets SWEK_6DOF_ORIENTATION)
+    try { return await runWith(o, step, io, out, err, readFile, appendFile, exists); } finally { (io.setStep || setOrientationDefault)(was); }
+}
+async function runWith(o, step, io, out, err, readFile, appendFile, exists) {
     const opts = { recipe: o.recipe, smoke: o.smoke }, log = o.quiet ? () => {} : out;
-    if (o.one) { const rec = (io.runner || runCircuit)(parseSpecs(o.one)[0], opts, o.quiet ? () => {} : (m) => err(m)); out("RESULT " + JSON.stringify(rec)); return 0; }
+    if (o.one) { const rec = (io.runner || runCircuit)(parseSpecs(o.one)[0], opts, o.quiet ? () => {} : (m) => err(m)); out("RESULT " + JSON.stringify({ ...rec, orientation: step })); return 0; }
     let have = []; if (exists(o.out)) { try { have = readRecords(readFile(o.out)); } catch (e) { err("trainSubVestibular: " + e.message); return 1; } }
     const stale = have.filter((r) => !!r.smoke !== o.smoke || (r.family !== "refs" && !sameRecipe(r, o)));
     if (stale.length) { err(`trainSubVestibular: ${o.out} holds ${stale.length} record(s) of another recipe or a smoke run (${stale.map((r) => r.spec).join(", ")}): it is not mixed with this run -- use another --out`); return 1; }
     const done = new Set(have.map((r) => r.spec)), specs = parseSpecs(o.specs), todo = specs.filter((s) => !done.has(specName(s))), tasks = TASK_NAMES.filter((t) => specs.some((s) => s.task === t)), records = [...have];
     log(`[trainSubVestibular] ${specs.length} circuits, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to train; ${o.workers} worker(s); recipe ${o.recipe.runs} x ${o.recipe.iters}${o.smoke ? " (SMOKE)" : ""}`);
-    const keep = (rec) => { appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); };
+    const mixed = have.filter((r) => r.orientation && r.orientation !== step);
+    if (mixed.length) { err(`trainSubVestibular: ${o.out} holds ${mixed.length} record(s) flown on the ${mixed[0].orientation} step and this run flies ${step}: it is not mixed with this run -- use another --out`); return 1; }
+    log(`[trainSubVestibular] orientation step: ${step} (brain/FISH_WIRING_RANK_WIP.md section 9)`);
+    const keep = (rec0) => { const rec = { ...rec0, orientation: step }; appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); };
     if (specs.some((s) => isRepl(s.family)) && !done.has(REFS_REPL)) { keep((io.refsRunner || refsRecord)("P", { ...opts, replicate: true })); log("[trainSubVestibular] references for the replicate audits (Addendum 10) done"); }
     for (const g of [2, 3, 4, 5, 6, 7]) if (specs.some((s) => genOf(s.family) === g) && !done.has(GENS[g].refs)) { keep((io.refsRunner || refsRecord)(GENS[g].task, { ...opts, replicate: GENS[g].refsGen || g })); log(`[trainSubVestibular] references for the generation ${g} audits (Addendum ${GEN_ADD[g]}) done`); }
     for (const t of tasks) if (!done.has(REFS_NAME(t))) { keep((io.refsRunner || refsRecord)(t, opts)); log(`[trainSubVestibular] references for 4b-${t} done`); }
