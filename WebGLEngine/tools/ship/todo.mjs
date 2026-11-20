@@ -548,6 +548,14 @@ export const TODO = [
         evidence: "node tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs && node tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs   # both readings pinned",
     },
     {
+        id: "fly-window-by-size",
+        status: "open", size: "small", order: 33,
+        title: "The held-trigger fly gunner with its hand window chosen by the fight's size",
+        why: "Scratch, 2026-11-20 (brain/flyTracking.mjs's header): one ship a side under the cannon-aware helm, seatFlyWired11 with no hand window leads by +1.796 (the car's gunner +1.768, the 45-degree window +1.495) -- the hand lays at the sight's shaking aim; in fleets under the helm no window trails 45 degrees (-0.176). A gunner with window 0 one ship a side and 45 in fleets would be one fly-wired gunner as good as the car's everywhere; tools/ship/takeBySizeLoadout.mjs already does the switch with the car's gunner.",
+        note: "If wanted: a seat option for the window by the side's ship count, and a registered study against the by-size button.",
+        evidence: "grep -n \"WHY THE HELD-TRIGGER GUNNER TRAILS\" brain/flyTracking.mjs",
+    },
+    {
         id: "fly-tracking-more-circuit",
         status: "open", size: "large", order: 30,
         title: "More of the tracking circuit: elevation (the sheet's other axis) and a target's motion",
