@@ -11,6 +11,7 @@ import * as NT from "./needsTask.mjs";
 import * as N from "../physics/mechanics/subNeeds.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import { mulberry } from "./pilotSubPolicy.mjs";
+import * as HULLS from "../physics/mechanics/subHulls.mjs";
 
 export const SECONDS = 600, CRUSH = 60, SURFACE_BAND = 3, SPEED = 2, LEAK_BUILD = 5;
 export const RANGES = Object.freeze({ depth: [15, 40], frac: [0.15, 0.45], leak: [0.03, 0.08], leakAt: [5, 60] });
@@ -26,6 +27,10 @@ export const HARD_LEAK = Object.freeze({ leak: Object.freeze([0.06, 0.08]) });
 export const NEED_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, blowNeed: true, blowAbove: 3, needWindowS: 10 });
 export const R12_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 203001 + i)), R12_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 204001 + i));
 const MODEL = NT.model();
+/** ROUND 13 (section 31): the needs-task vessel with subHulls' HIGH RIDER main ballast (a quarter of the weight, against 3 %) -- the hull rounds 9 and 12 said the hard leaks need. Everything else is the needs-task vessel's. */
+export const HIGH_RIDER_SPEC = Object.freeze({ ...NT.SPEC, ...HULLS.SPECS.highRider, name: "explorer-survey-highRider" });
+let HR = null;
+export const highRiderModel = () => HR || (HR = S.createSubModel(HIGH_RIDER_SPEC));
 
 /** The scenario of a seed: { seed, depth, heading, frac, leak, leakAt }. `ranges` replaces any of RANGES (round 12 draws the leak from HARD_LEAK); the draws are made in the same order, so the other fields of a seed do not move. */
 export function scenario(seed, ranges = RANGES) {
@@ -53,15 +58,16 @@ export function crew(name, ctx, knobs = FROZEN_TRIAGE) {
 
 /** Fly one scenario with one crew: { seed, crew, survived, status, crushedAt, reachedSurface, finalDepth, finalFrac, released, triage }. */
 // v4930 (round 8) -- `make(ctx)`: a caller-made captain in place of the named crew (the learned captain flies this exact loop); null keeps v4929's.
-export function fly(sc, name, { knobs = FROZEN_TRIAGE, seconds = SECONDS, dt = S.DT, make = null } = {}) {
-    let s = S.createState({ depth: sc.depth, speed: SPEED, model: MODEL }), needs = N.initialNeeds("battery", { crushDepth: CRUSH });
+// 2026-11-20 (round 13) -- `model`: the vessel (default the needs-task vessel, as before; round 13 passes highRiderModel()).
+export function fly(sc, name, { knobs = FROZEN_TRIAGE, seconds = SECONDS, dt = S.DT, make = null, model = MODEL } = {}) {
+    let s = S.createState({ depth: sc.depth, speed: SPEED, model }), needs = N.initialNeeds("battery", { crushDepth: CRUSH });
     needs.energy = N.CLASSES.battery.capacityJ * sc.frac;
-    const read = () => N.readings(MODEL, needs, s), cap = make ? make({ read, model: MODEL }) : crew(name, { read, model: MODEL }, knobs), target = Object.freeze({ depth: sc.depth, heading: sc.heading, speed: SPEED });
+    const read = () => N.readings(model, needs, s), cap = make ? make({ read, model }) : crew(name, { read, model }, knobs), target = Object.freeze({ depth: sc.depth, heading: sc.heading, speed: SPEED });
     let status = "submerged", crushedAt = null, reached = false, released = false;
     const total = Math.round(seconds / dt);
     for (let i = 0; i < total; i++) {
         const cmd = cap(s, target, [0, 0, 0]);
-        const res = N.stepNeeds(MODEL, s, needs, cmd, dt, [0, 0, 0], leakAt(sc, i * dt), cap.aux);
+        const res = N.stepNeeds(model, s, needs, cmd, dt, [0, 0, 0], leakAt(sc, i * dt), cap.aux);
         s = res.state; needs = res.needs;
         if (res.status !== "submerged" || !Number.isFinite(s.pos[2])) { status = res.status === "submerged" ? "lost" : res.status; crushedAt = (i + 1) * dt; break; }
         if (-s.pos[2] < SURFACE_BAND) reached = true;

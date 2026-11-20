@@ -668,3 +668,63 @@ Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by 
 * **One more learning round would need the price set first,** from what the boat is for (for example, a lost boat costs the goals it would have delivered for the rest of the run), and registered before training.
 
 **Status: round 11 CLOSED as registered.**
+
+## 31. ROUNDS 13 TO 15, REGISTRATIONS (2026-11-20, committed before any seed of their sets is flown)
+
+Keith, 2026-11-20: "Let's do all, those as you suggested, and also item 5" -- the four OPEN stations entries in `tools/ship/nextRounds.mjs` (COND in the Sub Aquarium, done before this section: a page change, no claim) and the page gate's flake.
+
+**What exists before this section, disclosed.** Round 13's vessel option (`stationsTask.fly`'s `model`, and `HIGH_RIDER_SPEC` / `highRiderModel()`: the needs-task vessel with subHulls' `highRider` main ballast, a quarter of the weight) is written. It was checked on three seeds OUTSIDE every set (990001 to 990003) with the leak set to 0: the NONE crew holds its target depth on it, and TRIAGE and NEED surface for charge as they do on the default vessel. Nothing about the leak was flown. Nothing for rounds 14 and 15 is written.
+
+### ROUND 13: THE HULL THAT CAN LIFT THE HARD LEAKS
+
+**THE QUESTION.** Rounds 9 and 12 stopped at DEV, and section 28 put the limit on the hull: a leak over the 6 % weight leaves the main tank's 3 % too little to matter. On a vessel whose main ballast is a quarter of its weight, (a) does the hull itself keep the hard-leak boats, and (b) does blowing by NEED then beat TRIAGE?
+
+**THE TASK.** Round 12's: round 2's task with the leak U(0.06, 0.08) (`HARD_LEAK`), unchanged. **The vessel** is the needs-task vessel with `ballastRange` 0.25 (`highRiderModel()`); everything else about it is the same (the 6 % drop weight, the six-level bottle, the 60 m hull).
+
+**THE CREWS (frozen, nothing tuned).** TRIAGE (round 2's `FROZEN_TRIAGE`) and NEED (round 12's `NEED_KNOBS`: blowing when the charge would run out before the climb reaches 3 m, over a 10 s window), each on the high rider; TRIAGE on the default vessel (round 12's boat), for the hull's question. Reported, not in a verdict: FIXED on the high rider.
+
+**THE SETS.** DEV: 206001 to 206048 (48 dives, twice round 12's, because round 12's bar was a count and it fell short on 24). HELD: 207001 to 207096.
+
+**THE DEV CHECKS (non-degeneracy, nothing chosen).** V1 goes to HELD iff TRIAGE on the high rider and TRIAGE on the default vessel differ in survival on at least 3 of the 48. V2 goes to HELD iff NEED and TRIAGE on the high rider differ on at least 3 of the 48. A verdict whose check fails is reported as STOPPED AT DEV, as rounds 9 and 12 were.
+
+**THE VERDICTS (HELD, once; exact one-sided sign tests on the discordant dives, p at most 0.05).**
+* **V1 (the hull):** THE HIGH RIDER KEEPS MORE BOATS (TRIAGE on it against TRIAGE on the default vessel), THE DEFAULT VESSEL KEEPS MORE, or NO DIFFERENCE SHOWN.
+* **V2 (the captain):** NEED BEATS TRIAGE, TRIAGE BEATS NEED, or NO DIFFERENCE SHOWN, on the high rider.
+
+**EXPECTATION.** V1: the high rider keeps more about 85 percent. V2: with a hull that lifts the leak, TRIAGE may already keep nearly every boat; V2 STOPPED AT DEV about 50 percent, NO DIFFERENCE about 30, NEED BEATS TRIAGE about 20.
+
+### ROUND 14: SONAR MEETS DAMAGE CONTROL
+
+**THE QUESTION.** Round 7 showed two winners can interfere on one boat, and round 10 that a conditional latch makes them combine. The duel (rounds 3 and 6) has never had a leak, so sonar and damage control have never met. When a fighting boat is breached, does COND's rule (drop the weight, fight on, go up only if it sinks again) beat TRIAGE's (drop the weight and go up for good)?
+
+**THE TASK.** Round 3's duel (`brain/subDuel.mjs` with its needs option; the battery U(0.05, 0.30) of `duelStationsTask.chargeOf`; 240 s; the four drone kinds), with two changes for side A only, said plainly:
+* **side A flies the needs-task vessel** (the EXPLORER with the tank, the six-level bottle and the 6 % drop weight, `needsTask.model()`), because damage control needs a tank and a weight; the drone keeps the duel's vessel;
+* **side A is breached:** a leak of U(0.03, 0.08) of its weight starting at U(20, 120) s, built over 5 s, never mended, drawn from the seed by a generator separate from the duel's (the duel's own draws do not move).
+`subDuel.duel` gains options for this (side A's vessel, side A's leak, and passing side A's captain's aux to the needs step); with none given it is the duel it was, bit for bit (gated).
+
+**THE CREWS** (side A; the sonar station and round 3's tactician as in rounds 3 and 6; the energy claim gated by round 3's RISK rule in all three):
+* **DC:** RISK plus the damage station, by rank (blow, then drop the weight).
+* **TRIAGE-D:** the same stations under `triageCaptain` with `FROZEN_TRIAGE`: once breached, drop the weight at once and claim the surface for the rest of the duel.
+* **COND-D:** the same under `COND_KNOBS`: drop at once; claim the surface only on a second sinking after the weight is gone.
+
+**THE SETS.** DEV: 208001 to 208006 per kind (24 duels), only to check that COND-D and TRIAGE-D differ (in score or in survival) on at least 4. HELD: 209001 to 209024 per kind (96 duels).
+
+**THE VERDICT (HELD, once; exact one-sided sign tests).** COND-D BEATS TRIAGE-D iff COND-D has the higher score on more duels by the test AND is not shown worse on survival (side A afloat at the end). COND-D WINS THE FIGHT BUT LOSES BOATS if the score test passes and the survival test goes against it. Otherwise COND-D DOES NOT BEAT TRIAGE-D. Reported: DC against both, on both outcomes; the mean scores; how often each latched.
+
+**EXPECTATION.** The duel is short and the fight is what scores; a boat that goes up for good fights on at the surface, badly. COND-D BEATS TRIAGE-D about 55 percent; it loses boats about 20 percent; NO DIFFERENCE about 25.
+
+### ROUND 15: A LEARNED COURIER WITH THE MISSION'S PRICE ON A BOAT
+
+**THE QUESTION.** Round 11's learner kept 91 boats and delivered 0.46 goals because its fitness priced a kept boat at 2 goals, a number written into the registration. With the price set from the mission instead, does a learned captain match COND?
+
+**THE PRICE, FIXED NOW.** A lost boat costs the goals it would have delivered for the rest of the run, at the rate COND delivered on round 10's HELD runs: R = 2.42 goals per 1,200 s. **The mission value of a run is goals - R x (1,200 - lostAt) if the boat is lost, and goals if it is kept.** R is taken from a committed result (section 29), not from anything in this round.
+
+**THE LEARNED CAPTAIN.** Round 11's, unchanged (the helm, the damage station, the SURFACE and DROP units over the same ten features). **The fitness is the mission value summed over the set.** Training is round 11's ES (mu 4, lambda 8, sigma 0.5 halving every 7 generations, 20 generations, from zeros) with **seed 9015**, on 16 fresh TRAIN seeds; the best of the last 4 parents on 16 fresh SELECTION seeds is frozen to `brain/learnedCourierPriced.json` and committed before HELD.
+
+**THE SETS.** TRAIN: 210001 to 210016. SELECTION: 210501 to 210516. HELD: 211001 to 211096.
+
+**THE VERDICT (HELD, once; exact one-sided sign tests).** PRICED against COND on the mission value: PRICED BEATS COND, COND BEATS PRICED, or NO DIFFERENCE SHOWN. Reported the same way: goals, survival, and round 11's LEARNED on the same seeds.
+
+**EXPECTATION.** A lost boat now costs at most 2.42 goals and usually less, so the learner should trade some boats for deliveries. COND BEATS PRICED about 55 percent (the hand rule reads the planned route, the learner one feature of it); NO DIFFERENCE about 35; PRICED BEATS COND about 10.
+
+**No file among the stations' tasks, captains or notes uses a seed from 206000 to 211999** (grep of `brain/stationsTask.mjs`, `duelStationsTask.mjs`, `courierTask.mjs`, `breachCourierTask.mjs`, `learnedC*.mjs` and this note, 2026-11-20). Elsewhere in the tree those numbers appear only in unrelated records (physics results, the universe, notes); no stations code reads them.
