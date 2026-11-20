@@ -54,6 +54,21 @@ export function learnedCourierCaptain(ctx, theta, { pilot = AS.pilot(), dt = 1 /
 /** One run of round 7's breached courier with the learned captain made in its loop. */
 export const runLearned = (seed, theta, opts = {}) => BC.run(seed, "LEARNED", { ...opts, make: (ctx) => learnedCourierCaptain(ctx, theta) });
 
+// ---- ROUND 15 (brain/SUB_STATIONS_WIP.md section 31): the same captain, trained on the MISSION'S PRICE of a boat --------------------------------------------------------------------------------------------------
+/** The price, as registered: a lost boat costs the goals it would have delivered for the rest of the run, at COND's rate on round 10's HELD runs (2.42 goals per 1,200 s, section 29). */
+export const PRICE = Object.freeze({ goals: 2.42, seconds: 1200, rate: 2.42 / 1200 });
+export const ES15 = Object.freeze({ ...ES, seed: 9015 });
+export const R15_TRAIN_SET = Object.freeze(Array.from({ length: 16 }, (_, i) => 210001 + i)), R15_SELECTION_SET = Object.freeze(Array.from({ length: 16 }, (_, i) => 210501 + i)), R15_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 211001 + i));
+/** The mission value of one run record (breachCourierTask.run's): its goals, less PRICE.rate x the seconds left if the boat was lost. */
+export function missionValue(r) {
+    if (!r || !Number.isFinite(r.goals) || typeof r.survived !== "boolean") throw new Error("learnedCourier.missionValue: a run record { goals, survived, lostAt } is needed");
+    if (r.survived) return r.goals;
+    if (!Number.isFinite(r.lostAt)) throw new Error("learnedCourier.missionValue: a lost run needs its lostAt");
+    return r.goals - PRICE.rate * Math.max(0, CT.SECONDS - r.lostAt);
+}
+/** Round 15's fitness over a set: the mission value summed. */
+export function fitnessPriced(theta, seeds, opts = {}) { let f = 0; for (const s of seeds) f += missionValue(runLearned(s, theta, opts)); return f; }
+
 /** The registered fitness over a set: goals + 2 x survived + 0.001 x the seconds lived. */
 export function fitness(theta, seeds, opts = {}) {
     let f = 0;

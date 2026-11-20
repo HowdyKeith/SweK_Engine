@@ -6,6 +6,8 @@
 // SABOTAGED -- 12 mutants of brain/learnedCourier.mjs and breachCourierTask.mjs, each alone in place and restored, EVERY ONE RED BY NAME (final pass): M01 the need by the straight line always | M02 the need not less the charge |
 //   M03 a 10 s goal window | M04 a goal never noted | M05 charging counted as spent | M06 breached never latched | M07 DROP from the SURFACE weights | M08 the fitness without survival | M09 the seed 9010 |
 //   M10 the choice by training fitness | M11 HELD from 205002 | M12 `make` ignored. M05 WENT 0 RED FIRST (no row had the battery rise); a fall then a charge is asked now.
+// 2026-11-20 -- ROUND 15 (section 6): 9 mutants of learnedCourier.mjs, every one red by name (final pass): P01 the price at 2 a boat | P02 the time left from 600 s | P03 a lost boat free | P04 a kept boat +2 | P05 round 11's
+//   fitness | P06 ES15 at 9009 | P07 24 generations | P08 HELD on round 11's | P09 no lostAt accepted. P05 WENT 0 RED FIRST (the row's 60 s run kept its boat, where the value IS the goals); a lost run (DEV 189001) is asked now.
 //   AND A ROW OF MINE CLAIMED TOO MUCH: it said the stub ES's best climbs. A (mu, lambda) ES keeps no parents, and on this stub the best falls after generation 0; the claim is gone and the comment says why.
 "use strict";
 import fs from "node:fs";
@@ -99,6 +101,30 @@ guarded("section 5", () => {
     const j = JSON.parse(fs.readFileSync(f, "utf8"));
     ok("the frozen captain is 20 finite weights, the registered ES and sets, its fitness and 20 generations of history", j.theta.length === 20 && j.theta.every(Number.isFinite) && J(j.es) === J(L.ES) && j.train === 16 && j.selection === 16 && j.history.length === 20 && Number.isFinite(j.selFit));
 });
+
+sec("6. ROUND 15 (section 31): the mission's price on a boat");
+await (async () => {
+    try {
+        ok("THE PRICE AS REGISTERED: 2.42 goals per 1,200 s (COND on round 10's HELD runs), frozen", L.PRICE.goals === 2.42 && L.PRICE.seconds === 1200 && L.PRICE.rate === 2.42 / 1200 && Object.isFrozen(L.PRICE));
+        const mv = L.missionValue;
+        ok("the mission value: a kept boat is its goals; a boat lost at 600 s with 1 goal is 1 - 1.21; one lost at 1,200 s costs nothing more; one lost at 0 s costs the whole 2.42",
+            mv({ goals: 3, survived: true, lostAt: null }) === 3 && Math.abs(mv({ goals: 1, survived: false, lostAt: 600 }) - (1 - 1.21)) < 1e-12 && mv({ goals: 2, survived: false, lostAt: 1200 }) === 2 && Math.abs(mv({ goals: 0, survived: false, lostAt: 0 }) + 2.42) < 1e-12);
+        ok("a record that is not a run, or a lost run with no time, is refused by name", /^learnedCourier\.missionValue: a run record/.test(throws(() => mv({ goals: 1 })) || "") && /^learnedCourier\.missionValue: a lost run needs its lostAt/.test(throws(() => mv({ goals: 1, survived: false, lostAt: null })) || ""));
+        const th = Array.from({ length: 20 }, (_, i) => ((i * 7) % 5 - 2) / 4), seed = BC.DEV_SET[0], r = L.runLearned(seed, th, { seconds: 60 });
+        ok("round 15's fitness is the mission value of the learned captain's runs, summed (a DEV seed of round 7, 60 s)", L.fitnessPriced(th, [seed, seed], { seconds: 60 }) === 2 * mv(r), J({ goals: r.goals, survived: r.survived }));
+        const z = new Array(20).fill(0), lost = L.runLearned(189001, z);
+        ok("...and on a LOST run it is the price, not the goals: DEV 189001 with all-zero weights is lost at 781 s with 0 goals, worth 0 - 2.42 x 419 / 1,200", !lost.survived && lost.goals === 0 && Math.abs(L.fitnessPriced(z, [189001]) - mv(lost)) < 1e-12 && L.fitnessPriced(z, [189001]) < -0.8, J({ lostAt: lost.lostAt, value: mv(lost) }));
+        ok("round 15's ES is round 11's with ONLY the seed changed, to 9015", J({ ...L.ES15, seed: 9009 }) === J(L.ES) && L.ES15.seed === 9015 && Object.isFrozen(L.ES15));
+        const target = Array.from({ length: 20 }, (_, i) => (i % 3) - 1), fit = async (t) => -t.reduce((a, w, i) => a + (w - target[i]) ** 2, 0);
+        const fp15 = (await L.train({ seeds: [], es: { ...L.ES15, generations: 3 }, fit })).parents.map((p) => p.fit.toFixed(6)).join(",");
+        ok("...and it draws other children than round 11's (the stub's fingerprint at 9015 is not 9009's)", fp15 !== FP, fp15);
+        ok("round 15's sets: TRAIN 210001-210016, SELECTION 210501-210516, HELD 211001-211096, disjoint from round 11's", L.R15_TRAIN_SET.length === 16 && L.R15_TRAIN_SET[0] === 210001 && L.R15_SELECTION_SET[15] === 210516 && L.R15_HELD_SET.length === 96 && L.R15_HELD_SET[0] === 211001 && !L.R15_HELD_SET.some((x) => L.HELD_SET.includes(x)));
+        const f = new URL("./learnedCourierPriced.json", import.meta.url);
+        if (!fs.existsSync(f)) { console.log("  NOT YET  brain/learnedCourierPriced.json is written by the training (tools/ship/trainLearnedCourier.mjs --round 15 --write) and committed before HELD is flown"); return; }
+        const j = JSON.parse(fs.readFileSync(f, "utf8"));
+        ok("the frozen PRICED captain is 20 finite weights, round 15's ES, price and sets, its fitness and 20 generations of history", j.round === 15 && j.theta.length === 20 && j.theta.every(Number.isFinite) && J(j.es) === J(L.ES15) && J(j.price) === J(L.PRICE) && j.train === 16 && j.selection === 16 && j.history.length === 20 && Number.isFinite(j.selFit));
+    } catch (e) { ok("section 6 ran to the end", false, "THREW " + String(e && e.message)); }
+})();
 
 finished = true;
 console.log(fails ? `\nlearnedCourier-selfcheck: ${fails} FAILED` : "\nlearnedCourier-selfcheck: all checks pass");
