@@ -16561,6 +16561,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "needs rounds 38 to 40 (the aquarium's survey profiles under a biased gauge): 3 gates, each green on arrival, each registered before it was written, each with its mutation pass logged in its header (17, 16 and 17 mutants; four survivors on first passes, each fixed and re-run red) and a result section re-derived from the committed run.",
     }),
+    since637: Object.freeze({
+        at: "v4929", swept: 7, green: 7, red: 0,
+        added: Object.freeze([
+            "brain/courierTask-selfcheck.mjs",
+            "brain/duelStationsTask-selfcheck.mjs",
+            "brain/stationsTask-selfcheck.mjs",
+            "brain/subStations-selfcheck.mjs",
+            "brain/subStationsNavSonar-selfcheck.mjs",
+            "render/advisorTrace-selfcheck.mjs",
+            "render/subAquariumCaptain-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the submarine stations (brain/SUB_STATIONS_WIP.md, rounds 1 to 6, each registered before it was flown) and the aquarium's advisor trace and captain: 7 gates, each green on arrival and each carrying its mutation pass in its header (26, 24, 21 + 5, 23 + 6, 14, 39 and 27 mutants; every survivor of a first pass given a row or argued equivalent by name)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

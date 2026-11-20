@@ -1,6 +1,6 @@
 // WebGLEngine/tools/flyCx-selfcheck.mjs -- UNNUMBERED. Run: node tools/flyCx-selfcheck.mjs
 //
-// THE GATE OF tools/flyCxLib.mjs AND tools/flyCx.mjs: the fruit fly's heading loop cut out of the hemibrain adjacency export, from a fixture of seven cells worked out by hand (no real body id).
+// THE GATE OF tools/flyCxLib.mjs AND tools/flyCx.mjs: the fruit fly's heading loop (and, since 2026-11-19, its steering readout) cut out of the hemibrain adjacency export, from a fixture of seven cells worked out by hand (no real body id).
 //
 // THE FIXTURE (traced-neurons.csv): 100 EPG L1 | 20 EPG R2 | 3 PEN_a L2 | 4 PEN_b R3 | 5 Delta7 (..._R) | 6 PEG L1 | 9 EPG with a comma and no side in its name (a quoted field) | 7 EPGt, 8 PFL3 (types that are NOT chosen) | 'abc' EPG (not an id).
 //   The chosen cells in ascending NUMERIC id: 3 (PEN_a, layer 1) 4 (PEN_b, 2) 5 (Delta7, 3, inhibitory) 6 (PEG, 4) 9 (EPG, 0, no side) 20 (EPG, R) 100 (EPG, L) = indices 0..6.
@@ -24,6 +24,15 @@
 // ONE WENT 0 RED: K14 (the command no longer strips a carriage return from each row). EQUIVALENT: a Windows line end leaves "\r" on the weight, and Number("3\r") is 3, so the strip changed nothing; it was CUT (the gate keeps its Windows-line-ends row, which
 // is a behaviour worth holding). The cut itself broke the command once, in a way the gate caught at once: the comment that said why was put on the line of the statement that moves to the next row, and swallowed it.
 // NOT TRIED: nothing the gate can see is left out.
+//
+// 2026-11-19 -- THE STEERING READOUT (section 3b and three command rows; backlog `circuits-next-from-open-data`): the five types and PFL1, PFL2, PFL3 as the outputs, and the P-FL name's side (PFL3(PB12c)_L2_C4: the glomerulus, then the column).
+// SABOTAGED -- 24 mutants, EVERY ONE RED BY A ROW THAT NAMES IT (count of red rows): of tools/flyCxLib.mjs S01 the P-FL side pattern dropped (2) | S02 _irreg not read (1) | S03 the column number optional (1) | S04 the pattern anywhere in the name (1) |
+//   S05 steering's outputs the heading loop's (2) | S06 the P-FL cells inhibitory (1) | S07 PFL2 left out (8) | S08 the circuit option ignored (7) | S09 no unknown-circuit refusal (1, the inherited name `toString`) | S10 the io from the default spec (2) |
+//   S11 the cells from the default spec (3) | S12 the rule always headingLoop (2) | S13 CIRCUITS not frozen (1) | S14 the steering types not frozen (1) | S15 the steering file the heading loop's (2);
+//   of tools/flyCx.mjs K01 --circuit not an option (3) | K02 any circuit accepted (1) | K03 the circuit not passed on (1) | K04 the default --out always the heading loop's (1) | K05 the old licence note on every circuit (1) | K06 the new one on the heading loop (1) |
+//   K07 the cell types the first five (1) | K08 the label always "heading loop" (1) | K09 the output note always E-PG and P-EG (1).
+// K04 WENT RED ONLY AFTER A ROW WAS ADDED FOR IT: written before the mutants, the gate passed --out on every steering run and never asked which file the steering circuit names by default. The row was written first and the mutant then run against it.
+// THE HEADING LOOP IS HELD UNCHANGED twice: a row runs the default circuit on the grown fixture (the six edges of section 2), and off the gate the real export was cut again and compared: byte for byte the vendored hemibrain-cx-heading-loop.json.
 //
 "use strict";
 import fs from "node:fs";
@@ -101,6 +110,30 @@ guarded("section 3", () => {
     ok("a table with none of the five types is refused by name; one that lacks a type (no Delta7) is refused naming the type", /^flyCx\.circuitOf: no neuron of the five types/.test(none || "") && /no neuron of type Delta7 in the table/.test(noDelta || ""), (none || "") + " | " + (noDelta || ""));
 });
 
+sec("3b. the steering readout (2026-11-19: the heading loop's five types and PFL1, PFL2, PFL3 as the outputs)");
+guarded("section 3b", () => {
+    // THE FIXTURE GROWS by two P-FL cells, named the way the export names them (bridge glomerulus, then fan-shaped-body column): 11 PFL1 R2_C7 | 12 PFL2 L1_C5; cell 8 (PFL3_L) was already there, NOT chosen by the heading loop.
+    // Three more rows: 5>11 : 4 (Delta7 onto PFL1, inhibitory) | 20>12 : 3 (EPG onto PFL2) | 11>12 : 2 (below the floor). Cells by id 3 4 5 6 8 9 11 12 20 100 = indices 0..9; 100>8 : 9 is now an edge.
+    const rows = [...NEURON_ROWS, { bodyId: "11", type: "PFL1", instance: "PFL1(PB12a)_R2_C7" }, { bodyId: "12", type: "PFL2", instance: "PFL2(PB12b)_L1_C5" }];
+    const conn = [...ALL, { pre: 5, post: 11, weight: 4 }, { pre: 20, post: 12, weight: 3 }, { pre: 11, post: 12, weight: 2 }];
+    const c = F.circuitOf(rows, conn, { circuit: "steering" }), s = c.selection;
+    ok("ten cells in ascending id, the P-FL cells among them with their classes; the rule is named steering", J(c.neurons.map((n) => [n.id, n.cls])) === '[[3,"PEN_a"],[4,"PEN_b"],[5,"Delta7"],[6,"PEG"],[8,"PFL3"],[9,"EPG"],[11,"PFL1"],[12,"PFL2"],[20,"EPG"],[100,"EPG"]]' && s.rule === "steering", J(c.neurons.map((n) => n.id)));
+    ok("the P-FL cells take layers 5, 6, 7 after the heading loop's 0..4 and are excitatory", J(c.neurons.filter((n) => /PFL/.test(n.cls)).map((n) => [n.cls, n.layer, n.nt])) === '[["PFL3",7,"Exc"],["PFL1",5,"Exc"],["PFL2",6,"Exc"]]');
+    ok("nine edges at the floor of 3, sorted: [0,9,12,+] [2,6,4,-] [2,9,3,-] [3,5,3,+] [8,2,4,+] [8,7,3,+] [8,9,8,+] [9,0,5,+] [9,4,9,+]: 51 synapses, 7 excitatory and 2 inhibitory",
+        J(c.edges) === "[[0,9,12,1],[2,6,4,-1],[2,9,3,-1],[3,5,3,1],[8,2,4,1],[8,7,3,1],[8,9,8,1],[9,0,5,1],[9,4,9,1]]" && s.synapses === 51 && s.excitatoryEdges === 7 && s.inhibitoryEdges === 2, J(c.edges));
+    ok("the inputs stay where heading and turning arrive (E-PG and P-EN: 0 1 5 8 9) and the outputs are the P-FL cells (4 6 7), not the E-PG or P-EG cells", J(c.io) === '{"inputs":[0,1,5,8,9],"outputs":[4,6,7]}', J(c.io));
+    ok("the sides: a P-FL name gives its bridge glomerulus's side (11 R2_C7 -> R, 12 L1_C5 -> L) as the other types' names do", J(c.neurons.map((n) => n.side)) === '["L","R","R","L","L",null,"R","L","R","L"]', J(c.neurons.map((n) => n.side)));
+    const pfl = [["PFL3(PB12c)_L2_C4", "L"], ["PFL1(PB12a)_L1_C8_irreg", "L"], ["PFL2(PB12b)_R5_C1", "R"], ["PFL3(PB12c)_R2_C", null], ["PFL3(PB12c)_C4", null], ["PFL3(PB12c)_L2_C4_odd", null], ["x_L2_C4_R", "R"]];
+    const badPfl = pfl.filter(([t, want]) => F.sideOfInstance(t) !== want).map(([t, want]) => `${t} -> ${F.sideOfInstance(t)} (want ${want})`);
+    ok("sideOfInstance reads a P-FL name's glomerulus side (_L2_C4, _L1_C8_irreg) and nothing looser (a column without a number, no glomerulus, another suffix)", badPfl.length === 0, badPfl.join(" ; "));
+    const hl = F.circuitOf(rows, conn);
+    ok("THE HEADING LOOP IS UNCHANGED by the P-FL rows: the default circuit on the grown fixture is the six edges of section 2 and the same io", J(hl.edges) === "[[0,6,12,1],[2,6,3,-1],[3,4,3,1],[5,2,4,1],[5,6,8,1],[6,0,5,1]]" && J(hl.io) === '{"inputs":[0,1,4,5,6],"outputs":[3,4,5,6]}' && hl.selection.rule === "headingLoop", J(hl.edges));
+    const noPfl1 = throws(() => F.circuitOf(NEURON_ROWS, ALL, { circuit: "steering" })), unk = throws(() => F.circuitOf(rows, conn, { circuit: "toString" }));
+    ok("the steering circuit refuses a table without PFL1 and PFL2 naming them; an unknown circuit name is refused (an inherited name like toString too)", /no neuron of type PFL1, PFL2 in the table/.test(noPfl1 || "") && /^flyCx\.circuitOf: no circuit named "toString"/.test(unk || ""), (noPfl1 || "did not throw") + " | " + (unk || "did not throw"));
+    ok("the circuits are frozen, the heading loop's spec IS the five types and its old io, and the steering file is a different file", Object.isFrozen(F.CIRCUITS) && Object.isFrozen(F.CIRCUITS.steering) && Object.isFrozen(F.CIRCUITS.steering.types) && F.CIRCUITS.headingLoop.types === F.CELL_TYPES && F.CIRCUITS.headingLoop.outputs === F.OUTPUT_CLASSES &&
+        F.CIRCUITS.headingLoop.out === "vendor/hemibrain/hemibrain-cx-heading-loop.json" && F.CIRCUITS.steering.out === "vendor/hemibrain/hemibrain-cx-steering.json" && F.CIRCUITS.steering.types.length === 8);
+});
+
 sec("4. the command");
 guarded("section 4", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "flycx-")), nf = path.join(dir, "traced-neurons.csv"), cf = path.join(dir, "traced-total-connections.csv"), of = path.join(dir, "out", "cx.json");
@@ -135,11 +168,23 @@ guarded("section 4", () => {
     ok("a file with Windows line ends is read the same (6 edges)", cr.status === 0 && /6 edges of at least 3 synapses/.test(cr.stdout), cr.stdout.slice(0, 200) + cr.stderr);
     const nolast = path.join(dir, "nolast.csv"); fs.writeFileSync(nolast, CONN_CSV.trimEnd());
     ok("a file with no line end after its last row is read whole too (11 rows)", /11 connection rows read/.test(run(["--neurons", nf, "--connections", nolast, "--out", path.join(dir, "nl.json")]).stdout));
+    const n2 = path.join(dir, "n2.csv"), c2 = path.join(dir, "c2.csv");
+    fs.writeFileSync(n2, NEURON_CSV.trimEnd() + "\n11,PFL1,PFL1(PB12a)_R2_C7\n12,PFL2,PFL2(PB12b)_L1_C5\n"); fs.writeFileSync(c2, CONN_CSV + "5,11,4\n20,12,3\n11,12,2\n");
+    const st = run(["--neurons", n2, "--connections", c2, "--circuit", "steering", "--out", path.join(dir, "st.json"), "--write"]);
+    let sj = null; try { sj = JSON.parse(fs.readFileSync(path.join(dir, "st.json"), "utf8")); } catch (e) { sj = null; }
+    ok("--circuit steering cuts the steering readout: it says so, names its outputs, and the file records the rule, the eight types, the io and the licence as the project page states it",
+        st.status === 0 && /steering readout: 10 neurons/.test(st.stdout) && /output cells 3 \(PFL1, PFL2 and PFL3\)/.test(st.stdout) && /9 edges of at least 3 synapses/.test(st.stdout) && sj && sj.meta.selection.rule === "steering" && sj.meta.cellTypes.length === 8 &&
+        J(sj.io) === '{"inputs":[0,1,5,8,9],"outputs":[4,6,7]}' && /Hemibrain is licensed under CC-BY/.test(sj.meta.license), st.stdout.slice(0, 300) + st.stderr);
+    const sdry = run(["--neurons", n2, "--connections", c2, "--circuit", "steering"]), dflt = run(["--neurons", n2, "--connections", c2]), badc = run(["--neurons", n2, "--connections", c2, "--circuit", "bogus"]);
+    ok("without --circuit the command is the heading loop and its file the old one; an unknown circuit is refused by name, exit 2, nothing on stdout", dflt.status === 0 && /heading loop: 7 neurons/.test(dflt.stdout) && /hemibrain-cx-heading-loop\.json\)/.test(dflt.stdout) &&
+        badc.status === 2 && badc.stdout === "" && /--circuit must be one of headingLoop, steering, got bogus/.test(badc.stderr), dflt.stdout.slice(0, 200) + badc.stderr);
+    ok("--circuit steering without --out names ITS OWN file (vendor/hemibrain/hemibrain-cx-steering.json), never the heading loop's", sdry.status === 0 && /dry run \(pass --write to write vendor[\\/]hemibrain[\\/]hemibrain-cx-steering\.json\)/.test(sdry.stdout), sdry.stdout.slice(-200));
     fs.rmSync(dir, { recursive: true, force: true });
 });
 
 sec("5. NOT CHECKED");
 console.log("  NOT CHECKED  the signs: they are the literature's as remembered, assigned by type; the gate holds that the code assigns what it says, not that what it says is right");
+console.log("  NOT CHECKED  that P-FL cells are cholinergic (the steering readout's three types are given Exc as remembered), or that the bridge side of a P-FL cell is the side it steers: the side here is its glomerulus's, as for the other types");
 console.log("  NOT CHECKED  that these five types are the whole heading loop of the fly (the real central complex has many more cell types that carry heading to the steering cells); the file says what it holds");
 
 finished = true;

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "cde6852e33d65aba208c9b96d45ae749cde83c5a",
+ "head": "30da26f506b062c28cdc1625fed8d3f66d0da92d",
  "bodies": {
   "box3d": [
    {
@@ -380,8 +380,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 56358,
-    "sha": "1982a832c21960c7844ce1eb521bca3c3a5e8736"
+    "bytes": 59791,
+    "sha": "6b949003dda79eb1ff8d31ff459cfd534516902b"
    },
    {
     "path": "switchboard.html",
@@ -389,9 +389,14 @@
     "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
-    "path": "tools/flyCx.mjs",
-    "bytes": 6499,
-    "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
+    "path": "tools/flyCx-selfcheck.mjs",
+    "bytes": 31144,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
+   },
+   {
+    "path": "tools/flyCxLib.mjs",
+    "bytes": 10103,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
    },
    {
     "path": "tools/ship/flyCxPilotFile-selfcheck.mjs",
@@ -975,8 +980,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3813243,
-    "sha": "c00bcb727795247fec881d13217c62aab1eec06d"
+    "bytes": 3815416,
+    "sha": "48018322cc57028b74312d0c5e6965465151ee7d"
    },
    {
     "path": "mpm3d.html",
@@ -1115,8 +1120,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 56358,
-    "sha": "1982a832c21960c7844ce1eb521bca3c3a5e8736"
+    "bytes": 59791,
+    "sha": "6b949003dda79eb1ff8d31ff459cfd534516902b"
    },
    {
     "path": "svg-forge.html",

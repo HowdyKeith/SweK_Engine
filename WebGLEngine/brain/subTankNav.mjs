@@ -128,6 +128,8 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
             if (x < 0 || x > scene.length || y < 0 || y > scene.width) return { depth: goal.depth, heading: Math.atan2(-(scene.width / 2 - y), scene.length / 2 - x), speed: 2 };   // outside the tank: back to the middle, as a wanderer does
             return H.hardTarget(arm, state, field, goal);
         },
+        /** 2026-11-19 (brain/SUB_STATIONS_WIP.md round 5): the planned route's length from (x, y) to the goal -- the field's distance at that cell -- or null with no plan, or no route from there. Reads; changes nothing. */
+        routeLength(x, y) { if (!field) return null; const c = N.cellOf(field, x, y); return c && field.dist[c.i] < N.BIG ? field.dist[c.i] : null; },
         snapshot() { return { arm, goal: goal ? { ...goal } : null, arrivals, hits, replans, noRoute, margin, travel, contact, subHits, subContact, t: lastT }; },
     };
 }

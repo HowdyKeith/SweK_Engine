@@ -255,6 +255,8 @@
   "brain/SUBMARINE_WIP.md": "another chat's work-in-progress note; not edited or linked from this chat",
   "brain/LESION_LEFT_SIDE_WIP.md": "the left-side lesion round: its registration and its result (NOT REPLICATED); nothing to run",
   "brain/RUNG_4A_V6_SHIFT_MAP_WIP.md": "rung 4a version 6, the glomerulus-shift map: its registration and its result (NO SIGNAL); nothing to run",
+  "brain/STEERING_READOUT_WIP.md": "the fly steering-readout round: its registration and its result (FAIL WITH SIGNAL: the P-FL readout reads what the heading loop's outputs read); nothing to run",
+  "brain/SUB_STATIONS_WIP.md": "the submarine stations: the design and rounds 1 to 6, each registered before it was flown and read once; one run replays with tools/ship/takeStationRun.mjs",
   "brain/SUB_ECCM_WIP.md": "the submarine duel's seeker ECCM round (item 1 of section E): its registration and its result; nothing to run",
   "brain/SUB_ENERGY_WIP.md": "the submarine duel's charge-budget round (item 2 of section E): its registration and its results; nothing to run",
   "brain/SUB_EVADE_WIP.md": "the submarine duel's the turn read of the evade series: its registration and its DEV and HELD results (brain/subEvadeDev.json, brain/subEvadeHeld.json); nothing to run",

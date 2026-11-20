@@ -1,0 +1,400 @@
+# The stations of a submarine, and a captain between them (2026-11-19; UNNUMBERED; round 1 of `ai-managed-sub-stations`)
+
+Keith's idea (the backlog entry): "the engine's AI managing ALL the stations of a submarine -- helm and planes, ballast and trim, navigation, the sensors, and the energy and hull -- each by a brain, instead of one pilot flying the whole boat." Keith, 2026-11-19: "And the next ai-managed-sub-stations round." The entry waited on the needs task, because "the stations only conflict when the boat has needs". That task exists (`brain/needsTask.mjs`, rounds 3 to 40 of `brain/NEEDS_AND_LIMITS.md`), so this round starts it.
+
+## 1. What a station is
+
+The entry's own sketch, made concrete in `brain/subStations.mjs`:
+
+* **A station** is a function from what that station can sense to what it commands. It sees only what it is handed: the energy station gets the needs readings and nothing of the mission; damage control gets the state and the target the helm flew.
+* **Two kinds.** A TARGET station may claim the target the helm will fly (a depth, a heading, a speed, the surface). A COMMAND station may override the helm's commands after the helm has spoken.
+* **The helm** is the boat's pilot behind the surfacing wrapper, so a claim of the surface is flown.
+* **Aux** (the flood pump and the repair) is asked for by any station; the captain gives the largest asked.
+* **The captain** decides between the claims and keeps a log of who had the con each tick and why.
+
+## 2. What already exists, as stations
+
+Every piece below was written as a WRAPPER around a pilot, for a boat with one problem. The table says what each is as a station.
+
+| station | the brain that exists | kind | in `subStations.mjs` now |
+|---|---|---|---|
+| helm and planes | `brain/autopilotSub.mjs` (PD); the fly, fish and plain-net pilots | the helm | `helmOf(pilot)` |
+| ballast and trim | the autopilot's ballast law; `brain/surfacePilot.mjs` (come up and stay up) | part of the helm | inside `helmOf` |
+| damage control | `brain/emergencyPilot.mjs` (blow, then the drop weight) | command | `damageStation()` |
+| energy and hull | `brain/needsAdvisor.mjs` (the Round 4 rule); `brain/needsPilot.mjs` (the fixed refill trip); `brain/surveySeat.mjs` (the survey planner) | target | `energyStation({ read })` (the advisor's rule) |
+| navigation | `tools/subNavigator.mjs` (dead reckoning); `brain/fieldNavigate.mjs` and the tank's navigator (`brain/SUB_FIELD_NAV_WIP.md`) | target | `targetStation(name, fn)`, generic; no navigator is wired yet |
+| sensors and weapons | `physics/mechanics/subSonar.mjs`; the duel's evade doctrine and torpedoes (`brain/subDuel.mjs`, the `SUB_EVADE_*` notes) | target and command | not yet |
+
+**What the tank does today: one event at a time.** `render/subAquariumSim.mjs` says so in its header: the needs event "does not mix with the flood events or the compass ones". So no two of these brains have ever run on one boat, and nothing has ever had to decide between them.
+
+## 3. Round 1: the framework, and the first captain (BUILT)
+
+`brain/subStations.mjs`, gated by `brain/subStations-selfcheck.mjs` (26 mutants, every one red by name; the log is in its header).
+
+* **THE FIXED-PRIORITY CAPTAIN** is what the tank's nested wrappers already do, written down: the highest-priority target claim wins (damage 90, energy 50, navigation 10, the mission 0; a tie goes to the earlier station), the helm flies it, then the command stations override in order.
+* **ONE STATION SPEAKING IS ITS WRAPPER, BIT FOR BIT.** The gate flies each beside the captain in the same loop and compares every command of every tick. The energy station alone is `needsAdvisor.wrap` over 150 s, on a dive where it sends the boat up. Damage control alone is `emergencyPilot.wrap` over 120 s, on a dive where it blows and drops the weight.
+* **One refactor** made that possible without a copy: `needsAdvisor.mjs` now exports `surfaceTarget`, which its own wrapper and the energy station both call. Its two gates are green.
+
+## 4. The first finding: stations written for one problem fight when there are two
+
+One boat, four crews, 400 s: 25 m down, 28% charge, and a leak of 6% of its weight from 5 s. This is the case the tank cannot fly. The numbers are from the gate's section 4, which pins them.
+
+| crew | outcome |
+|---|---|
+| no station (the plain helm) | crushed at 92 s (58.9 m) |
+| **energy alone** | **crushed at 58 s: sooner than with no station** |
+| damage control alone | holds near 25 to 35 m, drops the weight, spends the charge at depth; crushed at 341 s |
+| **both, under the fixed captain** | the only crew not crushed in 400 s: blows, drops the weight, climbs to 7.9 m. **Then the battery is flat** (0.000) and it sinks again: 19.1 m at 400 s |
+
+Why, read from the ticks:
+* **Energy alone is worse than nothing.** The surfacing wrapper rations the air bottle on the way up (it will not blow the tank while it rises: `brain/surfacePilot.mjs`, written for a sound boat with a finite bottle). The leak needed that air. The plain helm's ballast law at least blows as the boat sinks.
+* **Damage control spends the charge.** Its rescue is full thrust with the planes nose-up. On a 28% battery that is the last of the charge, spent holding depth rather than reaching the surface where the battery refills.
+* **The fixed captain only stacks them.** With both, the energy station has the con and damage control overrides the helm for 40 to 90 s at full thrust. The boat gets lighter (the weight goes) but arrives near the surface with nothing left.
+
+**This is the conflict the backlog entry predicted.** Every station is right about its own problem and none of them knows the others' costs. The finding is about the stations as written, under a fixed captain, on one dive. It is pinned in the gate; it is not a measured rate over many dives.
+
+## 5. Round 2, proposed (NOT registered, NOT built; Keith's call)
+
+**The question:** on boats with two problems at once, does a captain that knows the stations' costs keep more boats than the fixed captain?
+
+* **The task:** the needs vessel with a leak, from a scenario generator like `brain/floodTask.mjs` crossed with the needs task's charges: depth, charge and leak drawn per seed. It is scored like the needs task: survival first, then reaching the surface, then the hull.
+* **The captains**, each registered before anything is flown:
+  * FIXED, the one built here.
+  * TRIAGE: a hand-written rule that lets damage control blow and drop the weight but caps its thrust by the charge left, and lets the energy station's surface claim switch off the surfacing wrapper's bottle rationing while there is a leak.
+  * A learned captain, only if TRIAGE leaves a gap worth learning.
+* **The controls:** each station alone, and none.
+* **A fresh seed range, and the verdict rule written first**, as every round in this tree is.
+
+What round 2 would not answer: navigation and sensors as stations. They would come after a captain has been shown to matter on the simplest conflict.
+
+## 6. What this round did NOT do
+
+* **It does not change the tank.** The Sub Aquarium still runs one event at a time. Putting the captain in the tank (and a "watch" line showing who has the con) is a page round, after round 2 says which captain to put there.
+* **No navigator or sonar station is wired.** `targetStation` is the shape a navigator would take, and it is gated, but no navigation brain is behind it yet.
+* **No claim that the fixed captain is good.** Section 4 shows it is not, on the one dive measured.
+
+## 7. ROUND 2, REGISTRATION A (2026-11-19, written and committed before any code for it and before any dive of its sets is flown)
+
+Keith, 2026-11-19: "Let's do the a captain that knows each station's costs, for example capping the rescue's thrust by the charge left, against the fixed captain on many seeds."
+
+**THE QUESTION.** On boats with two problems at once (a leak, and a battery low enough to need the surface), does a captain that knows what each station's action COSTS keep more boats alive than the fixed-priority captain of round 1?
+
+**THE TASK (`brain/stationsTask.mjs`, to be built).** The needs-task vessel (`brain/needsTask.mjs` model), a battery hull with a 60 m crush depth, 600 s, `physics/mechanics/subNeeds.mjs` stepNeeds with the leak as its extra weight. Per seed, drawn from a seeded generator:
+* the start and mission depth uniform in 15 to 40 m; the heading uniform; the speed 2 m/s;
+* the charge uniform in 0.15 to 0.45 of capacity;
+* a leak of 3 to 8 percent of the weight, starting at a time uniform in 5 to 60 s and building over 5 s, for the rest of the dive (a breach: nothing mends it).
+
+**THE OUTCOME.** A dive SURVIVES iff the boat is not crushed (nor otherwise lost) in 600 s. Reported beside it, not in the verdict: whether the boat reached the surface band (shallower than 3 m) at any time, the time of a crush, the charge at the end, and whether the weight was dropped.
+
+**THE CREWS.** All have the same helm (the PD autopilot behind the surfacing wrapper, `helmOf`).
+* NONE: the helm alone.
+* ENERGY: the energy station alone.
+* DAMAGE: damage control alone.
+* FIXED: both, under round 1's fixed-priority captain.
+* TRIAGE: both, under a captain that knows the stations' costs (below).
+
+**TRIAGE, AS FAR AS IT IS FIXED NOW.** A captain over the SAME two stations. What it may change is limited to the CAPTAIN's choices about the stations' actions, each with a stated cost:
+* (T1) it caps damage control's rescue thrust by the charge left (thrust spends charge, which the boat needs to reach the surface);
+* (T2) it may drop the weight earlier when the charge is low (the drop weight costs no charge, but it is one-way);
+* (T3) it may let the energy station's surface claim be flown WITHOUT the surfacing wrapper's bottle rationing while the boat is sinking past its target (the bottle is spent to stop a sinking, not saved for the surface).
+
+Its constants (the thrust cap's curve, the charge under which the weight goes early, and the sink rate that lifts the rationing) are chosen on DEV only, from at most 12 variants, each flown once on all 48 DEV seeds. **TRIAGE is then frozen in REGISTRATION B, written and committed before any HELD seed is flown.** Any of T1 to T3 that does not help on DEV may be left out, and B says which.
+
+**THE SETS.** DEV: seeds 160001 to 160048. HELD: seeds 161001 to 161096. No file in the tree uses a seed from 160000 to 161999 for the submarine task (grep, 2026-11-19: the only matches are timings and a ray count). If DEV shows NONE and FIXED both surviving at least 95 percent, or both at most 5 percent, of DEV, the ranges above are amended on DEV and the amendment written into B before HELD.
+
+**THE VERDICT (HELD, flown once).**
+* **TRIAGE BEATS FIXED** iff TRIAGE survives more HELD dives than FIXED, AND the exact one-sided sign test on the discordant pairs (the dives where exactly one of the two survives) gives p at most 0.05.
+* **FIXED BEATS TRIAGE** by the same rule the other way.
+* **Otherwise: NO DIFFERENCE SHOWN**, with the counts.
+* Reported: the survival count of every crew, the discordant pairs, reaching the surface, and the charge at the end among dives both survive. Also whether round 1's single-dive finding (energy alone crushed sooner than none) holds as a rate: ENERGY's survival against NONE's, by the same sign test, reported and not in the verdict.
+
+**EXPECTATION, recorded now.** TRIAGE BEATS FIXED about 55 percent; NO DIFFERENCE about 40 percent (FIXED may already survive most dives, the charge mattering only for reaching the surface); FIXED BEATS TRIAGE about 5 percent.
+
+## 8. ROUND 2, REGISTRATION B (2026-11-19, written and committed after DEV and before any HELD seed is flown)
+
+**The ranges stand.** On DEV, NONE survives 0 of 48 and FIXED 34 of 48, so the amendment clause of registration A is not triggered. The other references on DEV: ENERGY 0, DAMAGE 16.
+
+**AN AMENDMENT, DISCLOSED: a fourth knob, T4, was added after reading the DEV failures.** Registration A limited TRIAGE to T1 to T3. On DEV, all 14 boats FIXED loses have a leak of 6.2 to 8.0 percent of the weight, more than the 6 percent drop weight. Every one ran its battery flat below the surface (13 of 14 never reached it). Most began with too much charge for the energy station to claim the surface (its threshold is 30 percent at depth), so damage control held the mission depth at full thrust until the charge was nearly gone. **T4: once damage control has acted, the boat is BREACHED for the rest of the dive, and the captain claims the surface itself while it still has charge.** This is a captain's choice about a cost, the charge that holding depth against an unending leak spends, so it is in the spirit of A, but A did not name it. The verdict rule, the sets and the outcome are unchanged, and no HELD seed has been flown.
+
+**THE 12 DEV VARIANTS (the most A allowed), each flown once on the 48 DEV seeds:**
+
+| # | knobs | survived (of 48) | survivors' mean charge at 600 s |
+|---|---|---|---|
+| 1 | all off (must be FIXED) | 34 | 0.448 |
+| 2 | T1: thrust <= frac / 0.3, floor 0.2 | 35 | 0.399 |
+| 3 | T1: thrust <= frac / 0.5, floor 0 | 35 | 0.382 |
+| 4 | T2: drop under 30% charge | 36 | 0.332 |
+| 5 | T2: drop under 20% | 35 | 0.371 |
+| 6 | T3: no rationing when sinking faster than 0.1 m/s | 34 | 0.454 |
+| 7 | T4 | 34 | 0.755 |
+| 8 | T4 + T2 (30%) | 38 | 0.921 |
+| 9 | T4 + T1 (#2) | 35 | 0.817 |
+| 10 | T4 + T2 (30%) + T1 (#2) | 38 | 0.921 |
+| **11** | **T4 + T2 at any charge** | **38** | **0.967** |
+| 12 | T4 + T2 at any charge + T3 (0.1) | 37 | 0.890 |
+
+**TRIAGE IS FROZEN AS #11** (`brain/stationsTask.mjs` FROZEN_TRIAGE). A set no rule between ties, so it was chosen by survival, then the charge at the end, then the fewer knobs. Once breached, it drops the weight at once and goes up while there is charge. **T1 (the thrust cap Keith named) and T3 are LEFT OUT:** on DEV the thrust cap kept one boat more alone and none more with T4. The thrust stays FIXED's full rescue thrust.
+
+**What DEV says and does not.** 38 against 34 on DEV is the set TRIAGE was chosen on, so it is optimistic by construction. Only HELD answers the question. The 10 DEV boats TRIAGE still loses were not studied further.
+
+**Gates, before HELD:** `brain/stationsTask-selfcheck.mjs` (the task, the verdict, the TRIAGE knobs, the crews; 24 mutants, 21 red and 3 equivalent, logged) and `brain/subStations-selfcheck.mjs` (round 1's, still green with TRIAGE added). Neither flies a HELD seed.
+
+**THE RUN:** every crew on the 96 HELD seeds, once, with `brain/stationsTask.mjs` (a short script writes one line a dive to `brain/stationsHeld.jsonl`). The file is committed unread, then read once with the registered verdict.
+
+## 9. ROUND 2 RESULT (2026-11-19; `brain/stationsHeld.jsonl`, 480 dives, committed unread at `9c94f3301`, then read ONCE)
+
+**VERDICT (registered): TRIAGE BEATS FIXED.** TRIAGE survives 75 of the 96 HELD dives and FIXED 62. Of the 17 dives where exactly one survives, 15 are TRIAGE's and 2 are FIXED's: exact one-sided sign test p = 0.0012, under the registered 0.05.
+
+| crew | survived (of 96) | reached the surface | dropped the weight | mean time of a crush |
+|---|---|---|---|---|
+| NONE | 0 | 0 | 0 | 156 s |
+| ENERGY | 0 | 2 | 0 | 110 s |
+| DAMAGE | 28 | 52 | 96 | 384 s |
+| FIXED | 62 | 64 | 96 | 319 s |
+| **TRIAGE** | **75** | **76** | 96 | 392 s |
+
+**Reported, not in the verdict.**
+* **Where both survive (60 dives), TRIAGE ends the dive charged and on the surface: mean charge 0.988, all 60 within 3 m.** FIXED ends at 0.477, with 3 of 60 on the surface. FIXED goes back down to its mission depth once the energy station is satisfied, with the leak still on. TRIAGE's breach latch keeps the boat up.
+* **Round 1's single-dive finding holds as a rate.** Energy alone is crushed sooner than no station in 83 of the 96 dives where both are crushed, and later in 8 (sign test p = 4e-17). Neither crew survives any dive. A station written for a sound boat makes a breached one worse.
+* **What TRIAGE still loses.** Its 21 losses all have a leak of 6.5 to 8.0 percent of the weight, against the 6 percent drop weight; no survivor has a leak above 7.0 percent. Past the weight's size the boat has only its thrust and its bottle, and the bottle is spent before the surface. That is the next limit, and it is the hull's, not the captain's.
+* **Against the expectation in section 7.** TRIAGE BEATS FIXED was put at about 55 percent; it happened.
+
+**What the result says, and does not.**
+* **A captain that knows what the stations' actions cost keeps more boats than one that only ranks them.** Every boat it saves over FIXED is saved by the same two moves: drop the weight at once instead of after the blow, and go up while there is charge. Both are free or cheap at the moment and expensive later.
+* **The thrust cap, the move Keith named, did not help.** On DEV it kept one boat more alone and none more beside T4, so it was left out; HELD did not test it. Full rescue thrust is not where the charge goes wrong. Holding depth for minutes before anyone decides to go up is.
+* **T4 was added after reading the DEV failures (section 8)** and so was tuned on DEV. The HELD result is its first test on dives it was not chosen on, and it holds there.
+* This is one task (a leak and a low battery), one vessel and a hand-written captain. It is not a claim about other pairs of problems, nor that a learned captain would do better or worse.
+
+**Status: round 2 CLOSED as registered.** Next, in the order the note proposed: TRIAGE into the Sub Aquarium (the tank runs one event at a time, so a flood and a battery need cannot meet there yet), then navigation and sonar as stations.
+
+## 10. TRIAGE IN THE SUB AQUARIUM (2026-11-19; BUILT)
+
+Keith, 2026-11-19: "putting TRIAGE into the Sub Aquarium (where a flood and a battery problem can't happen together yet)".
+
+**What the tank can now do.** A sub with battery needs can be BREACHED and given a CAPTAIN. Both live on the needs event, so a hull breach and a battery need are on one boat at once.
+* `tank.breach(id, leak = 0.07)`: a leak of `leak` of the weight (above 0, at most 0.2), built over 5 s from now, that never mends (`brain/stationsTask.mjs`'s leak). The default is past the 6 % drop weight. Starting or ending an event mends it.
+* `tank.setCaptain(id, "fixed" | "triage" | null)`: round 1's FIXED captain, or TRIAGE as frozen in registration B, over the sub's own pilot. A captain replaces the refill trip and the advisor (the advisor and a captain do not share a boat). It works the pump and the repair itself. Its damage control rescues on the tank's room (blow at 2 m past the target, drop at 4: the flood event's RESCUE), not the open sea's 5 and 10.
+* The snapshot's `needs` carries `leak` (now) and `captain` ({ kind, con, reason, overrides, watch }).
+
+**The page.** Beside the advisor box: a captain menu (off, fixed, triage) and a breach button (7 %), both enabled only on a sub with needs. The list line says who has the con, in words ("CAPTAIN triage: breach (going up while there is charge)"), "damage control acting" while it overrides, and "BREACHED (leak 7.0%)". Checked in headless Chromium: no page error, and the line reads as above on a breached TRIAGE boat.
+
+**In the tank, one starting state, breached at 7 %** (pinned in the gate, section 4): no captain loses the boat in 25 s; FIXED keeps it 300 s near its depth (31.7 to 29.3 m); TRIAGE keeps it 300 s and climbs (31.7 to 16.0 m) with the con as "breach". One boat, one state, not a rate: the rate is section 9's.
+
+**Gate:** `render/subAquariumCaptain-selfcheck.mjs` (27 mutants, every one red; the log is in its header). The aquarium's other gates (`subAquariumSim`, `subAquariumEvents`, `subAquariumPage`, `advisorTrace`) are green with it.
+
+## 11. NAVIGATION AND SONAR AS STATIONS (2026-11-19; BUILT)
+
+Keith, 2026-11-19: "then navigation and sonar as stations".
+
+**NAVIGATION** (`navigationStation(nav, { clock, dt, fleet, avoidFleet })`). The Sub Aquarium's navigator (`brain/subTankNav.mjs`: a goal through islands, icebergs and ships) is a target station at the navigation priority (10). It is asked every tick whoever has the con, so its counters and plan follow the boat's real position.
+* **Alone it IS the tank's courier, bit for bit:** every command of 240 s identical, with the same counters (3 arrivals, 0 hits).
+* **Under a higher claim held for a whole minute** it is still stepped every tick, and its travel follows the boat.
+
+**SONAR AND WEAPONS** (`sonarStation()`, `duelSide({ tactics, helm, more })`). The duel's tactician (`brain/subDuel.mjs`: at each look it is handed the passive contacts, its echoes and the pings it heard; it fires, pings and picks a target) is the sonar station's brain. The duel keeps the look and acts on fire and ping. The station holds the target the duel hands the helm and claims it at the sonar priority (30: above navigation, below energy and damage control). `duelSide` puts a captain behind it with any other stations.
+* **Alone it IS the duel's side, bit for bit:** three whole training duels are identical record for record (the fingerprint, every event).
+* **The gate found a bug before any mutant ran.** The sonar station handed out the target it holds rather than a copy. It is a copy now.
+
+**THE FIRST SONAR CONFLICT** (the duel's 24 TRAINING duels; its audit set is marked unread). One side at 12 % of its battery. The energy station reads the charge the duel hands the tactician at each look. This is pinned in the gate, not a rate.
+
+| crew | won / lost / drawn | mean score | ran flat |
+|---|---|---|---|
+| sonar alone | 15 / 2 / 7 | 0.999 | 11 of 24 |
+| sonar + energy, fixed ranking | 7 / 0 / 17 | 0.544 | 0 |
+
+* **The fixed ranking puts energy above sonar, so a low boat breaks off the fight to go up for charge.** It loses no more duels (0 against 2), but it wins 8 fewer and scores 0.45 less a duel.
+* **A correction to what I first said:** I told Keith a 4-minute duel "never empties even a 12% battery". It does: 11 of 24 boats ran flat. Running flat cost them nothing the duel counts; breaking off cost wins.
+* **The same lesson as round 2, between other stations:** a captain that only ranks the stations pays for an action without asking what it costs. When the cost of the energy claim (the fight) is larger than the cost it prevents (running flat in a fight that ends in 4 minutes), the ranking is wrong. In section 4 it was the other way round, and the ranking was too slow to act.
+
+**Gate:** `brain/subStationsNavSonar-selfcheck.mjs` (14 mutants, every one red; the log is in its header). Round 1's, round 2's and the aquarium captain's gates are green beside it.
+
+**NEXT (proposed, NOT registered): round 3, a captain that weighs sonar against energy.** In the duel with needs: does a captain that lets the energy claim through only when the charge will not last the fight (a CHARGE-AT-RISK rule: the charge left against the draw at the current speed for the time left) keep the wins of sonar alone without being run flat? Registered first, with fresh duel seeds; the duel's own sets are used by other rounds. Then navigation against energy in the aquarium (a courier with a battery: does it reach more goals with a captain that times its charging between legs?).
+
+## 12. ROUND 3, REGISTRATION (2026-11-19, written and committed before any code for it and before any duel of its sets is flown)
+
+Keith, 2026-11-19: "round 3, a captain that lets the energy claim override sonar only when the charge won't last the fight, tested on fresh duel seeds."
+
+**THE QUESTION.** In a duel on a low battery, does a captain that lets the energy station's surface claim outrank sonar ONLY when the charge will not last the fight keep sonar's fight, and beat the fixed ranking?
+
+**THE TASK (`brain/duelStationsTask.mjs`, to be built).** `brain/subDuel.mjs`'s duel, unchanged: 240 s, side A against the scripted drone of the scenario's kind, both boats on battery needs (the duel's `needs` option). Side A's tactician is `subTactics.makeTactician(THETA_DEFAULT)` behind `subStations.duelSide`, with the helm `helmOf(autopilot)`. Per duel, the battery is a fraction of capacity drawn from the seed, uniform in 0.05 to 0.30 (the same for both boats). The energy station reads the charge the duel hands the tactician at each look (`obs.self.charge`, a fraction of the start, times the start).
+
+**THE CREWS.**
+* SONAR: the sonar station alone (round 1's duel side).
+* FIXED: sonar and the energy station under the fixed ranking (energy 50 outranks sonar 30).
+* RISK: sonar and the energy station, with energy's surface claim passed through ONLY WHEN THE CHARGE IS AT RISK. Its pump and repair asks always pass.
+
+**RISK, FIXED NOW (no tuning on any set).** At each tick the captain knows the fight's length (240 s: an assumption, said plainly; a real boat would not), the time t of the last look, the charge c then (a fraction of capacity) and the start c0. The rate is r = (c0 - c) / t. **The charge is AT RISK iff t is at least 10 s and c - r x (240 - t) is under 0.02**: at the rate spent so far, the battery would be flat before the fight ends. Before 10 s nothing is at risk (the rate is not known). The energy station must ALSO claim (its own rule: under its threshold at the depth) for the surface to be flown.
+
+**THE SETS.** DEV: seeds 171001 to 171006, crossed with the four drone kinds (24 duels), to check that the task is not degenerate. If SONAR and FIXED score the same on every DEV duel (the energy station never claims), the battery range is amended on DEV and the amendment written before HELD; nothing about RISK changes. HELD: seeds 173001 to 173024 x 4 kinds (96 duels). No file in the tree uses a duel seed from 171000 to 173999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once).** The score is the duel's own score for side A.
+* **(V1) RISK BEATS FIXED** iff RISK's mean score is above FIXED's AND the exact one-sided sign test over the duels where the two scores differ gives p at most 0.05. FIXED BEATS RISK by the same rule the other way. Otherwise NO DIFFERENCE SHOWN.
+* **(V2) RISK KEEPS SONAR'S FIGHT** iff RISK's mean score is at least SONAR's less 0.05.
+* **THE BOTTOM LINE.** V1 RISK BEATS FIXED and V2 kept: "a captain that weighs the charge against the fight keeps the fight and beats the ranking". V1 without V2: "better than the ranking, still short of sonar alone". V2 without V1: "no worse than sonar alone, and not shown better than the ranking". Neither: reported as it is.
+* **Reported, not in the verdict:** won / lost / drawn for each crew; the duels in which side A ran flat; the ticks the energy station held the con; and whether RISK runs flat in fewer duels than SONAR.
+
+**EXPECTATION, recorded now.** Round 1's measurement (24 training duels at 12 %: running flat cost nothing the score counts) says the energy claim rarely pays inside one fight. So: V2 kept about 80 percent; V1 RISK BEATS FIXED about 70 percent. RISK will run flat in about as many duels as SONAR. It lets the claim through only when the boat would go flat before the end, and going up mid-fight then costs it the fight, which the score counts.
+
+**BUILT AND GATED BEFORE HELD (2026-11-19).** `brain/duelStationsTask.mjs`, `subStations.gatedStation`, and the gate `brain/duelStationsTask-selfcheck.mjs` (21 mutants, every one red; the log is in its header). **DEV (24 duels) is not degenerate**, so the battery range stands: SONAR and FIXED differ on every DEV duel. **Nothing was tuned on DEV;** RISK is as registered. For the record, the DEV numbers, seen before HELD: SONAR mean 1.409 (W/L/D 20/2/2, 5 ran flat); FIXED 0.864 (11/0/13, 0 flat); RISK 1.519 (20/0/4, 0 flat). The run: every crew on the 96 HELD duels once, one line a duel to `brain/duelStationsHeld.jsonl`, committed unread, then read once.
+
+## 13. ROUND 3 RESULT (2026-11-19; `brain/duelStationsHeld.jsonl`, 288 duels, committed unread at `d14bbf970`, then read ONCE)
+
+**BOTTOM LINE (registered): a captain that weighs the charge against the fight keeps the fight and beats the ranking.**
+* **V1: RISK BEATS FIXED.** RISK scores higher in 54 of the 96 HELD duels and lower in 11 (sign test p = 3e-8). Mean 1.098 against 0.566.
+* **V2: RISK KEEPS SONAR'S FIGHT.** Mean 1.098 against SONAR's 1.069, above the line (SONAR less 0.05).
+
+| crew | mean score | won / lost / drawn | ran flat | duels in which energy had the con |
+|---|---|---|---|---|
+| SONAR | 1.069 | 65 / 10 / 21 | 21 | 0 |
+| FIXED | 0.566 | 31 / 1 / 64 | 0 | 96 |
+| **RISK** | **1.098** | 62 / **5** / 29 | **4** | 46 |
+
+**Reported, not in the verdict.**
+* **RISK runs flat in far fewer duels than SONAR:** 4 against 21. Every duel in which RISK ran flat SONAR did too, and SONAR alone ran flat in 17 more (sign test p < 1e-4). It also loses half as many duels (5 against 10). SONAR wins 3 more (65 against 62).
+* **Duel by duel, RISK and SONAR are the same in 71 of 96.** RISK is lower in 18 and higher in 7: not shown better or worse (p 0.99 for "higher"). The means differ by 0.03.
+* **By drone kind (mean score, SONAR / FIXED / RISK):** patrol 1.47 / 1.10 / 1.40; quiet 1.06 / 0.06 / 0.97; evader 1.31 / 0.86 / 1.31; **hunter 0.44 / 0.25 / 0.72**. Against the hunter, the drone that comes after the boat, keeping the charge to go up only when the fight would outlast it is worth the most.
+* **FIXED gave energy the con in all 96 duels** and drew 64 of them: the boat went up and the fight timed out.
+* **Against the expectation in section 12.** V1 (put at about 70 percent) and V2 (about 80 percent) both happened. **I was wrong about running flat:** I wrote that RISK would run flat in about as many duels as SONAR. It ran flat in a fifth as many.
+
+**What it says, and does not.**
+* **The cost-aware rule beats the rank again, on a different pair of stations.** In round 2 the ranking acted too late (damage control holding depth while the battery died); here it acts too early (energy breaking off a fight the battery would have lasted). In both, the better captain asks what an action costs before letting it outrank another.
+* **RISK knows the fight's length (240 s)**, which a real boat would not; section 12 said so before the run. A captain that has to guess it is the next honest version, if this line goes further.
+* One duel model, one tactician, one drone per kind, a battery of 5 to 30 percent.
+
+## 14. ROUND 4, REGISTRATION (2026-11-19, written and committed before any code for it and before any run of its sets)
+
+Keith, 2026-11-19: "a navigating courier with a battery, to see whether timing its charging between legs reaches more goals."
+
+**THE QUESTION.** A courier in the Sub Aquarium's sea (islands, icebergs, ships) carries a battery that only the surface refills. Does a captain that charges BETWEEN LEGS, at a goal and only when the next leg needs it, reach more goals than one that goes up wherever the energy rule says?
+
+**THE TASK (`brain/courierTask.mjs`, to be built).**
+* The sea is `brain/subTankNav.mjs` tankScene(seed), and the navigator createNavigator(scene, { arm: "any+predict", seed }). The boat starts at (20, 150) at 20 m and 2 m/s.
+* The vessel is the needs-task's (`brain/needsTask.mjs` model): a battery hull, a 60 m crush depth, `subNeeds.stepNeeds`. The run lasts 1,200 s, and the battery starts at a fraction of capacity drawn from the seed, U(0.15, 0.45).
+* **The navigator supplies the MISSION every tick** (it is stepped every tick whoever has the con, so its goals and counters follow the boat). The crews' stations claim against that mission, under `subStations.captain` with the helm `helmOf(autopilot)`.
+* One fact, measured before this registration on scene 5 (not in either set): over 300 s a full-battery courier travelled 868 m, reached 2 goals and used 0.84 of its battery, about 0.001 of capacity per metre. A battery lasts about 6 minutes of travel, and a full charge takes about 7.
+
+**THE CREWS.**
+* NAV: no station; the navigator alone. It runs flat and stops.
+* FIXED: the energy station (round 1's), by rank. It goes up wherever its rule says (under 30 % of charge at depth) and charges until the rule lets go (about 57 % near the surface).
+* LEGS: a captain that times the charging, with constants FIXED NOW (none tuned on any set):
+  * **AT EACH ARRIVAL** (and at the start), it estimates the next leg's need. That is the charge spent per metre travelled so far (0.001 before 50 m of travel) x the straight distance to the new goal x 1.5, plus 0.05. **If the charge is under that need, it CHARGES THERE:** it claims the surface (the energy station's surfaceTarget) until the charge reaches the need plus 0.2, capped at 0.95. Otherwise it goes on.
+  * **MID-LEG** it claims the surface only in an EMERGENCY, a charge under 0.10. It then charges as above, to 0.10 plus the leg's need plus 0.2 (capped at 0.95).
+  * The pump and repair asks of the energy station pass as in FIXED.
+
+**THE OUTCOME.** The goals reached (the navigator's arrivals) in 1,200 s. Reported beside it: whether the boat was lost (crushed or grounded), the seconds it spent with an empty battery, the hits, and the time spent charging.
+
+**THE SETS.** DEV: seeds 175001 to 175024, to check that the task is not degenerate. If NAV, FIXED and LEGS reach the same number of goals on 20 or more of the 24, the duration or the battery range is amended on DEV and the amendment written before HELD; LEGS's constants do not change. HELD: seeds 177001 to 177096. No file in the tree uses a seed from 175000 to 177999 for the submarine or tank tasks (grep, 2026-11-19: the only matches are unrelated ids).
+
+**THE VERDICT (HELD, flown once).**
+* **LEGS BEATS FIXED** iff LEGS's mean goals are above FIXED's AND the exact one-sided sign test over the runs where their goal counts differ gives p at most 0.05. FIXED BEATS LEGS by the same rule the other way. Otherwise NO DIFFERENCE SHOWN.
+* Reported, not in the verdict: each crew's mean goals and goal counts; both against NAV; boats lost; empty-battery seconds; charging time; hits.
+
+**EXPECTATION, recorded now.** LEGS BEATS FIXED about 50 percent; NO DIFFERENCE about 40 percent (both charge about as often; where they charge may not matter much when a goal is about 150 s apart and a charge takes minutes); FIXED BEATS LEGS about 10 percent (LEGS's estimate of a leg is a straight line; the navigator's route around an island is longer, and LEGS may set out short).
+
+**BUILT AND GATED BEFORE HELD (2026-11-19).** `brain/courierTask.mjs` and its gate `brain/courierTask-selfcheck.mjs` (23 mutants, every one red; the log is in its header). **DEV (24 runs) is not degenerate:** the three crews never tie on all 24. **Nothing was tuned on DEV.** For the record, the DEV numbers, seen before HELD: NAV 0.88 goals (15 boats lost: a flat courier cannot hold its depth); FIXED 3.63 goals (0 lost, 18 s empty, 643 s charging); LEGS 3.67 goals (1 lost, 163 s empty, 588 s charging). LEGS's empty seconds are the risk section 14 named: its leg estimate is a straight line, and the route around an island is longer. The run: every crew on the 96 HELD seeds once, in four processes, one line a run to `brain/courierHeld.<part>.jsonl`, committed unread, then read once.
+
+## 15. ROUND 4 RESULT (2026-11-19; `brain/courierHeld.{0,1,2,3}.jsonl`, 288 runs, committed unread at `b62ed9456`, then read ONCE)
+
+**VERDICT (registered): LEGS BEATS FIXED.** LEGS reaches 3.69 goals a run against FIXED's 3.36. It reaches more on 45 of the 96 HELD runs and fewer on 22 (sign test p = 0.0034).
+
+| crew | mean goals | goals (runs) | boats lost | runs with an empty battery | mean empty s | mean charging s | hits |
+|---|---|---|---|---|---|---|---|
+| NAV | 0.93 | 0: 21, 1: 61, 2: 14 | **69** | 96 | 656 | 1 | 53 |
+| FIXED | 3.36 | 2: 5, 3: 57, 4: 28, 5: 6 | 0 | 43 | 14 | 643 | 207 |
+| **LEGS** | **3.69** | 0: 1, 1: 1, 2: 11, 3: 29, 4: 30, **5: 20, 6: 4** | 0 | 65 | 161 | 588 | 167 |
+
+**Reported, not in the verdict.**
+* **LEGS has the wider spread.** It reaches 5 or 6 goals in 24 runs against FIXED's 6, but only 0 to 2 in 13 against FIXED's 5. **In 21 of the 22 runs where LEGS reaches fewer, its battery ran empty.** That is the risk section 14 named: LEGS plans a leg as a straight line, and the route around an island is longer, so it sets out short and stalls. No LEGS boat was lost.
+* **LEGS charges less and hits less:** 588 s charging against 643, and 167 hits against 207. Its charging stops are at goals, in open water. FIXED goes up wherever the rule fires, sometimes among obstacles.
+* **NAV, which never charges, loses 69 of 96 boats:** a flat courier cannot hold its depth.
+* **Against the expectation in section 14:** LEGS BEATS FIXED was put at about 50 percent. It happened. "FIXED BEATS LEGS" was put at 10 percent, for the straight-line risk. That risk is real (the 22 runs), but it does not outweigh the gain.
+
+**What it says, and does not.**
+* **Charging between legs, when the next leg needs it, reaches more goals than charging wherever the rule fires.** That is the fourth pair of stations on which a captain that asks what an action costs (here, where and when a charging stop costs least) beats the fixed ranking.
+* **The obvious next step is named by the losses:** LEGS's leg estimate should be the navigator's planned route, not the straight line. That is a new registration, not a change to this one.
+* One sea generator, one navigator arm, one vessel, a battery of 15 to 45 percent, 20 minutes.
+
+**Status: rounds 3 and 4 CLOSED as registered.**
+
+## 16. ROUND 5, REGISTRATION (2026-11-19, written and committed before any code for it beyond one read-only method, and before any run of its sets)
+
+Keith, 2026-11-19: "Let's do both proposed rounds" (LEGS with the navigator's planned route; RISK without the fight's length).
+
+**THE QUESTION.** Round 4's LEGS lost goals in 22 runs, 21 of them with an empty battery, because it estimated a leg as a straight line. Does LEGS with the navigator's PLANNED ROUTE as the leg's length reach more goals than LEGS?
+
+**WHAT WAS ADDED AND MEASURED FIRST, said plainly.**
+* `subTankNav.createNavigator` gained one READ-ONLY method, `routeLength(x, y)`: the planned field's distance from that cell to the goal, or null. It changes nothing the navigator does. Its gates and the aquarium's are green with it.
+* To learn the units, it was read beside the straight line at each new goal on scenes 5, 9 and 13 (neither in round 4's sets nor in this round's). It is in metres, 1.15 to 1.7 times the straight line (420 against 282, 220 against 152, 405 against 285 ...).
+
+**THE TASK.** Round 4's, unchanged (`brain/courierTask.mjs`): the sea, the navigator, the vessel, the 1,200 s, the start, and the battery U(0.15, 0.45) per seed.
+
+**THE CREWS.** FIXED and LEGS as in round 4. **ROUTE: LEGS with one change.** The leg's distance is `routeLength` at the boat's position at the decision (straight line where it is null: no plan yet, or no route). Every constant of LEGS stands as registered in section 14.
+
+**THE SETS.** DEV: seeds 181001 to 181024, only to check that ROUTE and LEGS differ on at least 4 of them; if not, the battery range is amended on DEV, and nothing of ROUTE. HELD: seeds 183001 to 183096. No file in the tree uses a seed from 181000 to 183999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once).** **ROUTE BEATS LEGS** iff ROUTE's mean goals are above LEGS's AND the exact one-sided sign test over the runs where their goal counts differ gives p at most 0.05. LEGS BEATS ROUTE by the same rule the other way. Otherwise NO DIFFERENCE SHOWN. Reported: both against FIXED, by the same test; the runs with an empty battery; the empty seconds; the charging seconds; the boats lost.
+
+**EXPECTATION, recorded now.** ROUTE BEATS LEGS about 45 percent; NO DIFFERENCE about 45 percent. The route is longer, so ROUTE charges more often and for longer, which costs time, and the gain is only in the runs where LEGS set out short. LEGS BEATS ROUTE about 10 percent.
+
+## 17. ROUND 6, REGISTRATION (2026-11-19, written and committed before any code for it and before any duel of its sets is flown)
+
+**THE QUESTION.** Round 3's RISK was told the fight lasts 240 s, which a real boat would not know. Does a captain that does NOT know the fight's length, and asks only whether the charge will last a fixed look-ahead, still beat the fixed ranking and keep sonar's fight?
+
+**THE TASK.** Round 3's, unchanged (`brain/duelStationsTask.mjs`): the duel, the tactician, the drones, and the battery U(0.05, 0.30) per seed.
+
+**THE CREWS.** SONAR, FIXED and RISK as in round 3, plus **BLIND: RISK's rule with the fight's time left replaced by a fixed look-ahead of 60 s.** At risk iff t is at least 10 s and c - r x 60 is under 0.02, with r = (c0 - c) / t as before. It is the same rule with nothing about the fight in it. 60 s is about the time a boat at depth needs to reach the surface and start charging; it is fixed now, not tuned.
+
+**THE SETS.** DEV: seeds 185001 to 185006 x the four kinds (24), only to check that BLIND and FIXED differ on at least 4; if not, the battery range is amended on DEV, and nothing of BLIND. HELD: seeds 187001 to 187024 x the four kinds (96). No file in the tree uses a seed from 185000 to 187999 (grep, 2026-11-19).
+
+**THE VERDICT (HELD, flown once), round 3's rules with BLIND in RISK's place.**
+* **(V1) BLIND BEATS FIXED** by the sign test on the duels where their scores differ (p at most 0.05).
+* **(V2) BLIND KEEPS SONAR'S FIGHT** iff its mean score is at least SONAR's less 0.05.
+* **The bottom line** is round 3's sentences with BLIND for RISK.
+* **Reported:** BLIND against RISK by the same sign test (what knowing the fight's length was worth); won, lost and drawn; ran flat; the ticks energy had the con.
+
+**EXPECTATION, recorded now.** A 60 s look-ahead fires LATER than "the rest of the fight" early in a duel (240 - t is larger than 60), and the same near the end. So BLIND lets the energy claim through less often than RISK and runs flat more, close to SONAR. V2 kept about 85 percent; V1 BLIND BEATS FIXED about 75 percent; BLIND against RISK no difference shown about 60 percent.
+
+**ROUNDS 5 AND 6, BUILT AND GATED BEFORE HELD (2026-11-19).**
+* ROUTE is one option of the legs station (`route: true`, using `routeLength` where there is a plan). BLIND is RISK's rule with the fight's end at the last look plus 60 s.
+* Both are gated in the round 3 and 4 gates (11 more mutants, every one red; the logs are in their headers).
+* **DEV is not degenerate in either.** Round 5: ROUTE and LEGS differ on 12 of 24 DEV runs; mean goals LEGS 4.00, ROUTE 3.92; runs with an empty battery LEGS 13, ROUTE 5. Round 6: BLIND and FIXED differ on 14 of 24 DEV duels; mean score FIXED 0.550, BLIND 0.933; BLIND ran flat in 2.
+* **Nothing was tuned.** HELD: round 5 flies FIXED, LEGS and ROUTE on the 96 seeds (`brain/routeHeld.<part>.jsonl`, four processes); round 6 flies SONAR, FIXED, RISK and BLIND on the 96 duels (`brain/blindHeld.jsonl`). Each is committed unread, then read once.
+
+## 18. ROUND 6 RESULT (2026-11-19; `brain/blindHeld.jsonl`, 384 duels, committed unread at `b92c59fe7`, then read ONCE)
+
+**BOTTOM LINE (registered, BLIND in RISK's place): a captain that weighs the charge against the fight keeps the fight and beats the ranking, WITHOUT KNOWING HOW LONG THE FIGHT IS.**
+* **V1: BLIND BEATS FIXED.** Higher in 54 of the 96 HELD duels, lower in 14 (sign test p = 6e-7).
+* **V2: BLIND KEEPS SONAR'S FIGHT.** Mean 1.383 against SONAR's 1.418, inside the 0.05 line.
+
+| crew | mean score | won / lost / drawn | ran flat | duels in which energy had the con |
+|---|---|---|---|---|
+| SONAR | 1.418 | 75 / 1 / 20 | 15 | 0 |
+| FIXED | 0.828 | 43 / 1 / 52 | 0 | 96 |
+| RISK (knows 240 s) | 1.395 | 73 / 0 / 23 | 0 | 27 |
+| **BLIND (60 s look-ahead)** | **1.383** | 73 / 1 / 22 | **1** | 23 |
+
+**Reported, not in the verdict.**
+* **Knowing the fight's length was worth almost nothing:** BLIND and RISK score the same in 85 of 96 duels. BLIND is higher in 7 and lower in 4: no difference shown (p 0.27 one way, 0.89 the other).
+* **Round 3 replicates on these fresh duels:** RISK BEATS FIXED and KEEPS SONAR'S FIGHT again.
+* **Against the expectation in section 17.** V1 (put at about 75 percent), V2 (about 85) and "BLIND against RISK, no difference" (about 60) all happened. **I was wrong about running flat:** I wrote that BLIND would run flat more, close to SONAR. It ran flat once, against SONAR's 15. A 60 s look-ahead fires late early in a fight, but early enough: the battery that would go flat within a minute is the one that matters.
+
+**What it says.** The charge-at-risk rule does not need the fight's length, which a real boat would not know. A fixed one-minute look-ahead does as well. Round 3's caveat is answered.
+
+## 19. ROUND 5 RESULT (2026-11-19; `brain/routeHeld.{0,1,2,3}.jsonl`, 288 runs, committed unread at `2cdfb9491`, then read ONCE)
+
+**VERDICT (registered): ROUTE BEATS LEGS.** ROUTE reaches 4.02 goals a run against LEGS's 3.66. It reaches more on 38 of the 96 HELD runs and fewer on 18 (sign test p = 0.005).
+
+| crew | mean goals | goals (runs) | runs with an empty battery | mean empty s | mean charging s | hits | lost |
+|---|---|---|---|---|---|---|---|
+| FIXED | 3.22 | 2: 7, 3: 64, 4: 22, 5: 3 | 43 | 12 | 643 | 180 | 0 |
+| LEGS | 3.66 | 1: 3, 2: 12, 3: 26, 4: 31, 5: 22, 6: 2 | 66 | 163 | 589 | 162 | 0 |
+| **ROUTE** | **4.02** | 1: 1, 2: 9, 3: 10, **4: 47, 5: 25, 6: 4** | **32** | **60** | 665 | 152 | 0 |
+
+**Reported, not in the verdict.**
+* **The straight-line failure is mostly fixed:** ROUTE runs empty in 32 runs against LEGS's 66, for 60 s on average against 163. It charges a little longer (665 s against 589), as the route is longer than the line. That time is repaid.
+* **Both against FIXED:** ROUTE BEATS FIXED, 63 runs more and 11 fewer (p = 3e-10). LEGS BEATS FIXED again, 51 to 21 (p = 3e-4): **round 4 replicates on these fresh seeds.**
+* ROUTE also hits the least (152 against 162 and 180).
+* **Against the expectation in section 16:** ROUTE BEATS LEGS was put at about 45 percent; it happened. I thought the longer charging might eat the gain. It ate a small part of it.
+
+**What it says.** A courier that times its charging by the leg it is about to fly, measured as the route it will fly, reaches the most goals of any crew. The fix was the one the round-4 losses named.
+
+**Status: rounds 5 and 6 CLOSED as registered.** Across six rounds and four pairs of stations (damage and energy, sonar and energy, navigation and energy, twice each for the last two), every captain that weighs what an action costs has beaten the fixed ranking on HELD. The two refinements the losses named (the route, no fight clock) held up on fresh seeds.
