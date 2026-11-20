@@ -22,6 +22,10 @@ const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 export const DEV_SEEDS = Object.freeze(range(1901, 1930));
 export const HELD89_SEEDS = Object.freeze(range(2401, 2460));
 export const IDENTITY_SEEDS = Object.freeze([1901, 1902, 1903]);
+/** ROUND 2 (registered 2026-11-20): CAP 12 from Round 1's DEV, not re-chosen; DEV2 (space seeds 2101-2130) flies D and C at that cap for the checks only. */
+export const ROUND2_CAP = 12;
+export const DEV2_SEEDS = Object.freeze(range(2101, 2130));
+export const IDENTITY2_SEEDS = Object.freeze([2101, 2102, 2103]);
 /** Space seeds already spent elsewhere (gates, gunner training, the prototypes, this round's smoke). The sets must avoid them. */
 export const SPENT = Object.freeze({ gates: [1, 40], prototypes: [1601, 1800], smoke: [9990001, 9990005] });
 export const TIE_EPS = 1e-9, FLOOR_MIN = 20, ALPHA = 0.05, CAP_SLACK = 2, DOCTRINE_MARGIN = 5, SHIP_HP = 1500, SECONDS = 120;
@@ -76,11 +80,12 @@ export function flyOne({ seed, kind, preset, cap = null, network = null, probe =
     const b = BF.build(seed, kind, { gunners: preset, ...(pilot ? { pilot } : {}), ...(network ? { network } : {}) });
     arena = b.arena;
     const raiders = arena.crafts.filter((c) => c.kind === "fighter" && c.team !== BF.SHIP_ID);
-    let strafeTicks = 0, aliveTicks = 0, peakClosing = -Infinity, passes = 0;
-    const wasStrafing = new Map();
+    let strafeTicks = 0, aliveTicks = 0, peakClosing = -Infinity, passes = 0, overCap = 0, notCut = 0;
+    const wasStrafing = new Map(), capped = typeof cap === "number" && Number.isFinite(cap), startClosing = new Map();
     while (!arena.done) {
         const flying = raiders.filter((c) => !c.dead);
-        for (const c of flying) { const f = SA.nearestFoe(arena, c); if (f) peakClosing = Math.max(peakClosing, closingSpeed(c.body, f.body)); }
+        startClosing.clear();
+        for (const c of flying) { const f = SA.nearestFoe(arena, c); if (f) { const cl = closingSpeed(c.body, f.body); startClosing.set(c.id, cl); peakClosing = Math.max(peakClosing, cl); } }
         if (pr) pr.foeOf.clear();
         SA.stepSpaceArena(arena);
         for (const c of flying) {
@@ -89,6 +94,8 @@ export function flyOne({ seed, kind, preset, cap = null, network = null, probe =
             if (s) { strafeTicks++; if (!wasStrafing.get(c.id)) passes++; }
             wasStrafing.set(c.id, s);
             if (pr && c.last && c.last.foe !== null) { pr.calls++; if (pr.foeOf.get(c.id) !== c.last.foe) pr.mismatches++; }
+            // ROUND 2's check 3, read off the ARENA's record of the decision, not the wrapper's: at or over the cap at the tick's start, the thrust was 0
+            if (capped && startClosing.has(c.id) && startClosing.get(c.id) >= cap) { overCap++; if (!(c.last && c.last.thrust === 0)) notCut++; }
         }
     }
     const t = BF.tally(arena);
@@ -100,6 +107,7 @@ export function flyOne({ seed, kind, preset, cap = null, network = null, probe =
         strafeS, dpss: strafeS > 0 ? t.damageOnShip / strafeS : null, passes, aliveS: aliveTicks / 30,
         peakClosing, shipDamagePerRound: t.ship.seatRounds > 0 ? t.ship.hitsDealt / t.ship.seatRounds : null,
         ...(pr ? { probe: { calls: pr.calls, mismatches: pr.mismatches, nullFoe: pr.nullFoe } } : {}),
+        ...(capped ? { capApplied: { overCap, notCut } } : {}),
     };
 }
 
@@ -197,6 +205,22 @@ export function devChecks(rows, cap) {
         sameFoe: { ok: probed.length > 0 && probed.every((r) => r.probe.mismatches === 0 && r.probe.nullFoe === 0 && r.probe.calls > 0), probed: probed.length, calls: probed.reduce((a, r) => a + r.probe.calls, 0) },
         capHolds: { ok: C.length > 0 && cPeak <= cap + CAP_SLACK && doctrinePeak > cap + DOCTRINE_MARGIN, cPeak, doctrinePeak },
         allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
+    };
+}
+
+/**
+ * ROUND 2's DEV2 checks: SAME FOE (probes), THE CAP IS APPLIED (decisions at or over the cap exist, and the arena recorded thrust 0 at every one; the
+ * doctrine's peak exceeds CAP + 5), EVERY FIGHT ENDS. The overshoot (peak minus CAP) is reported, worst and 95th percentile, and moves nothing.
+ */
+export function devChecks2(rows, cap = ROUND2_CAP) {
+    const C = rows.filter((r) => r.cap === cap), D = rows.filter((r) => r.cap === "D"), probed = C.filter((r) => r.probe);
+    const over = C.reduce((a, r) => a + (r.capApplied ? r.capApplied.overCap : 0), 0), notCut = C.reduce((a, r) => a + (r.capApplied ? r.capApplied.notCut : 0), 0);
+    const doctrinePeak = Math.max(...D.map((r) => r.peakClosing)), os = C.map((r) => r.peakClosing - cap).sort((a, b) => b - a);
+    return {
+        sameFoe: { ok: probed.length > 0 && probed.length === C.length && probed.every((r) => r.probe.mismatches === 0 && r.probe.nullFoe === 0 && r.probe.calls > 0), probed: probed.length, calls: probed.reduce((a, r) => a + r.probe.calls, 0) },
+        capApplied: { ok: C.length > 0 && C.every((r) => r.capApplied) && over > 0 && notCut === 0 && doctrinePeak > cap + DOCTRINE_MARGIN, overCap: over, notCut, doctrinePeak },
+        allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
+        overshoot: { worst: os[0], p95: os[Math.floor(os.length * 0.05)], overTwo: os.filter((x) => x > CAP_SLACK).length, of: os.length },
     };
 }
 
