@@ -982,8 +982,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 2026-11-19 -- two gates, tools/ship/ruleMove-selfcheck.mjs and circuitRetrain-selfcheck.mjs (Needs Rounds 39 and 40), each defining ok(n, c, d) once and naming first: gates 2379 -> 2381, usesOk 2358 -> 2360, definesOk 2350 -> 2352, nameFirst 2240 -> 2242, read off the code's own census (nothing else moved).
     // v4928 -- MERGED with v4927 (23 gates): main's 2401 plus this branch's three (circuitBias, ruleMove, circuitRetrain) = 2404, usesOk 2383, definesOk 2375, nameFirst 2265, read off the code's own census.
     // v4929 -- seven gates (tools/flyCx-selfcheck's neighbours unchanged; new: render/advisorTrace, render/subAquariumCaptain, brain/subStations, brain/stationsTask, brain/subStationsNavSonar, brain/duelStationsTask, brain/courierTask), each defining ok(n, c, d) once and naming first: gates 2404 -> 2411, usesOk 2383 -> 2390, definesOk 2375 -> 2382, nameFirst 2265 -> 2272, read off the code's own census.
-    gates: 2411, usesOk: 2390, definesOk: 2382, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2272, condFirst: 99, unknownSignature: 19,
+    // v4930 -- the merge of v4929 into this line: three gates of this line beside v4929's seven (tools/ship/circuitRetrain2-selfcheck.mjs, spaceDoctrineStudy-selfcheck.mjs, plannerCircuit-selfcheck.mjs), each defining ok(n, c, d) once and naming first: gates 2411 -> 2414, usesOk 2390 -> 2393, definesOk 2382 -> 2385, nameFirst 2272 -> 2275, read off the gate.
+    gates: 2414, usesOk: 2393, definesOk: 2385, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2275, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

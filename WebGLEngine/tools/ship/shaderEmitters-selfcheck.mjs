@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as E from "../../render/shaderEmitters.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 import { classify, codeOnly } from "../../render/backendParity.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -42,6 +43,7 @@ function M_files() {
         const io = {
             readdir: (d) => fs.readdirSync(d, { withFileTypes: true }),
             readFile: (p) => codeOnly(fs.readFileSync(p, "utf8")),
+            isSource: (n) => SOURCE_EXT.test(n),
             join: path.join, relative: (a, b) => path.relative(a, b).split(path.sep).join("/"),   // v4880: posix, as HAND_VERIFIED names files -- the rig is win32
         };
         CENSUS = E.census(ENG, io, classify);

@@ -1526,6 +1526,12 @@ A champion is eligible (not the start): about 75 percent. V1 holds: about 65 (th
 ## Round 38, CORRECTION (2026-11-19, found while Round 39 moved the rule profile; the result is unchanged)
 Check 6 of Round 38's report (`C06 AND R06 ARE THE AQUARIUM'S PROFILES`) is weaker than its words: `circuitBias.profilesSame` flies 60 s dives, on which the -0.04 and -0.06 bases fly the same, so it could not have told the bases apart and is still true after the move. What established C06 and R06 as the aquarium's profiles when the round flew is the gate's full-dive row (`tools/ship/circuitBias-selfcheck.mjs` section 4), which held then. The check is left as committed and the gate says so.
 
+**FIXED 2026-11-20 (tool hygiene; Round 38's result does not change).** `profilesSame` now flies full dives, at about 0.7 s for the check. Measured on the gate's two dives:
+- At 60 s the -0.06 rule (R06) is indistinguishable from today's -0.04 rule profile. At full length they differ.
+- Against the profiles as Round 38 flew them, the check is true. Against today's aquarium it is false, because Rounds 39 and 40 moved both profiles. So re-running `circuitBiasCmd.mjs report` now prints check 6 as FAIL, and that is correct: C06 and R06 are no longer the aquarium's profiles.
+- The committed Round 38 report keeps its 60 s reading as history.
+- A gate row holds all three cases, including the probe a 60 s check passed: the old circuit with today's -0.04 rule. Two sabotages, both red.
+
 ## Round 39, RESULT (2026-11-19): THE MOVE IS CONFIRMED -- R04'S HULL IS NO WORSE THAN R06'S IN ANY CONDITION; the aquarium's rule profile now flies low -0.04
 
 **The run.** `node tools/ship/ruleMoveCmd.mjs run --jobs 2` in the sandbox (beside Round 40's training), 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/rule-move/`, `brain/rig-results/rule-move-report.json`). All five checks passed, R06 flown as the aquarium's `rule` profile on full dives before it changed.
@@ -1562,3 +1568,124 @@ V1: NEW's hull under BIAS is no worse than the seat's (5 against 2: 3 <= 2 sqrt 
 **Against the expectations of section 6 (written first).** A champion eligible, about 75: held (3 of 4). V1 holds, about 65: held. V2 holds, about 90: held. Replaces, about 60: came. NEW minus the seat at REF LOSES (inside 2 se), about 70: NO -- it HURTS, by 5.6 se.
 
 **WHAT THIS MEANS and does not.** The retrained net fixes the hull: under a gauge reading +0.10 high it loses 5 boats in 300 where the profile it replaces lost 77 (88 in Round 38). It is not a better pilot: it scores 0.027 below the shipped seat at a sound gauge and 0.039 below it under the bias, and its training did not generalise to its own held-out dives. By the rule registered first (the hull decides; the score is reported, not weighed) it replaces the profile, and it has: `render/subAquariumCircuitWeights.mjs` gains CIRCUIT_CHAMPION (generated from search-1.json, digest 0ec046a3), `render/subAquariumCircuit.mjs`'s `circuit` profile flies it on the -0.04 base, PLAIN_CHAMPION is kept as what Rounds 38 and 40 name as C06, and the gates that pinned the old profile are restated with dated lines. **The circuit profile is now a safe watch-only seat and a weaker one; whether a better-trained net (more training dives, more searches) is worth a round is Keith's call** -- this round retrained once, as registered, and does not retrain again.
+
+# Round 41 -- a better-trained circuit profile: more training dives, the champion chosen on held-out dives, and a registered score line (REGISTERED 2026-11-19, before any code, any training and any of its seeds was flown)
+
+## 1. Why
+Keith, 2026-11-19, after v4928: "let's do all 3" of backlog `better-trained-circuit-profile`. Round 40's retrained net replaced the Sub Aquarium's circuit profile on its hull (5 lost of 300 under a +0.10-biased gauge, where the old profile lost 77) but scores 0.027 below the shipped seat at a sound gauge and 0.039 under the bias, and every one of its searches scored BELOW the untrained start on held-out dives: the search fitted 16 training dives and did not generalise. This round changes three things, and only these three: **(1) more training dives; (2) the champion chosen on held-out dives, checkpoint by checkpoint, instead of the end of the search; (3) a registered score line, so a net that scores worse than the seat cannot replace the profile.**
+
+## 2. The training (fixed now, before any search)
+- **Policy:** Round 40's, unchanged: the 21 -> 84 -> 7 plain net on the -0.04 base (by value), WIDE_BOUNDS, every readout starting at zero (the untrained pilot IS R04); the two-gauge fitness (the set flown at the sound gauge and with +0.10 bias, their mean score, their summed crushed and stranded), through the policy's `evaluate` seam.
+- **(1) Training dives:** `needsTask.TRAIN_SET` (seeds 1-10 of the four kinds, **40 dives, 80 with both gauges**) instead of TRAIN_SMALL (16).
+- **(2) Selection on held-out:** the (1+1)-ES of the recipe (4 searches x 300 children, sigma 0.3, 1 to 4 weights a child; search seeds **97600-97603**), with the current best weights **checkpointed every 50 children** (children 0, 50, ..., 300: seven checkpoints, the start included) and each checkpoint scored on HELD_OUT_SET (seeds 11-20, 40 dives, both gauges). **A search's result is its checkpoint of the best held-out score, ties to the earlier.** There is no prune toward the start (Round 40's prune fitted the training dives; it is dropped, and this is the third change's price: the weights keep every move up to the chosen checkpoint).
+- **Champion:** ELIGIBLE = crushed in no more POOL dives (seeds 21-32, both gauges) than the start; the best held-out of the eligible, ties to the lower k; **a search whose best checkpoint is the start contributes the start**; none eligible -> the start (R04). Chosen from the four records before any audit seed is flown; weights to six decimals as float32.
+
+## 3. The audit: arms, conditions and seeds
+- **Arms:** **NEW** (the champion); **CUR** (the circuit profile as it ships since Round 40: CIRCUIT_CHAMPION on -0.04); **SEAT-04** (the shipped seat, `surveyPilot()`).
+- **Conditions:** REF (sd 0.10) and BIAS (+0.10).
+- **Seeds:** **55001-55300, kind `both`, 300 dives per arm and condition**; unused; the gate flies only 55901-55902. 3 x 2 x 300 = 1,800 dives.
+
+## 4. Checks (a failure: NOT WEIGHED, and nothing is replaced)
+GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT; THE ARMS DIFFER (unless NEW is the start's R04 and differs from CUR and the seat, which it must); THE LEDGER IS COMPLETE (4 searches, 7 checkpoints each, one recipe, one start); NEW'S START IS R04; CUR IS THE AQUARIUM'S CIRCUIT PROFILE (full BIAS dives); SEAT-04 IS THE SHIPPED SEAT.
+
+## 5. The verdicts (hull: Round 33's test; score: the paired difference against 2 se)
+- **V1:** NEW's hull under BIAS no worse than SEAT-04's. **V2:** the same at REF.
+- **V3, THE SCORE LINE (the new one):** NEW minus SEAT-04 at REF, paired, is **not HURTS** (its mean is not below -2 se) **and** the same under BIAS.
+- **REPORTED, NOT WEIGHED:** NEW minus CUR at REF and under BIAS; each arm's mean and counts; which checkpoint each search chose; whether the champion is the start.
+- **The bottom line:** V1 and V2 and V3 -> `THE BETTER-TRAINED CIRCUIT HOLDS ITS HULL AND ITS SCORE: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE` (the weights file gains its champion, the profile flies it, the gates are restated with dated lines). Otherwise -> `THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (<which>): NOTHING IS REPLACED` and Round 40's profile stays.
+
+## 6. Expectations, recorded BEFORE any training
+Some search's best checkpoint is NOT the start: about 55 percent (Round 40's searches all ended below the start on held-out; held-out selection may simply return the start). The champion is the start: about 45. V1: about 75 (R04 itself held: 1 crushed of 300 under BIAS in Round 39). V2: about 95. V3 at REF: about 55 (R04 cost -0.004 against the seat in Round 39's REF, inside 2 se; a trained net may do better or worse). V3 under BIAS: about 70. The bottom line replaces: about 40 -- and if the champion is the start, the profile would become R04, the rule, which is a statement that the training bought nothing measurable.
+
+## 7. What will be built
+`tools/ship/circuitRetrain2.mjs` (Round 40's policy and two-gauge seam imported, a checkpointed search of its own -- the ES loop is the recipe's, written out because trainNeedsCircuit.search cannot checkpoint, and the gate holds it to search() child for child on its first segment -- the champion, the audit, the verdicts), `tools/ship/circuitRetrain2Cmd.mjs` (`train`, `audit`, `report`), `tools/ship/circuitRetrain2-selfcheck.mjs` with a mutation pass. The training ledger is committed before the audit; the audit is flown once and read once. **Not in this round:** other gauge conditions in the fitness, other net shapes, a second retraining.
+
+## Round 41, RESULT (2026-11-19): THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3, the score, at REF and under BIAS): NOTHING IS REPLACED
+
+**The training** (`circuitRetrain2Cmd.mjs train --workers 4`, four searches of about 55 minutes on TRAIN_SET with both gauges; the ledger `brain/rig-results/circuit-retrain2/` committed before any audit seed was flown). **Held-out selection found almost nothing to keep:** in three of the four searches no checkpoint beat the untrained start (R04) on held-out dives (0.8913), so they chose child 0; search 3 chose child 100 at 0.8931, 0.0018 above it. All four were eligible. The champion by the registered rule: **search 3, child 100** -- a net a hundred children from the rule.
+
+**The audit** (`audit --jobs 4`, 24 jobs, all exit 0, 1,800 dives on 55001-55300 `both`, read once; `brain/rig-results/circuit-retrain2-report.json`). All nine checks passed.
+
+| arm | REF score (crushed) | BIAS score (crushed) |
+|---|---|---|
+| NEW (Round 41's champion) | 0.7890 (0) | 0.8193 (0) |
+| CUR (the circuit profile since Round 40) | 0.7778 (0) | 0.8055 (4) |
+| SEAT-04 (the shipped seat) | 0.8003 (0) | 0.8444 (1) |
+
+V1 (hull under BIAS, 0 against 1) and V2 (hull at REF, 0 against 0): no worse. **V3, the score line: NEW minus the seat -0.0112 (se 0.0043) at REF and -0.0252 (se 0.0055) under BIAS, both HURTS: MISSES.** Reported: NEW minus CUR +0.0112 (se 0.0054) at REF, KEEPS; +0.0137 (se 0.0079) under BIAS, LOSES. Bottom line: `THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3 the score at REF; V3 the score under BIAS): NOTHING IS REPLACED`.
+
+**Against the expectations of section 6 (written first).** Some search's best checkpoint not the start, about 55: held, barely (one of four, by 0.0018). V1 about 75 and V2 about 95: held. V3 at REF, about 55: NO. V3 under BIAS, about 70: NO. Replaces, about 40: no.
+
+**WHAT THIS MEANS and does not.** The three changes did what they were for: more training dives and held-out selection stopped the overfitting (the champion is no longer below the start on held-out, and it beats Round 40's profile at REF by 0.011) and the score line stopped a weaker net replacing the profile. What they found is that **on this net, recipe and base there was almost nothing to learn: the held-out-selected net is nearly the -0.04 rule, and the rule itself scores below the shipped seat** (the seat is the rule's constants plus a planner; the planner's gain is what the seat has and the circuit does not). So the circuit profile stays Round 40's: safe under the biased gauge, 0.011 below what this round found at REF, and below the seat. **This round changes nothing that ships.** A circuit that matches the seat would need what the seat has -- the planner's look-ahead as an input or a base -- which is a different design, not more training of this one, and is Keith's call.
+
+# Round 42 -- a circuit built on the planner: the shipped seat as the base, the net's residuals on its decisions (REGISTERED 2026-11-19, before any code, any training and any of its seeds was flown)
+
+## 1. Why
+Round 41 found that a circuit on the -0.04 RULE cannot match the shipped seat: the held-out-selected net is nearly the rule, and the rule scores below the seat (NEW minus SEAT-04 -0.0112 at REF, -0.0252 under BIAS). The seat is the rule's constants plus the planner, and the planner is what the circuit lacked. Keith, 2026-11-19: "1, with 3 alongside as a small side task. Take 2 also." (2 is this round), then "i can do the training on my rig." **This round changes one thing: the base. The net's residuals adjust the PLANNER seat's decisions instead of the rule's.** The recipe, the sets, the selection, the champion rule, the audit's conditions and the score line are Round 41's.
+
+**What the planner decides that the rule does not, measured before this registration** (throwaway seeds 99971-99973 and 99981-99984, in no set; brain/plannerPerturbed.mjs read, not edited):
+- Only the STATION. Surface, cap, pump and repair are the rule's formulas on the same filtered charge.
+- The planner's station differed from the nearest on 0-4% of ticks, and on only 2 of 16 dives. Its measured worth is +0.02 (Round 22), and 0.011-0.025 over the -0.04 rule (Round 41's audit).
+- A planner dive costs about 1.5-2.3 s against the rule's about 0.13-0.2 s (about 11.6x).
+
+## 2. The seat (new module brain/plannerCircuitSeat.mjs; plannerPerturbed.mjs is NOT edited)
+`makePlannerSeat(sp, ctx)` wraps `plannerPerturbed.perturbedSeat(BASE_04, {}, surveySeat.planOf("standard"))`, with BASE_04 by value (Round 40's constants, equal to SURVEY_CONSTANTS today). On EVERY tick:
+1. d = the planner seat's decision (it is called every tick: it advances its own filter and replan clock).
+2. The wrapper advances its own filter by the same formula and alpha (bitwise equal to the planner's).
+3. Every STEP_TICKS (30) ticks, the net steps on x = the 21 pilotNeedsCircuit.featuresOf features plus 3 one-hot of the planner's station index among the open feasible stations (index >= 3, or no station: all zero).
+   **CLARIFIED 2026-11-19, before any code used it:** "the planner's station index" is its position k in `obs.stations`, the list the 21 features' per-station block and circuitSeat.makeSeat's station residuals already index (k < 3). "Among the open feasible stations" in the line above was loose wording: the one-hot is set at k when the planner's station sits at k < 3, and is all zero otherwise. The override in step 4 uses the same k.
+4. Decide with the held residuals y:
+   - station: the planner's station p scores y[1+p]; every other feasible open station k < 3 scores -1 + y[1+k]; the argmax wins (with y = 0, p wins strictly; a swing above 1 can override it);
+   - surface: lastCall || !station || 10 (thresholdAt(q, depth) - ema) + y0 > 0 (SURFACE_GAIN);
+   - cap: clamp(q.cap + 0.05 y4, 0.6, 0.95);
+   - pump: (flood > 0.001 && ema > 0.1 ? 1 : -1) + 2 y5 > 0; repair: (atSurface && damage > 0 && ema > 0.1 ? 1 : -1) + 2 y6 > 0.
+
+**The policy:** a plain relu net 24 -> 84 -> 7 (2,695 weights), createPlainPolicy's shape with 24 features, every readout starting at zero. **THE UNTRAINED NET IS THE SHIPPED SEAT, decision for decision** (a scratch prototype, not in the repo, matched surveyPilot() on 8 of 8 throwaway dives, fingerprint and command, every tick, both gauges). The gate re-proves it on 56901-56902.
+
+## 3. The training (Round 41's, with the base changed; fixed now, before any search)
+- **Fitness:** TRAIN_SET (40 dives, 80 with both gauges: SOUND and +0.10 BIASED), the mean score, through the policy's `evaluate` seam.
+- **Search:** (1+1)-ES, 4 searches x 300 children, sigma 0.3, 1-4 weights a child; **search seeds 97700-97703**.
+- **Checkpoints:** the best weights every 50 children (0, 50, ..., 300: seven, the start included), each scored on HELD_OUT_SET (40 dives, both gauges). A search's result is its checkpoint with the best held-out score, ties to the earlier. No prune.
+- **Champion:** eligible = crushed in no more POOL dives (both gauges) than the start; the best held-out of the eligible, ties to the lower k; a search whose best checkpoint is the start contributes the start; none eligible -> the start. Weights to six decimals as float32. Chosen from the four records before any audit seed is flown.
+- **WHERE: ON THE RIG** (Keith, 2026-11-19). About 24,830 planner dives a search; about 10.5-16 h a search, the four in parallel.
+- **RESUMABLE, AND THE RESUME IS EXACT.** Each search writes a ledger line at every checkpoint: the best weights (full float32, not rounded), the best training score, the improved and neutral counts, and the number of random draws consumed. A restarted search resumes from its last line: a fresh mulberry(seed) skips that many draws and the loop continues. **The gate holds a search stopped and resumed equal to one run unbroken, child for child, on a smoke recipe.** A lost search costs at most one segment of 50 children.
+
+## 4. The audit: arms, conditions and seeds
+- **Arms:** **NEW** (the champion on the planner base); **SEAT-04** (the shipped seat, `surveyPilot()`); **CUR** (the circuit profile as it ships: CIRCUIT_CHAMPION on -0.04).
+- **Conditions:** REF (sd 0.10) and BIAS (+0.10).
+- **Seeds:** **56001-56300, kind `both`, 300 dives per arm and condition**, 1,800 dives (about 48 CPU minutes); unused. The gate flies only 56901-56902.
+- The audit is flown once, after the training ledger is committed, and read once.
+
+## 5. Checks (a failure: NOT WEIGHED, and nothing is replaced)
+Round 41's nine, adapted: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT; THE ARMS DIFFER (NEW may equal SEAT-04 exactly when the champion is the start, and must then); THE LEDGER IS COMPLETE (4 searches, 7 checkpoints each, one recipe, one start, each search's own seed, every resume exact); **NEW'S START IS THE SHIPPED SEAT** (the untrained policy against surveyPilot() on 56901-56902, both gauges, full length, fingerprint and command for command); CUR IS THE AQUARIUM'S CIRCUIT PROFILE; SEAT-04 IS THE SHIPPED SEAT.
+
+## 6. The verdicts (Round 41's, plus one weighed only for a claim)
+- **V1:** NEW's hull (crushed + stranded) under BIAS no worse than SEAT-04's (Round 33's test, b - b0 <= 2 sqrt(b + b0)). **V2:** the same at REF.
+- **V3, the score line:** NEW minus SEAT-04, paired, is not HURTS (mean not below -2 se), at REF and under BIAS.
+- **V4 (weighed only for the claim "beats the seat"):** NEW minus SEAT-04 KEEPS (mean above +2 se) at REF and under BIAS.
+- **Reported, not weighed:** NEW minus CUR; arm means and counts; each search's chosen checkpoint; station overrides a dive (ticks where NEW's station differs from the planner's).
+- **The bottom line:**
+  - V1 + V2 + V3 -> `THE PLANNER CIRCUIT HOLDS ITS HULL AND ITS SCORE: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE`. If the champion IS the start, the line must add `-- AND IT IS THE SHIPPED SEAT: THE TRAINING BOUGHT NOTHING` (the circuit profile then flies the seat).
+  - V1 + V2 + V3 + V4 -> the line adds `-- AND IT BEATS THE SEAT`. The seat itself is NOT replaced in this round.
+  - Otherwise -> `THE PLANNER CIRCUIT DOES NOT CLEAR THE LINE (<which>): NOTHING IS REPLACED`.
+
+## 7. Expectations, recorded BEFORE any training
+- The champion is the start: about 55% (Round 41's searches chose the start 3 of 4 times; the planner's own headroom is already taken).
+- V1: about 85%. V2: about 95%. V3, both gauges: about 80%. V4: about 10%.
+- The station residuals train poorly (the one-hot is nearly constant; overrides on fewer than 1% of ticks): about 75%.
+
+## 8. What will be built
+`brain/plannerCircuitSeat.mjs` (the seat and the 24-feature policy); `tools/ship/plannerCircuit.mjs` (the policy with the two-gauge seam, the resumable checkpointed search, the champion, the audit, the verdicts); `tools/ship/plannerCircuitCmd.mjs` (export-free: `train` for the rig, `audit`, `report`); `tools/ship/plannerCircuit-selfcheck.mjs` with a mutation pass. **Not in this round:** the look-ahead values as features (they are private to the planner's closure, and exposing them would edit plannerPerturbed.mjs), other net shapes, replacing the seat.
+
+## Round 42, BUILT (2026-11-19): the training is the rig's
+- **What was built:**
+  - `brain/plannerCircuitSeat.mjs`: the seat and the 24 -> 84 -> 7 policy, 2,695 weights.
+  - `tools/ship/plannerCircuit.mjs`: the resumable search, the record, the champion, the audit and the verdicts.
+  - `tools/ship/plannerCircuitCmd.mjs`: export-free.
+  - `tools/ship/plannerCircuit-selfcheck.mjs`: 20 mutants, all red. Its header logs the findings.
+- **What the gate proves on 56901-56902:** the untrained net is the shipped seat (eight full dives, both gauges, fingerprint and command for command). A search killed twice and resumed equals one run unbroken, line for line. Both equal Round 41's esWithCheckpoints, move for move.
+- **Two clarifications before any training, neither a change:** the one-hot indexes `obs.stations` (dated above). And on 56901 the +0.10 bias does not change a dive shorter than its full 600 s, so the gate flies its gauge check at full length.
+- **ON THE RIG, from WebGLEngine:** `node tools/ship/plannerCircuitCmd.mjs train --workers 4`.
+  - It writes `brain/rig-results/planner-circuit/ledger-K.jsonl` (a line every 50 children) and `search-K.json` (when a search is done).
+  - **A killed run is restarted with the same command.** Each search resumes from its last whole line, and loses at most 50 children.
+  - Send the four `search-K.json` and four `ledger-K.jsonl` files. They are committed before any audit seed is flown. The audit (about 48 CPU minutes) is flown here and read once.

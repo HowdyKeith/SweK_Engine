@@ -70,6 +70,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 import * as Z from "../../render/zoomBlurExact.mjs";
 import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "./headlessGpu.mjs";
 
@@ -499,7 +500,7 @@ sec("6. *** ONE HOME FOR THE ORDER, AND THE LIMITS SAID PLAINLY ***");
                 if (e.name === "node_modules" || e.name === "vendor" || e.name === ".git") continue;
                 const p = path.join(dir, e.name);
                 if (e.isDirectory()) { walk(p); continue; }
-                if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+                if (!SOURCE_EXT.test(e.name)) continue;
                 if (re.test(fs.readFileSync(p, "utf8"))) out.push(path.relative(root, p).split(path.sep).join("/"));
             }
         };

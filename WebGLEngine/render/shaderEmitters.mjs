@@ -387,7 +387,7 @@ export function census(root, io, preambleKind) {
             if (skip.has(e.name)) continue;
             const p = io.join(dir, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!io.isSource(e.name)) continue;   // handed in (SOURCE_EXT), so this module stays free of node:fs -- shaderRefs counts hand-spelled filters
             out.scanned++;
             const text = io.readFile(p);
             if (preambleKind(text) !== "none") { out.seenByPreamble++; continue; }
