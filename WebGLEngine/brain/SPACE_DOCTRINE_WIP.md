@@ -146,3 +146,57 @@ The lead stands where brain/SPACE_ITEMS_2026-11-18.md left it, now with a measur
 
 ## HELD89 RESULT
 (not yet flown)
+
+# ROUND 2: THE SAME QUESTION, WITH A CAP CHECK ON WHAT THE PILOT CONTROLS (Keith 2026-11-20, "1, with 3 alongside as a small side task, then 2"; REGISTERED 2026-11-20 BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why a second round, said first.** Round 1 was NOT WEIGHED on one check: the capped peak closing speed reached 14.05 against a bar of CAP + 2 = 14 (one fight of 480). That bar measured the ARENA's speed, which the pilot does not control: the cap is a thrust CUT, so a fighter swinging past the ship turns lateral speed into closing speed with the thrust already off. Round 1's own rule forbade widening the bar, so this round replaces it with a check on what the pilot DOES control, and asks the question again on the unspent held set.
+
+**What is already known, before this registration** (Round 1, read once, above):
+- DEV (1901-1930) chose CAP 12 by its registered rule, before any check was read.
+- Its means favour the capped arm by about 700 R at every cap from 6 to 15.
+- The overshoot table: worst 2.05 at cap 12, 3.98 at cap 6.
+- **So CAP BETTER under regular and green is again expected.** The round earns its keep through the per-preset split and a check that can be held exactly.
+
+## WHAT CHANGES, AND ONLY THIS
+1. **CAP = 12, TAKEN FROM ROUND 1's DEV.** It is not re-chosen. The choice was the registered rule's, made on DEV's means. The failed check was a bar on the arena, not on the choice.
+2. **CHECK 3 IS REPLACED: THE CAP IS APPLIED.**
+   - In every arm-C fight on DEV2, at every decision of a flying fighter whose closing speed to its nearest foe at the START of the tick is >= CAP, the thrust the ARENA RECORDED for that decision (c.last.thrust) is exactly 0.
+   - It is counted from the arena's own record, outside the pilot wrapper. Pass iff such decisions exist (the cap is reached at all) and none of them carries thrust.
+   - Its bite half is Round 1's, kept: the doctrine's peak closing speed on DEV2 exceeds CAP + 5 (the cap binds).
+   - The overshoot (peak minus CAP) is REPORTED (worst and 95th percentile) and moves nothing.
+3. **A NEW DEV FOR THE CHECKS ONLY: DEV2 = space seeds 2101-2130 x the four kinds = 120 scenarios**, fresh: no space file and no commit names them. Arm D and arm C at CAP 12 are flown under the four verdict-bearing presets. Checks 1 (identity, on 2101-2103), 2 (same foe), 3 (the cap is applied) and 6 (every fight ends) run on DEV2. **Nothing is chosen on DEV2 and it gives no verdict.**
+
+## WHAT DOES NOT CHANGE (Round 1's text above holds, word for word)
+- The arms and the wrapper (cappedPilot: thrust 0 when closing >= CAP, torque and firing untouched).
+- **HELD89 = space seeds 2401-2460 x 4 kinds, flown ONCE**, unspent by Round 1.
+- The presets, verdict-bearing and reported (green + MLP).
+- R, the tie rule, the sign test, FLOOR under 20 discordant pairs, the median kept with ties (so CAP BETTER needs more than half of ALL pairs).
+- The per-preset verdict, SUPPORTED / PARTLY / NOT SUPPORTED, and HARMFUL.
+- Checks 4 (the old fights stand) and 5 (same scenarios).
+- The reported readings, including the ship's damage per round.
+- **CLOSED AFTER DEV2**, as Round 1 was after DEV.
+
+## ORDER
+1. DEV2 is flown and read once.
+2. If any of checks 1, 2, 3 or 6 fails, the round is NOT WEIGHED and HELD89 stays unflown.
+3. If all pass, CAP_CHOSEN = 12 is committed in tools/ship/spaceDoctrineStudy.mjs, with the DEV2 result in this note, BEFORE any HELD89 seed. Then HELD89 is flown once and read once.
+
+## EXPECTATIONS (written before DEV2)
+- Checks 1, 2, 3 and 6 all pass: about 90%. Check 3 holds by construction; the risk is the measurement, not the pilot.
+- Round 1's bar would have failed again on DEV2 (worst overshoot at cap 12 above 2): about 35%.
+- E1 regular CAP BETTER: about 95%.
+- E2 green CAP BETTER: about 95%.
+- E3 perfect FLOOR: about 70%.
+- E4 ace FLOOR or NO DIFFERENCE SHOWN: about 70%.
+- E5 DOCTRINE BETTER under any preset: about 5%.
+- E6 SUPPORTED: about 85%.
+- E8 green + MLP: C kills the ship in at least 80% of scenarios, about 85%.
+- E9 arm C loses fewer fighters under regular and green: about 80%.
+
+**Cost:** DEV2 is 120 x 4 x 2 = 960 fights, about 8 CPU minutes. HELD89 is 1,920 fights plus 480 network fights, about 25 CPU minutes.
+
+## ROUND 2, DEV2 RESULT
+(not yet flown)
+
+## ROUND 2, HELD89 RESULT
+(not yet flown)
