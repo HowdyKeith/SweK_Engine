@@ -3553,10 +3553,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "blob-cast-bisect",
-        blocker: "OPEN",
-        what: "Read after v4928: still open. physics/blobSpace-selfcheck.mjs l.156 defers bisecting castIntoBlob's last march interval; physics/blobSpace.js castIntoBlob still returns the first sample inside, up to one step h deep.",
-        how: "Bisect the last interval to a tolerance and tighten the gate's 'short of the surface by less than h' row to that tolerance.",
-        why: "A hit can land a whole step inside the surface.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-20: physics/blobSpace.js castIntoBlob bisects the last march interval (REFINE_STEPS = 40 halvings) and returns the inside end, so a radial hit is short of the closed-form radius by 5.6e-16 instead of 1.750e-3 and is still never outside. refine 0 keeps the old march; a ray starting inside returns its origin. physics/blobSpace-selfcheck.mjs holds it (2 sabotages, both red). WAS: physics/blobSpace-selfcheck.mjs l.156 deferred the bisect.",
+        how: "Done.",
+        why: "A contact resolver trusting the hit as a surface point embedded every body by up to one step.",
     },
     {
         id: "fdtd-dispersive-and-magnetic-loss",

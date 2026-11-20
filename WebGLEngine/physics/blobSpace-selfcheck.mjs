@@ -7,8 +7,10 @@
 // blob would be the space, and the universe in the simulator."
 //
 // THE ANSWER IS NO, AND IT IS GATED AS A FACT ABOUT THE INTERFACE, NOT AN OPINION ABOUT THE BLOB.
+// 2026-11-20 (backlog blob-cast-bisect): castIntoBlob bisects its last march interval. SABOTAGED twice, restored byte-identical: REFINE_STEPS 0 -> 1 red
+// (the radial-cast row); the OUTSIDE end of the bracket returned -> 2 red (the radial-cast row and the unrefined-march row).
 import { CONTRACT } from "./backendConformance.mjs";
-import { insideBlob, outwardNormal, castIntoBlob, pushOut, depth } from "./blobSpace.js";
+import { insideBlob, outwardNormal, castIntoBlob, pushOut, depth, REFINE_STEPS } from "./blobSpace.js";
 import { makeBlobs } from "../simulation/tomo/blobPhantom.js";
 
 let fails = 0;
@@ -144,16 +146,23 @@ const blobs = makeBlobs(7, 20260715);
         const want = isoRadius(a, r), h = 0.002;
         const hit = castIntoBlob(3, 0, 0, -1, 0, 0, B, 8, h);
         const overshoot = want - hit.x;
-        ok("a radial cast returns the closed-form radius to WITHIN ITS OWN STEP, and lands INSIDE it",
-           overshoot > 0 && overshoot < h,
-           `hit x = ${hit.x.toPrecision(9)} against the exact ${want.toPrecision(9)} -- short by ${overshoot.toExponential(3)}, step h = ${h}`);
+        // 2026-11-20 (backlog blob-cast-bisect): the last interval is BISECTED (REFINE_STEPS halvings), so the hit is ON the surface to ~1e-15 and still
+        // never outside. refine: 0 keeps the old march, and it still measures the old shortfall, 1.750e-3 against a step of 2e-3.
+        const raw = castIntoBlob(3, 0, 0, -1, 0, 0, B, 8, h, { refine: 0 }), rawShort = want - raw.x;
+        ok("!! a radial cast returns the closed-form radius to 1e-12 -- the last interval is bisected -- and still lands INSIDE it (never outside)",
+           overshoot >= 0 && overshoot < 1e-12 && insideBlob(hit.x, hit.y, hit.z, B) && REFINE_STEPS === 40,
+           `hit x = ${hit.x.toPrecision(17)} against the exact ${want.toPrecision(17)} -- short by ${overshoot.toExponential(3)}; the unrefined march (refine 0) was short by ${rawShort.toExponential(3)}, step h = ${h}`);
+        ok("...and the unrefined march is still what it was: short by less than one step, inside", rawShort > 1e-4 && rawShort < h && insideBlob(raw.x, raw.y, raw.z, B));
+        const start = castIntoBlob(0, 0, 0, 1, 0, 0, B, 8, h);
+        ok("a ray that STARTS inside returns its own origin, as before (there is no outside end to bisect toward)", start.t === 0 && start.x === 0);
         ok("...and the normal it hands back at a radial hit is exactly the ray axis", 
            hit.normal[0] === 1 && hit.normal[1] === 0 && hit.normal[2] === 0, JSON.stringify(hit.normal));
         report("WHAT IS NOT CLAIMED, AND IT IS A REAL LIMIT", "castIntoBlob MARCHES and stops at the first sample " +
                "inside; it does not refine the last interval. So the hit is accurate to h and is always INSIDE the " +
                "true surface, never on it. A contact resolver that trusted it as a surface point would embed every " +
                "body by up to one step. Bisecting the final interval would make it exact and costs ~40 evaluations " +
-               "-- NOT DONE HERE, because changing the function is a different round from keying it.");
+               "-- NOT DONE HERE, because changing the function is a different round from keying it. " +
+               "2026-11-20: DONE -- the last interval is bisected (40 halvings); the row above holds it to 1e-12.");
     }
 }
 
