@@ -11,6 +11,7 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain ship; THE BUTTON'S LESS THE CAR'S, pair by pair.
 // FORECAST, for the record: rationed CANNOT BE TOLD or a small lead (both hold the trigger; whole magazines it was +0.02 with the cannon); with the pilot's escorts a lead, as the fly-wired gunner led the car's against the pilot's fighters (+0.13).
 // WHAT IS DECIDED: the button's pick HOLDS if it TRAILS the car's gunner in neither fight; if it trails, the by-size hand's note says where. Nothing is written but the reading.
+// READ 2026-11-20 (brain/buttonOneHard.reading.json): THE PICK HOLDS -- +0.008 rationed, +0.055 with pilot-flown escorts, both cannot be told. The by-size hand's note says so.
 // Every arm's leads are kept (brain/rig-results/buttonOneHard/); the reading file (brain/buttonOneHard.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets (tools/ship/takeButtonUntried.mjs, takePresetsHard.mjs), other rations, the pilot on one side only.
 "use strict";
