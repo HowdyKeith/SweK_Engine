@@ -42,10 +42,11 @@ export function crew(name, ctx, knobs = FROZEN_TRIAGE) {
 }
 
 /** Fly one scenario with one crew: { seed, crew, survived, status, crushedAt, reachedSurface, finalDepth, finalFrac, released, triage }. */
-export function fly(sc, name, { knobs = FROZEN_TRIAGE, seconds = SECONDS, dt = S.DT } = {}) {
+// v4930 (round 8) -- `make(ctx)`: a caller-made captain in place of the named crew (the learned captain flies this exact loop); null keeps v4929's.
+export function fly(sc, name, { knobs = FROZEN_TRIAGE, seconds = SECONDS, dt = S.DT, make = null } = {}) {
     let s = S.createState({ depth: sc.depth, speed: SPEED, model: MODEL }), needs = N.initialNeeds("battery", { crushDepth: CRUSH });
     needs.energy = N.CLASSES.battery.capacityJ * sc.frac;
-    const read = () => N.readings(MODEL, needs, s), cap = crew(name, { read, model: MODEL }, knobs), target = Object.freeze({ depth: sc.depth, heading: sc.heading, speed: SPEED });
+    const read = () => N.readings(MODEL, needs, s), cap = make ? make({ read, model: MODEL }) : crew(name, { read, model: MODEL }, knobs), target = Object.freeze({ depth: sc.depth, heading: sc.heading, speed: SPEED });
     let status = "submerged", crushedAt = null, reached = false, released = false;
     const total = Math.round(seconds / dt);
     for (let i = 0; i < total; i++) {
