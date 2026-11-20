@@ -82,7 +82,7 @@ export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold"
         const rule = sight(seat, st, body, targets, t);
         if (rule.target == null) { decide.last = null; laid = null; return { rule, x: null, st, seat, t, ...(handOn !== null && handRest ? { hand: true } : {}) }; }   // with `handOn`, no target is the hand's too: its gun goes back to rest as the hand gunner's does -- unless `handRest` is false (2026-11-19): then the seat's own idle, the network's hold
         const tg = targets.find((q) => q.id === rule.target); if (!tg) { decide.last = null; laid = null; return { rule, x: null, st, seat, t }; }
-        if (handOn !== null && handOn(tg)) { decide.last = null; laid = null; return { rule, x: null, st, seat, t, hand: true }; }   // the hand's own laying: and the network's laid gun forgotten, so that it starts from where the seat is when it is next asked
+        if (handOn !== null && handOn(tg, rule, st, seat)) { decide.last = null; laid = null; return { rule, x: null, st, seat, t, hand: true }; }   // the hand's own laying: and the network's laid gun forgotten, so that it starts from where the seat is when it is next asked
         if (!laid || !sigma) laid = { yaw: st.yaw, pitch: st.pitch };
         const spent = ammoSense && st.gun && seat.gun && seat.gun.magazine > 0 ? 1 - st.gun.ammo / seat.gun.magazine : 0;   // THE ROUNDS-LEFT SENSE (see the header): off unless asked for
         return { rule, x: features(seat, laid, body, rule, tg, reach, spent), st, seat, t };

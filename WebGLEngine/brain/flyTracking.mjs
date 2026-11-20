@@ -32,6 +32,9 @@
 // THE SLIP FROM THE TARGET (2026-11-19; round 4): `movingWith({ from: "target" })` reads the slip off the target's own bearing in the ship's frame, from where it really is each tick. On the same scratch fighter attacks tau 0.1 gave 125 kills (128 smoothed over
 //   0.2 s) against 117 at tau 0 (the plain ship 128), 0.2 about level, 0.4 and 0.8 far worse (overshoot); in fleets of three (24 pairs) tau 0.1 was level with and without the cannon (-0.022 to +0.071). So `movingTarget` (seatFlyWired7: tau 0.1, smoothed 0.2 s,
 //   CHOSEN ON THOSE SCRATCH PAIRS) goes to a registered study on fresh pairs: tools/ship/takeFlyWiredGunnerSees.mjs.
+// THE HAND FOR THE LAST DEGREES (2026-11-20; round 2 of the second set). NOT REGISTERED, scratch pairs 133001-133012 of each kind, fleets of three, against seatFlyWired8 (48 pairs each): the hand laying the gun within 6 degrees of the solution
+//   +0.063 with the cannon and +0.056 without, within 10 degrees +0.170 and +0.201, within 20 degrees +0.173 and +0.258; a stiffer circuit instead (the gains -6 and -10) LOST, -0.13 to -0.21. So `holdNear` (seatFlyWired9: 20 degrees) goes to a
+//   registered study on fresh pairs: tools/ship/takeFlyWiredGunnerNear.mjs.
 // AN ELEVATION OF ITS OWN (2026-11-19; round 5): `elevatedWith({ front })` reads the gun's pitch off the circuit with its cells at their places ALONG the sheet's other axis. The command is nearly the yaw's (front +1 about 20% steeper close in, -1 about
 //   10%: places are ranks, so either axis spreads the cells evenly, and only how the wiring sits on the axis can differ). On scratch pairs it was level: 117-118 kills against fighters (117 the ships-sticky gunner), and in fleets of three -0.074 to +0.004 against
 //   the ships-sticky gunner, none told. So no study was registered and nothing ships.
@@ -156,6 +159,12 @@ export const elevatedWith = ({ front = 1 } = {}) => { if (front !== 1 && front !
  *  over 0.2 s), on a FIGHTER the seat is the hand gunner, with no target it holds (seatFlyWired6). Three weights, the third tau (0.1 as flown; 0 is seatFlyWired6 to the bit). Against fighters alone it IS seatFlyWired6 whatever tau (the network is never
  *  asked); in fleets with no fighters it IS seatFlyWired7. See tools/ship/takeFlyWiredGunnerHoldSees.mjs. */
 export const POLICY_ID8 = "seatFlyWired8", holdSees = libraryOf("fly:medial for ships, seeing its target move, the hand for fighters, holding with no target", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0.2, from: "target" });
+/** THE GUNNER WHOSE HAND LAYS THE LAST DEGREES (`seatFlyWired9`, 2026-11-20): the seeing holding gunner (seatFlyWired8), but where the gun is within NEAR (20 degrees) of the sight's solution on a ship, the seat does what the hand does -- the circuit makes
+ *  the big swings, the hand the fine laying. Why: the fly gun, not firing, sat a median 3-5 degrees off the solution, just outside the trigger's window, where the circuit's command is soft (10% of the slew at 2 degrees); a stiffer gain overshot and lost
+ *  (tools/ship/takeFlyWiredGunnerShips.mjs's header). NEAR 20 degrees was CHOSEN ON SCRATCH PAIRS (the module header). `holdSeesNear(near)` builds another. See tools/ship/takeFlyWiredGunnerNear.mjs. */
+export const NEAR = 20 * Math.PI / 180;
+export const holdSeesNear = (near) => libraryOf(`fly:medial for ships until within ${near} rad, then the hand; the hand for fighters; holding; seeing its target move`, FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q, rule, st) => !ST.SHIPS_ONLY(q) || (rule && st && Math.hypot(wrap(rule.yaw - st.yaw), rule.pitch - st.pitch) < near), handRest: false, motion: true, smooth: 0.2, from: "target" });
+export const POLICY_ID9 = "seatFlyWired9", holdNear = holdSeesNear(NEAR);
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
