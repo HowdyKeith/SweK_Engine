@@ -80,7 +80,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((arm) => [arm, k(f, arm)]))).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE BUTTON STAYS, BY ONE FIGHT: the cannon-aware helm over the fly gunner LEADS the button in fleets (+0.183) and with escorts (+0.344) but TRAILS it ONE SHIP A SIDE (-0.097, z -2.9), the page's default fight; the bow-on arms trail it everywhere (-0.47 to -1.22)", near(R("oneCannon").helmFlyOverButton, -0.097) && rd.oneCannon.words.helmFlyOverButton === "TRAILS" && near(R("fleetCannon").helmFlyOverButton, 0.183) && near(R("escortsCannon").helmFlyOverButton, 0.344) && G.FIGHTS.every((f) => rd[f].words.faceCarOverButton === "TRAILS" && rd[f].words.faceFlyOverButton === "TRAILS") && rd.verdict.winner === "helmCar" && rd.verdict.qualified.length === 0
+        && G.FIGHTS.every((f) => Object.keys(re[f]).every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! against the plain ship: the button +1.725, +1.529, +1.819; the cannon-aware helm over the fly gunner +1.627, +1.711, +2.163; the bow-on rule over the car's gunner +0.953, +0.308, +1.350 and over the fly gunner +0.745, +0.607, +1.679 -- THE HELM IS WORTH MORE THAN THE GUNNER. The forecast was right that the bow-on arms trail, and wrong one ship a side (it said the fly gunner would lead there)", near(R("oneCannon").helmCar, 1.725) && near(R("fleetCannon").helmFly, 1.711) && near(R("escortsCannon").helmFly, 2.163) && near(R("oneCannon").faceCar, 0.953) && near(R("fleetCannon").faceCar, 0.308) && near(R("oneCannon").faceFly, 0.745));
+    ok("!! AND THE PAGE STILL CARRIES THE CAR'S GUNNER UNDER THE CANNON-AWARE HELM", JSON.stringify(C.presetOf("best").choice) === '{"hand":"car-big","helm":"flywired","cannon":true}');
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

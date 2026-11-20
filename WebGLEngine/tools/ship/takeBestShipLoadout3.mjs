@@ -15,6 +15,8 @@
 //   with the cannon) and are about level in the fleets. So helmFly takes the button.
 // WHAT IS DECIDED: a challenger REPLACES the button's loadout if it LEADS it in at least one fight and TRAILS it in none; of several, the one whose three gains have the largest mean. Otherwise the preset stays. Nothing is written but the reading; a change
 //   to the preset is made by hand in render/spaceDuelCore.mjs and its gate pins the reading.
+// READ 2026-11-20 (brain/bestShipLoadout3.reading.json): THE BUTTON STAYS, by one fight. The cannon-aware helm over the fly gunner (seatFlyWired11) leads the button in fleets (+0.183, z 6.2) and with escorts (+0.344, z 8.6) but trails it one ship a side
+//   (-0.097, z -2.9), the page's default fight; the bow-on arms trail it everywhere (-0.14 to -1.22). The helm is worth more than the gunner: under the bow-on rule both gunners lose 0.3 to 1.2 against the plain ship. The forecast was wrong one ship a side.
 // Every arm's leads are kept (brain/rig-results/bestShipLoadout3/); the reading file (brain/bestShipLoadout3.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the other helms (trained, steer, compass), other gunners, fights without the cannon, rationed magazines, the trained pilot.
 "use strict";
