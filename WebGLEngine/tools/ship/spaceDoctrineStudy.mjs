@@ -39,7 +39,7 @@ export const networkOf = (module, file) => ({ module, weights: Float32Array.from
  * 2026-11-19: DEV chose 12, AND CHECK 3 FAILED (peak 14.05 against CAP + 2 = 14), so the round is NOT WEIGHED and this
  * stays null: HELD89 is not flown. The gate holds the two together (a failed DEV check keeps this null).
  */
-export const CAP_CHOSEN = null;
+export const CAP_CHOSEN = 12;   // 2026-11-20: ROUND 2's DEV2 passed checks 1, 2, 3 (the cap is applied) and 6; committed with the result before any HELD89 seed
 
 /** The scenarios of a seed list, seed-major: [{ seed, kind }]. */
 export const scenariosOf = (seeds) => seeds.flatMap((seed) => KINDS.map((kind) => ({ seed, kind })));

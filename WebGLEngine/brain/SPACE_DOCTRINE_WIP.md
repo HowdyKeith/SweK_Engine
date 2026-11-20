@@ -195,8 +195,15 @@ The lead stands where brain/SPACE_ITEMS_2026-11-18.md left it, now with a measur
 
 **Cost:** DEV2 is 120 x 4 x 2 = 960 fights, about 8 CPU minutes. HELD89 is 1,920 fights plus 480 network fights, about 25 CPU minutes.
 
-## ROUND 2, DEV2 RESULT
-(not yet flown)
+## ROUND 2, DEV2 RESULT (2026-11-20, read once: `spaceDoctrineStudyCmd.mjs dev2-read`; brain/rig-results/space-doctrine/dev2-*.json and dev2-report.json)
+
+**ALL FOUR CHECKS PASS. CAP_CHOSEN = 12 is committed with this result, before any HELD89 seed.**
+
+* Check 1 IDENTITY: PASS. 48 tallies at cap Infinity equal no pilot, to the bit.
+* Check 2 SAME FOE: PASS. 480 probed fights, 2,199,352 decisions, no mismatch.
+* **Check 3 THE CAP IS APPLIED: PASS.** 1,414,431 decisions at or over 12, and the arena recorded thrust at none of them. The doctrine's peak was 33.52 (> 17).
+* Check 6 EVERY FIGHT ENDS: PASS (960 fights).
+* Reported, moving nothing: overshoot worst 2.03, 95th percentile 1.73. **3 of 480 fights were over +2, so Round 1's bar would have failed again** (expected about 35%). Mean R: D 90.4, C 796.9 (DEV gives no verdict).
 
 ## ROUND 2, HELD89 RESULT
 (not yet flown)

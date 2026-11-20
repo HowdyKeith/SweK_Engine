@@ -1,0 +1,33 @@
+{
+ "round": 2,
+ "cap": 12,
+ "identity": {
+  "ok": true,
+  "n": 48
+ },
+ "checks": {
+  "sameFoe": {
+   "ok": true,
+   "probed": 480,
+   "calls": 2199352
+  },
+  "capApplied": {
+   "ok": true,
+   "overCap": 1414431,
+   "notCut": 0,
+   "doctrinePeak": 33.519510872779904
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 960
+  },
+  "overshoot": {
+   "worst": 2.029163223690711,
+   "p95": 1.7327222504090702,
+   "overTwo": 3,
+   "of": 480
+  }
+ },
+ "allOk": true,
+ "cpuSeconds": 598.6179999999999
+}
