@@ -15,6 +15,9 @@
 //   gunner runs dry and the hand gunner LEADS it, by about 0.3, and the fly gunner by less. So most likely no challenger qualifies (each trails somewhere) and the button stays.
 // WHAT IS DECIDED: a challenger REPLACES the car's gunner in the preset if it LEADS it in at least one fight and TRAILS it in none; of two that do, the one whose three gains have the larger mean. Otherwise the preset stays. Nothing is written but the
 //   reading; a change to the preset is made by hand in render/spaceDuelCore.mjs and its gate pins the reading.
+// READ 2026-11-20 (brain/bestShipLoadout2.reading.json): THE PRESET STAYS. The car's always-firing gunner leads the hand gunner by 1.283, 0.905 and 0.189 and the fly-wired gunner by 0.851, 0.796 and 0.381 (escorts without and with the cannon; rationed).
+//   The forecast was wrong rationed: at a quarter of every magazine the car's gunner still leads. Seen in passing: under the cannon-aware helm the fly-wired gunner leads the plain side by only +0.136 with escorts and no cannon, where under the bow-on
+//   rule it led by +0.40 (tools/ship/takeFlyWiredGunnerHoldSees.mjs, other pairs) -- the helm and that gunner do not add; not a reading of this study.
 // Every arm's leads are kept (brain/rig-results/bestShipLoadout2/); the reading file (brain/bestShipLoadout2.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side and fleets with whole magazines and no escorts (the first study), other rations, escorts with the cannon AND a ration, fighters alone, other helms.
 "use strict";
