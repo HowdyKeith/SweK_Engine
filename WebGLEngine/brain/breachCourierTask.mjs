@@ -17,6 +17,9 @@ import { mulberry } from "./pilotSubPolicy.mjs";
 export const BREACH = Object.freeze({ leak: Object.freeze([0.03, 0.08]), at: Object.freeze([60, 600]), build: 5 }), SURFACE_BAND = 3;
 export const CREWS = Object.freeze(["FIXED", "ROUTE+DC", "TRIAGE", "COMBINED"]);
 export const DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 189001 + i)), HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 191001 + i));
+/** ROUND 10 (section 27): COND -- COMBINED with the breach latch made conditional (latchOnSecond); its sets. */
+export const COND_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, latchOnSecond: true });
+export const R10_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 198001 + i)), R10_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 199001 + i));
 const MODEL = NT.model();
 
 /** The breach of a seed: { leak, at }. The battery is round 4's (courierTask.chargeOf). */
@@ -34,15 +37,17 @@ export function crew(name, ctx) {
     if (name === "ROUTE+DC") return SS.captain({ helm, stations: [CT.legsStation({ ...ctx, route: true }), SS.gatedStation(SS.energyStation({ read: ctx.read }), shut), SS.damageStation()] });
     if (name === "TRIAGE") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE });
     if (name === "COMBINED") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });
+    if (name === "COND") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: COND_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 10; not in CREWS (round 7's registered four)
     throw new Error(`breachCourierTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
 }
 
 /** One run: { seed, crew, c0, leak, at, survived, status, lostAt, goals, emptyS, surfacedAfterBreachS, released }. */
-export function run(seed, name, { seconds = CT.SECONDS, dt = S.DT } = {}) {
+// v4930 (round 11) -- `make(ctx)`: a caller-made captain (ctx: read, nav, pos, model) in place of the named crew; null keeps round 7's.
+export function run(seed, name, { seconds = CT.SECONDS, dt = S.DT, make = null } = {}) {
     const c0 = CT.chargeOf(seed), b = breachOf(seed), scene = TN.tankScene(seed), nav = TN.createNavigator(scene, { arm: CT.ARM, seed });
     let s = S.createState({ depth: CT.START.depth, speed: CT.START.speed, model: MODEL, pos: [CT.START.x, CT.START.y, -CT.START.depth] }), needs = N.initialNeeds("battery", { crushDepth: 60 });
     needs.energy = N.CLASSES.battery.capacityJ * c0;
-    const read = () => N.readings(MODEL, needs, s), cap = crew(name, { read, nav, pos: () => [s.pos[0], s.pos[1]] });
+    const read = () => N.readings(MODEL, needs, s), cap = make ? make({ read, nav, pos: () => [s.pos[0], s.pos[1]], model: MODEL }) : crew(name, { read, nav, pos: () => [s.pos[0], s.pos[1]] });
     let status = "submerged", t = 0, empty = 0, surfaced = 0, lostAt = null, released = false;
     const total = Math.round(seconds / dt);
     for (let i = 0; i < total; i++) {
@@ -81,3 +86,12 @@ export function verdict({ FIXED, "ROUTE+DC": ROUTE, TRIAGE, COMBINED }) {
         pairs: { survivalVsFixed: sF, goalsVsFixed: gF, survivalVsTriage: sT, goalsVsRoute: gR },
     };
 }
+
+/** ROUND 10's registered verdict: COND BEATS COMBINED iff more goals by the test AND not shown worse on survival; with what it keeps of each parent (goals against ROUTE+DC, survival against TRIAGE). */
+export function condVerdict({ COND, COMBINED, "ROUTE+DC": ROUTE, TRIAGE }) {
+    const g = compare(COND, COMBINED, "goals"), sv = compare(COND, COMBINED, "survived"), gR = compare(COND, ROUTE, "goals"), sT = compare(COND, TRIAGE, "survived");
+    const worseSurvival = sv.pB <= 0.05 && sv.bMore > sv.aMore, moreGoals = g.pA <= 0.05 && g.aMore > g.bMore;
+    return { verdict: moreGoals && !worseSurvival ? "COND BEATS COMBINED" : moreGoals ? "COND WINS GOALS BUT LOSES SURVIVAL" : "COND DOES NOT BEAT COMBINED",
+        keepsRouteGoals: !(gR.pB <= 0.05 && gR.bMore > gR.aMore), keepsTriageSurvival: !(sT.pB <= 0.05 && sT.bMore > sT.aMore), pairs: { goalsVsCombined: g, survivalVsCombined: sv, goalsVsRoute: gR, survivalVsTriage: sT } };
+}
+

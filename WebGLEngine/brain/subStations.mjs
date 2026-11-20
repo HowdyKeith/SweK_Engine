@@ -109,26 +109,35 @@ export function captain({ helm, stations = [] } = {}) {
  */
 // v4930 (round 9) -- T5, BLOW: once breached and the weight gone, while deeper than blowAbove (m) and climbing slower than blowClimb (m/s), ballast = -1 -- the main tank blown with STORED AIR (no charge), over the surfacing
 //   wrapper's rationing. Off with blowClimb null. Round 9 found the air a breached TRIAGE boat dies with: 5.53 of 6, never used.
-export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3 });
+// v4930 (round 10) -- COND, latchOnSecond: the breach latch claims the surface only once damage control's TROUBLE TEST (emergencyPilot.stage's: 5 m past the target flown and still sinking) fires AGAIN after the weight is
+//   gone -- a leak bigger than the weight. Damage control itself is silent once the weight is gone (its stage reads 'gone'), so the latch asks the same test. Off by default.
+export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false });
 // v4930 (round 7) -- `more`: extra target stations asked FIRST (round 7's COMBINED puts ROUTE's legs station here); `energyAllow`: a gate on the energy station's surface claim (null: none; ROUTE shuts it). Both default to v4929's captain.
 export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {}, more = [], energyAllow = null } = {}) {
     if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
     const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyAllow ? gatedStation(energyStation({ read }), energyAllow) : energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
     const counts = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
-    let breached = false;
+    let breached = false, second = false, recovered = false;
+    const latched = () => (k.latchOnSecond ? second : breached);
     // the stations are asked through the same captain() so the log, the watch and the aux are kept the same way; T3 swaps the helm for the tick, T1 and T2 edit the commands after it
     let bare = false;
     const swapHelm = (state, target, current, aux) => (bare ? pilot(state, { ...target, depth: SD }, current, aux) : helm(state, target, current, aux));
-    const breach = check({ name: "breach", kind: "target", priority: PRIORITY.energy, propose: ({ target }) => (breached ? { claim: AV.surfaceTarget(target, read()), aux: null, reason: "breached: up while there is charge" } : { claim: null, aux: null, reason: null }) });
+    const breach = check({ name: "breach", kind: "target", priority: PRIORITY.energy, propose: ({ target }) => (latched() ? { claim: AV.surfaceTarget(target, read()), aux: null, reason: "breached: up while there is charge" } : { claim: null, aux: null, reason: null }) });
     const run = captain({ helm: swapHelm, stations: [...more, ...(k.surfaceOnBreach ? [energy, breach, damage] : [energy, damage])] });
     const out = (state, mission, current = [0, 0, 0], aux) => {
         const r = read(), sinking = k.unrationSink !== null && state.vel[2] < -k.unrationSink;
         bare = false;
-        if (sinking) { const p = energy.propose({ state, target: mission }); if ((p.claim && p.claim.surface) || (breached && k.surfaceOnBreach && read().refillDepth <= 1)) { bare = true; counts.T3++; } }
-        if (breached && k.surfaceOnBreach) counts.T4++;
+        if (sinking) { const p = energy.propose({ state, target: mission }); if ((p.claim && p.claim.surface) || (latched() && k.surfaceOnBreach && read().refillDepth <= 1)) { bare = true; counts.T3++; } }
+        if (latched() && k.surfaceOnBreach) counts.T4++;
         let cmd = run(state, mission, current, aux);
         const log = run.log;
         if (log.overrides.includes("damage")) breached = true;
+        // AGAIN means a NEW episode: after the weight is gone the trouble test must first CLEAR (the boat has recovered), and only a later firing counts. (The first build counted the same sinking, which goes on for a
+        //   while after the drop; round 10's DEV check found COND identical to COMBINED on all 24 and that was why.)
+        if (k.latchOnSecond && breached && !second && state.tank && state.tank.released) {
+            const trouble = EP.stage({ ...state, tank: { ...state.tank, released: false } }, log.flown, damageOpts) !== "ok";
+            if (!trouble) recovered = true; else if (recovered) second = true;
+        }
         if (log.overrides.includes("damage")) {
             let c = { ...cmd }, changed = false;
             if (k.thrustFull !== null) { const cap = Math.max(k.thrustFloor, Math.min(1, r.frac / k.thrustFull)); if (c.thrust > cap) { c.thrust = cap; counts.T1++; changed = true; } }

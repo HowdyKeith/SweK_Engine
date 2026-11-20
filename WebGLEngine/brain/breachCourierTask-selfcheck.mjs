@@ -8,6 +8,9 @@
 //   B05 COMBINED without the legs station | B06 COMBINED's energy claim open | B07 COMBINED's legs without the route | B08 ROUTE+DC without damage control | B09 TRIAGE unfrozen | B10 the leak never reaching the physics |
 //   B11 survival counted as goals | B12 the interference read against FIXED | B13 the seeds unchecked; brain/subStations.mjs S01 `more` asked last | S02 energyAllow ignored | S03 `more` dropped.
 // TWO WENT 0 RED ON THE FIRST PASS AND GOT ROWS: B07 (no row put COMBINED on a leg where the route and the line disagree) and B10 (the gate's only run lasted 60 s, before any breach can start; a DEV run breached at 62 s now).
+// v4930 -- COND (round 10, section 7): 9 mutants, every one red by name (final pass): C1 the same episode latching | C2 latching at the first breach | C3 never latching | C4 the test judged against a target 100 m deeper |
+//   C5 a recovery before the weight goes counting | C6 COND_KNOBS without the latch | C7 COND without the legs station | C8 the verdict ignoring survival | C9 HELD from 199002. C5 WENT 0 RED FIRST (every fixture began at the
+//   first breach); a calm tick before it is asked now.
 "use strict";
 import * as T from "./breachCourierTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -99,6 +102,33 @@ guarded("section 6", () => {
     const lost = mk([[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [1, 1]]), v3 = T.verdict({ FIXED: F, "ROUTE+DC": lost, TRIAGE: Tr, COMBINED: lost });
     ok("five fewer survivors than TRIAGE: INTERFERES, losing TRIAGE's survival", v3.v2 === "COMBINED INTERFERES: it loses TRIAGE's survival", v3.v2);
     ok("runs on different seeds are refused, by name", /not flown on the same seeds/.test(throws(() => T.compare(C, F.slice(1), "goals")) || ""));
+});
+
+sec("7. COND (round 10): the conditional latch");
+guarded("section 7", () => {
+    const tg = { depth: 30, heading: 0, speed: 2 }, at = (depth, vz, released) => { const st = S.createState({ depth, speed: 2, model: MODEL }); st.vel[2] = vz; st.tank = { ...(st.tank || {}), released }; return st; };
+    const cond = () => T.crew("COND", ctxOf(0.9, { arrivals: 0, goal: { x: 100, y: 0 }, travel: 0 }));
+    const a = cond(); a(at(40, -0.5, false), tg, [0, 0, 0]);                       // the first breach: damage control acts
+    a(at(38, -0.3, true), tg, [0, 0, 0]); a(at(37, -0.2, true), tg, [0, 0, 0]);    // the SAME sinking, the weight now gone
+    ok("THE SAME EPISODE DOES NOT LATCH: after the first breach and the drop, a boat still sinking from it keeps the mission (no 'breach' con)", a.log.con !== "breach", a.log.con);
+    a(at(30, 0.1, true), tg, [0, 0, 0]);                                           // recovered: near the target, not sinking
+    a(at(31, 0.0, true), tg, [0, 0, 0]);
+    ok("...nor does a boat that has recovered (near its target, not sinking)", a.log.con !== "breach", a.log.con);
+    a(at(40, -0.5, true), tg, [0, 0, 0]); a(at(30, 0.1, true), tg, [0, 0, 0]);     // a NEW sinking past the target, then a calm tick
+    ok("A NEW SINKING AFTER RECOVERY LATCHES: from then on the captain claims the surface as 'breach', even on a calm tick", a.log.con === "breach" && a.log.flown.surface === true, J([a.log.con, a.log.flown]));
+    const e = cond(); e(at(30, 0.0, false), tg, [0, 0, 0]); e(at(40, -0.5, false), tg, [0, 0, 0]); e(at(38, -0.3, true), tg, [0, 0, 0]); e(at(30, 0.1, true), tg, [0, 0, 0]);
+    ok("a calm boat BEFORE the breach has not 'recovered' from anything: its first breach, after calm ticks, does not latch", e.log.con !== "breach", e.log.con);
+    const c = T.crew("COMBINED", ctxOf(0.9, { arrivals: 0, goal: { x: 100, y: 0 }, travel: 0 })); c(at(40, -0.5, false), tg, [0, 0, 0]); c(at(30, 0.1, true), tg, [0, 0, 0]);
+    ok("...where COMBINED latches at the first breach", c.log.con === "breach");
+    ok("COND carries COMBINED's stations; COND_KNOBS is FROZEN_TRIAGE with the latch conditional; round 10's sets are 198001-198024 and 199001-199096",
+        J(Object.keys(cond().watch.con)) === '["mission","legs","energy","breach"]' && T.COND_KNOBS.latchOnSecond === true && T.COND_KNOBS.earlyDropBelow === Infinity && Object.isFrozen(T.COND_KNOBS) && T.R10_DEV_SET[0] === 198001 && T.R10_HELD_SET.length === 96 && T.R10_HELD_SET[0] === 199001);
+    const rec = (seed, survived, goals) => ({ seed, survived, goals }), mk = (rows) => rows.map(([sv, g], i) => rec(i, !!sv, g));
+    const C = mk([[1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 1]]), K = mk([[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]]), R = mk([[1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 1]]), Tr = K;
+    const v = T.condVerdict({ COND: C, COMBINED: K, "ROUTE+DC": R, TRIAGE: Tr });
+    ok("five runs with more goals (p 1/32) and survival level: COND BEATS COMBINED, keeping ROUTE's goals and TRIAGE's survival", v.verdict === "COND BEATS COMBINED" && v.keepsRouteGoals && v.keepsTriageSurvival, J(v));
+    const C2 = mk([[0, 3], [0, 3], [0, 3], [0, 3], [0, 3], [1, 1]]), v2 = T.condVerdict({ COND: C2, COMBINED: K, "ROUTE+DC": R, TRIAGE: Tr });
+    ok("...but with five fewer survivors it WINS GOALS AND LOSES SURVIVAL, and does not keep TRIAGE's", v2.verdict === "COND WINS GOALS BUT LOSES SURVIVAL" && !v2.keepsTriageSurvival, J(v2));
+    ok("level goals: COND DOES NOT BEAT COMBINED", T.condVerdict({ COND: K, COMBINED: K, "ROUTE+DC": R, TRIAGE: Tr }).verdict === "COND DOES NOT BEAT COMBINED");
 });
 
 finished = true;

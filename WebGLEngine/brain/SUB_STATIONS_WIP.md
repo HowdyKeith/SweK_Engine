@@ -599,3 +599,10 @@ Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by 
 **EXPECTATION.** On round 2's DEV losses the fixed BLOW saved 6 of 10, and the need gate should leave the easy boats alone. NEED BEATS TRIAGE about 70 percent; NO DIFFERENCE about 25 percent.
 
 **No file in the tree uses a seed from 198000 to 199999, 201000 to 201999, 203000 to 205999** (grep, 2026-11-20).
+
+**ROUND 10, BUILT AND GATED BEFORE HELD (2026-11-20).**
+* COND is `triageCaptain`'s `latchOnSecond`. "Damage control acts again" is implemented as **damage control's own trouble test** (`emergencyPilot.stage`: 5 m past the target flown and still sinking) firing in a NEW episode after the weight is gone. Damage control itself is silent once the weight is gone (its stage reads "gone"), so it can never act again as written; the test is the same test.
+* **A DISCLOSURE: the first build was wrong, and DEV caught it.** It counted the SAME sinking: right after the drop the boat is still sinking from the first breach, so the test fired again within a tick and COND latched as early as COMBINED. DEV read COND identical to COMBINED on all 24. The fix makes AGAIN mean a new episode (the test must first clear, then fire), which is what section 27 says; nothing of the design changed.
+* After the fix, DEV: COND and COMBINED differ on 22 of 24; survived 22 and 22, mean goals 2.67 against 0.92. **Nothing was tuned.**
+* Gated in `brain/breachCourierTask-selfcheck.mjs` section 7 (9 mutants, every one red; logged).
+* HELD: COND, COMBINED, ROUTE+DC and TRIAGE on 199001 to 199096, to `brain/condHeld.<part>.jsonl`, committed unread, then read once.
