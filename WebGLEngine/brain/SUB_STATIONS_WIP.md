@@ -542,3 +542,60 @@ All ten of TRIAGE's DEV losses have a leak of 7.0 to 8.0 %, past the 6 % weight.
 * **What a fair test needs, named by the result:** a task that scores the mission too (time held at the mission depth, or a courier's goals, as in rounds 4 to 7), and dives that are not all breached (so going up early has a price). Rounds 4 to 7's courier already scores the mission; a learned captain there is the natural next registration. This one is not changed after the fact.
 
 **Status: round 8 CLOSED as registered, with the meaning above.**
+
+## 27. ROUNDS 10 TO 12, REGISTRATIONS (2026-11-20, written and committed before any code for them and before any of their seeds is flown)
+
+Keith, 2026-11-20: "Let's do Proposed next items." The three proposals named by rounds 7, 8 and 9.
+
+### ROUND 10: THE CONDITIONAL BREACH LATCH
+
+**THE QUESTION.** Round 7's COMBINED kept the most boats (74) but lost ROUTE's deliveries, because TRIAGE's latch keeps a breached courier on the surface for the rest of the run. Does a latch that fires only when the boat CANNOT go on keep COMBINED's survival and win back the deliveries?
+
+**THE RULE (COND), FIXED NOW.** COMBINED (round 7: TRIAGE with ROUTE's legs station and its energy claim shut), with the latch made conditional:
+* at the first breach (damage control acts), drop the weight at once, as TRIAGE does;
+* **latch the surface claim only if damage control acts AGAIN after the weight is gone.** A boat still sinking past its target without its weight has a leak bigger than the weight, and cannot go on. Otherwise the mission (the legs station) flies.
+* Nothing else changes.
+
+**THE TASK.** Round 7's breached courier (`brain/breachCourierTask.mjs`), unchanged.
+
+**THE SETS.** DEV: 198001 to 198024, only to check that COND and COMBINED differ on at least 4 (in either outcome). HELD: 199001 to 199096.
+
+**THE VERDICT (HELD, once; exact one-sided sign tests at p at most 0.05).**
+* **COND BEATS COMBINED** iff COND has more goals than COMBINED by the test AND is not shown worse on survival.
+* Reported: COND against ROUTE+DC on goals and against TRIAGE on survival (whether it keeps both parents' gains, round 7's question), and every crew on both outcomes.
+
+**EXPECTATION.** The leaks run 3 to 8 % against a 6 % weight, so about 60 % of breached boats can go on. COND BEATS COMBINED about 65 percent. COND loses survival against COMBINED about 25 percent (a boat that can just hold depth, and is lost to a second, later sinking).
+
+### ROUND 11: A LEARNED CAPTAIN ON THE BREACHED COURIER
+
+**THE QUESTION.** Round 8's learner beat TRIAGE by abandoning the mission at once, because round 2's task scores only survival. On a task that scores the mission (round 7's breached courier: deliveries and survival), does a learned captain beat the hand rules?
+
+**THE LEARNED CAPTAIN (`brain/learnedCourier.mjs`, to be built).**
+* **The crew:** the helm, the damage station, and two logistic units over TEN features: the charge; depth / 60; the vertical speed; (depth - mission depth) / 10; breached; the air left / its capacity; the weight dropped; the next leg's need by its planned route less the charge (round 5's legNeed); a goal reached in the last 5 s (0 or 1); and a constant. That is 20 weights.
+* **The units:** SURFACE claims the surface at the energy priority; DROP releases the weight while it is aboard.
+* **Training, fixed now:** a seeded (mu, lambda) ES with mu 4, lambda 8, sigma 0.5 halving every 7 generations, 20 generations, from zeros, seed 9009, on 16 TRAIN seeds. The FITNESS is goals + 2 x survived + 0.001 x the seconds lived. The best of the last 4 parents on 16 SELECTION seeds is frozen, written to `brain/learnedCourier.json` and committed before HELD.
+* The budget is smaller than round 8's because a courier run costs about 2.5 s; said so.
+
+**THE SETS.** TRAIN: 201001 to 201016. SELECTION: 201501 to 201516. HELD: 205001 to 205096. (202000 to 202999 is in use elsewhere in the tree; 201000 to 201999 and 205000 to 205999 are not, by grep, 2026-11-20.)
+
+**THE VERDICT (HELD, once).** LEARNED against COND, on goals and on survival, each by the exact one-sided sign test (p at most 0.05): LEARNED BEATS COND ON GOALS, COND BEATS LEARNED ON GOALS, or NO DIFFERENCE SHOWN; the same for survival. Reported: against COMBINED and ROUTE+DC, and what the units do (when each fires).
+
+**EXPECTATION.** The budget is small, and the hand rules encode a planned route the learner sees only through one feature. NO DIFFERENCE on goals about 40 percent; COND BEATS LEARNED on goals about 45 percent; LEARNED BEATS COND on goals about 15 percent. Dropping the weight early now costs deliveries (a goal needs the boat within a depth band, and a boat without its weight struggles to hold depth), so I do not expect round 8's trick.
+
+### ROUND 12: BLOW ON THE HARD CASES, GATED BY NEED
+
+**THE QUESTION.** Round 9 stopped at DEV: its draw had almost no hard cases, and the fixed 0.2 m/s gate cost one boat TRIAGE kept. On boats whose leak is bigger than the weight, does blowing the main tank with stored air, ONLY when the climb will not reach the surface before the charge runs out, keep more boats than TRIAGE?
+
+**THE TASK.** Round 2's (`brain/stationsTask.mjs`), with ONE range changed, said plainly: **the leak is U(0.06, 0.08)**, over the 6 % weight. Everything else is as round 2.
+
+**THE RULE (NEED), FIXED NOW.** TRIAGE plus blowing (ballast = -1), when all of these hold:
+* the boat is BREACHED, the weight is gone, and it is deeper than 3 m;
+* AND, at the charge spent per second over the last 10 s, the battery would be empty before a boat at the current climb reaches 3 m: the time to empty (charge / spend rate) is less than (depth - 3) / climb, with a climb of 0 or less counting as never arriving.
+
+**THE SETS.** DEV: 203001 to 203024, only to check that NEED and TRIAGE differ on at least 3. If not, the round says so and stops, as round 9 did. HELD: 204001 to 204096.
+
+**THE VERDICT (HELD, once).** NEED BEATS TRIAGE iff NEED survives more and the exact one-sided sign test on the discordant dives gives p at most 0.05. TRIAGE BEATS NEED by the same rule. Otherwise NO DIFFERENCE SHOWN. Reported: round 9's fixed BLOW (0.2 m/s) on the same dives, and FIXED.
+
+**EXPECTATION.** On round 2's DEV losses the fixed BLOW saved 6 of 10, and the need gate should leave the easy boats alone. NEED BEATS TRIAGE about 70 percent; NO DIFFERENCE about 25 percent.
+
+**No file in the tree uses a seed from 198000 to 199999, 201000 to 201999, 203000 to 205999** (grep, 2026-11-20).
