@@ -16,7 +16,8 @@
 // FORECAST, for the record: a candidate that turns harder and throttles back less wins (the cannon wants the bow on the foe soon); the audit gain over steer about +0.1 to +0.3; the fly-wired helm still ahead by about 0.5.
 // WHAT SHIPS: brain/helmSteerCannonWeightsTuned.json (policy helmSteerCannon: the winner's three with a cannon, the shipped three without) if THE WINNER LESS THE STEER HELM LEADS in at least one fight and TRAILS in neither; the duel page then gains it as a helm
 //   (its note carries the audit, and where it stands against the fly-wired helm). It does not replace the fly-wired helm on any preset unless it LEADS it in both fights. If (1, 1) wins, or the winner fails held out, nothing is audited and steer stands.
-// @@READ@@
+// READ 2026-11-20 (brain/helmSteerCannonWeightsTuned.reading.json): THE SHIPPED STEER HELM STANDS. The train scores peak at the shipped (1, 1), 1.138; next (1, 1.5) 1.126 and (1, 0.5) 1.106; a harder turn loses (2, x) 0.99-1.01, (3, x) 0.92-0.97;
+//   no turn loses most (0, x) 0.75-0.87. Nothing was held out or audited. The forecast (a harder turn and less throttling back win) was wrong: what steer learned without the cannon is already its best with it.
 // Every arm's leads are kept (brain/rig-results/steerCannon/); the reading file (brain/helmSteerCannonWeightsTuned.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the encoder weight, the set without a cannon, escorts, fighters, the car's gunner, the compass helm.
 "use strict";

@@ -113,7 +113,11 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), k = (c) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `train_one_${c.replace(",", "x")}.json`), "utf8")).leads.concat(JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `train_fleet_${c.replace(",", "x")}.json`), "utf8")).leads);
+    const re = Object.fromEntries(G.CANDIDATES.map((c) => { const l = k(c); return [c, l.reduce((a, b) => a + b, 0) / l.length]; }));
+    ok("!! AS KEPT AND RE-DERIVED -- THE SHIPPED STEER HELM STANDS: of the sixteen the shipped (1, 1) scores best on the 192 train pairs, 1.138 (next (1, 1.5) 1.126); nothing held out or audited; no file written", rd.winner === G.SHIPPED && G.pick(re) === G.SHIPPED && Math.abs(re["1,1"] - 1.138) < 5e-4 && Math.abs(re["1,1.5"] - 1.126) < 5e-4 && rd.held === null && rd.audit === null && !rd.verdict.ok
+        && G.CANDIDATES.every((c) => Math.abs(re[c] - rd.scores[c]) < 1e-12) && !fs.existsSync(G.DEFAULT_OUT) && !fs.existsSync(path.join(G.KEPT_DIR, "held_one_1x1.json")));
+    ok("!! AND THE STEER HELM'S NOTE SAYS SO", /takeSteerCannon/.test(C.HELMS.find((h) => h.id === "steer").note) && /buys it nothing/.test(C.HELMS.find((h) => h.id === "steer").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
