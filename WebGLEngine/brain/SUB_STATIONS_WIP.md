@@ -430,3 +430,24 @@ Keith, 2026-11-20: "Let's do all 4 items on 'Next rounds on the stations line:' 
 * **DEV (24) is not degenerate:** COMBINED and FIXED match on both outcomes in only 9. **Nothing was tuned.**
 * For the record, the DEV numbers seen before HELD (survived of 24, mean goals): FIXED 16, 1.83; ROUTE+DC 10, 2.21; TRIAGE 18, 1.13; COMBINED 19, 1.42.
 * The run: the four crews on the 96 HELD seeds once, in four processes, to `brain/breachCourierHeld.<part>.jsonl`, committed unread, then read once.
+
+## 21. ROUND 8, REGISTRATION (2026-11-20, written and committed before any code for it and before any of its seeds is flown)
+
+The second of the four: **a learned captain against the hand rules.**
+
+**THE QUESTION.** On round 2's task (a breached boat with a low battery), does a captain whose choices are LEARNED keep more boats than TRIAGE, the hand-written rule that beat the ranking (75 of 96)?
+
+**THE TASK.** Round 2's, unchanged (`brain/stationsTask.mjs` scenario and flight: 15 to 40 m, battery 0.15 to 0.45, a leak of 3 to 8 % from 5 to 60 s, 600 s; the outcome is SURVIVED).
+
+**THE LEARNED CAPTAIN (`brain/learnedCaptain.mjs`, to be built).** The same helm and the same damage station as every crew. It makes TRIAGE's two choices itself, from what a captain can sense:
+* **The features**, all read by the captain at each tick: the charge (fraction); depth / 60; the vertical speed; (depth - mission depth) / 10; BREACHED (1 once damage control has acted, as TRIAGE's latch); the air left / its capacity; the weight already dropped (0 or 1); and a constant 1.
+* **The choices**, each a logistic unit over the eight features (16 weights in all):
+  * SURFACE: when it fires, the captain claims `surfaceTarget(mission)` at the energy priority.
+  * DROP: when it fires and the weight is still aboard, the commands carry release = 1.
+* **Training, fixed now:** a seeded (mu, lambda) evolution strategy. Mu 4, lambda 12, sigma 0.5 halving every 10 generations, 40 generations, the start all zeros (neither choice ever fires). The fitness is the number of TRAIN dives survived plus 0.001 x the seconds lived (a tie-breaker), on 32 TRAIN seeds. The 4 parents of the last generation are flown on the 24 SELECTION seeds, and the best by the same fitness is FROZEN, written to a JSON file and committed before any HELD seed is flown.
+
+**THE SETS.** TRAIN: seeds 193001 to 193032. SELECTION: 193501 to 193524. HELD: 195001 to 195096. No file in the tree uses a seed from 193000 to 195999 (grep, 2026-11-20).
+
+**THE VERDICT (HELD, flown once):** LEARNED BEATS TRIAGE iff LEARNED survives more HELD dives and the exact one-sided sign test on the discordant dives gives p at most 0.05. TRIAGE BEATS LEARNED by the same rule. Otherwise NO DIFFERENCE SHOWN. Reported: FIXED on the same dives (and LEARNED against it), and what the learned weights do (when each choice fires).
+
+**EXPECTATION, recorded now.** TRIAGE's two moves are simple thresholds that a logistic unit can represent: drop at once when breached, and go up when breached. So NO DIFFERENCE about 55 percent; LEARNED BEATS TRIAGE about 20 percent (it can learn to drop BEFORE damage control acts, from the sink rate); TRIAGE BEATS LEARNED about 25 percent (32 training dives may not find the latch).
