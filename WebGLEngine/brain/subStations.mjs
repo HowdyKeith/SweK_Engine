@@ -161,6 +161,8 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
     Object.defineProperty(out, "watch", { get: () => run.watch });
     Object.defineProperty(out, "aux", { get: () => run.aux });
     Object.defineProperty(out, "triage", { get: () => ({ ...counts }) });
+    // 2026-11-20 -- the breach latch as a reading (the Sub Aquarium names COND's state): breached (damage control has acted), second (a new sinking after the weight was gone), latched (the surface claim is on).
+    Object.defineProperty(out, "latch", { get: () => ({ breached, second, latched: latched() }) });
     return out;
 }
 
