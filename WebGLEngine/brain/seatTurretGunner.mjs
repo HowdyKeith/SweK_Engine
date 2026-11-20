@@ -73,7 +73,7 @@ export function stickySight(sight, { only: may = null } = {}) {
         const r = sight(seat, st, body, targets, t); cur = r.target; return r;
     };
 }
-export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, handOn = null, handRest = true, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, handOn = null, handRest = true, alwaysFire = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
     // `handOn` (default null): a predicate on the target the sight chose; where it holds -- and whenever the sight has no target -- the seat does what the HAND GUNNER does (the sight's own command, its aim and its trigger) and the network is not asked (2026-11-18: the fly-wired gunner lays the gun by rates, which costs it against fighters)
     const sight = sticky === "ships" ? stickySight(sight0, { only: SHIPS_ONLY }) : sticky ? stickySight(sight0) : sight0;   // `sticky` (default false; true, or "ships" for a sight that sticks to capital ships only): see stickySight
     if (idle !== "hold" && idle !== "rest") throw new Error(`seatTurretGunner.gunnerFor: idle is "hold" or "rest" (got ${idle})`);
@@ -88,14 +88,14 @@ export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold"
         return { rule, x: features(seat, laid, body, rule, tg, reach, spent), st, seat, t };
     }
     function finish(prep, y) {
-        if (prep.hand) { decide.shake = [0, 0]; return prep.rule; }
+        if (prep.hand) { decide.shake = [0, 0]; return alwaysFire && prep.rule.target != null ? { ...prep.rule, fire: true } : prep.rule; }   // `alwaysFire` (2026-11-20): with a target the trigger is held, whoever lays the gun -- what the car's trained gunner learned
         if (prep.x === null) return idle === "rest" ? { yaw: 0, pitch: 0, fire: false, target: null } : { yaw: prep.st.yaw, pitch: prep.st.pitch, fire: false, target: null };   // nothing to shoot at: the gun stays where it is, or with `idle: "rest"` goes back to its rest as the hand gunner's seat does
         decide.last = { x: prep.x, y };
         let ey = 0, ep = 0;
         if (sigma) { const rng = mulberry((seed * 7919 + Math.round(prep.t * 1000) * 104729 + hash(prep.seat.id)) >>> 0); ey = gauss(rng) * sigma; ep = gauss(rng) * sigma; }   // THE HAND'S ERROR, on what the hand does (see the header)
         decide.shake = [ey, ep];
         laid = clampToArc(prep.seat, laid.yaw + y[0] * prep.seat.slew.yaw * dt, laid.pitch + y[1] * prep.seat.slew.pitch * dt);
-        return { yaw: laid.yaw + ey, pitch: laid.pitch + ep, fire: y[2] > 0, target: prep.rule.target };
+        return { yaw: laid.yaw + ey, pitch: laid.pitch + ep, fire: alwaysFire || y[2] > 0, target: prep.rule.target };
     }
     function decide(seat, st, body, targets, t = 0) { const p = prepare(seat, st, body, targets, t); return finish(p, p.x === null ? null : fwd(w, p.x)); }
     decide.prepare = prepare; decide.finish = finish;

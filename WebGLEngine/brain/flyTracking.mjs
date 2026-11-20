@@ -37,6 +37,8 @@
 //   registered study on fresh pairs: tools/ship/takeFlyWiredGunnerNear.mjs.
 // READ (2026-11-20): seatFlyWired9 ships (tools/ship/takeFlyWiredGunnerNear.mjs). AND THEN SEEN: with the hand laying the last 20 degrees, the motion term at tau 0.1 changes nothing -- seatFlyWired9 flies tau 0's fight to the bit, and the smoothing does
 //   nothing either (the gate pins it on two fights): the circuit now makes only the big swings, where its command is near the full slew. So the live choice left is the window; `nearTunable` (seatFlyWired10) carries it as a weight for a search.
+// HOLDING THE TRIGGER (2026-11-20). NOT REGISTERED, scratch pairs 136001-136006 of each kind (24 a fight): seatFlyWired11 (the trigger held with a target) less seatFlyWired10, +0.492 (se 0.173) in fleets of three with the cannon, +0.813 (0.171)
+//   without, +0.434 (0.162) with a quarter of every magazine, +0.017 (0.007) against fighters. To a registered study: tools/ship/takeFlyWiredGunnerTrigger.mjs.
 // AN ELEVATION OF ITS OWN (2026-11-19; round 5): `elevatedWith({ front })` reads the gun's pitch off the circuit with its cells at their places ALONG the sheet's other axis. The command is nearly the yaw's (front +1 about 20% steeper close in, -1 about
 //   10%: places are ranks, so either axis spreads the cells evenly, and only how the wiring sits on the axis can differ). On scratch pairs it was level: 117-118 kills against fighters (117 the ships-sticky gunner), and in fleets of three -0.074 to +0.004 against
 //   the ships-sticky gunner, none told. So no study was registered and nothing ships.
@@ -102,7 +104,7 @@ function oddOf(raw) {
     function S(e) { const a = wrap(e), x = Math.abs(a) / Math.PI * GRID, k = Math.min(GRID - 1, Math.floor(x)), v = (table[k] + (table[k + 1] - table[k]) * (x - k)) / amplitude; return a < 0 ? -v : v; }
     return { S, amplitude };
 }
-function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, handRest = true, motion = false, smooth = 0, from = "aim", pitchRaw = null, tunable = false } = {}) {
+function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, handRest = true, motion = false, smooth = 0, from = "aim", pitchRaw = null, tunable = false, alwaysFire = false } = {}) {
     const { S, amplitude } = oddOf(raw), Sp = pitchRaw ? oddOf(pitchRaw).S : S;   // `pitchRaw` (2026-11-19): ANOTHER read-out for the gun's pitch -- the circuit with its cells at their places along the sheet's other axis; without it the pitch is read off the same S as the yaw
     const count = tunable ? WEIGHT_COUNT + 3 : motion ? WEIGHT_COUNT + 1 : WEIGHT_COUNT,   // `tunable` (2026-11-20): w[3] the slip's smoothing in seconds and w[4] the hand's window in radians, as weights a search can move
         _c = 0, zeroWeights = () => new Float32Array(count);
@@ -116,7 +118,7 @@ function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, han
             if (fresh) { prev.sy = 0; prev.sp = 0; } else { prev.sy = keep * prev.sy + (1 - keep) * raw[0]; prev.sp = keep * prev.sp + (1 - keep) * raw[1]; }   // `smooth` (seconds, 0 none): the slip low-passed, as a motion detector integrates
             prev.target = now.target; prev.t = now.t; prev.ey = ey; prev.ep = ep; prev.ay = now.ay; prev.ap = now.ap; return forward(ww, x, [prev.sy, prev.sp]); };
         const hand = tunable ? (q, rule, st) => !ST.SHIPS_ONLY(q) || (rule && st && Math.hypot(wrap(rule.yaw - st.yaw), rule.pitch - st.pitch) < win) : handOn;
-        const d = ST.gunnerFor(w, sight, { ...opts, sticky: false, handOn: hand, handRest, forward: fwd, layersOf: () => [], post: (y) => y }); d.slip = () => ({ ...prev }); return d;
+        const d = ST.gunnerFor(w, sight, { ...opts, sticky: false, handOn: hand, handRest, alwaysFire, forward: fwd, layersOf: () => [], post: (y) => y }); d.slip = () => ({ ...prev }); return d;
     };
     const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
     return Object.freeze({ name, amplitude, sticky, motion, ...(motion ? { smooth, from } : {}), elevated: pitchRaw !== null, Sp, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT: count, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
@@ -182,6 +184,8 @@ export function nearTunableOver(name) {
     return NEAR_OVER.get(name);
 }
 export const wiringOf10 = nearTunableOver;
+/** THE PAGE'S GUNNER HOLDING THE TRIGGER (`seatFlyWired11`, 2026-11-20): seatFlyWired10 but with a target the trigger is held, on the circuit's ticks and the hand's -- the race car's trained gunner's one trick (tools/ship/trainTurretSeatBig.mjs). Same five weights. */
+export const POLICY_ID11 = "seatFlyWired11", nearAlways = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding, the trigger held", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
