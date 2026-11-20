@@ -15,6 +15,8 @@
 // FORECAST, for the record: LEADS in all three -- with escorts by about the fleet's +0.3, more with six than with two; against PD fighters by less than the pilot's +0.13 (the PD fighters are easier for both).
 // WHAT SHIPS: if the gain LEADS in at least one fight and TRAILS in none, the page's `bysize` hand takes the car's gunner only when a side has one ship and the fight no escorts. Nothing is written but the reading; the page is changed by hand in
 //   render/spaceDuelCore.mjs and its gate pins the reading.
+// READ 2026-11-20 (brain/bySightLoadout.reading.json): by sight less by size -0.032 and +0.053 with two and six escorts (CANNOT BE TOLD), +0.010 (z 4.5) against PD fighters. IT SHIPS by the rule, on the fighters alone: the page's `bysize` hand now
+//   takes the fly-wired gunner one ship a side with escorts, where the two cannot be told. The forecast (a lead of 0.3 with escorts) was wrong.
 // Every arm's leads are kept (brain/rig-results/bySightLoadout/); the reading file (brain/bySightLoadout.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side with one escort, the trained pilot (tools/ship/takePresetsHard.mjs read it), fights without the cannon.
 "use strict";

@@ -82,7 +82,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ bySize: k(f, "bySize"), bySight: k(f, "bySight") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT SHIPS, BY THE FIGHTERS ALONE: by sight less by size is -0.032 (CANNOT BE TOLD) with two escorts, +0.053 (CANNOT BE TOLD) with six, and +0.010 (z 4.5, LEADS) against eight PD fighters; it trails nowhere. In the duel page's own fights (one ship a side with escorts) the two rules cannot be told", near(R("oneEscorts2").gain, -0.032) && near(R("oneEscorts6").gain, 0.053) && near(R("fighters").gain, 0.010) && rd.oneEscorts2.words.gain === "CANNOT BE TOLD" && rd.oneEscorts6.words.gain === "CANNOT BE TOLD" && rd.fighters.words.gain === "LEADS" && rd.verdict.ok
+        && G.FIGHTS.every((f) => ["bySize", "bySight", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! the forecast was WRONG with escorts (it said a lead of about 0.3) and right in direction against fighters (smaller than the pilot's +0.13, as forecast); AND THE PAGE CARRIES IT: the by-size hand takes the fly-wired gunner one ship a side with escorts", near(R("oneEscorts6").bySize, 1.872) && near(R("fighters").bySight, 0.052) && /with escorts/.test(C.HANDS.find((h) => h.id === "bysize").label) && /WITH ESCORTS/.test(C.HANDS.find((h) => h.id === "bysize").note) && C.presetOf("best").choice.hand === "bysize");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
