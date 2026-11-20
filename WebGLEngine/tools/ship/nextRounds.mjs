@@ -3026,10 +3026,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-approach-doctrine",
-        blocker: "UPSTREAM",
-        what: "REGISTERED AND FLOWN ON DEV 2026-11-19, NOT WEIGHED (brain/SPACE_DOCTRINE_WIP.md; tools/ship/spaceDoctrineStudy.mjs): DEV chose CAP 12, and check 3 failed -- the capped peak closing was 14.05 against the bar CAP + 2 = 14 in one fight of 480. The bar came from a smoke claim that DEV measured wrong: the overshoot grows as the cap falls (worst 3.98 at cap 6, 2.05 at 12, 1.64 at 15). HELD89 (space seeds 2401-2460) was not flown and stays unspent. A second registration, with a cap check defined on what the wrapper controls (zero thrust at every decision where closing >= CAP), is Keith's call. WAS: OPENED 2026-11-18 from prototypes on space seeds 1601-1800 (brain/SPACE_ITEMS_2026-11-18.md; a lead, not a result): the fighters' full-throttle, no-brake approach to a capital ship is dominated by a slow arrival -- with the closing speed capped (unlimited fuel) the ship is destroyed in about 46 of 48 fights it otherwise wins every time. Either the doctrine is poor or the ship's hand gunners are tuned against fast fighters (as they were built and gated), or both.",
-        how: "A registered round on fresh space seeds (not 1601-1800): today's doctrine against a speed-capped arrival (the cap defined exactly: closing speed to the nearest foe's centre, every mode, thrust cut at the cap), under the gunner presets named in advance; an endpoint that does not top out (time until the ship dies, damage per strafe-second); ties handled in every sign test.",
-        why: "It is a balance and doctrine finding the space needs item turned up, and the arena's gunner training and gates rest on today's doctrine.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-20, ROUND 2 SUPPORTED (brain/SPACE_DOCTRINE_WIP.md): a fighter that cuts its thrust at a closing speed of 12 beats today's full-throttle approach under the regular and green gunners on HELD89 (240 of 240 pairs each; the ship destroyed in 233 and 240 of 240 capped fights against 0 under the doctrine), and under no preset is the doctrine better by the registered rule. Under ace the discordant pairs lean the OTHER way (the doctrine 35 of 42) while 198 tie; filed as space-cap-strong-gunners. Round 1 was NOT WEIGHED on a peak-speed bar; Round 2 replaced it with the cap checked on the arena's own record (1,414,431 decisions over the cap on DEV2, none with thrust). WAS: OPENED 2026-11-18 from prototypes on space seeds 1601-1800.",
+        how: "Done (two registered rounds).",
+        why: "The arena's gunner training and gates rest on today's doctrine.",
     },
     {
         id: "nav-margin-sweep-any",
@@ -3536,6 +3536,13 @@ export const NEXT_ROUNDS = [
         what: "Read after v4930: left undecided. simulation/lbm/onsetTrend-selfcheck.mjs l.81 deferred varying the perturbation to test whether the Zou-He inlet suppresses the instability behind the 'damping'. v3345 answered it by withdrawing the premise (the wake grows at yOffset 1.5), not by the test itself.",
         how: "Either run the deferred mechanism test or close this entry saying the premise is gone.",
         why: "A question answered sideways is still marked as asked.",
+    },
+    {
+        id: "space-cap-strong-gunners",
+        blocker: "OPEN",
+        what: "OPENED 2026-11-20 from the space approach doctrine's ROUND 2 table (brain/SPACE_DOCTRINE_WIP.md), as a question and not a result: against the ace gunners the capped approach did slightly WORSE where either approach reached the ship -- the doctrine won 35 of 42 discordant pairs (sign p < 0.0001) while 198 of 240 tied at 0 damage -- and against perfect 9 of 10. The registered rule (ties kept in the median) read both as no verdict. Does a capped fighter lose to strong gunners, and is there a cap that does not?",
+        how: "A registered round on fresh space seeds under ace and perfect only, with an endpoint that does not tie at 0 (damage per fighter-second inside the gunners' reach, or the closest approach), and a cap grid that includes a higher cap.",
+        why: "The doctrine round's verdict line hides a direction the table shows; the gunner training and the arena's balance depend on which approach strong gunners face.",
     },
     {
         id: "hand-metrics-consumers",

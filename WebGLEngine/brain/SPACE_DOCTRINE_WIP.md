@@ -205,5 +205,38 @@ The lead stands where brain/SPACE_ITEMS_2026-11-18.md left it, now with a measur
 * Check 6 EVERY FIGHT ENDS: PASS (960 fights).
 * Reported, moving nothing: overshoot worst 2.03, 95th percentile 1.73. **3 of 480 fights were over +2, so Round 1's bar would have failed again** (expected about 35%). Mean R: D 90.4, C 796.9 (DEV gives no verdict).
 
-## ROUND 2, HELD89 RESULT
-(not yet flown)
+## ROUND 2, HELD89 RESULT (2026-11-20, read once: `spaceDoctrineStudyCmd.mjs held-read`; the five result files committed UNREAD first; brain/rig-results/space-doctrine/held-report.json)
+
+**OVERALL: SUPPORTED.** CAP BETTER under regular and under green, and DOCTRINE BETTER under none. Checks 5 (same scenarios) and 6 (every fight ends) pass.
+
+| preset | verdict | C wins / loses / ties | median R_C - R_D | ship destroyed C / D | fighters lost C / D | DPSS median C / D |
+|---|---|---|---|---|---|---|
+| perfect | FLOOR | 1 / 9 / 230 | 0.0 | 0 / 0 | 1920 / 1920 | 0.00 / 0.00 (over 6) |
+| ace | NO DIFFERENCE SHOWN | 7 / 35 / 198 (p < 0.0001) | 0.0 | 0 / 0 | 1920 / 1920 | 0.00 / 0.00 (over 51) |
+| regular | **CAP BETTER** | 240 / 0 / 0 | +1466.6 | 233 / 0 | 723 / 1920 | 39.11 / 2.73 |
+| green | **CAP BETTER** | 240 / 0 / 0 | +1434.1 | 240 / 0 | 120 / 744 | 38.93 / 2.23 |
+| green + MLP (reported) | CAP BETTER | | | C kills the ship in 100% | | |
+
+Peak closing: C 13.5-14.1 against D 33.5-33.6.
+
+**WHAT THE TABLE SAYS THAT THE VERDICT LINE DOES NOT, SAID PLAINLY.**
+* Under ace, the discordant pairs lean the OTHER way: the doctrine wins 35 of 42, with a sign p below 0.0001. By the registered rule this is NO DIFFERENCE SHOWN, because ties stay in the median and 198 of 240 pairs tie at 0. That is the consequence stated before DEV, and here it hides a consistent direction.
+* Under perfect the 10 discordant pairs lean the same way (9 to 1), below the floor.
+* So against strong gunners neither approach reaches the ship in almost every fight. In the few where one does damage, it is more often the doctrine. A slower fighter sits longer inside a good gunner's envelope.
+* This is NOT a verdict. It is filed as its own question in the backlog (space-cap-strong-gunners).
+
+**Against the expectations (written before DEV2):**
+* E1 regular CAP BETTER: held. E2 green CAP BETTER: held.
+* E3 perfect FLOOR: held.
+* E4 ace FLOOR or NO DIFFERENCE SHOWN: held, by the rule's letter; the direction is the doctrine's.
+* E5 DOCTRINE BETTER under any preset: did not happen.
+* E6 SUPPORTED: held.
+* E8 green + MLP: held, 100%.
+* E9 fewer fighters lost under regular and green: held (C fewer in 233 and 227 pairs).
+* All checks pass: held. Round 1's bar failing again on DEV2: happened (3 of 480).
+
+**WHAT THIS DOES NOT SAY:**
+* Nothing about learned 6DOF pilots, escorts or two ships.
+* Nothing about which cap is best beyond Round 1's grid.
+* Nothing about real gunners: the presets are hand rules.
+* Nothing about whether the shipped seat networks would do better retrained against slow fighters. They were trained against the doctrine, and C kills the ship in every scenario with them.
