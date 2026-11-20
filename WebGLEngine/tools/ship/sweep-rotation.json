@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-20T05:59:50.664Z",
+ "at": "2026-11-20T17:46:01.498Z",
  "poolAt": "2026-11-20T05:40:26.914Z",
  "poolHorizon": "2026-11-16T18:32:18.286Z",
  "budgetMs": 3000,
@@ -165,6 +165,12 @@
    "at": "2026-11-19T17:14:00.540Z"
   },
   {
+   "gate": "brain/crabMlg1-selfcheck.mjs",
+   "ms": 42803,
+   "code": 0,
+   "at": "2026-11-20T17:44:02.103Z"
+  },
+  {
    "gate": "brain/dogfightArena-selfcheck.mjs",
    "ms": 8149,
    "code": 0,
@@ -204,6 +210,24 @@
    "code": 0,
    "priorMs": 5504,
    "at": "2026-11-16T02:55:29.158Z"
+  },
+  {
+   "gate": "brain/flyEmdLplc2Gf-selfcheck.mjs",
+   "ms": 27356,
+   "code": 0,
+   "at": "2026-11-20T17:44:29.582Z"
+  },
+  {
+   "gate": "brain/flyGfLoomModel-selfcheck.mjs",
+   "ms": 70,
+   "code": 0,
+   "at": "2026-11-20T17:44:29.780Z"
+  },
+  {
+   "gate": "brain/gfGain-selfcheck.mjs",
+   "ms": 30459,
+   "code": 0,
+   "at": "2026-11-20T17:45:00.376Z"
   },
   {
    "gate": "brain/gunnerPolicy-selfcheck.mjs",
@@ -258,6 +282,12 @@
    "code": 0,
    "priorMs": 9006,
    "at": "2026-11-17T14:42:05.773Z"
+  },
+  {
+   "gate": "brain/oppLoom-selfcheck.mjs",
+   "ms": 5666,
+   "code": 0,
+   "at": "2026-11-20T17:45:06.180Z"
   },
   {
    "gate": "brain/pilot6dofMlpPage-selfcheck.mjs",
@@ -549,6 +579,18 @@
    "code": 0,
    "priorMs": 4062,
    "at": "2026-11-19T17:14:00.540Z"
+  },
+  {
+   "gate": "brain/stealthLoomStimuli-selfcheck.mjs",
+   "ms": 51864,
+   "code": 0,
+   "at": "2026-11-20T17:45:58.177Z"
+  },
+  {
+   "gate": "brain/stealthMotion-selfcheck.mjs",
+   "ms": 2713,
+   "code": 0,
+   "at": "2026-11-20T17:46:01.028Z"
   },
   {
    "gate": "brain/subCountermeasures-selfcheck.mjs",
@@ -2178,6 +2220,12 @@
    "at": "2026-11-17T18:01:46.533Z"
   },
   {
+   "gate": "render/subAquarium3dDark-selfcheck.mjs",
+   "ms": 88,
+   "code": 0,
+   "at": "2026-11-20T17:46:01.253Z"
+  },
+  {
    "gate": "render/subAquariumCircuit-selfcheck.mjs",
    "ms": 694,
    "code": 0,
@@ -2202,6 +2250,12 @@
    "code": 0,
    "priorMs": 20031,
    "at": "2026-11-18T15:04:49.675Z"
+  },
+  {
+   "gate": "render/subAquariumKinds-selfcheck.mjs",
+   "ms": 109,
+   "code": 0,
+   "at": "2026-11-20T17:46:01.498Z"
   },
   {
    "gate": "render/subAquariumPlain14-selfcheck.mjs",
