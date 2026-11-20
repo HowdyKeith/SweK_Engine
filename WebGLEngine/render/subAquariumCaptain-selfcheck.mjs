@@ -14,6 +14,9 @@
 //   P02 the menu not calling setCaptain | P03 a 5 % breach | P04 the menu never synced | P05 the menu enabled with no needs.
 // THREE WENT 0 RED ON THE FIRST PASS AND GOT ROWS: C08 (no row put the captain where it asks for the pump), C13 (the row ended the event first, which mends by another path; and restarting over a running event leaves a stale breach
 //   whose start is in the new clock's future, so it reads 0 for a few seconds -- the row now waits 12 s), C17 (the row flew FIXED only, which was built with the tank's rescue; TRIAGE's was the one changed).
+// v4930 -- THE ROUTE CAPTAIN (section 4b): 8 more mutants, every one red by name (final pass): R01 route without a courier | R02 route without the planned route | R03 the navigator held, not proxied | R04 the energy claim open |
+//   R05 no damage control | R06 route not accepted | V01 the legs words lost | P01 no route in the menu. THREE WENT 0 RED FIRST AND GOT ROWS: R02 and R03 (nothing asked whether the planned route was read, or by which navigator: a spy
+//   on each navigator's routeLength, before and after a new sea), R04 (the run was 400 s, too short for the charge to fall under the energy rule mid-leg: it is 900 s now, and the row checks that it did fall).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -38,7 +41,7 @@ console.log("subAquariumCaptain-selfcheck -- a captain over the stations, and a 
 sec("1. the API");
 guarded("section 1", () => {
     const t = tankWith(["a", "b"]); run(t, 5); t.setNeeds("a", "battery");
-    const bad = [["a captain that is not fixed, triage or null", () => t.setCaptain("a", "admiral"), /^subAquariumSim\.setCaptain: a captain is "fixed", "triage" or null, got "admiral"/],
+    const bad = [["a captain that is not fixed, triage, route or null", () => t.setCaptain("a", "admiral"), /^subAquariumSim\.setCaptain: a captain is "fixed", "triage", "route" or null, got "admiral"/],
         ["a captain on a sub with no needs", () => t.setCaptain("b", "triage"), /setCaptain: the sub has no needs/], ["a breach of 0", () => t.breach("a", 0), /^subAquariumSim\.breach: a leak is a fraction of the weight above 0 and at most 0\.2, got 0/],
         ["a breach over 0.2", () => t.breach("a", 0.25), /got 0\.25/], ["a breach that is not a number", () => t.breach("a", "x"), /got "x"/], ["a breach on a sub with no needs", () => t.breach("b", 0.05), /breach: the sub has no needs/]];
     for (const [what, f, re] of bad) { const e = throws(f); ok(`refuses ${what}, by name`, e !== null && re.test(e), e || "did not throw"); }
@@ -93,6 +96,26 @@ guarded("section 4", () => {
     ok("the captain WORKS THE PUMP itself: on an injured, breached boat its energy station asks and the tank's physics is given it (the snapshot's pump reaches 1, with no box ticked)", pump === 1, String(pump));
 });
 
+sec("4b. the ROUTE captain (v4930): a courier with a battery");
+guarded("section 4b", () => {
+    const t = tankWith(["a", "b"]); run(t, 5); t.setNeeds("a", "battery"); t.setNeeds("b", "battery");
+    const notCourier = throws(() => t.setCaptain("a", "route"));
+    ok("the route captain is refused on a sub that is not a courier, by name, and changes nothing", /setCaptain: the route captain is for a courier \(start one with setNav\)/.test(notCourier || "") && snap(t).needs.captain === null, notCourier || "did not throw");
+    const c = tankWith(["a"]); c.setScene(7); c.setNav("a", "any+predict"); run(c, 5); c.setNeeds("a", "battery");
+    ok("on a courier it is accepted and named", c.setCaptain("a", "route") === "route" && (run(c, 1), snap(c).needs.captain.kind === "route"));
+    const spy = (nav) => { const real = nav.routeLength.bind(nav); let n = 0; nav.routeLength = (x, y) => { n++; return real(x, y); }; return () => n; };
+    const calls1 = spy(c.subs.get("a").nav);
+    const cons = new Set(), lows = []; let firstLegs = null;
+    for (let k = 0; k < 90; k++) { run(c, 10); const sn = snap(c); cons.add(sn.needs.captain.con); if (sn.needs.captain.con === "legs" && firstLegs === null) firstLegs = (k + 1) * 10; lows.push(sn.needs.frac); }
+    ok("A COURIER ON A FULL BATTERY flies its legs, then the LEGS station takes the con when a leg needs more than it has (scene 7: from about 230 s), and the boat is not lost", cons.has("mission") && cons.has("legs") && firstLegs !== null && firstLegs < 400 && snap(c).lost === 0 && Math.min(...lows) < 0.3, J({ cons: [...cons], firstLegs }));
+    ok("THE PLANNED ROUTE IS READ: the courier's own navigator is asked for the route length at the decisions", calls1() > 0, String(calls1()));
+    ok("the captain's watch has the legs station, the energy station (gated shut: over 900 s, through charge low enough for its own rule, it never holds the con) and damage control", J(Object.keys(snap(c).needs.captain.watch.con)) === '["mission","legs","energy"]' && snap(c).needs.captain.watch.con.energy === 0 && J(Object.keys(snap(c).needs.captain.watch.overrides)) === '["damage"]');
+    c.setScene(9); const calls2 = spy(c.subs.get("a").nav); run(c, 60);
+    ok("a NEW SEA (a new navigator under the sub) is followed: the captain still reads the courier's goal, through the proxy, and the run goes on", snap(c).needs.captain.kind === "route" && snap(c).nav && snap(c).lost === 0 && calls2() > 0, String(calls2()));
+    c.setNav("a", null); run(c, 2);
+    ok("an ENDED courier reads as no goal: the captain stays aboard and nothing throws", snap(c).needs.captain.kind === "route" && !snap(c).nav);
+});
+
 sec("5. the list line");
 guarded("section 5", () => {
     const row = (n) => ({ needs: { cls: "battery", frac: 0.5, watts: 3000, strain: 0.1, collapseDepth: 60, damage: 0, flood: 0, advisor: { on: false }, leak: 0, captain: null, ...n } });
@@ -100,13 +123,14 @@ guarded("section 5", () => {
     ok("with no captain and no breach the line has neither", !/CAPTAIN|BREACHED/.test(plain), plain);
     ok("a captain is named with who has the con in words, and 'damage control acting' when it overrides; a breach shows its leak to a tenth of a percent", /CAPTAIN triage: breach \(going up while there is charge\), damage control acting/.test(cap) && /BREACHED \(leak 7\.1%\)/.test(cap), cap);
     ok("FIXED on the mission says so, with no 'acting'", /CAPTAIN fixed: the mission/.test(fx) && !/acting/.test(fx), fx);
+    ok("the legs station's con reads 'legs (charging for the next leg)'", /CAPTAIN route: legs \(charging for the next leg\)/.test(needsLine(row({ captain: { kind: "route", con: "legs", overrides: [] } }))));
     ok("the energy station's con reads 'energy (going up for charge)'", /CAPTAIN fixed: energy \(going up for charge\)/.test(needsLine(row({ captain: { kind: "fixed", con: "energy", overrides: [] } }))));
 });
 
 sec("6. the page");
 guarded("section 6", () => {
     const html = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
-    ok("the page has the captain menu (off, fixed, triage) and the breach button, both disabled until the sub has needs", /<select id="captainSel" disabled><option value="">off<\/option><option value="fixed">fixed<\/option><option value="triage">triage<\/option><\/select>/.test(html) && /<button id="breachBtn" disabled /.test(html));
+    ok("the page has the captain menu (off, fixed, triage, route for a courier) and the breach button, both disabled until the sub has needs", /<select id="captainSel" disabled><option value="">off<\/option><option value="fixed">fixed<\/option><option value="triage">triage<\/option><option value="route"[^>]*>route \(courier\)<\/option><\/select>/.test(html) && /<button id="breachBtn" disabled /.test(html));
     ok("the menu calls tank.setCaptain with the choice (off as null) and puts the menu back to off when it is refused", /\$\("captainSel"\)\.onchange = \(\) => \{ if \(!selected\) return; try \{ tank\.setCaptain\(selected, \$\("captainSel"\)\.value \|\| null\); \} catch \(e\) \{[^}]*\$\("captainSel"\)\.value = ""; \} \};/.test(html));
     ok("the button breaches the selected sub at 7 % and says so", /\$\("breachBtn"\)\.onclick = [^\n]*tank\.breach\(selected, 0\.07\)/.test(html) && /"hull breached: a leak of "/.test(html));
     ok("every snapshot sets the menu from the sub's own captain and enables both only with needs", /\$\("captainSel"\)\.disabled = \$\("breachBtn"\)\.disabled = !on; \$\("captainSel"\)\.value = on && me\.needs\.captain \? me\.needs\.captain\.kind : "";/.test(html));

@@ -28,6 +28,7 @@ import * as NP from "../brain/needsPilot.mjs";
 import * as AV from "../brain/needsAdvisor.mjs";
 import * as SST from "../brain/subStations.mjs";   // 2026-11-19: a captain over the stations (brain/SUB_STATIONS_WIP.md): FIXED or TRIAGE on a sub with needs, and the breach it was registered against
 import { FROZEN_TRIAGE } from "../brain/stationsTask.mjs";
+import { legsStation } from "../brain/courierTask.mjs";   // v4930: the ROUTE captain (rounds 4-5: charge between legs, by the planned route)
 import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
 import * as TN from "../brain/subTankNav.mjs";
@@ -166,7 +167,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const pilot = (st, tg, cur, aux) => {
             if (sub.captainPilot) { const c = sub.captainPilot(st, tg, cur, aux); sub.advice = null; return c; }
             if (sub.advisor) { const c = adv(st, tg, cur, aux); sub.advice = adv.advice; return c; } sub.advice = null; return trip(st, tg, cur, aux); };
-        Object.defineProperty(pilot, "refilling", { get: () => (sub.captainPilot ? !!sub.captainPilot.log && (sub.captainPilot.log.con === "energy" || sub.captainPilot.log.con === "breach") : sub.advisor ? adv.refilling : trip.refilling) });
+        Object.defineProperty(pilot, "refilling", { get: () => (sub.captainPilot ? !!sub.captainPilot.log && (sub.captainPilot.log.con === "energy" || sub.captainPilot.log.con === "breach" || sub.captainPilot.log.con === "legs") : sub.advisor ? adv.refilling : trip.refilling) });
         return pilot;
     }
     /** v4912 -- the survey event's pilot: the survey seat (brain/surveySeat.mjs) behind needsTask's decision wrapper, shown what the task shows a seat (the stations with their visited flags, the needs readings through the task's noisy gauge). After the survey it holds the surface. */
@@ -311,11 +312,16 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          */
         setCaptain(id, kind) {
             const off = kind === null || kind === undefined || kind === "";
-            if (!off && kind !== "fixed" && kind !== "triage") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage" or null, got ${JSON.stringify(kind)}`);
+            if (!off && kind !== "fixed" && kind !== "triage" && kind !== "route") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage", "route" or null, got ${JSON.stringify(kind)}`);
             const sub = subs.get(id); if (!sub) return null;
             if (!sub.needs) throw new Error("subAquariumSim.setCaptain: the sub has no needs (start them with setNeeds)");
             if (off) { sub.captainKind = null; sub.captainPilot = null; sub.aux = null; return null; }
+            if (kind === "route" && !sub.nav) throw new Error("subAquariumSim.setCaptain: the route captain is for a courier (start one with setNav)");
             const read = () => N.readings(sub.eventModel, sub.needs, sub.state), pilot = sub.pilot;
+            // v4930 -- ROUTE (brain/SUB_STATIONS_WIP.md rounds 4-5): the legs station over THIS sub's navigator, read through a proxy so a new sea or a new navigator (startNav replaces sub.nav) is followed and an ended courier
+            //   reads as no goal (it then charges only in an emergency); the energy station's own claim shut, its pump and repair asks kept; damage control on the tank's room. It does not read a breach (round 7: see the note).
+            const navProxy = { snapshot: () => (sub.nav ? sub.nav.snapshot() : { arrivals: 0, goal: null, travel: 0 }), routeLength: (x, y) => (sub.nav ? sub.nav.routeLength(x, y) : null) };
+            if (kind === "route") { sub.captainPilot = SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [legsStation({ read, nav: navProxy, pos: () => [sub.state.pos[0], sub.state.pos[1]], route: true }), SST.gatedStation(SST.energyStation({ read }), () => false), SST.damageStation(RESCUE)] }); sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind; }
             sub.captainPilot = kind === "triage" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: FROZEN_TRIAGE, damageOpts: RESCUE })
                 : SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [SST.energyStation({ read }), SST.damageStation(RESCUE)] });
             sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind;

@@ -474,3 +474,14 @@ The second of the four: **a learned captain against the hand rules.**
 * **NOT TESTED, as section 20 said:** sonar's rule. The duel has no leak.
 
 **Status: round 7 CLOSED as registered.**
+
+## 23. THE ROUTE CAPTAIN IN THE SUB AQUARIUM (2026-11-20; BUILT)
+
+The third of the four.
+* `tank.setCaptain(id, "route")` puts round 5's ROUTE captain on a courier with needs: the legs station over the sub's own navigator, with the planned route; the energy station's own claim shut, its pump and repair asks kept; damage control on the tank's room.
+* **The navigator is read through a proxy**, so a new sea (startNav replaces it) is followed, and an ended courier reads as no goal (the captain then charges only in an emergency).
+* **A sub that is not a courier is refused**, by name. The page says what to do instead ("start a sea and pick a courier arm first").
+* The captain menu has "route (courier)". The list line names the legs station's con ("legs (charging for the next leg)").
+* **In the tank, scene 7:** a courier on a full battery flies its legs, and from about 230 s the legs station takes the con when a leg needs more than is left; the boat is not lost. That is pinned in the gate; it is one run, not a rate.
+* **Said plainly, from round 7:** the route captain does not read a hull breach. On a breached courier the TRIAGE captain keeps more boats and delivers less, and the union of the two interferes.
+* Gate: `render/subAquariumCaptain-selfcheck.mjs` section 4b (8 more mutants, every one red). Checked in headless Chromium: the refusal message, no page error.
