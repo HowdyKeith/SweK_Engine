@@ -1,0 +1,2 @@
+R9 on: plain 3.17 s | static 3.97 s (time ratio 1.25) | moving 1.97 s (0.62) | contracting light no alarm
+R9 both: plain 3.17 s | static 3.93 s (time ratio 1.24) | moving 0.30 s (0.09) | contracting light ALARM at 0.57 s

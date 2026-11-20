@@ -1,0 +1,2 @@
+both: plain alarm at 3.17 s (frame 95), 204 spike frames | static alarm at 3.93 s (frame 118), 185 spike frames (time ratio 1.24) | moving alarm at 0.30 s (frame 9), 114 spike frames (time ratio 0.09) | contracting plain ALARM at 0.57 s
+off: plain alarm at 3.17 s (frame 95), 204 spike frames | static alarm at 7.13 s (frame 214), 80 spike frames (time ratio 2.25) | moving alarm at 2.03 s (frame 61), 83 spike frames (time ratio 0.64) | contracting plain no alarm

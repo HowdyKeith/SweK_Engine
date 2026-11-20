@@ -1,0 +1,28 @@
+both r/v 0.05 none   peak  1300 spikes  18 first-spike 57.3
+both r/v 0.05 static peak  1150 spikes  14 first-spike 57.3
+both r/v 0.05 moving peak   983 spikes  10 first-spike 57.3
+both r/v 0.1 none   peak  1820 spikes  28 first-spike 57.3
+both r/v 0.1 static peak  1738 spikes  28 first-spike 57.3
+both r/v 0.1 moving peak  1820 spikes  28 first-spike 57.3
+off  r/v 0.05 none   peak  1300 spikes  18 first-spike 57.3
+off  r/v 0.05 static peak     0 spikes   0 first-spike -
+off  r/v 0.05 moving peak   160 spikes   0 first-spike -
+off  r/v 0.1 none   peak  1820 spikes  28 first-spike 57.3
+off  r/v 0.1 static peak   626 spikes   5 first-spike 70.0
+off  r/v 0.1 moving peak   754 spikes   7 first-spike 70.0
+on   r/v 0.05 none   peak     0 spikes   0 first-spike -
+on   r/v 0.05 static peak  1150 spikes  15 first-spike 63.1
+on   r/v 0.05 moving peak   983 spikes  10 first-spike 63.1
+on   r/v 0.1 none   peak     0 spikes   0 first-spike -
+on   r/v 0.1 static peak  1565 spikes  23 first-spike 57.3
+on   r/v 0.1 moving peak  1820 spikes  28 first-spike 57.3
+
+moving/plain and static/plain peak ratios:
+both r/v 0.05: moving 0.756 static 0.885 (plain 1300)
+both r/v 0.1: moving 1.000 static 0.955 (plain 1820)
+off r/v 0.05: moving 0.123 static 0.000 (plain 1300)
+off r/v 0.1: moving 0.414 static 0.344 (plain 1820)
+on r/v 0.05: moving n/a static n/a (plain 0)
+on r/v 0.1: moving n/a static n/a (plain 0)
+off plain / both plain at 0.05: 1.000; on plain / off plain: 0.000
+off plain / both plain at 0.1: 1.000; on plain / off plain: 0.000

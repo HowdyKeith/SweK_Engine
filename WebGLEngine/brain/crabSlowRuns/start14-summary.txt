@@ -1,0 +1,4 @@
+start 14 deg, r/v 0.5 g 0 plain 17.0 | moving 0.86 (14.6 deg) static 1.01 UP 0.86 | recede ALARM
+start 14 deg, r/v 0.5 g 300 plain 17.0 | moving 1.49 (25.3 deg) static 1.02 UP 0.86 | recede ALARM
+start 14 deg, r/v 1 g 0 plain 17.1 | moving 0.84 (14.5 deg) static 0.97 UP 0.83 | recede ALARM
+start 14 deg, r/v 1 g 300 plain 17.1 | moving 1.31 (22.4 deg) static 1.00 UP 0.83 | recede ALARM

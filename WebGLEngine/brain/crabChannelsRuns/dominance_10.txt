@@ -1,0 +1,3 @@
+R10 dominance r/v 0.15: plain light 13.6 deg (33 sp) dark 13.6 deg (33 sp) | static 17.7 deg (24 sp) x1.30 | moving 11.5 deg (42 sp) x0.85 | recede light ALARM dark ALARM | stripes-like false
+R10 dominance r/v 0.5: plain light 17.1 deg (79 sp) dark 17.1 deg (79 sp) | static 20.3 deg (65 sp) x1.19 | moving 6.5 deg (146 sp) x0.38 | recede light ALARM dark ALARM | stripes-like false
+R10 dominance: ANIMAL-LIKE-STRIPES false

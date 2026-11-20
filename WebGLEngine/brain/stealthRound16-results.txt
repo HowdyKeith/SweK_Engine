@@ -1,0 +1,12 @@
+global g 0.1  down 0.756 / 1.000 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+global g 1    down 0.756 / 1.000 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+global g 10   down 0.756 / 0.996 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+global g 100  down 0.756 / 0.918 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+local  g 0.1  down 0.756 / 1.000 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+local  g 1    down 0.756 / 1.000 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+local  g 10   down 0.756 / 0.963 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+local  g 100  down 0.756 / 0.913 | static 0.885 / 0.955 | plain kept 1.000 / 1.000 | up kept 1.000 / 1.000 | P1 n P2 Y P4 Y | ordering lum255: 2/4, lum1: 1/4
+
+ungated U: down 0.756 / 1.000
+best setting by the larger of the two moving-down ratios: local g 100 (0.913)
+settings satisfying predictions 1, 2, 4 and the ordering 4/4: none

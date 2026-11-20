@@ -134,6 +134,7 @@
 </section>
 <script type="module">
 import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX, KICK } from "/render/subAquariumSim.mjs";
+import { ensureKinds, newKindState, pilotLabel } from "/render/subAquariumKinds.mjs";   // UNNUMBERED (backlog fly-kind-peer-registration): the kinds this repository ships are registered when a sub that waits for one arrives, and the list says what each sub is really flown by
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
 import { createView3d } from "/render/subAquarium3d.mjs";
 import { readout } from "/render/subBallastCues.mjs";
@@ -143,13 +144,13 @@ import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
 import { needsLine } from "/render/needsView.mjs";
 import * as ADV from "/render/advisorTrace.mjs";   // 2026-11-19: the advice over time, for the selected sub with the advisor on
-import * as LBL from "/render/subAquariumLabel.mjs";   // 2026-11-17: what flies a sub, said in its row (a waiting or refused kind is named, not called the autopilot)
 import { CLASSES as NEEDS_CLASSES } from "/physics/mechanics/subNeeds.mjs";   // the menu's values are checked against the model's own class table
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
 const SIZES = { standard: [LENGTH, WIDTH], large: [1500, 900], open: [3000, 1800] }, sizeKey = Object.hasOwn(SIZES, new URLSearchParams(location.search).get("size")) ? new URLSearchParams(location.search).get("size") : "standard";
+const kindState = newKindState();
 const tank = createTank({ length: SIZES[sizeKey][0], width: SIZES[sizeKey][1] });   // v4902: room to swim; the page reloads with ?size= to change it
 let view3d = null;
 try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
@@ -264,7 +265,7 @@ const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#55
 async function refresh() {
   try {
     const j = await fetch("/subaquarium/list", { cache: "no-store" }).then((r) => r.json());
-    if (j && j.ok) { tank.sync(j.subs); listErr = false; const arm = $("navSel").value; if (arm && tank.scene) for (const s of tank.snapshot()) if (!s.nav) tank.setNav(s.id, arm); } else listErr = true;
+    if (j && j.ok) { tank.sync(j.subs); try { await ensureKinds(tank, tank.snapshot(), kindState); } catch (e) {} listErr = false; const arm = $("navSel").value; if (arm && tank.scene) for (const s of tank.snapshot()) if (!s.nav) tank.setNav(s.id, arm); } else listErr = true;
   } catch (e) { listErr = true; }
   renderList();
 }
@@ -323,7 +324,7 @@ function fillRows(snap) {
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${LBL.pilotLabel(s)} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${pilotLabel(s, kindState)} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -417,7 +418,7 @@ function render() {
     sg.strokeStyle = c; sg.lineWidth = 2; sg.beginPath(); sg.arc(q.x * dx, q.depth * dz, 4, 0, 6.2832); sg.stroke();
   }
   drawCompass(snap); drawBrain();
-  if (view3d) { view3d.setSea(tank.sceneNow()); view3d.render(snap, performance.now() / 1000); }   // 2026-11-17 (tank-nav-3d): the sea and the goals in 3D too
+  if (view3d) { view3d.setObstacles(tank.sceneNow()); view3d.render(snap, performance.now() / 1000); }   // UNNUMBERED (tank-nav-3d, survey-3d-markers): the obstacles; goals and stations come with the snapshot
   updateStats(snap);
 }
 function frame(now) {
@@ -467,13 +468,14 @@ function mountGpuSwitch(circuit, cpuKind) {
         } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
         try {   // UNNUMBERED (brain/TANK_PILOTS_WIP.md): the stateful fly pilot as a kind of sub the tank can fly -- the autopilot's laws plus a residual read from this circuit run with a memory (1,729 weights); registering re-seats any such sub already in the tank
             const fx = await import("/render/subAquariumFlyCx.mjs"), cpuKind = fx.flyCxKind(circuit);
+            kindState.ctx.flyCircuit = circuit; kindState.tried.add(fx.CIRCUIT);   // the kinds module (render/subAquariumKinds.mjs) need not load it again
             tank.registerPilotKind(fx.CIRCUIT, cpuKind);
             mountGpuSwitch(circuit, cpuKind);
-        } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
+        } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; kindState.tried.add("flycx"); kindState.failed.set("flycx", String((e && e.message) || e).slice(0, 60)); renderList(); }   // 2026-11-20: the row says the kind failed to load, not that it is still on its way
         try {   // 2026-11-17 (nextRounds fish-pilot-tank-kind): the zebrafish TEN-core pilot as a kind of sub the tank can fly (803 weights, no state; render/subAquariumFish.mjs says what seating it shows); its weights come with the sub
             const fk = await import("/render/subAquariumFish.mjs");
-            tank.registerPilotKind(fk.CIRCUIT, fk.fishKind());
-        } catch (e) { $("msg").textContent = "the zebrafish pilot is not available here: its subs fly the autopilot"; }
+            kindState.tried.add(fk.CIRCUIT); tank.registerPilotKind(fk.CIRCUIT, fk.fishKind());
+        } catch (e) { $("msg").textContent = "the zebrafish pilot is not available here: its subs fly the autopilot"; kindState.tried.add("fish"); kindState.failed.set("fish", String((e && e.message) || e).slice(0, 60)); renderList(); }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>

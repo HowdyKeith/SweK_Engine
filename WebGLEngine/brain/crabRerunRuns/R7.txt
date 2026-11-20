@@ -1,0 +1,6 @@
+R7 on r/v 0.1: plain 11.9 deg (28 spikes) | static 11.9 deg (26 spikes) 1.00 | moving 4 Hz 24.2 deg (18 spikes) 2.04 | moving 2.2 Hz 15.6 deg (22 spikes) 1.31 | receding light no alarm
+R7 on r/v 0.3: plain 13.6 deg (64 spikes) | static 17.4 deg (43 spikes) 1.28 | moving 4 Hz 14.3 deg (57 spikes) 1.05 | moving 2.2 Hz 20.5 deg (39 spikes) 1.51 | receding light no alarm
+R7 on r/v 0.6: plain 17.6 deg (90 spikes) | static 20.3 deg (75 spikes) 1.15 | moving 4 Hz 11.4 deg (121 spikes) 0.65 | moving 2.2 Hz 20.1 deg (74 spikes) 1.14 | receding light no alarm
+R7 both r/v 0.1: plain 11.9 deg (28 spikes) | static 11.9 deg (26 spikes) 1.00 | moving 4 Hz 13.2 deg (32 spikes) 1.11 | moving 2.2 Hz 9.4 deg (31 spikes) 0.79 | receding light no alarm
+R7 both r/v 0.3: plain 13.6 deg (64 spikes) | static 16.9 deg (47 spikes) 1.24 | moving 4 Hz 6.8 deg (94 spikes) 0.50 | moving 2.2 Hz 9.3 deg (77 spikes) 0.68 | receding light ALARM
+R7 both r/v 0.6: plain 17.6 deg (90 spikes) | static 20.3 deg (79 spikes) 1.15 | moving 4 Hz 6.4 deg (203 spikes) 0.36 | moving 2.2 Hz 8.0 deg (159 spikes) 0.46 | receding light ALARM
