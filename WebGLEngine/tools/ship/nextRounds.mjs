@@ -2889,8 +2889,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-learned-mission-price",
-        blocker: "OPEN",
-        what: "Round 11's learned courier (brain/learnedCourier.mjs) chose the trade its fitness priced (a kept boat = 2 goals): 91 of 96 kept but 0.46 goals, against COND's 76 and 2.28. Train again with the price of a lost boat set from the mission instead of a typed 2, for example the goals it would have delivered for the rest of the run.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-20 as round 15 (brain/SUB_STATIONS_WIP.md sections 31 and 34): COND BEATS PRICED on the mission value (58 to 27, p 0.0005), on goals too, and no difference on survival. The price moved the learner as it should (1.75 goals a run against round 11's 0.66, more value on 60 runs to 16) but not to the hand rule (2.51). WAS: Round 11's learned courier (brain/learnedCourier.mjs) chose the trade its fitness priced (a kept boat = 2 goals): 91 of 96 kept but 0.46 goals, against COND's 76 and 2.28. Train again with the price of a lost boat set from the mission instead of a typed 2, for example the goals it would have delivered for the rest of the run.",
         how: "Register the price formula, the sets (fresh TRAIN/SELECTION/HELD seed blocks) and the verdict against COND on both outcomes BEFORE training (section 30 says so). The fitness is one function in learnedCourier.mjs; the command is tools/ship/trainLearnedCourier.mjs (worker_threads). Gate the new fitness in brain/learnedCourier-selfcheck.mjs with a mutant.",
         why: "Section 30: which of COND and LEARNED is better is a question of the mission's values; a learner given a principled price answers whether learning can match COND's deliveries without its losses.",
     },

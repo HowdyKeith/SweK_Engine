@@ -764,3 +764,24 @@ Keith, 2026-11-20: "Let's do all, those as you suggested, and also item 5" -- th
 **Built and kept:** `subDuel.duel`'s `modelA` and `leakA` (default bit for bit, gated), `duelStationsTask`'s `breach14`, `leak14At`, `sideFor14`, `fight14` (with a `breach` fixture), `verdict14` and round 14's sets. Gated in `brain/duelStationsTask-selfcheck.mjs` section 6 (17 mutants, 16 red, 1 equivalent; logged).
 
 **Status: round 14 CLOSED, STOPPED AT DEV as registered.**
+
+## 34. ROUND 15 RESULT (2026-11-20; `brain/learnedCourierPriced.json` frozen at `048c0a696` before HELD; `brain/pricedHeld.{0,1,2,3}.jsonl`, 288 runs, committed unread at `d0912888c`, then read ONCE)
+
+**VERDICT (registered): COND BEATS PRICED** on the mission value: more on 58 runs, less on 27 (p = 0.0005). Reported the same way: **COND BEATS PRICED on goals** (54 to 22, p = 0.0002); **NO DIFFERENCE SHOWN on survival** (COND keeps 11 boats PRICED loses, PRICED 7 COND loses; p = 0.24).
+
+| crew | survived (of 96) | mean goals | mean mission value | seconds on the surface after the breach |
+|---|---|---|---|---|
+| **COND** | 78 | **2.51** | **2.28** | 434 |
+| **PRICED** (round 15) | 74 | 1.75 | 1.56 | 572 |
+| LEARNED (round 11) | **85** | 0.66 | 0.52 | 627 |
+
+**Reported:**
+* **The price moved the learner the way it should have.** Against round 11's LEARNED on the same seeds, PRICED has more mission value on 60 runs to 16 (p = 2e-7) and more goals on 58 to 13. It gives up boats for them: LEARNED keeps 15 that PRICED loses, PRICED 4 that LEARNED loses (p = 0.01). Its goals rise from 0.66 to 1.75 a run.
+* **It did not reach the hand rule.** COND delivers 0.76 goals a run more, with no difference shown on survival, and is better on the mission's own measure.
+* **COND against round 11's LEARNED, on the mission value:** COND more on 81 runs, LEARNED on 8.
+* **What it learned, from the weights.** SURFACE fires mostly on a low charge (-2.10 on the charge, with a negative constant). It is held back by a goal just reached (-1.42) and by being deeper than the mission (-1.56), and it stays down while the bottle is full (-1.50 on the air). DROP's largest weight is on a goal just reached (+2.52), then on the next leg costing more than the charge (+0.96). Every boat in every crew dropped its weight (all 96 runs are breached, and damage control drops it), so DROP's own firing cannot be told apart in these records.
+* **Against the expectation in section 31:** COND BEATS PRICED was put at about 55 percent; it happened.
+
+**What it says.** Rounds 11 and 15 together: the learner's answer follows the price on a boat. A price of 2 bought boats and lost deliveries; the mission's price bought deliveries back (1.75 a run against 0.66) at the cost of boats. Neither learner, on 20 generations of a (mu, lambda) ES with 16 training runs, matched the hand rule that reads the planned route. That is a result about this budget and this feature set, not about learning.
+
+**Status: round 15 CLOSED as registered.**
