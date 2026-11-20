@@ -85,7 +85,10 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"))) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), k = (st, f, g, gain) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${st}_${f}_${g}_${gain}.json`), "utf8")).leads, near = (x, v) => Math.abs(x - v) < 5e-4;
+    const sc = Object.fromEntries(G.GAINS.map((gain) => { const all = G.FIGHTS.flatMap((f) => G.GUNNERS.flatMap((g) => k("train", f, g, gain))); return [gain, all.reduce((x, y) => x + y, 0) / all.length]; }));
+    const w = G.FIGHTS.flatMap((f) => G.GUNNERS.flatMap((g) => k("held", f, g, -6))), s2 = G.FIGHTS.flatMap((f) => G.GUNNERS.flatMap((g) => k("held", f, g, -2))), hg = w.map((v, i) => v - s2[i]).reduce((x, y) => x + y, 0) / w.length;
+    ok("!! AS KEPT AND RE-DERIVED -- THE SHIPPED GAIN STANDS: the train scores are FLAT from -1 to -6 (1.612, 1.683, 1.642, 1.618, 1.695; only -0.5 is clearly lower, 1.496); -6 won by 0.012 and DID NOT HOLD (-0.029 less -2 on 384 held-out pairs, z -1.2); nothing was audited and no file was written", G.GAINS.every((g) => Math.abs(sc[g] - rd.scores[g]) < 1e-12) && near(sc[-0.5], 1.496) && near(sc[-2], 1.683) && near(sc[-6], 1.695) && rd.winner === -6 && Math.abs(hg - rd.held.mean) < 1e-12 && near(rd.held.mean, -0.029) && !G.holds(rd.held) && rd.audit === null && !rd.verdict.ok && !fs.existsSync(G.DEFAULT_OUT));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

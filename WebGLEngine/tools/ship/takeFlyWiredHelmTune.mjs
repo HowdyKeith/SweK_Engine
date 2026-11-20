@@ -15,6 +15,8 @@
 // FORECAST, for the record: a stronger turn (-3 or -4) wins, a gunner that always fires gaining from more of its guns on the target sooner; the audit gain small, about +0.1, larger in fleets than one a side.
 // WHAT SHIPS: brain/helmFlyWired3WeightsTuned.json (policy helmFlyWired3, [the winner, the winner, 0.25, 0.25]) if the audit gain LEADS in at least one of the four and TRAILS in none; the page's cannon-aware helm then loads it. If -2 wins, or the winner fails
 //   held out, nothing is audited and the shipped gain stands.
+// READ 2026-11-20 (brain/helmFlyWired3WeightsTuned.reading.json): THE SHIPPED GAIN STANDS. The train scores are flat from -1 to -6 (1.61 to 1.70; -0.5 lower, 1.50); -6 won by 0.012 and did not hold (-0.029, z -1.2, 384 held-out pairs); nothing audited.
+//   The forecast (a stronger turn wins) was wrong: with the trigger held, how hard the helm turns barely matters once it turns at all -- what the helm is worth is that it knows the cannon is there (tools/ship/takeBestShipLoadout3.mjs: the bow-on rule loses 0.3 to 1.2).
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmTune/); the reading file (brain/helmFlyWired3WeightsTuned.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: unequal gains, the gains without a cannon, escorts, the hand gunner, the other helms.
 "use strict";
