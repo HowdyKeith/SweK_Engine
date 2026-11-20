@@ -34,6 +34,7 @@ import * as HF from "./takeFlyWiredHelmFix.mjs";
 import * as NX from "./takeFlyWiredNext.mjs";
 import * as GN from "./takeFlyWiredGunner.mjs";
 import * as FT from "../../brain/flyTracking.mjs";
+import * as C from "../../render/spaceDuelCore.mjs";
 import * as D from "../../brain/battleshipDuel.mjs";
 import * as BF from "../../brain/battleshipFight.mjs";
 import * as P6 from "../../brain/pilot6dofPolicy.mjs";
@@ -75,7 +76,13 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm.replace(":", "-")}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((arm) => [arm, k(f, arm)]))).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE CIRCUIT'S SHAPE IS NOT SHOWN TO MATTER IN THE PAGE'S GUNNER: the fly less sine, the scramble and flat is CANNOT BE TOLD in every fight but one -- one ship a side it TRAILS flat (-0.025, z -2.3) -- and it is credited against the SHUFFLE only (+1.300, +2.105, +0.551), which swings the gun the wrong way at large angles", G.FIGHTS.every((f) => ["sine", "scrambled:4242"].every((c) => rd[f].words[`flyOver:${c}`] === "CANNOT BE TOLD")) && rd.fleetCannon.words["flyOver:flat"] === "CANNOT BE TOLD" && rd.fleetNoCannon.words["flyOver:flat"] === "CANNOT BE TOLD" && rd.oneCannon.words["flyOver:flat"] === "TRAILS" && near(R("oneCannon")["flyOver:flat"], -0.025)
+        && near(R("fleetCannon")["flyOver:shuffled:4242"], 1.300) && near(R("fleetNoCannon")["flyOver:shuffled:4242"], 2.105) && near(R("oneCannon")["flyOver:shuffled:4242"], 0.551) && rd.verdict.credited.join() === "shuffled:4242" && !rd.verdict.shapeMatters
+        && G.FIGHTS.every((f) => Object.keys(re[f]).every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! the page's gunner against the plain side: +0.099 in fleets with the cannon, +0.349 without, and +0.171 ONE SHIP A SIDE with the cannon (the page's default fight, flown here for the first time with this gunner); the forecast was right", near(R("fleetCannon").fly, 0.099) && near(R("fleetNoCannon").fly, 0.349) && near(R("oneCannon").fly, 0.171) && G.FIGHTS.every((f) => rd[f].words.fly === "LEADS"));
+    ok("!! AND THE PAGE SAYS IT: the flywired hand's note says the circuit's shape is not shown to matter in this gunner", /shape is not shown to matter/i.test(C.HANDS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

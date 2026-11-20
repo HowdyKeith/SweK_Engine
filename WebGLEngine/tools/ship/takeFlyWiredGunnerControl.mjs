@@ -14,6 +14,9 @@
 // FORECAST, for the record: against sine, the scramble and flat CANNOT BE TOLD in every fight (they fly the same fight most of the time); against the shuffle the fly LEADS (its read-out has the wrong sign at a quarter turn and more).
 // WHAT IS DECIDED (nothing ships): the fly's wiring is CREDITED against a control if the fly LEADS it in at least one fight and TRAILS it in none. If it is credited against NONE of sine, the scramble and flat, the page's `flywired` note says so -- in this
 //   gunner the circuit's shape is not shown to matter, only that it swings the gun the right way. Either way the reading is pinned and said on the page.
+// READ 2026-11-20 (brain/flyWiredGunnerControl.reading.json): THE CIRCUIT'S SHAPE IS NOT SHOWN TO MATTER in this gunner. The fly less sine, the scramble and flat CANNOT BE TOLD in every fight but one (one ship a side it TRAILS flat, -0.025, z -2.3);
+//   it is credited against the shuffle only (+1.30, +2.11, +0.55), whose read-out swings the gun the wrong way. What the page's gunner needs from the circuit is that it swings the gun toward the target; the fly's own wiring, places and connections do no
+//   more here than a sine. (The earlier fly-wired gunners, whose circuits laid the gun themselves, had their own controls: tools/ship/takeFlyWiredGunner.mjs, takePlacesControl.mjs.) The page's flywired note says so.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerControl/); the reading file (brain/flyWiredGunnerControl.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts and fighters (the hand's, in every arm alike), other scramble and shuffle seeds (one draw each), the earlier fly-wired gunners (their own controls were flown: tools/ship/takeFlyWiredGunner.mjs, takePlacesControl.mjs).
 "use strict";
