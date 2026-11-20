@@ -84,7 +84,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((arm) => [arm, k(f, arm)]))).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- THE FLY'S WIRING IS NOT BETTER THAN A SINE IN THE HELM: the fly less sine TRAILS one ship a side (-0.063, z -2.2) and CANNOT BE TOLD in fleets (+0.007); against the shuffle it LEADS by +2.015 and +2.112; credited against the shuffle only", near(R("one")["flyOver:sine"], -0.063) && rd.one.words["flyOver:sine"] === "TRAILS" && near(R("fleet")["flyOver:sine"], 0.007) && rd.fleet.words["flyOver:sine"] === "CANNOT BE TOLD" && near(R("one")["flyOver:shuffled"], 2.015) && near(R("fleet")["flyOver:shuffled"], 2.112) && rd.verdict.credited.join() === "shuffled" && !rd.verdict.beatsSine
+        && G.FIGHTS.every((f) => Object.keys(re[f]).every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    ok("!! against the plain ship: fly +1.725 and +1.771, sine +1.788 and +1.764, the shuffle -0.290 and -0.342 (TRAILS: a helm that steers the wrong way); the forecast was right in fleets and a little off one ship a side (it said CANNOT BE TOLD; sine is ahead by 0.06); AND THE PAGE SAYS IT", near(R("one").fly, 1.725) && near(R("one").sine, 1.788) && near(R("fleet").shuffled, -0.342) && /sine comparator does as well or a little better/i.test(C.HELMS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

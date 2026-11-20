@@ -12,6 +12,8 @@
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain ship; THE FLY LESS EACH CONTROL, pair by pair.
 // FORECAST, for the record: against the shuffle the fly LEADS (by about a whole point, as when it shipped); against sine CANNOT BE TOLD in both fights.
 // WHAT IS DECIDED (nothing ships): the fly's wiring is CREDITED against a control if it LEADS it in at least one fight and TRAILS it in none. The page's helm note says what it read either way.
+// READ 2026-11-20 (brain/flyWiredHelmControl.reading.json): the fly less sine TRAILS one ship a side (-0.063, z -2.2) and cannot be told in fleets (+0.007); against the shuffle +2.0 in both. The fly's wiring is credited against the shuffle only: what the
+//   helm needs of the circuit is that it steers the right way, and a sine does that as well or a little better. The page's helm note says so.
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmControl/); the reading file (brain/flyWiredHelmControl.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other shuffle seeds (one draw), escorts, the gains without a cannon, the first helm's wirings.
 "use strict";
