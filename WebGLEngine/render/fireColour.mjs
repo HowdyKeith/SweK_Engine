@@ -40,6 +40,7 @@
 // SKIP regex, so gateFiles() never sees it and no gate in 4,412 versions has read a line of it. A directory
 // the scanners skip is a directory where a name can mean two things for ever. That is reported here rather
 // than repaired by widening the scan -- widening it is a round of its own, with its own count to argue about.
+// SETTLED at v4425 by another route: tools/ship/demosReach-selfcheck.mjs reads demos_code (its collisions named, no gate hiding there) and decides the scans stay narrow.
 //
 // ---- WHAT IS DELIBERATELY NOT CLAIMED --------------------------------------------------------------------
 // That any of these IS the colour of a blackbody at some temperature. That needs CIE colour matching, which

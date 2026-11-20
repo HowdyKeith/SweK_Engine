@@ -3602,10 +3602,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "staleness-demos-code",
-        blocker: "OPEN",
-        what: "Read after v4928: still open. render/fireColour.mjs l.42 (v4412) defers widening tools/ship/staleness.mjs so demos_code/ comes under gateFiles(); staleness.mjs's SKIP still excludes demos_code.",
-        how: "Drop demos_code from SKIP, run staleness --fix, and register what it finds.",
-        why: "Gates under demos_code are invisible to the staleness check.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-20, NOT by widening the scan: v4425 already answered render/fireColour.mjs's deferral by another route. tools/ship/demosReach-selfcheck.mjs reads inside demos_code (the function-name collisions named, each with an oracle), holds as a standing fact that no gate hides there, and records the decision that the scans stay narrow ('do not add demos_code to a walk to fix it'). Widening staleness.mjs's SKIP would change no count today (zero gates there) and would go against that recorded decision. fireColour's note is marked SETTLED at v4425 and held in deferralCensus (SETTLED_BY_BACKLOG). WAS: widen staleness.mjs so demos_code comes under gateFiles().",
+        how: "None: answered by tools/ship/demosReach-selfcheck.mjs.",
+        why: "A directory the scanners skip was a place a name could mean two things; demosReach reads it.",
     },
     {
         id: "sweep-record-staleness-per-device",

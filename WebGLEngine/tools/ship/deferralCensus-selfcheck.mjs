@@ -52,6 +52,7 @@
 // fsrContent's marker removed (2: the census row names satisfied 26 -> 25, and the adjacency row). *** FRAG_SRC_DEPTH renamed to FRAG_SRC_DEPTHX went
 // 0 RED: the declaration regex was a PREFIX and still matched. *** Bounded with \b; re-run: 1 red (the declaration row). The first tranche's
 // readAngularVelocities and stabilityRate regexes are prefixes of the same kind and are left as written, said here.
+// 2026-11-20, the backlog's one (render/fireColour.mjs, SETTLED_BY_BACKLOG): its marker removed -> 2 red (the census row, 27 -> 26, and its own row).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -307,8 +308,8 @@ sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A D
         missing.length ? "the work a marker points at is gone, so the marker is false: " + missing.join("; ")
                        : T.reduce((n, t) => n + t.decl.length, 0) + " declarations found: primeTrellis, STREAMED, readAngularVelocities in box3d and Jolt, taitB, " +
                          "STATE.drive, HoleFillGPU, makeLockLife, CSBomb, evaluateGuards in DungeonAI, the forceslate plant, chunkAudit and resumePlan, _dry, mountMiniAvatar");
-    ok("the tranches account for the record's move EXACTLY: satisfied +18 and undecided -18 (13, then 5), from the counts v4906 left",
-        REC.satisfied - 8 === T.length + D.SETTLED_TRANCHE_TWO.length && 217 - REC.undecided === T.length + D.SETTLED_TRANCHE_TWO.length,   // after v4930: both tranches, 13 + 5
+    ok("the tranches account for the record's move EXACTLY: satisfied +19 and undecided -19 (13, then 5, then 1 from the backlog), from the counts v4906 left",
+        REC.satisfied - 8 === T.length + D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length && 217 - REC.undecided === T.length + D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length,   // both tranches and the backlog's one: 13 + 5 + 1
         `satisfied 8 -> ${REC.satisfied}, undecided 217 -> ${REC.undecided}. The other seventeen were read and are still open; ` +
         "they stay undecided because nothing structural decides them, and the ones no entry named were filed as backlog entries");
 }
@@ -316,7 +317,7 @@ sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A D
 // ---- 6b. THE SECOND TRANCHE, AFTER v4930 ----------------------------------------------------------------------
 sec("6b. *** THIRTY MORE READ, FIVE SETTLED -- EACH HELD AGAINST A DECLARATION ***");
 {
-    const T2 = D.SETTLED_TRANCHE_TWO, T1 = D.SETTLED_TRANCHE_AFTER_V4928;
+    const T2 = D.SETTLED_TRANCHE_TWO, T1 = D.SETTLED_TRANCHE_AFTER_V4928, TB = D.SETTLED_BY_BACKLOG;
     const readRel = (rel) => { try { return fs.readFileSync(path.join(HERE, "../..", rel), "utf8"); } catch { return null; } };
     const unmarked = T2.filter((t) => {
         const src = readRel(t.file); if (src === null) return true;
@@ -327,6 +328,11 @@ sec("6b. *** THIRTY MORE READ, FIVE SETTLED -- EACH HELD AGAINST A DECLARATION *
         T2.length === 5 && new Set(T2.map((t) => t.file)).size === 5 && !T2.some((t) => T1.some((u) => u.file === t.file)) && unmarked.length === 0,
         unmarked.length ? "not adjacent or not classed satisfied: " + unmarked.map((t) => t.file).join(", ") : T2.map((t) => t.file.split("/").pop() + " " + t.settledAt).join("; "));
     const missing = T2.flatMap((t) => t.decl.filter(([rel, re]) => { const src = readRel(rel); return src === null || !new RegExp(re).test(src); }).map(([rel, re]) => t.file + " -> " + rel + " /" + re + "/"));
+    const unmarkedB = TB.filter((t) => { const src = readRel(t.file); if (src === null) return true; const L = src.split("\n"), tag = new RegExp("SETTLED at " + t.settledAt + "\\b");
+        return !L.some((l, i) => D.TIGHT.test(l) && D.classifyLine(t.file, l, L[i - 1] || "", L[i + 1] || "") === D.CLASS.SATISFIED && (tag.test(l) || tag.test(L[i + 1] || ""))); });
+    const missingB = TB.flatMap((t) => t.decl.filter(([rel, re]) => { const src = readRel(rel); return src === null || !new RegExp(re).test(src); }).map(([rel]) => t.file + " -> " + rel));
+    ok("!! and the one settled from the backlog (render/fireColour.mjs, by v4425's demosReach) is marked beside its claim and held against that gate's declarations",
+        TB.length === 1 && unmarkedB.length === 0 && missingB.length === 0, unmarkedB.length || missingB.length ? "unmarked: " + unmarkedB.map((t) => t.file).join(", ") + "; missing: " + missingB.join("; ") : "hiddenGates, collisions, and the recorded decision that the scans stay narrow");
     ok("!! *** and every one is held against a DECLARATION in the tree ***", missing.length === 0 && T2.every((t) => t.decl.length > 0),
         missing.length ? "the work a marker points at is gone: " + missing.join("; ") : T2.reduce((n, t) => n + t.decl.length, 0) + " declarations: chunk inBounds and its air read, the escTol sweep and its knob, flyAudits, FRAG_SRC_DEPTH and gl_FragDepth, the folds7 result");
 }
