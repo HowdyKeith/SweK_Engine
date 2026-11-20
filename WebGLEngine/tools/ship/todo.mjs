@@ -564,6 +564,15 @@ export const TODO = [
         evidence: "grep -n \"WHY THE HELD-TRIGGER GUNNER TRAILS\" brain/flyTracking.mjs",
     },
     {
+        id: "fly-several-targets",
+        status: "done", version: "UNNUMBERED (chosen at ship time)", size: "small", order: 35,
+        outcome: "TRIED ON SCRATCH, NOT REGISTERED (brain/flyTracking.mjs header, 2026-11-20): the circuit choosing the ship from all bearings at once loses to the sight's choice by 0.44 and cannot be told from a sum of sines choosing the same way.",
+        title: "A test the fly's wiring could pass: several targets at once",
+        why: "Both wiring controls found a sine does as well as the fly circuit in the page's gunner and helm; a sine sees one bearing, the LC10a cells see all of them, so a target choice from their joint response was the one place the wiring might matter.",
+        note: "Closed by the scratch reading; a fight where bearing alone is the right choice would be needed to ask again.",
+        evidence: "grep -n \"SEVERAL TARGETS AT ONCE\" brain/flyTracking.mjs",
+    },
+    {
         id: "fly-tracking-more-circuit",
         status: "open", size: "large", order: 30,
         title: "More of the tracking circuit: elevation (the sheet's other axis) and a target's motion",

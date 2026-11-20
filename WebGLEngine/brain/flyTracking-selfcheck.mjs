@@ -13,6 +13,7 @@
 //
 // SABOTAGE LOG: 23 mutants of brain/flyTracking.mjs, each a copy of the module with this gate pointed at it (row 5's `seated in the seats` compares with the real module and is red for every copy: NOT counted). 22 red by name the first time. ONE 0-RED, A GAP, CLOSED: the sine not held at its peak behind a quarter turn (no row asked it for a bearing past 90 degrees; row 5 now does). After it: 23 of 23. THEN FIVE for the scrambled places (section 3b), all red: the scramble the identity, ignored, the same for every seed, a place of one value for every cell of both eyes, and `flat` in its stead. Red by name: the eyes swapped, every cell excitatory, no overlap, the places reversed, no places, no constant drive, the read-out swapped, the read-out not odd, the amplitude left at one, a trigger that always fires, one gain for both axes, the elevation's scale, an unbounded rate, `fly:lateral` the medial circuit, `flat` with places, the shuffle the identity, any wiring name taken, a new library each call, two steps, no normalisation, another sigma, S not odd.
 // AND TWO ON THE GUNNER HOLDING THE TRIGGER (2026-11-20), tree copies, both red: B1 seatFlyWired11 not holding it 1 | B2 alwaysFire not passed to the seat 1
+// AND TWO ON SEVERAL TARGETS AT ONCE (2026-11-20), tree copies, both red: M1 the drives not summed 1 | M2 not read the odd way 1
 // AND FOUR ON THE PAGE'S GUNNER OVER ANOTHER WIRING (2026-11-20), tree copies, all red: O1 every name the fly's 2 | O2 not memoised 1 | O3 sticky to every target 1 | O4 not tunable 1 (the section threw)
 // AND FIVE ON THE TUNABLE NEAR-HAND GUNNER (2026-11-20), tree copies, all red: U1 the window not read off the weights 1 | U2 the smoothing not read 1 (read off the slip: in a fight it changes nothing) | U3 four weights 2 | U4 no hand on fighters 1 | U5 the shipped window 1
 // AND SIX ON THE HAND FOR THE LAST DEGREES (2026-11-20), tree copies: N1 the window ignored 1 | N3 ten degrees 1 | N4 no hand on fighters 1 | N5 it rests 1 | N6 the slip from the aim 1 | N2 the window on yaw only 0 THE FIRST TIME, A GAP,
@@ -199,6 +200,11 @@ section(() => {
     ok("!! THE PAGE'S GUNNER HOLDING THE TRIGGER (seatFlyWired11, 2026-11-20): seatFlyWired10's five weights, a fleet another fight from seatFlyWired10's (the trigger is the only difference), and on fighters too", FT.POLICY_ID11 === "seatFlyWired11" && FT.nearAlways.WEIGHT_COUNT === 5 && FT.nearAlways.sticky === "ships" && fl(FT.nearAlways, { ships: 3 }) !== fl(FT.nearTunable, { ships: 3 }) && JSON.stringify(BF.fight(99001, "swarm", { network: { module: FT.nearAlways, weights: w } })) !== JSON.stringify(BF.fight(99001, "swarm", { network: { module: FT.nearTunable, weights: w } })));
 });
 
+section(() => {
+    const d = Math.PI / 180;
+    ok("!! SEVERAL TARGETS AT ONCE (oddMany, 2026-11-20): one bearing is the gunner's own read-out (S times its amplitude); two mirrored bearings give exactly 0; it is odd in the bearings; and the far of two targets on either side wins (20 and -60 degrees: it turns to the -60 side)", Math.abs(FT.oddMany([20 * d]) - FT.S(20 * d) * FT.wiringOf("fly:medial").amplitude) < 1e-12 && FT.oddMany([20 * d, -20 * d]) === 0 && Math.abs(FT.oddMany([20 * d, -60 * d]) + FT.oddMany([-20 * d, 60 * d])) < 1e-12 && FT.oddMany([20 * d, -60 * d]) > 0 && FT.oddMany([20 * d, 30 * d, -60 * d]) < 0);
+});
+
 console.log("4d. AN ELEVATION OF ITS OWN (2026-11-19)");
 section(() => {
     const up = FT.elevatedWith({ front: 1 }), dn = FT.elevatedWith({ front: -1 }), deg = (d) => d * Math.PI / 180, B = [2, 5, 10, 20, 45, 80, 90];
@@ -216,7 +222,7 @@ section(() => {
     const job = (wiring) => ({ x: { id: "n", cannon: false, network: wiring ? { policy: "seatFlyWired", weights: [-4, -4], wiring } : { policy: "seatFlyWired", weights: [-4, -4] } }, y: { id: "hand", cannon: false }, kind: "crossing", seed: 90003 }), a = leadOf(job(null)), b = leadOf(job("flat")), c = leadOf(job("fly:medial"));
     ok("!! the pool flies it over a named wiring: `flat` is another fight of the same gains, and `fly:medial` by name is the default", a !== b && a === c, `leads ${a.toFixed(3)}, ${b.toFixed(3)}`);
     ok("the report says real numbers", /281 neurons, 6589 connections, no learned weight inside; with places the command reaches 90% of its peak at 55\.5 degrees and peaks at 80\.5/.test(FT.reportLines()[1]));
-    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,NEAR,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID10,POLICY_ID11,POLICY_ID2,POLICY_ID3,POLICY_ID4,POLICY_ID5,POLICY_ID6,POLICY_ID7,POLICY_ID8,POLICY_ID9,S,SHIPPED9,SIGMA,STEPS,WEIGHT_COUNT,cells,elevatedWith,forward,gunnerFactory,gunnerFor,handWeights,holdNear,holdSees,holdSeesNear,mixed,mixedHold,moving,movingTarget,movingWith,nearAlways,nearTunable,nearTunableOver,raw,reportLines,signOf,sticky,stickyShips,topology,tuning,wiringOf,wiringOf10,withBaseline,zeroWeights");
+    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,NEAR,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID10,POLICY_ID11,POLICY_ID2,POLICY_ID3,POLICY_ID4,POLICY_ID5,POLICY_ID6,POLICY_ID7,POLICY_ID8,POLICY_ID9,S,SHIPPED9,SIGMA,STEPS,WEIGHT_COUNT,cells,elevatedWith,forward,gunnerFactory,gunnerFor,handWeights,holdNear,holdSees,holdSeesNear,mixed,mixedHold,moving,movingTarget,movingWith,nearAlways,nearTunable,nearTunableOver,oddMany,raw,reportLines,signOf,sticky,stickyShips,topology,tuning,wiringOf,wiringOf10,withBaseline,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

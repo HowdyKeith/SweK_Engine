@@ -44,6 +44,10 @@
 //   trigger still held) it is 0.046 a round and leads by +1.796 against the car's +1.768 and the 45-degree window's +1.495; 10 and 20 degrees are as 45. The hand lays the gun at the sight's aim, which shakes from tick to tick; laid by rates the gun
 //   filters that shake, and with the trigger held every round counts. But in fleets under the helm no window TRAILS 45 degrees (-0.176, se 0.106, 24 pairs; level under the bow-on rule, -0.041): there the hand's quick laying onto new targets pays.
 //   So the window is a trade by fight size, which is what tools/ship/takeBySizeLoadout.mjs's button does with the car's gunner one ship a side (as good there as no window).
+// SEVERAL TARGETS AT ONCE (2026-11-20; Keith: "then 2" -- a test the fly's wiring could pass, since a sine sees one bearing). `oddMany(es)` drives the cells with every bearing together. NOT REGISTERED, scratch pairs 138001-138006 of each kind (24),
+//   fleets of three with the cannon under the cannon-aware helm, seatFlyWired11 otherwise: letting the circuit CHOOSE THE SHIP (the side its joint drive turns to, the nearest ship there) LOSES to the sight's own choice (soonest hittable) by -0.438
+//   (se 0.181), and a SUM OF SINES choosing the same way loses by -0.428 -- the two cannot be told (0.01). Choosing by bearing throws away what the sight knows (range, closing); and even with several targets the fly's joint response picks as a
+//   sine does. No study was registered.
 // AN ELEVATION OF ITS OWN (2026-11-19; round 5): `elevatedWith({ front })` reads the gun's pitch off the circuit with its cells at their places ALONG the sheet's other axis. The command is nearly the yaw's (front +1 about 20% steeper close in, -1 about
 //   10%: places are ranks, so either axis spreads the cells evenly, and only how the wiring sits on the axis can differ). On scratch pairs it was level: 117-118 kills against fighters (117 the ships-sticky gunner), and in fleets of three -0.074 to +0.004 against
 //   the ships-sticky gunner, none told. So no study was registered and nothing ships.
@@ -84,7 +88,14 @@ function circuitOf(M, { front = 1, flat = false, baseline = BASELINE, places = P
         return h;
     }
     const raw = (e) => { const h = cells(e); return h[DNA02_R] - h[DNA02_L]; };
-    return { cells, raw };
+    /** SEVERAL TARGETS AT ONCE (2026-11-20): the cells driven by every bearing in `es` together (each target's drive added), then the same three steps; DNa02 right less left. */
+    function rawMany(es) {
+        let h = new Float64Array(N);
+        for (const e of es) { const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places[i] - p) ** 2) / (2 * SIGMA * SIGMA))); if (wl > 0) for (const i of EYE_L) h[i] += wl * g(i); if (wr > 0) for (const i of EYE_R) h[i] += wr * g(i); }
+        for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + (i === DNA02_L || i === DNA02_R ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
+        return h[DNA02_R] - h[DNA02_L];
+    }
+    return { cells, raw, rawMany };
 }
 /** THE NEIGHBOURHOOD SHUFFLED, THE PLACES KEPT: the retarget for `unneighboured:<seed>` -- only the LC10a-to-LC10a connections move, each to another LC10a cell of the same eye (one random permutation an eye). Every cell stays at its place and keeps its connections onto AOTU019 and AOTU025. */
 function unneighbourOf(seed) {
@@ -191,6 +202,8 @@ export function nearTunableOver(name) {
 export const wiringOf10 = nearTunableOver;
 /** THE PAGE'S GUNNER HOLDING THE TRIGGER (`seatFlyWired11`, 2026-11-20): seatFlyWired10 but with a target the trigger is held, on the circuit's ticks and the hand's -- the race car's trained gunner's one trick (tools/ship/trainTurretSeatBig.mjs). Same five weights. */
 export const POLICY_ID11 = "seatFlyWired11", nearAlways = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding, the trigger held", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true });
+/** The fly's circuit (fly:medial) asked about SEVERAL bearings at once, read the odd way: half of (all the bearings) less (all of them mirrored). Its sign is the side the circuit turns to (negative: the positive side, as S). */
+export const oddMany = (es) => (FLY_M.rawMany(es) - FLY_M.rawMany(es.map((e) => -e))) / 2;
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
