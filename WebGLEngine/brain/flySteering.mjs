@@ -126,16 +126,21 @@ export const hasCannon = (ship) => !!(ship && ship.waveGun && Number.isFinite(sh
  * the helm asks hasCannon(ctx.ship) and answers as the second helm at that pair of gains. With a cannon it IS the second helm at w[0..1] to the bit, without one at w[2..3] (the gate flies both); zero gains are the rule. tools/ship/takeFlyWiredHelmFix.mjs chose the gains without a cannon.
  */
 export const POLICY_ID3 = "helmFlyWired3";
-export const third = (() => {
+/** The cannon-aware helm over a read-out `base` (a wiringOf library): `third` is it over `second` (fly2~odd); `thirdOver(name)` over another wiring's, for a control (2026-11-20). */
+const thirdOf = (base, name) => {
     const zeroWeights = () => new Float32Array(4);
     function helmFor(w) {
-        const withC = second.helmFor(Float32Array.from([w[0], w[1]])), without = second.helmFor(Float32Array.from([w[2], w[3]]));
+        const withC = base.helmFor(Float32Array.from([w[0], w[1]])), without = base.helmFor(Float32Array.from([w[2], w[3]]));
         function helm(rule, ctx) { const h = hasCannon(ctx.ship) ? withC : without, out = h(rule, ctx); helm.last = h.last; helm.cannon = h === withC; return out; }
         helm.last = null; helm.cannon = null;
         return helm;
     }
-    return Object.freeze({ name: "fly2~odd, cannon-aware", amplitude: second.amplitude, FEATURES, HIDDEN, OUTPUTS: 4, WEIGHT_COUNT: 4, TORQUE_FRACTION, steer: second.steer, zeroWeights, handWeights: zeroWeights, helmFor, helmFactory: (w) => () => helmFor(w) });
-})();
+    return Object.freeze({ name, amplitude: base.amplitude, FEATURES, HIDDEN, OUTPUTS: 4, WEIGHT_COUNT: 4, TORQUE_FRACTION, steer: base.steer, zeroWeights, handWeights: zeroWeights, helmFor, helmFactory: (w) => () => helmFor(w) });
+};
+export const third = thirdOf(second, "fly2~odd, cannon-aware");
+const THIRD_OVER = new Map();
+/** The cannon-aware helm over another wiring ("sine~odd", "shuffled2:<seed>~odd", ...; "fly2~odd" is `third` itself). */
+export function thirdOver(name) { if (name === "fly2~odd") return third; if (!THIRD_OVER.has(name)) THIRD_OVER.set(name, thirdOf(wiringOf(name), `${name}, cannon-aware`)); return THIRD_OVER.get(name); }
 /** The circuit with another threshold (for the gate's and the header's claim about what the threshold does). */
 export const withThreshold = (threshold) => circuitOf(matrixOf(), { threshold });
 export const steer = FLY.steer, cells = FLY.cells, zeroWeights = FLY.zeroWeights, handWeights = FLY.handWeights, helmFor = FLY.helmFor, helmFactory = FLY.helmFactory, topology = CX;
