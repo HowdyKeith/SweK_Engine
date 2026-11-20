@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 // under load loses its evidence and this wall goes red about the machine rather than the tree.
 import { loadObserved, observedFinishes } from "./observedGates.mjs";
 import { MEASURED, UNRESOLVED, DEFAULT_BUDGET_MS } from "./gateBudget.mjs";
+import * as BT from "./boxTimings.mjs";
 
 const ENG = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let failed = 0;
@@ -60,7 +61,17 @@ const failingAt = record.failingAt || {};
 // what it saw. A gate the sweep timed to completion (exit 0) is TIMED; one it killed at the cap (124) is
 // still unknown, and one that exited non-zero has not exercised its full path -- the same rule that keeps
 // failures out of `timings` above, applied to the new file.
-const sweepFile = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8")); } catch { return {}; } })();
+// v4932 -- *** THE SWEEP'S RECORD IS EVERY COMMITTED TIMINGS RECORD, NOT ONLY THE SHARED FILE. *** A box that does not own the shared record writes its own
+//   tracked per-box record (tools/ship/boxTimings.mjs --record, the ship skill's step for that box) and can never write the shared one; this gate read the
+//   shared file alone, so on such a box every new gate stayed "new since the capture" however it was timed, and the merge of claude/inspiring-mayer-9mdcut
+//   (nine gates at once) crossed the handful. It reads the union now -- boxTimings.records({ committed: true }), what a fresh clone holds, the same union
+//   recordDrift's coverage reads since v4839 -- with each gate's reading taken from the SHARED record where it has one, so nothing the shared record says
+//   is overridden; a per-box record only fills a gate the shared one has never seen. `captured` stays the shared record's stamp.
+const sweepFile = (() => {
+    const recs = BT.records(ENG, { committed: true }), shared = recs.find((r) => r.kind === "shared"), out = { captured: shared ? shared.rec.captured : undefined, timings: {}, codes: {} };
+    for (const r of recs) for (const [g, ms] of Object.entries(r.rec.timings || {})) if (!(g in out.timings)) { out.timings[g] = ms; if (r.rec.codes && g in r.rec.codes) out.codes[g] = r.rec.codes[g]; }
+    return out;
+})();
 const swept = {}, sweptFailing = {};
 for (const [g, ms] of Object.entries(sweepFile.timings || {})) {
     const code = (sweepFile.codes || {})[g];
