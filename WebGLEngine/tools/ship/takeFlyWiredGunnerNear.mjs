@@ -15,6 +15,9 @@
 // FORECAST, for the record: in fleets without escorts LEADS, by about the scratch pairs' +0.17 with the cannon and +0.25 without, perhaps less (the window was chosen on those pairs); with escorts a smaller lead (a fighter is the hand's either way).
 //   With the cannon and no escorts it should then be about level with the plain side (-0.25 + 0.17).
 // WHAT SHIPS: brain/seatFlyWired9WeightsDefault.json (policy seatFlyWired9) if the gain LEADS in at least one fight and TRAILS in none. It would replace seatFlyWired8 as the `flywired` hand on space-duel.html.
+// READ 2026-11-20 (brain/seatFlyWired9WeightsDefault.reading.json): the near-hand gunner less the page's +0.224 (z 4.7) and +0.308 (z 6.4) with escorts, without and with the cannon; +0.363 (z 8.0) and +0.177 (z 4.1) without escorts. IT SHIPS:
+//   brain/seatFlyWired9WeightsDefault.json, the `flywired` hand on space-duel.html. It now leads the plain side in all four fights, +0.141 in fleets with the cannon and no escorts, the fight every fly-wired gunner before it lost. The own-cannon cost
+//   was the gun hovering just outside the trigger's window; the hand closing the last degrees removes it.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerNear/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: other windows (chosen on scratch, not searched here), one ship a side, the trained 6DOF pilot, rationed magazines.
 "use strict";

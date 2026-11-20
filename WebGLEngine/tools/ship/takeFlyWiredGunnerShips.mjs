@@ -29,6 +29,7 @@
 //   and far fewer seats wildly off) but fires less (52% of its seat-ticks against 61% with two enemy ships left; 46% against 66% in the two seconds after a kill). The trigger fires within about 5 degrees of the sight's LEAD solution; when not firing the
 //   fly gun sits a median 3-5 degrees off it -- just outside the window -- where the hand's is far off, swinging (19-55). The circuit's command is soft close in (10% of the slew at 2 degrees); a stiffer gain overshot and lost. The fix tried: the hand
 //   laying the last degrees (brain/flyTracking.mjs's holdNear, seatFlyWired9), registered in tools/ship/takeFlyWiredGunnerNear.mjs.
+//   AND THE FIX READ (2026-11-20, tools/ship/takeFlyWiredGunnerNear.mjs): the hand laying the last 20 degrees, +0.363 (z 8.0) over seatFlyWired8 in fleets with the cannon, where it now LEADS the plain side (+0.141). The cost is closed.
 //   CAVEAT: a one-sided cannon fight is near decided (leads about +-2.1), which squeezes any gunner's difference, so the one-sided numbers are not to be added up against the both-sides one. Still not found: what about a side's own cannon makes its rate-laid guns fire less.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerShips/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the trained 6DOF fighter pilot, escorts with the cannon on, a sight that remembers the other targets while it sticks, a radius rule told by anything but the aim radius the arena shows.
