@@ -749,3 +749,18 @@ Keith, 2026-11-20: "Let's do all, those as you suggested, and also item 5" -- th
 **Built and kept:** `stationsTask`'s `model` option (the default unchanged, gated field for field), `HIGH_RIDER_SPEC`, `highRiderModel()` and round 13's sets. Gated in section 8 (7 mutants, 6 red, 1 equivalent; logged).
 
 **Status: round 13 CLOSED, STOPPED AT DEV as registered.**
+
+## 33. ROUND 14: STOPPED AT DEV, AS REGISTERED (2026-11-20)
+
+**The registered check failed:** on the 24 DEV duels (208001 to 208006 x the four kinds) COND-D and TRIAGE-D differ, in score or in survival, on 3, under the 4 required. **HELD is not flown;** 209001 to 209024 stay unread.
+
+**What DEV showed, recorded because it was seen (DEV only, not a result):**
+* **No boat of any crew is lost** (24 of 24 each): a leak of 3 to 8 % in a 240 s duel never sinks a boat that has damage control, whichever rule follows it.
+* **The latches differ as designed:** TRIAGE-D's closes on 19 duels (every breached one), COND-D's on 3. DC has none.
+* **But the score hardly moves:** mean 1.309 (TRIAGE-D) against 1.377 (COND-D) and 1.379 (DC). A boat that goes up for good still wins most of these duels, because they are decided by the first salvo, not by depth. The drone kinds of round 3 do not punish a boat at the surface.
+
+**What it suggests, for a later registration, not a result:** sonar and damage control, met in this duel, do not interfere enough to matter. A test where they could would need either a longer fight (where the surface is a worse place to fight from) or a drone that hunts a surfaced boat. That is a change to the duel, and a separate question.
+
+**Built and kept:** `subDuel.duel`'s `modelA` and `leakA` (default bit for bit, gated), `duelStationsTask`'s `breach14`, `leak14At`, `sideFor14`, `fight14` (with a `breach` fixture), `verdict14` and round 14's sets. Gated in `brain/duelStationsTask-selfcheck.mjs` section 6 (17 mutants, 16 red, 1 equivalent; logged).
+
+**Status: round 14 CLOSED, STOPPED AT DEV as registered.**

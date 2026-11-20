@@ -2882,8 +2882,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-duel-with-leak",
-        blocker: "OPEN",
-        what: "Sonar meets damage control: rounds 3 and 6's duel (brain/duelStationsTask.mjs, crews SONAR/FIXED/RISK/BLIND) with round 2's breach added, so the energy, sonar and damage stations all claim the same boat. Section 20 of the note says this pair was never tested because the duel has no leak model.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-20 as round 14 (brain/SUB_STATIONS_WIP.md sections 31 and 33): STOPPED AT DEV. COND-D and TRIAGE-D differed on 3 of 24 duels (4 needed). No boat of any crew was lost, and TRIAGE-D's latch closed on 19 duels against COND-D's 3, but the scores hardly moved (1.31 against 1.38): the duels are decided by the first salvo, and round 3's drones do not punish a boat at the surface. A longer fight or a drone that hunts a surfaced boat would be a new question. WAS: Sonar meets damage control: rounds 3 and 6's duel (brain/duelStationsTask.mjs, crews SONAR/FIXED/RISK/BLIND) with round 2's breach added, so the energy, sonar and damage stations all claim the same boat. Section 20 of the note says this pair was never tested because the duel has no leak model.",
         how: "Register first in brain/SUB_STATIONS_WIP.md (question, crews, sets, the sign-test verdict, a DEV non-degeneracy bar). Add a seeded breach to the duel's run (breachCourierTask.breachOf's pattern, a fresh seed multiplier so the duel draws do not move) and crews such as RISK+DC and a TRIAGE-latched RISK; DEV, freeze, HELD once, commit unread, read once.",
         why: "Round 7 showed two winners can interfere on one boat; the sonar pair is the only station pair left unmet.",
     },
