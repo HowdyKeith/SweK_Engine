@@ -485,3 +485,27 @@ The third of the four.
 * **In the tank, scene 7:** a courier on a full battery flies its legs, and from about 230 s the legs station takes the con when a leg needs more than is left; the boat is not lost. That is pinned in the gate; it is one run, not a rate.
 * **Said plainly, from round 7:** the route captain does not read a hull breach. On a breached courier the TRIAGE captain keeps more boats and delivers less, and the union of the two interferes.
 * Gate: `render/subAquariumCaptain-selfcheck.mjs` section 4b (8 more mutants, every one red). Checked in headless Chromium: the refusal message, no page error.
+
+## 24. ROUND 9, REGISTRATION (2026-11-20, written and committed before any code for it and before any of its seeds is flown)
+
+The fourth of the four: **TRIAGE's remaining losses.**
+
+**A CORRECTION FIRST.** Section 9 said of TRIAGE's 21 losses: "Past the weight's size the boat has only its thrust and its bottle, and the bottle is spent before the surface." **That was a guess, written as a finding, and it is wrong.** A trace of TRIAGE's first DEV loss (round 2's DEV seed 160001: a 7.3 % leak, 36 % charge, crushed at 495 s; DEV, so no test seed is spent) shows:
+* the weight dropped at about 45 s;
+* the boat then climbing at **0.05 m/s**, from 32 m;
+* the battery running down under the climb's thrust (0.36 to 0.02 by 370 s);
+* and **the air bottle at 5.53 of 6 the whole time, unused.** The surfacing wrapper's rationing (`brain/surfacePilot.mjs`: no blowing while the boat rises) holds the ballast at 0. The stored air that could blow the main tank, at no cost in charge, is never spent.
+
+All ten of TRIAGE's DEV losses have a leak of 7.0 to 8.0 %, past the 6 % weight.
+
+**THE QUESTION.** Does TRIAGE with one more rule, blowing the main tank with stored air while a breached boat climbs too slowly, keep more boats?
+
+**THE RULE (BLOW), FIXED NOW.** Once BREACHED (damage control has acted) and the weight is gone, while the boat is deeper than 3 m and climbs slower than 0.2 m/s, the commands carry ballast = -1. That blows the main tank with stored air, overriding the surfacing wrapper's rationing. Nothing else of TRIAGE changes. The constants (0.2 m/s, 3 m) are set by reasoning, not tuned: 0.2 m/s brings a boat up from 40 m in about 200 s, and 3 m is the surface band.
+
+**THE TASK.** Round 2's (`brain/stationsTask.mjs`), unchanged.
+
+**THE SETS.** DEV: seeds 196001 to 196024, only to check that BLOW and TRIAGE differ on at least 3 of them; if not, the round says so and stops. HELD: seeds 197001 to 197096. No file in the tree uses a seed from 196000 to 197999 (grep, 2026-11-20).
+
+**THE VERDICT (HELD, flown once).** BLOW BEATS TRIAGE iff BLOW survives more HELD dives and the exact one-sided sign test on the discordant dives gives p at most 0.05. TRIAGE BEATS BLOW by the same rule. Otherwise NO DIFFERENCE SHOWN. Reported: the leak of each loss, the air left at the end, and FIXED on the same dives.
+
+**EXPECTATION, recorded now.** If the trace is typical, most of TRIAGE's losses are this one: BLOW BEATS TRIAGE about 75 percent. NO DIFFERENCE about 20 percent (the main tank's 3 % may not be enough with an 8 % leak once the weight's 6 % is gone, or the bottle may empty on the way). TRIAGE BEATS BLOW about 5 percent.
