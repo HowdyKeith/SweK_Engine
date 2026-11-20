@@ -14,11 +14,11 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(HERE, "..", "..");
-const MODULES = ["brain/flyTracking-selfcheck.mjs", "brain/flySteering-selfcheck.mjs", "brain/seatTurretGunner-selfcheck.mjs", "brain/battleshipDuel-selfcheck.mjs", "brain/peerFleet-selfcheck.mjs", "render/spaceDuelCore-selfcheck.mjs", "tools/ship/spaceDuelPage-selfcheck.mjs", "tools/ship/todo-selfcheck.mjs", "tools/ship/runFlyWiredGates-selfcheck.mjs"];
+const MODULES = ["brain/flyTracking-selfcheck.mjs", "brain/flySteering-selfcheck.mjs", "brain/helmSteerCannon-selfcheck.mjs", "brain/seatTurretGunner-selfcheck.mjs", "brain/battleshipDuel-selfcheck.mjs", "brain/peerFleet-selfcheck.mjs", "render/spaceDuelCore-selfcheck.mjs", "tools/ship/spaceDuelPage-selfcheck.mjs", "tools/ship/todo-selfcheck.mjs", "tools/ship/runFlyWiredGates-selfcheck.mjs"];
 const STUDIES = ["takeFlyWiredHelm", "takeFlyWiredGunner", "takePlacesControl", "takeFlyWiredNext", "takeFlyWiredHelmFix", "takeFlyWiredFights", "takeFlyWiredGunnerFix", "takeFlyWiredGunnerShips", "takeFlyWiredPilot",
     "takeFlyWiredGunnerMixed", "takeFlyWiredGunnerHold", "takeFlyWiredGunnerSees", "takeFlyWiredGunnerHoldSees", "takeFlyWiredGunnerNear", "takeFlyWiredGunnerVsPilot", "takeFlyWiredGunnerTune", "takeFlyWiredGunnerControl", "takeFlyWiredGunnerTrigger",
     "takeFlyWiredHelmTune", "takeFlyWiredHelmControl", "takeFlyWiredOneWindow", "takeBestShipLoadout", "takeBestShipLoadout2", "takeBestShipLoadout3", "takeBySizeLoadout", "takeBySightLoadout", "takePresetsHard", "takeButtonUntried", "takeButtonOneHard",
-    "takeButtonLast", "takeLadder", "takeHelmLadder", "takeSineTwins"].map((s) => `tools/ship/${s}-selfcheck.mjs`);
+    "takeButtonLast", "takeLadder", "takeHelmLadder", "takeSineTwins", "takeSteerCannon", "trainTurretSeatBig"].map((s) => `tools/ship/${s}-selfcheck.mjs`);
 export const GATES = Object.freeze([...MODULES, ...STUDIES]);
 /** What a gate's output says: "pass", "fail" (with the failing rows' names) or "threw". Pure. */
 export function verdictOf(out, code) {
