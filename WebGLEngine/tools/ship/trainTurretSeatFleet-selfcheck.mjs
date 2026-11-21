@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: the search on the train pairs from the start, the choice on the held-out pairs, the audit once; the file; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept records
 //
-// @@SABOTAGE@@
+// SABOTAGE LOG: 15 mutants of tools/ship/trainTurretSeatFleet.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 15 RED the first time (a seed moved, the audit a pair short; two searches, fewer children;
+//   one ship a side, the foe without the helm or the cannon, the no-window foe, the car-big start, the old helm file, the foe's file unchecked; the held-out read on the train pairs, the audit on the held-out; an unknown option let through;
+//   the file's text another fight's). No mutant flew into the real folders.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

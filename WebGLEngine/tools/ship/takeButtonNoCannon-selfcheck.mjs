@@ -10,7 +10,8 @@
 //
 // @@READ@@
 //
-// @@SABOTAGE@@
+// SABOTAGE LOG: 16 mutants of tools/ship/takeButtonNoCannon.mjs, before any pair was flown: ALL 16 RED the first time (a seed moved, a pair short; the cannon on either side, no helm, the old helm file, the no-window pick in fleets, a fleet of one,
+//   car-big's file car-today's; the gain's sign, a lead at 1.9, the smaller of two leads taken; a file unchecked; the second read and an unknown option let through; one arm's leads for all).
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

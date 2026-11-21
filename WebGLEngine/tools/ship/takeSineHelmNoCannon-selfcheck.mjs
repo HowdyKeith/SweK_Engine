@@ -10,7 +10,9 @@
 //
 // @@READ@@
 //
-// @@SABOTAGE@@
+// SABOTAGE LOG: 19 mutants of tools/ship/takeSineHelmNoCannon.mjs, before any pair was flown: 18 RED the first time (a seed moved, the audit a pair short, a gain dropped; the sine twin's file the fly's, no sine wiring, the sine on the fly's arm;
+//   the cannon on, a fleet of one, the no-window gunner in fleets; a tie moving the gain, the winner kept although it does not hold, the fly less the sine's sign, a trail at exactly -2 let by, a lead at 1.9; a file unchecked; the second read
+//   and an unknown option let through; the file at another gain). ONE GREEN, and it cannot be red: dropping `z above -2` from the held-out rule -- a held-out gain whose mean is above 0 has z above 0.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

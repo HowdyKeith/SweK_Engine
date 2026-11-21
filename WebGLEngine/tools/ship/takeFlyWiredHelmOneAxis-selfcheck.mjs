@@ -10,7 +10,8 @@
 //
 // @@READ@@
 //
-// @@SABOTAGE@@
+// SABOTAGE LOG: 15 mutants of tools/ship/takeFlyWiredHelmOneAxis.mjs, before any pair was flown: ALL 15 RED the first time (a seed moved, a pair short; another candidate, the old gains without a cannon, the cannon off, a fleet of one, the no-window
+//   gunner in fleets, the old helm file; the gain's sign, a trail at exactly -2 let by, replacing with no lead; a file unchecked; the second read and an unknown option let through; one arm's leads for both).
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
