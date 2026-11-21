@@ -122,6 +122,32 @@ records for the dataset as served by Neuprint; it was NOT re-confirmed for the b
 
 **Not here:** the eye's own input to LC10a, the other LC10 subtypes, and anything upstream of FC2.
 
+### A small-object pathway: LC11 (2026-11-21, same route; the choice checked against Neuprint)
+
+`lc11-object-circuit.json` -- `LC11` 143 (68 left, 75 right), `AVLP079`, `AVLP080`, `AVLP086` (each predicted
+GABA, one a side) and `DNp35` (one a side). 151 neurons, 7,936 edges. Made by `tools/maleCnsFlatExtract.py
+--types LC11,AVLP079,AVLP080,AVLP086,DNp35` from the same three flat files as the circuits above.
+
+**How the types were chosen (one rule, stated before anything was built or flown on them):** LC11 is the
+small-moving-object cell type (Keith's pick, after `brain/STEALTH_ROUNDS_WIP.md`'s reading of Klapoetke et al.
+2017's LC11 imaging). The descending neuron is the one that takes the most of LC11's output, directly and
+through one relay: **DNp35**, 2,027 synapses directly (5.8% of its 35,016 input synapses) and the most of any
+descending type through a relay. **LC11 barely reaches DNa02**, the tracking circuit's steering neuron (its best
+relay, PVLP048, takes 421 synapses from LC11). The relays are the central-brain types taking at least 2,000
+synapses from LC11 and giving at least 400 to DNp35: AVLP079, AVLP080, AVLP086. (LC17, LC31a, LPLC1 and LC21 also
+relay to DNp35 but are visual projection neurons, other eye cells, and were left out by the rule.) The query
+that found them was read through Neuprint's `/api/custom/custom` at `male-cns:v1.0` with the maintainer's token
+supplied by the session's network proxy (it never appeared in a file or command line); the numbers were then
+re-counted from the flat files, and those are the ones pinned. `brain/maleCnsCircuits-selfcheck.mjs` (section 6)
+pins the file. Baked for a policy as `brain/lc11Topology.mjs` (tools/bakeConnectomeTopology.mjs).
+
+**What the wiring shows:** every LC11 cell reaches DNp35 directly, on its own side only; the three GABA relays
+feed back onto LC11 (AVLP079 1,792 synapses, AVLP086 595), a loop the LC10a circuit does not have. The body
+annotations give LC11 no place in the eye (`assignedOlHex*` empty), as for LC10a.
+
+**Not here:** what DNp35 does in behaviour (not read; this file says nothing about it), the eye's input to LC11,
+and the other descending neurons LC11 reaches more weakly (DNp103, DNp09, DNp06 through relays).
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,
