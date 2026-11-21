@@ -1724,3 +1724,76 @@ Round 41's nine, adapted: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT
 - The aquarium's circuit profile is now the safest pilot measured: 2 crushed under the biased gauge, against Round 40's 8.
 - It also no longer shows anything the `standard` profile does not.
 - Whether a circuit can BEAT the seat would need a different design (other inputs, the look-ahead values, or a different task). That is not this round, and it is Keith's call.
+
+# Round 43 -- the look-ahead circuit: the planner circuit, given the planner's own rollout values as inputs (REGISTERED 2026-11-21, before any code, any training and any of its seeds is flown)
+
+## 1. Why
+Keith, 2026-11-21: "lets do 'giving the net the planner's look-ahead values'".
+
+Round 42's net, on the planner base, found nothing to improve on held-out dives. Its only view of the planner was the one-hot of the station the planner chose, and that is nearly constant. The planner knows much more:
+- every order it scored;
+- by how much the best beat the rest;
+- what each first station is worth.
+
+**This round changes one thing: the net's inputs gain the values of the planner's last plan.** The base, the outputs, the recipe, the sets, the selection, the champion rule and the hull and score lines are Round 42's.
+
+## 2. Exposing the values (the one edit to brain/plannerPerturbed.mjs)
+- perturbedSeat's seat gains a READ-ONLY getter, `plan`: { values (a copy), order, t } of its last plan, or null before the first. Nothing else in that file changes, and it makes no decision differently.
+- The gate holds this two ways. Fresh flights of the shipped seat must reproduce the SEAT-04 fingerprints Round 42's committed audit recorded, flown before the edit. And plannerPerturbed's own gate stays green.
+
+## 3. The seat and the net
+brain/plannerCircuitSeat.mjs gains a look-ahead variant. It has the same base, cadence and outputs as Round 42's seat. At each net step (every STEP_TICKS ticks, after the planner has decided that tick), x has 35 features:
+- The 21 pilotNeedsCircuit features and Round 42's 3 one-hot features (the planner's position k < 3 in obs.stations).
+- Then **11 look-ahead features** from the plan the getter returns, all 0 before the first plan:
+  - L1 the best value among all scored orders (nearest-first included);
+  - L2 the nearest-first value;
+  - L3 = L1 - L2, the planner's gain over the rule's order;
+  - L4-L6: for stations k = 0, 1, 2 of obs.stations, the best value of any scored permutation that STARTS at k, 0 if none does;
+  - L7-L9: the matching masks, 1 if some permutation starts at k;
+  - L10: the best value minus the second best (0 with a single order);
+  - L11: the plan's age, min(1, (t - plan.t) / 120).
+- Values are rollout scores in [0, 1], used raw.
+- **The policy:** a plain relu net 35 -> 84 -> 7 (3,619 weights), Round 42's shape with 35 inputs, the readout starting at zero. **The untrained net is the shipped seat, decision for decision.**
+
+## 4. The training (Round 42's, unchanged but for the inputs; ON THE RIG)
+- TRAIN_SET fitness, both gauges.
+- (1+1)-ES, 4 x 300 children, sigma 0.3, 1-4 weights a child, **search seeds 97800-97803**.
+- Checkpoints every 50 children, scored on HELD_OUT_SET. A search's result is its best held-out checkpoint, ties to the earlier.
+- Eligibility on POOL. The champion rule is Round 42's.
+- Resumable and exact, as Round 42's.
+- Rig command: `lookaheadCircuitCmd.mjs train --workers 4`. The ledger is committed before any audit seed is flown.
+
+## 5. The audit
+- **Arms:** **NEW** (the champion) and **SEAT-04** (`surveyPilot()`). Round 42's CUR arm is dropped: the aquarium's circuit profile IS the shipped seat since Round 42, so it would equal SEAT-04.
+- **Conditions:** REF and BIAS (+0.10).
+- **Seeds: 57001-57300, kind `both`, 300 dives per arm and condition**, 1,200 dives. The gate flies only 57901-57902.
+- 57000 and 58000 appear in the tree as denoiser scene seeds, a different generator; no needs seed range touches 57xxx.
+
+## 6. Checks (a failure: NOT WEIGHED, nothing is replaced)
+- Round 42's, for two arms: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT; THE LEDGER IS COMPLETE; SEAT-04 IS THE SHIPPED SEAT.
+- THE ARMS DIFFER: NEW must EQUAL SEAT-04 when the champion is the start, and must differ otherwise.
+- NEW'S START IS THE SHIPPED SEAT: 57901-57902, both gauges, full length, fingerprint and command for command.
+- And: **THE GETTER IS PASSIVE**, as in section 2.
+
+## 7. The verdicts
+- V1, V2 (hull), V3 (the score line, not HURTS) and V4 (KEEPS against the seat at REF and under BIAS): Round 42's.
+- **The bottom line:**
+  - V1 + V2 + V3 + **V4** -> `THE LOOK-AHEAD CIRCUIT BEATS THE SEAT: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE`. The shipped seat itself is NOT replaced in this round; that would be Keith's call on this result.
+  - Otherwise -> `THE LOOK-AHEAD CIRCUIT DOES NOT BEAT THE SEAT (<which>): NOTHING IS REPLACED`. The profile stays Round 42's, i.e. the seat. **Unlike Round 42, clearing V3 without V4 replaces nothing**: a net that only equals the seat is not worth a profile that already is the seat.
+  - If the champion is the start, the line adds `-- THE CHAMPION IS THE START: THE TRAINING BOUGHT NOTHING`.
+- Reported, not weighed: arm means and counts, the chosen checkpoints, the station overrides a dive, and the mean |output| of each residual on NEW's dives.
+
+## 8. Expectations, recorded BEFORE any training
+- The champion is the start: about 45%.
+- Some search's best held-out checkpoint beats the start: about 55%.
+- V1 about 85%. V2 about 95%. V3 about 85%.
+- **V4 (beats the seat beyond 2 se at both gauges): about 10%.**
+- The bottom line replaces the profile: about 10%.
+
+## 9. What will be built
+- The `plan` getter in brain/plannerPerturbed.mjs.
+- The look-ahead seat and its 35-input policy in brain/plannerCircuitSeat.mjs.
+- tools/ship/lookaheadCircuit.mjs, which reuses Round 42's search, record, ledger and verdict code with this round's seeds, policy and arms.
+- tools/ship/lookaheadCircuitCmd.mjs, export-free.
+- tools/ship/lookaheadCircuit-selfcheck.mjs, with a mutation pass.
+- **Not in this round:** other net shapes, the planner's orders as features beyond their values, replacing the seat.
