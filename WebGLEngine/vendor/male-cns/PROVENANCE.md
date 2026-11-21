@@ -145,6 +145,12 @@ pins the file. Baked for a policy as `brain/lc11Topology.mjs` (tools/bakeConnect
 feed back onto LC11 (AVLP079 1,792 synapses, AVLP086 595), a loop the LC10a circuit does not have. The body
 annotations give LC11 no place in the eye (`assignedOlHex*` empty), as for LC10a.
 
+**Where the LC11 dendrites are:** `lc11-positions.json`, by `tools/maleCnsDendritePositions.py` from the same
+per-synapse file as LC10a's (343,904 input sites, 316,652 dendrite). The places of a side lie on a sheet
+(spreads about 6,000, 2,900 and 840 voxels), and **DNp35 draws from one end of the sheet's second axis**: with the
+axis pointed toward the midline, a cell's synapses onto DNp35 fall along it (correlation -0.71 left, -0.56
+right). Which part of the visual field that end is, is not in this data. Pinned by section 7 of the gate.
+
 **Not here:** what DNp35 does in behaviour (not read; this file says nothing about it), the eye's input to LC11,
 and the other descending neurons LC11 reaches more weakly (DNp103, DNp09, DNp06 through relays).
 
