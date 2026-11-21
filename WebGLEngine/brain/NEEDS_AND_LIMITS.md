@@ -1689,3 +1689,38 @@ Round 41's nine, adapted: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT
   - It writes `brain/rig-results/planner-circuit/ledger-K.jsonl` (a line every 50 children) and `search-K.json` (when a search is done).
   - **A killed run is restarted with the same command.** Each search resumes from its last whole line, and loses at most 50 children.
   - Send the four `search-K.json` and four `ledger-K.jsonl` files. They are committed before any audit seed is flown. The audit (about 48 CPU minutes) is flown here and read once.
+
+## Round 42, RESULT (2026-11-21): THE PLANNER CIRCUIT HOLDS ITS HULL AND ITS SCORE: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE -- AND IT IS THE SHIPPED SEAT: THE TRAINING BOUGHT NOTHING
+
+**The training** ran on Keith's rig: `plannerCircuitCmd.mjs train --workers 4`, four searches of 300 children, no resume needed. The ledger is `brain/rig-results/planner-circuit/`, committed before any audit seed was flown. Every record matches its ledger line for line, and the ledger checks pass.
+- **Every search chose child 0.** The start scored 0.9044 on held-out dives, and every later checkpoint scored below it or tied (search 3, child 100, tied at 0.9044 and lost the tie to the earlier).
+- The champion is therefore the start: the untrained net, which IS the shipped seat.
+
+**The audit** (`plannerCircuitCmd.mjs audit --jobs 4`; 24 jobs, 1,800 dives on 56001-56300 `both`; read once; `brain/rig-results/planner-circuit-report.json`). All nine checks passed, including THE ARMS DIFFER in its isStart form: NEW equals SEAT-04 exactly.
+
+| arm | REF score (crushed/stranded) | BIAS score (crushed/stranded) |
+|---|---|---|
+| NEW (the start: the shipped seat) | 0.8115 (0/0) | 0.8381 (2/0) |
+| SEAT-04 (surveyPilot) | 0.8115 (0/0) | 0.8381 (2/0) |
+| CUR (Round 40's circuit profile) | 0.7847 (0/0) | 0.8016 (8/1) |
+
+- V1 and V2 (hull): no worse.
+- V3 (score): NEW minus the seat is +0.0000 (se 0.0000) at both gauges, so it clears.
+- V4: no claim.
+- Reported: NEW minus CUR is +0.0268 (se 0.0047) at REF and +0.0365 (se 0.0088) under BIAS, both KEEPS. There were 0 station overrides on all 600 NEW dives.
+
+**Against the expectations of section 7 (written first):**
+- The champion is the start, about 55: YES.
+- V1 about 85, V2 about 95, V3 about 80: all held.
+- V4 about 10: no.
+- Station residuals train poorly, about 75: held. No search moved the start on held-out.
+
+**THE REPLACEMENT, MADE as the registration committed.** render/subAquariumCircuit.mjs's `circuit` profile is now the planner circuit at its champion: brain/plannerCircuitSeat.mjs with a zero readout, PLANNER_CHAMPION. **It flies exactly as the planner profile `standard` does**, and sub-aquarium.html now says so in the profile's tooltip and option label.
+- Round 40's net stays reachable by name, as `circuitSeat("circuit", CIRCUIT_CHAMPION)`. It is what the profile WAS.
+- The gates that held the old profile are restated with dated lines: subAquariumCircuit, subAquariumEvents, circuitRetrain, circuitRetrain2 and plannerCircuit. subAquariumCircuit's new section 4b holds the new default to the shipped seat's full dive at both gauges; sabotaged, 2 red.
+
+**WHAT THIS MEANS.**
+- The decision-circuit line has reached the seat and not passed it. A net on the rule base could not match the seat (Round 41). A net on the planner base, given the seat's own decisions as its start, found nothing to improve on held-out dives.
+- The aquarium's circuit profile is now the safest pilot measured: 2 crushed under the biased gauge, against Round 40's 8.
+- It also no longer shows anything the `standard` profile does not.
+- Whether a circuit can BEAT the seat would need a different design (other inputs, the look-ahead values, or a different task). That is not this round, and it is Keith's call.

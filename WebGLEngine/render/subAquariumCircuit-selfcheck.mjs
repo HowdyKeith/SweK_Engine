@@ -27,6 +27,7 @@ import { digestOf } from "../tools/ship/takeDecisionCircuit.mjs";
 import * as C from "./subAquariumCircuit.mjs";
 import * as W from "./subAquariumCircuitWeights.mjs";
 import * as R40 from "../tools/ship/circuitRetrain.mjs";
+import * as GF from "../tools/ship/gaugeFaults.mjs";
 
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished, which is a failure of whatever it was asking: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exit(1); };
@@ -67,7 +68,8 @@ sec("2. THE PROFILES");
 sec("3. THE SEATS");
 {
     const walk = (seat) => grid.map(({ st, obs }) => seat(st, obs)), ruleRef = walk(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf()));   // 2026-11-19 (Round 39): the rule profile moved from SURVEY_ROUND33 (low -0.06) to SURVEY_CONSTANTS (low -0.04)
-    const rule = walk(C.circuitSeat("rule")(ctxOf())), circuit = walk(C.circuitSeat("circuit")(ctxOf()));
+    // RESTATED 2026-11-21: since Round 42 the default circuit profile is the planner circuit (section 4b); these rows hold ROUND 40's net, reached by name, as what the profile WAS
+    const rule = walk(C.circuitSeat("rule")(ctxOf())), circuit = walk(C.circuitSeat("circuit", W.CIRCUIT_CHAMPION)(ctxOf()));
     // 2026-11-19, Round 40: the reference net is CIRCUIT_CHAMPION's on the -0.04 base (was PLAIN_CHAMPION through Pol.seatFor, on circuitSeat's BASE_PARAMS, low -0.06)
     const Pol = CS.createPlainPolicy(84, "plain"), on04 = (w) => CS.makeSeat(Pol.stepper(w), { params: SV.SURVEY_CONSTANTS, bounds: U.WIDE_BOUNDS });
     const netRef = walk(on04(Float32Array.from(W.CIRCUIT_CHAMPION.weights))), untrained = walk(on04(Pol.handWeights()));
@@ -79,7 +81,7 @@ sec("3. THE SEATS");
     ok("!! an unknown profile is refused by its words naming the circuit profiles (a planner profile, a wrong case and nothing included)", msg(() => C.circuitSeat("standard")) === 'subAquariumCircuit.circuitSeat: unknown circuit profile "standard" (rule, circuit)' && msg(() => C.circuitSeat("Circuit")) === 'subAquariumCircuit.circuitSeat: unknown circuit profile "Circuit" (rule, circuit)' && msg(() => C.circuitSeat()) === "subAquariumCircuit.circuitSeat: unknown circuit profile undefined (rule, circuit)");
     ok("!! the policy is built once and shared (it is a pure function of its width), and a champion whose weights do not fit the net is refused by its words (2 weights against 2,443); the weights given are the ones used (the untrained net's weights seat the rule's decisions)", C.plainPolicy() === C.plainPolicy() && msg(() => C.circuitSeat("circuit", { ...W.PLAIN_CHAMPION, weights: [0.1, 0.2] })) === "subAquariumCircuit.circuitSeat: the champion has 2 weights and its net takes 2443" && (() => { const seat = C.circuitSeat("circuit", { ...W.PLAIN_CHAMPION, weights: Array.from(C.plainPolicy().handWeights()) })(ctxOf()); return grid.every(({ st, obs }, i) => same(seat(st, obs), ruleRef[i])); })());
     ok("!! the rule profile does not depend on which bounds the rule is normalised against, for the survey constants (they lie inside both the default and the wide bounds), so `U.WIDE_BOUNDS` is the task's choice and not a hidden one", J(U.normalise(SV.SURVEY_CONSTANTS, U.BOUNDS)) === J(U.normalise(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)));
-    const a = C.circuitSeat("circuit")(ctxOf()), b = C.circuitSeat("circuit")(ctxOf());
+    const a = C.circuitSeat("circuit", W.CIRCUIT_CHAMPION)(ctxOf()), b = C.circuitSeat("circuit", W.CIRCUIT_CHAMPION)(ctxOf());
     const wa = grid.map(({ st, obs }) => a(st, obs)), wb = grid.map(({ st, obs }, i) => (i === 0 ? b(st, { ...obs, r: { ...obs.r, frac: 0.1 } }) : b(st, obs)));
     ok("!! two seats of one profile are independent dives: feeding one a different first reading (a low charge) leaves the other's decisions as they were (the rule's filter of the gauge is per seat)", wa.every((d, i) => same(d, netRef[i])) && wb.some((d, i) => !same(d, netRef[i])));
 }
@@ -89,9 +91,22 @@ sec("4. THE SEAT THE AUDITS FLEW");
     // 2026-11-19, Round 40: the audited pilot is Round 40's NEW arm (circuitRetrain.pilotOf with the champion's weights); it was the decision-circuit round's circuit-plain (D.familyPolicy)
     const w = Float32Array.from(W.CIRCUIT_CHAMPION.weights), planned = { pilotFor: (x) => R40.pilotOf("NEW", { weights: Array.from(x) }) }, gauge = T.GAUGE, scenarios = [T.scenario(18001, "far"), T.scenario(18002, "both"), T.scenario(7, "plain")].map((s) => s);
     const flown = (seatOf, sc) => { const r = T.fly(T.flyDecision(seatOf), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; };
-    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit"), sc), a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS), sc) }));   // 2026-11-19 (Round 39): was SURVEY_ROUND33
+    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit", W.CIRCUIT_CHAMPION), sc),   // RESTATED 2026-11-21: Round 40's net by name (the profile until Round 42)
+         a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS), sc) }));   // 2026-11-19 (Round 39): was SURVEY_ROUND33
     ok("!! three real dives of the task (seeds of the DEV and spare ranges, 200 s): the circuit profile's seat gives the dive of Round 40's audited NEW pilot (the same score and fingerprint; until 2026-11-19 the decision-circuit round's circuit-plain), and the rule profile's the dive of the tuned rule's seat", rows.every((x) => J(x.c) === J(x.a) && J(x.r) === J(x.l)));
     ok("!! and the trained net is a different pilot from the rule on at least one of the three dives (the net acts)", rows.some((x) => J(x.c) !== J(x.r)));
+}
+
+sec("4b. SINCE ROUND 42: THE CIRCUIT PROFILE IS THE PLANNER CIRCUIT, AND ITS CHAMPION IS THE SHIPPED SEAT");
+{
+    // brain/NEEDS_AND_LIMITS.md Round 42: every search chose the start, so the audited champion is the untrained planner circuit, which flies surveyPilot() decision for decision
+    const R42 = [0, 1, 2, 3].map((k) => JSON.parse(fs.readFileSync(new URL(`../brain/rig-results/planner-circuit/search-${k}.json`, import.meta.url), "utf8")));
+    const sc = T.scenario(56901, "both"), fp = (pilot, g) => T.fly(pilot, sc, { gauge: g }).fingerprint;
+    const sameRef = fp(T.flyDecision(C.circuitSeat("circuit")), GF.gaugeOfCond("REF")) === fp(SV.surveyPilot(), GF.gaugeOfCond("REF"));
+    const sameBias = fp(T.flyDecision(C.circuitSeat("circuit")), GF.gaugeOfCond("BIAS")) === fp(SV.surveyPilot(), GF.gaugeOfCond("BIAS"));
+    ok("!! the default circuit profile flies the shipped seat's full dive at both gauges (Round 42's champion is the start), and every search of the committed ledger chose child 0",
+        sameRef && sameBias && R42.length === 4 && R42.every((r) => r.chosenAt === 0) && C.PLANNER_CHAMPION.isStart === true && C.PLANNER_CHAMPION.hidden === 84 && C.PLANNER_CHAMPION.features === 24);
+    ok("...and Round 40's net is still reachable by name, and is a different pilot from today's profile on that dive", fp(T.flyDecision(C.circuitSeat("circuit", W.CIRCUIT_CHAMPION)), GF.gaugeOfCond("BIAS")) !== fp(T.flyDecision(C.circuitSeat("circuit")), GF.gaugeOfCond("BIAS")));
 }
 
 sec("5. BROWSER-LIGHT");

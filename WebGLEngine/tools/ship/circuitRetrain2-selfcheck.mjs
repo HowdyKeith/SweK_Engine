@@ -101,7 +101,10 @@ sec("4. CHECKS");
 sec("5. FLIGHT (the gate's two seeds)");
 {
     const set = T.setOf(["both"], X.GATE_SEEDS[0], X.GATE_SEEDS[1]), fps = (p) => T.evaluate(p, set, { gauge: X.BIASED }).runs.map((r) => r.fingerprint).join("|");
-    ok("!! CUR is the aquarium's circuit profile (CIRCUIT_CHAMPION on -0.04) on full BIAS dives, and profileSame() says so", fps(X.pilotOf("CUR")) === fps(T.flyDecision(circuitSeat("circuit"))) && X.profileSame(circuitSeat));
+    // RESTATED 2026-11-21: since Round 42 the aquarium's circuit profile is the planner circuit (the shipped seat); CUR is what it WAS, Round 40's CIRCUIT_CHAMPION on -0.04, still reachable by name
+    const asWas = (p) => circuitSeat(p, CIRCUIT_CHAMPION);
+    ok("!! CUR is Round 40's circuit profile (CIRCUIT_CHAMPION on -0.04, what the aquarium flew until Round 42) on full BIAS dives, and profileSame() says so of it -- and not of today's profile",
+        fps(X.pilotOf("CUR")) === fps(T.flyDecision(asWas("circuit"))) && X.profileSame(asWas) && !X.profileSame(circuitSeat));
     const hand = X.retrainPolicy().handWeights();
     ok("!! NEW flies the weights it is given on the -0.04 seat: the start's are R04's dives (R40.startIsR04), CUR's weights are CUR's dives", fps(X.pilotOf("NEW", { weights: Array.from(hand) })) === fps(R40.pilotOf("NEW", { weights: Array.from(hand) })) && R40.startIsR04() &&
         fps(X.pilotOf("NEW", { weights: Array.from(CIRCUIT_CHAMPION.weights) })) === fps(X.pilotOf("CUR")));
@@ -128,7 +131,8 @@ sec("7. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/circuit
     ok("!! *** the table and the line: NEW 0 crushed in both, CUR 4 under BIAS, the seat 1; V1 and V2 hold; V3 MISSES at REF (-0.0112) and under BIAS (-0.0252); NOTHING IS REPLACED ***",
         res.NEW.REF.crashed === 0 && res.NEW.BIAS.crashed === 0 && res.CUR.BIAS.crashed === 4 && res["SEAT-04"].BIAS.crashed === 1 && v.v1 && v.v2 && !v.v3ref && !v.v3bias && nr(v.refVsSeat.mean, -0.0112) && nr(v.biasVsSeat.mean, -0.0252) &&
         X.bottomLine(res) === "THE BETTER-TRAINED CIRCUIT DOES NOT CLEAR THE LINE (V3 the score at REF; V3 the score under BIAS): NOTHING IS REPLACED");
-    ok("!! and nothing was replaced: the aquarium's circuit profile is still Round 40's CIRCUIT_CHAMPION (seed 97501)", CIRCUIT_CHAMPION.seed === 97501 && CIRCUIT_CHAMPION.digest === "0ec046a3");
+    // RESTATED 2026-11-21: Round 41 replaced nothing -- Round 40's CIRCUIT_CHAMPION stayed the profile -- until Round 42 replaced it with the planner circuit (the shipped seat)
+    ok("!! and Round 41 replaced nothing: Round 40's CIRCUIT_CHAMPION (seed 97501) stayed the aquarium's circuit profile until Round 42, and is kept by name", CIRCUIT_CHAMPION.seed === 97501 && CIRCUIT_CHAMPION.digest === "0ec046a3");
     const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 41, RESULT"), t = i > 0 ? nl.slice(i) : "";
     ok("  the RESULT note states the miss, that this round changes nothing that ships, and that the seat's planner is what the circuit lacks", /NOTHING IS REPLACED/.test(t) && /This round changes nothing that ships/.test(t) && /planner/.test(t));
 }
