@@ -103,7 +103,7 @@ await section(() => {
     const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), button: k(f, "button") }).reading]));
     ok("!! AS KEPT AND RE-DERIVED -- IT QUALIFIES: car-today less the pick +0.219 with two escorts (LEADS), -0.011 with six (CANNOT BE TOLD)", near(R("escorts2").gain, 0.219) && near(R("escorts6").gain, -0.011) && rd.escorts2.words.gain === "LEADS" && rd.escorts6.words.gain === "CANNOT BE TOLD" && rd.verdict.ok && G.qualifies(rd).ok && near(R("escorts2").today, 2.002) && G.FIGHTS.every((f) => ["today", "button", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
     const h = C.HANDS.find((x) => x.id === "bysize");
-    ok("!! AND THE PAGE: the by-the-fight button's third pick, one ship a side with escorts, is car-today; its note says where it was flown and where not", h.bySize.escorts === "car-today" && h.bySize.one === "flywired-one" && h.bySize.fleet === "flywired" && /takeCarTodayEscorts/.test(h.note) && /\+0\.219/.test(h.note) && /not flown there without the cannon/.test(h.note));
+    ok("!! AND THE PAGE: the by-the-fight button's third pick, one ship a side with escorts, is car-today; its note says where it was flown and where not", h.bySize.escorts === "car-today" && h.bySize.one === "flywired-one" && h.bySize.fleet === "flywired" && /takeCarTodayEscorts/.test(h.note) && /\+0\.219/.test(h.note) && /not flown there without the cannon|without the cannon it leads the 45-degree gunner too/.test(h.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

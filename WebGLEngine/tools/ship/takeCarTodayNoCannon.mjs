@@ -14,7 +14,8 @@
 // FORECAST, for the record: one ship a side the lead comes back smaller and cannot be told (it was near the line); with escorts car-today leads with two (as with the cannon) and cannot be told with six.
 // WHAT IS DECIDED, each pick apart. ONE SHIP A SIDE WITHOUT A CANNON: car-today stays unless it TRAILS there; if it trails, the button's `oneNoCannon` pick is dropped (the no-window gunner again). WITH ESCORTS AND NO CANNON: car-today stays unless it
 //   TRAILS in either escorts fight; if it trails, the button gains an `escortsNoCannon` pick, the 45-degree gunner. Nothing is written but the reading; the page is changed by hand to what is decided.
-// @@READ@@
+// READ 2026-11-21 (brain/carTodayNoCannon.reading.json; the kept arms in brain/rig-results/carTodayNoCannon/): BOTH PICKS STAY. Without a cannon, car-today less the other: one ship a side +0.031 (z 1.38, 600 pairs, CANNOT BE TOLD -- the +0.080 of
+//   takeButtonNoCannon came back smaller, as forecast); with two escorts a side +0.256 (z 6.18, LEADS), with six +0.199 (z 4.74, LEADS -- the forecast said it could not be told). The page is unchanged; the by-the-fight hand's note carries the reading.
 // Every arm's leads are kept (brain/rig-results/carTodayNoCannon/); the reading file (brain/carTodayNoCannon.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets, fighters, the bow-on rule, other helms, the rationed fight and the trained pilot's escorts (tools/ship/takeButtonHardToday.mjs).
 "use strict";
