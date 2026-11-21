@@ -20057,6 +20057,10 @@ broadcastSpectatorViewerCount = function() {
 })();
 
 wss.on("connection", (ws, req) => {
+    // /tv/live -- the page's canvas, encoded in the page, to a TV through tvpipe (ai-bridge/tvpipeBridge.js). Taken here, inside the one WebSocketServer,
+    // rather than by a second "upgrade" listener: ws answers every upgrade on the port, so a second listener would fight it for the socket. The
+    // server's verifyClient has already applied the bridge's trust rule to this socket.
+    if (String(req.url || "").split("?")[0] === "/tv/live") { tvpipeBridge.attachLive(ws); return; }
     // v1234 — swallow per-client WS errors (client dropped off network, etc.) so
     // they don't bubble to uncaughtException. Without this, a phone leaving wifi
     // mid-send raises an unhandled 'error' on the ws.

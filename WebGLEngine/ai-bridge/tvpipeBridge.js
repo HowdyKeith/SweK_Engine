@@ -16,6 +16,12 @@
 //   POST /tv/pattern { to }     tvpipe's test pattern (clock, frame counter): "is the TV reachable at all", no ffmpeg needed
 //   POST /tv/stop   { id? }     one session, or every session
 //   POST /tv/pin    { id, pin } an Apple TV asking for the PIN it shows: the session waits here until the page answers (or PIN_WAIT_MS passes)
+//   WS   /tv/live               THE ENGINE'S OWN CANVAS, LIVE (Keith: "8"): the page encodes its canvas as H.264 with WebCodecs (ui/tvLive.js) and sends each
+//                               access unit here; this hands it to tvpipe's stream() (writeH264), which sends it to the TV without re-encoding -- no browser
+//                               of tvpipe's own capturing the page, so less delay than /tv/share. The first message is JSON { type: "start", to, width,
+//                               height, fps }; the bridge answers { type: "started", session } or { type: "error", error }; each later message is BINARY:
+//                               one flags byte (1 = keyframe), the timestamp in microseconds (u64, little-endian), then the access unit in Annex B. When tvpipe
+//                               asks for a keyframe (a TV joined, a packet was lost) the page is sent { type: "keyframe" }. Closing the socket ends the stream.
 // `to` is a receiver name (or a unique prefix), "airplay:NAME" / "cast:NAME", an address, "browser" (tvpipe's own player page on this machine), or a list
 // of up to MAX_TARGETS of those, played in sync. A new session to a TV already showing one stops the old one first: a TV shows one thing.
 //
@@ -65,8 +71,14 @@ function _useSdk(sdk) { _sdk = sdk; _sdkWhy = ""; }   // the gate's stand-in
 // ---- sessions ----
 const sessions = new Map(), pins = new Map();
 let _seq = 0;
-const publicOf = (s) => ({ id: s.id, kind: s.kind, to: s.to, source: s.source, state: s.state, startedAt: s.startedAt, endedAt: s.endedAt || null, error: s.error || null,
-    receivers: Object.fromEntries(s.receivers), playerUrl: s.playerUrl || null, info: s.info || null });
+// receivers and info are read from the SDK's session as well, at the time of asking: a stream() session resolves only once its receivers have
+// connected, so their "receiver" events have already fired before a listener can be attached, and the SDK keeps the state on the session
+function publicOf(s) {
+    const live = s.session || {}, rec = new Map(s.receivers);
+    if (live.receivers && typeof live.receivers.forEach === "function") live.receivers.forEach((v, k) => { if (!rec.has(k)) rec.set(k, { protocol: v.protocol || null, state: v.state, error: v.error || null }); });
+    return { id: s.id, kind: s.kind, to: s.to, source: s.source, state: s.state, startedAt: s.startedAt, endedAt: s.endedAt || null, error: s.error || null,
+        receivers: Object.fromEntries(rec), playerUrl: s.playerUrl || live.playerUrl || null, info: s.info || live.info || null, frames: s.frames || 0, backedUp: s.backedUp || 0 };
+}
 function status() { return { ok: true, installed: !!_sdk, why: _sdk ? undefined : _sdkWhy || `not loaded yet (${INSTALL_HINT})`, sessions: [...sessions.values()].map(publicOf), pins: [...pins.values()].map((p) => ({ id: p.id, name: p.name, address: p.address })) }; }
 
 /** The SDK error as a sentence a page can show, keeping tvpipe's stable code. Pure. */
@@ -136,6 +148,64 @@ async function start(kind, body = {}, { importer } = {}) {
     }
 }
 
+// ---- the live canvas ----
+/** A live stream's size and rate, checked: even, at most 3840 x 2160, 1 to 60 frames a second. Pure. */
+function checkLive(o = {}) {
+    const w = Number(o.width), h = Number(o.height), fps = Number(o.fps);
+    if (!(Number.isInteger(w) && Number.isInteger(h) && w > 0 && h > 0 && w % 2 === 0 && h % 2 === 0)) return { ok: false, why: "width and height must be positive, whole and even (H.264 needs it)" };
+    if (w > 3840 || h > 2160) return { ok: false, why: "at most 3840 x 2160" };
+    if (!(fps >= 1 && fps <= 60)) return { ok: false, why: "1 to 60 frames a second" };
+    return { ok: true, width: w, height: h, fps };
+}
+/** One binary message from the page: flags (1 = keyframe), the timestamp in microseconds (u64 LE), then the access unit. Pure. */
+function parseLiveFrame(buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (b.length < 10) return null;
+    return { keyframe: (b[0] & 1) === 1, ptsUs: Number(b.readBigUInt64LE(1)), au: b.subarray(9) };
+}
+/** Serve one /tv/live socket: start on its first message, then feed every frame to tvpipe; the socket closing ends the stream. */
+function attachLive(ws, { importer } = {}) {
+    let rec = null, s = null, waitingKey = false, ended = false;
+    const send = (o) => { try { ws.send(JSON.stringify(o)); } catch { /* the page has gone */ } };
+    const finish = async () => { if (ended) return; ended = true; if (s) { try { await s.end(); } catch { try { await s.stop(); } catch { /* already over */ } } } if (rec && rec.state !== "failed") { rec.state = "stopped"; rec.endedAt = new Date().toISOString(); } };
+    ws.on("close", () => { finish(); });
+    ws.on("message", async (data, isBinary) => {
+        if (!isBinary) {
+            let m; try { m = JSON.parse(String(data)); } catch { return send({ type: "error", error: "not JSON" }); }
+            if (m.type !== "start" || rec) return send({ type: "error", error: rec ? "already started" : "the first message is { type: 'start', to, width, height, fps }" });
+            const T = checkTarget(m.to); if (!T.ok) return send({ type: "error", error: T.why });
+            const L = checkLive(m); if (!L.ok) return send({ type: "error", error: L.why });
+            const sdk = await loadSdk(importer); if (!sdk) return send({ type: "error", error: _sdkWhy });
+            const want = new Set(T.to.map((t) => t.toLowerCase()));
+            for (const o of sessions.values()) if ((o.state === "playing" || o.state === "starting") && o.to.some((t) => want.has(t.toLowerCase()))) await stop(o.id);
+            rec = { id: `tv-${++_seq}`, kind: "live", to: T.to, source: `canvas ${L.width}x${L.height}@${L.fps}`, state: "starting", startedAt: new Date().toISOString(), receivers: new Map(), session: null };
+            sessions.set(rec.id, rec);
+            try {
+                s = await sdk.stream({ to: T.to.length === 1 ? T.to[0] : T.to, video: { width: L.width, height: L.height, fps: L.fps, codec: "h264" }, onPin: (r) => _askPin(r, rec.id) });
+                rec.session = s; rec.state = "playing"; rec.info = s.info || null;
+                if (s.on) {
+                    s.on("keyframe", () => { waitingKey = true; send({ type: "keyframe" }); });
+                    rec.askKeyframe = () => { waitingKey = true; send({ type: "keyframe" }); };   // the same request, for a caller that needs a fresh picture now
+                    s.on("receiver", (r) => rec.receivers.set(r.name, { protocol: r.protocol || null, state: r.state, error: r.error || null }));
+                    s.on("error", (e) => { rec.error = errorOf(e); });
+                }
+                Promise.resolve(s.done).then(() => { if (rec.state === "playing") { rec.state = "ended"; rec.endedAt = new Date().toISOString(); } send({ type: "ended" }); try { ws.close(); } catch { /* gone */ } },
+                    (e) => { rec.state = "failed"; rec.error = errorOf(e); rec.endedAt = new Date().toISOString(); send({ type: "error", error: rec.error.message, code: rec.error.code }); try { ws.close(); } catch { /* gone */ } });
+                send({ type: "started", session: publicOf(rec) });
+            } catch (e) { rec.state = "failed"; rec.error = errorOf(e); send({ type: "error", error: rec.error.message, code: rec.error.code }); try { ws.close(); } catch { /* gone */ } }
+            return;
+        }
+        if (!s || rec.state !== "playing") return;
+        const f = parseLiveFrame(data); if (!f) return;
+        // after tvpipe asked for a keyframe, frames that cannot start a picture are dropped until one arrives: the TV could not decode them anyway
+        if (waitingKey && !f.keyframe) return;
+        if (f.keyframe) waitingKey = false;
+        const okWrite = s.writeH264(f.au, { keyframe: f.keyframe, ptsUs: f.ptsUs, annexB: true });
+        rec.frames = (rec.frames || 0) + 1;
+        if (okWrite === false) { rec.backedUp = (rec.backedUp || 0) + 1; waitingKey = true; send({ type: "keyframe" }); }   // backed up: skip to the next keyframe rather than fall behind
+    });
+}
+
 /** The receivers on the network, by tvpipe's discovery. */
 async function devices({ timeout = DISCOVER_MS, importer } = {}) {
     const sdk = await loadSdk(importer); if (!sdk) return { ok: false, error: _sdkWhy, devices: [] };
@@ -145,6 +215,7 @@ async function devices({ timeout = DISCOVER_MS, importer } = {}) {
     } catch (e) { const er = errorOf(e); return { ok: false, error: er.message, code: er.code, devices: [] }; }
 }
 
+function _sessionsForTest() { return sessions; }
 function _reset() { sessions.clear(); pins.clear(); _sdk = null; _sdkWhy = ""; _seq = 0; }
 
-module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, errorOf, loadSdk, status, devices, start, stop, answerPin, _useSdk, _reset };
+module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, checkLive, parseLiveFrame, errorOf, loadSdk, status, devices, start, stop, answerPin, attachLive, _useSdk, _reset, _sessionsForTest };

@@ -76,6 +76,10 @@ const DEFAULT_GAUGES = [
     { source: "claude5h",        color: "amber",  showPct: true  },
     { source: "claudeweek",      color: "violet", showPct: true  },
     { source: "codex5h",         color: "green",  showPct: true  },
+    // ROW 6: this page on a TV, through tvpipe (ui/tvOut.js, ai-bridge/tvpipeBridge.js). Keith: "7" and "8". Last, for the same padding reason as row 5.
+    { action: "tv",     label: "TO TV",   color: "cyan"   },
+    { action: "tvlive", label: "LIVE TV", color: "amber"  },
+    { action: "tvoff",  label: "TV OFF",  color: "white"  },
 ];
 
 function _lighten(hex, amt) {
@@ -268,7 +272,7 @@ function _makeActionCell(cfg, scale) {
         // visual property that actually decides how big a circle READS as. Same transform, same row, same size.
         transform: "perspective(150px) rotateX(17deg)",
     });
-    btn.textContent = { record: "●", mp4: "▶", clip: "✂" }[cfg.action] || "●";
+    btn.textContent = { record: "●", mp4: "▶", clip: "✂", tv: "📺", tvlive: "⚡", tvoff: "■" }[cfg.action] || "●";
 
     const cap = document.createElement("div");
     Object.assign(cap.style, { font: (7.5 * scale) + "px ui-monospace, Menlo, Consolas, monospace",
@@ -313,6 +317,22 @@ function _makeActionCell(cfg, scale) {
                 if (!(r.ok && j && j.ok !== false)) btn.title = "export failed: " + ((j && j.error) || ("HTTP " + r.status));
             } catch (e) { setLabel("FAILED"); btn.title = "export failed: " + ((e && e.message) || e); }
             setTimeout(() => setLabel(cfg.label || "MP4"), 2500);
+        };
+    } else if (cfg.action === "tv" || cfg.action === "tvlive" || cfg.action === "tvoff") {
+        // THIS PAGE ON A TV (ui/tvOut.js, imported on the first click): TO TV mirrors the page, LIVE TV streams its canvas, TV OFF stops both.
+        // Each failure is said on the button and in its tooltip -- tvpipe not installed, no TV found, no canvas, no WebCodecs -- never a silent no-op.
+        const label = cfg.label || cfg.action.toUpperCase(), say = (t, tip) => { setLabel(t); if (tip) btn.title = tip; };
+        btn.title = { tv: "Mirror this page to a TV (Apple TV, Chromecast) through tvpipe", tvlive: "Stream this page's canvas live to a TV: encoded here, less delay than mirroring", tvoff: "Stop what this computer is sending to a TV" }[cfg.action];
+        if (cfg.action === "tvlive" && typeof document !== "undefined" && !document.querySelector("canvas")) disable("nothing to stream: this page has no <canvas>");
+        else btn.onclick = async () => {
+            try {
+                const tv = await import("./tvOut.js");
+                if (cfg.action === "tvoff") { const ids = await tv.stopTv(); say(ids.length ? "STOPPED" : "NOTHING ON", ""); setTimeout(() => setLabel(label), 2500); return; }
+                const to = await tv.pickTv(btn); if (!to) return;
+                say("...");
+                if (cfg.action === "tv") { await tv.sharePage(to); say("ON " + to.toUpperCase().slice(0, 8), "Mirroring this page to " + to + " -- TV OFF stops it"); }
+                else { const live = await tv.startLive(to); say("LIVE", `Streaming the canvas to ${to} (${live.stats().codec}, ${live.stats().width} x ${live.stats().height}) -- TV OFF stops it`); }
+            } catch (e) { say("FAILED", "To TV failed: " + ((e && e.message) || e)); setTimeout(() => setLabel(label), 4000); }
         };
     } else if (cfg.action === "clip") {
         btn.title = "Open the clip editor to trim what you just recorded";
