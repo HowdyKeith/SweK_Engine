@@ -8,7 +8,8 @@
 //   2  THE STUDY             against a stand-in: four arms, each once; the gain pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/carTodayEscorts.reading.json; the kept arms in brain/rig-results/carTodayEscorts/): IT QUALIFIES. Car-today less the 45-degree gunner: +0.219 with two escorts a side (z 5.08, LEADS -- twice takeCarToday's +0.112), -0.011 with
+//   six (z -0.23, CANNOT BE TOLD). The by-the-fight button now takes car-today one ship a side with escorts (spaceDuelCore's bySize `escorts`). The forecast (cannot be told in both) was wrong with two escorts.
 //
 // SABOTAGE LOG: 16 mutants of tools/ship/takeCarTodayEscorts.mjs, before any pair was flown: ALL 16 RED the first time (a seed moved, a pair short; six escorts as two, a fleet, no helm, the old helm file, car-today on both arms,
 //   the cannon off on the plain side; the gain's sign, a lead at 1.9, a trail at exactly -2 let by, a lead needed in both; a file unchecked; the second read and an unknown option let through; one arm's leads for both).
@@ -98,7 +99,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), button: k(f, "button") }).reading]));
+    ok("!! AS KEPT AND RE-DERIVED -- IT QUALIFIES: car-today less the pick +0.219 with two escorts (LEADS), -0.011 with six (CANNOT BE TOLD)", near(R("escorts2").gain, 0.219) && near(R("escorts6").gain, -0.011) && rd.escorts2.words.gain === "LEADS" && rd.escorts6.words.gain === "CANNOT BE TOLD" && rd.verdict.ok && G.qualifies(rd).ok && near(R("escorts2").today, 2.002) && G.FIGHTS.every((f) => ["today", "button", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300)));
+    const h = C.HANDS.find((x) => x.id === "bysize");
+    ok("!! AND THE PAGE: the by-the-fight button's third pick, one ship a side with escorts, is car-today; its note says where it was flown and where not", h.bySize.escorts === "car-today" && h.bySize.one === "flywired-one" && h.bySize.fleet === "flywired" && /takeCarTodayEscorts/.test(h.note) && /\+0\.219/.test(h.note) && /not flown there without the cannon/.test(h.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

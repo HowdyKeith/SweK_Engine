@@ -13,6 +13,8 @@
 // FORECAST, for the record: the +0.11 comes back smaller and cannot be told with two escorts; with six it cannot be told either.
 // WHAT IS DECIDED: if CAR-TODAY LESS THE PICK LEADS in at least one fight and TRAILS in neither, the by-the-fight button gains a third pick: one ship a side with escorts takes car-today (a fleet, with or without escorts, keeps the 45-degree gunner).
 //   Nothing is written but the reading; the page is changed by hand to what is decided.
+// READ 2026-11-21 (brain/carTodayEscorts.reading.json; the kept arms in brain/rig-results/carTodayEscorts/): IT QUALIFIES. Car-today less the 45-degree gunner: +0.219 with two escorts a side (z 5.08, LEADS -- twice takeCarToday's +0.112), -0.011 with
+//   six (z -0.23, CANNOT BE TOLD). The by-the-fight button now takes car-today one ship a side with escorts (spaceDuelCore's bySize `escorts`). The forecast (cannot be told in both) was wrong with two escorts.
 // Every arm's leads are kept (brain/rig-results/carTodayEscorts/); the reading file (brain/carTodayEscorts.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets with escorts, the bow-on rule, other helms, fighters, the rationed fight.
 "use strict";
