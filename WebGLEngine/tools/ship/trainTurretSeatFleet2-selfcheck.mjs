@@ -128,7 +128,12 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), rec = JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, "s9510.json"), "utf8")), near = (x, v) => Math.abs(x.mean - v) < 5e-4, start = G.brainsOf().start.weights;
+    ok("!! THE KEPT SEARCH: 9510 accepted none of 150 from car-today at sigma 0.1, one move a child, train -0.272 -> -0.272; its weights are the start's to the bit", rec.seed === 9510 && rec.iters === 150 && rec.sigma === 0.1 && rec.maxK === 1 && rec.trainFirst === 1291001 && rec.accepted.length === 0
+        && Math.abs(rec.startTrain + 0.2716) < 1e-3 && rec.train === rec.startTrain && rec.weights.map((v) => Math.fround(v)).join() === Array.from(start).map((v) => Math.fround(v)).join());
+    ok("!! THE READING, read once: the champion (9510, car-today unchanged) TRAILS the 45-degree fly-wired gunner by 0.242 (z -7.14) on the 600 audit pairs; the training bought +0.000; it does not qualify", rd.champion === 9510 && rd.reading.lead.n === 600 && near(rd.reading.lead, -0.2416)
+        && TA.word(rd.reading.lead.z) === "TRAILS" && rd.reading.training.mean === 0 && !rd.verdict.ok);
+    ok("!! NOTHING WAS WRITTEN, the page has no fleet-trained hand, and car-today's note says both searches found nothing", !fs.existsSync(G.DEFAULT_OUT) && !Object.values(C.FILES).some((f) => /WeightsFleet2?\.json/.test(f.path)) && /trainTurretSeatFleet2/.test(C.HANDS.find((h) => h.id === "car-today").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
