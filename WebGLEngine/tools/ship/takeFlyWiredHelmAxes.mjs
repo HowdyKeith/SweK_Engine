@@ -1,7 +1,7 @@
 // WebGLEngine/tools/ship/takeFlyWiredHelmAxes.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
 // THE CANNON-AWARE HELM'S TWO GAINS WITH A CANNON, SEARCHED APART. The cannon-aware fly-wired helm (helmFlyWired3) turns with a cannon at -2 about each of the two axes that are not the nose (brain/flySteering.mjs: one gain an axis).
-// tools/ship/takeFlyWiredHelmTune.mjs searched the two together once the gunners held their triggers (flat from -1 to -6; the shipped -2 stood) and listed unequal gains as not searched. Keith: "then 3". The gains without a cannon are kept (0.25, 0.25).
+// tools/ship/takeFlyWiredHelmTune.mjs searched the two together once the gunners held their triggers (flat from -1 to -6; the shipped -2 stood) and listed unequal gains as not searched. Keith: "then 3". The gains without a cannon are kept (0.25, 0.25; -0.25, -0.25 since the amendment below).
 //
 //   node tools/ship/takeFlyWiredHelmAxes.mjs [--workers n] [--write]
 //
@@ -13,8 +13,10 @@
 //
 // REGISTERED 2026-11-20, BEFORE ANY PAIR BELOW WAS FLOWN. Readings: each candidate's train score; the held-out gain; in each audit fight the winner and (-2, -2) against the plain ship and THE WINNER LESS (-2, -2), pair by pair.
 // FORECAST, for the record: as when the two moved together, the gains barely matter once the helm turns about both axes; an axis at 0 loses; (-2, -2) stands or a winner fails held out.
-// WHAT SHIPS: brain/helmFlyWired3WeightsAxes.json (policy helmFlyWired3, [the winner's two, 0.25, 0.25]) if THE WINNER LESS (-2, -2) LEADS in at least one fight and TRAILS in neither; the duel page's cannon-aware helm then loads it (without a cannon it is the
+// WHAT SHIPS: brain/helmFlyWired3WeightsAxes.json (policy helmFlyWired3, [the winner's two, -0.25, -0.25]) if THE WINNER LESS (-2, -2) LEADS in at least one fight and TRAILS in neither; the duel page's cannon-aware helm then loads it (without a cannon it is the
 //   shipped helm to the bit). If (-2, -2) wins, or the winner fails held out, nothing is audited and the shipped gains stand.
+// AMENDED 2026-11-21, STILL BEFORE ANY PAIR BELOW WAS FLOWN: tools/ship/takeFlyWiredHelmNoCannon.mjs shipped -0.25 without a cannon (the page's helm is now brain/helmFlyWired3WeightsNoCannon.json), so the helm read here and the file written
+//   carry that file's gains without a cannon (-0.25, -0.25) in place of 0.25. Every fight below has the cannon on both sides, so no pair, score or reading changes: only the two weights a winner's file carries for a fight without one.
 // @@READ@@
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmAxes/); the reading file (brain/helmFlyWired3WeightsAxes.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the gains without a cannon, escorts, fighters, the car's gunner, gains past -4.
@@ -31,7 +33,7 @@ import { createPool } from "./pairPool.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), BRAIN = path.resolve(HERE, "..", "..", "brain");
 export const DEFAULT_OUT = path.join(BRAIN, "helmFlyWired3WeightsAxes.json"), KEPT_DIR = path.join(BRAIN, "rig-results", "flyWiredHelmAxes");
-export const FILES = Object.freeze({ helm: path.join(BRAIN, "helmFlyWired3WeightsDefault.json"), fly: path.join(BRAIN, "seatFlyWired11WeightsDefault.json"), flyOne: path.join(BRAIN, "seatFlyWired11WeightsOne.json") });
+export const FILES = Object.freeze({ helm: path.join(BRAIN, "helmFlyWired3WeightsNoCannon.json"), fly: path.join(BRAIN, "seatFlyWired11WeightsDefault.json"), flyOne: path.join(BRAIN, "seatFlyWired11WeightsOne.json") });
 export const AXIS = Object.freeze([0, -1, -2, -4]), GAINS = Object.freeze(AXIS.flatMap((a) => AXIS.map((c) => `${a},${c}`))), SHIPPED = "-2,-2", FIGHTS = Object.freeze(["one", "fleet"]);
 const pairs = (first, n) => Object.freeze(D.KINDS.flatMap((kind) => Array.from({ length: n }, (_, i) => Object.freeze({ kind, seed: first + i }))));
 export const SETS = Object.freeze({ train: Object.freeze({ one: pairs(1021001, 24), fleet: pairs(1031001, 24) }), held: Object.freeze({ one: pairs(1041001, 24), fleet: pairs(1051001, 24) }), audit: Object.freeze({ one: pairs(1061001, 75), fleet: pairs(1071001, 75) }) });

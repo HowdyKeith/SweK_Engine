@@ -115,7 +115,13 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), k = (st, f, g) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${st}_${f}_${g}.json`), "utf8")).leads, mean = (a) => a.reduce((x, y) => x + y, 0) / a.length, near = (x, v) => Math.abs(x - v) < 5e-4;
+    const want = { "-2": 1.632, "-1": 1.665, "-0.25": 1.665, 0: 1.537, 0.25: 1.091, 0.5: -0.248, 1: -0.575, 2: -1.274 };
+    ok("!! AS KEPT AND RE-DERIVED -- THE TRAIN SCORES (each gain's mean over its 192 pairs): the helm without a cannon wants to turn the way it turns with one; -0.25 wins, by a hair over -1", G.GAINS.every((g) => near(mean([...k("train", "one", g), ...k("train", "fleet", g)]), want[g]) && Math.abs(rd.scores[g] - mean([...k("train", "one", g), ...k("train", "fleet", g)])) < 1e-12) && rd.winner === -0.25 && G.pick(rd.scores) === -0.25);
+    const held = TA.stat([...k("held", "one", -0.25), ...k("held", "fleet", -0.25)].map((v, i) => v - [...k("held", "one", 0.25), ...k("held", "fleet", 0.25)][i])), au = (f) => TA.stat(k("audit", f, -0.25).map((v, i) => v - k("audit", f, 0.25)[i]));
+    ok("!! HELD OUT -0.25 less 0.25 +0.618 (z 8.62); THE AUDIT, read once: +0.720 one ship a side (z 10.59), +0.457 in fleets (z 9.69), both LEADS; it qualifies", near(held.mean, 0.618) && Math.abs(held.mean - rd.held.mean) < 1e-12 && near(au("one").mean, 0.720) && near(au("fleet").mean, 0.457) && G.FIGHTS.every((f) => Math.abs(au(f).mean - rd.audit[f].gain.mean) < 1e-12 && TA.word(au(f).z) === "LEADS" && au(f).n === 300) && rd.verdict.ok && G.qualifies(rd.audit).ok);
+    const blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8"));
+    ok("!! THE FILE is [-2, -2, -0.25, -0.25], the cannon-aware helm's; THE PAGE'S cannon-aware helm loads it, its note says so, and the sine twin keeps the shipped file", blob.policy === FS.POLICY_ID3 && blob.weights.join() === "-2,-2,-0.25,-0.25" && C.FILES["helm-flywired"].path === "brain/helmFlyWired3WeightsNoCannon.json" && C.FILES["helm-sine"].path === "brain/helmFlyWired3WeightsDefault.json" && /takeFlyWiredHelmNoCannon/.test(C.HELMS.find((h) => h.id === "flywired").note) && /\+0\.72/.test(C.HELMS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

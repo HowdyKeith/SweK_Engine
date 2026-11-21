@@ -16,7 +16,9 @@
 // FORECAST, for the record: as with the cannon, the gain barely matters once the helm turns at all; 0.25 stands, or a winner fails held out.
 // WHAT SHIPS: brain/helmFlyWired3WeightsNoCannon.json (policy helmFlyWired3, [-2, -2, the winner, the winner]) if THE WINNER LESS 0.25 LEADS in at least one fight and TRAILS in neither; the duel page's cannon-aware helm then loads it (with the cannon it is the
 //   shipped helm to the bit, so no fight with a cannon changes). If 0.25 wins, or the winner fails held out, nothing is audited and the shipped gains stand.
-// @@READ@@
+// READ 2026-11-21 (brain/helmFlyWired3WeightsNoCannon.reading.json; the kept arms in brain/rig-results/flyWiredHelmNoCannon/): IT SHIPS, and the forecast was wrong. Train scores: -2 1.632, -1 1.665, -0.25 1.665, 0 1.537, 0.25 1.091, 0.5 -0.248,
+//   1 -0.575, 2 -1.274 -- the helm without a cannon should turn the SAME way it turns with one, and a little; -0.25 won by a hair over -1. Held out, -0.25 less 0.25 +0.618 (z 8.62, 192 pairs). The audit, read once: -0.25 less 0.25 +0.720 one ship a side
+//   (z 10.59) and +0.457 in fleets of three (z 9.69), both LEADS. brain/helmFlyWired3WeightsNoCannon.json is [-2, -2, -0.25, -0.25]; the duel page's cannon-aware helm loads it (the sine twin keeps 0.25: it was not searched here).
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmNoCannon/); the reading file (brain/helmFlyWired3WeightsNoCannon.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: unequal gains, escorts, fighters, the car's gunner, the gain with a cannon.
 "use strict";
