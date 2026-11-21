@@ -17,7 +17,8 @@
 //   shipped helm to the bit). If (-2, -2) wins, or the winner fails held out, nothing is audited and the shipped gains stand.
 // AMENDED 2026-11-21, STILL BEFORE ANY PAIR BELOW WAS FLOWN: tools/ship/takeFlyWiredHelmNoCannon.mjs shipped -0.25 without a cannon (the page's helm is now brain/helmFlyWired3WeightsNoCannon.json), so the helm read here and the file written
 //   carry that file's gains without a cannon (-0.25, -0.25) in place of 0.25. Every fight below has the cannon on both sides, so no pair, score or reading changes: only the two weights a winner's file carries for a fight without one.
-// @@READ@@
+// READ 2026-11-21 (brain/helmFlyWired3WeightsAxes.reading.json; the kept arms in brain/rig-results/flyWiredHelmAxes/): THE SHIPPED (-2, -2) STANDS, as forecast. Train scores (first gain, second): THE SECOND AXIS AT 0 LOSES (0,0 0.776; -1,0 0.877; -2,0 0.890;
+//   -4,0 0.929); the first at 0 costs little (0,-1 1.534 to 0,-4 1.676); every other candidate scores 1.60 to 1.76 -- the second axis does the work, the first hardly matters. The winner (-1, -2) 1.759 over the shipped 1.746; held out, -1,-2 less -2,-2 -0.007 (z -0.22, 192 pairs): it does not hold. Nothing was audited, no file written.
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmAxes/); the reading file (brain/helmFlyWired3WeightsAxes.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the gains without a cannon, escorts, fighters, the car's gunner, gains past -4.
 "use strict";

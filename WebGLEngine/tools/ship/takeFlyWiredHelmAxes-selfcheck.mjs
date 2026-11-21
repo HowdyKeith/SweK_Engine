@@ -116,7 +116,10 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), k = (st, f, g) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${st}_${f}_${g.replace(",", "x")}.json`), "utf8")).leads, mean = (a) => a.reduce((x, y) => x + y, 0) / a.length, sc = (g) => mean([...k("train", "one", g), ...k("train", "fleet", g)]);
+    ok("!! AS KEPT AND RE-DERIVED -- THE TRAIN SCORES: THE SECOND AXIS AT 0 LOSES (all under 0.93), the first at 0 costs little (1.53 to 1.68), every other candidate scores 1.60 to 1.76; (-1, -2) 1.759 wins over the shipped 1.746", G.GAINS.every((g) => Math.abs(rd.scores[g] - sc(g)) < 1e-12) && G.GAINS.every((g) => { const [p, q] = g.split(","), v = sc(g); return q === "0" ? v < 0.93 : p === "0" ? v > 1.53 && v < 1.68 : v > 1.60 && v < 1.76; }) && Math.abs(sc("-1,-2") - 1.7592) < 5e-4 && Math.abs(sc("-2,-2") - 1.7465) < 5e-4 && rd.winner === "-1,-2" && G.pick(rd.scores) === "-1,-2");
+    const both = (g) => [...k("held", "one", g), ...k("held", "fleet", g)], h0 = both("-2,-2"), held = TA.stat(both("-1,-2").map((v, i) => v - h0[i]));
+    ok("!! HELD OUT -1,-2 less -2,-2 -0.007 (z -0.22, 192 pairs): IT DOES NOT HOLD; nothing audited, no file written; the page's helm is still -2, -2 with a cannon", Math.abs(held.mean - rd.held.mean) < 1e-12 && Math.abs(held.mean + 0.0068) < 5e-4 && held.n === 192 && !G.holds(held) && rd.audit === null && !rd.verdict.ok && !fs.existsSync(G.DEFAULT_OUT) && !fs.readdirSync(G.KEPT_DIR).some((f) => f.startsWith("audit")) && JSON.parse(fs.readFileSync(G.FILES.helm, "utf8")).weights.slice(0, 2).join() === "-2,-2");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
