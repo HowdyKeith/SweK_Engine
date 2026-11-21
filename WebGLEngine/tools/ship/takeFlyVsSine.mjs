@@ -14,7 +14,8 @@
 // FORECAST, for the record: none can be told; the largest is one ship a side with the cannon, the sine ahead by about 0.04.
 // WHAT IS DECIDED (nothing ships; the fly-wired helm's note says it): if THE FLY LESS THE SINE can be told in no fight, the note says the fly's wiring adds nothing a sine does not, to within the largest two standard errors read; where it can be told,
 //   the note says where and by how much, either way.
-// @@READ@@
+// READ 2026-11-21 (brain/flyVsSine.reading.json; the kept arms in brain/rig-results/flyVsSine/): TOLD ONCE, THE SINE AHEAD. The fly less the sine: one ship a side with the cannon -0.056 (z -3.90, TRAILS -- the forecast had the sine ahead by
+//   about 0.04 but not told); fleets of three with it -0.016 (z -1.81), one ship a side without it +0.016 (z 1.07), fleets without it +0.013 (z 1.30), none of the three can be told. The fly-wired helm's note says so (and the sine's).
 // Every arm's leads are kept (brain/rig-results/flyVsSine/); the reading file (brain/flyVsSine.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, the shuffled circuit (takeFlyWiredHelmControl: the fly leads it by 2.0), the gunners' own read-outs (tools/ship/takeSineTwins.mjs).
 "use strict";

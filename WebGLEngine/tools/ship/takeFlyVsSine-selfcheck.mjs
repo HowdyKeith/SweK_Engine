@@ -8,7 +8,8 @@
 //   2  THE STUDY             against a stand-in: eight arms, each once; the gain pair by pair; what the note says; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/flyVsSine.reading.json; the kept arms in brain/rig-results/flyVsSine/): TOLD ONCE, THE SINE AHEAD. The fly less the sine: one ship a side with the cannon -0.056 (z -3.90, TRAILS -- the forecast had the sine ahead by
+//   about 0.04 but not told); fleets of three with it -0.016 (z -1.81), one ship a side without it +0.016 (z 1.07), fleets without it +0.013 (z 1.30), none of the three can be told. The fly-wired helm's note says so (and the sine's).
 //
 // SABOTAGE LOG: 18 mutants of tools/ship/takeFlyVsSine.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 18 RED the first time (a seed moved, a quarter of the pairs, old pairs; the sine on its old file, the sine without its
 //   wiring, the fly over the sine too; car-today with the cannon, the no-window gunner in fleets, the cannon on where it is off, the plain side always armed, fleets of two; the gain's sign, told only as a lead, a bound of one standard error;
@@ -71,7 +72,13 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ fly: k(f, "fly"), sine: k(f, "sine") })])), R = (f) => out[f].reading.gain;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: the fly less the sine -0.056 one ship a side with the cannon (TRAILS), -0.016, +0.016 and +0.013 in the other three (CANNOT BE TOLD); 1200 pairs each", near(R("oneCannon"), -0.0562) && TA.word(R("oneCannon").z) === "TRAILS" && near(R("fleetCannon"), -0.0155) && near(R("oneNone"), 0.0156) && near(R("fleetNone"), 0.0127)
+        && ["fleetCannon", "oneNone", "fleetNone"].every((f) => TA.word(R(f).z) === "CANNOT BE TOLD") && G.FIGHTS.every((f) => R(f).n === 1200 && Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12));
+    const v = G.decide(out), fly = C.HELMS.find((h) => h.id === "flywired"), sine = C.HELMS.find((h) => h.id === "sine");
+    ok("!! WHAT THE NOTE SAYS, as read: told one ship a side with the cannon only, the fly trailing; the fly-wired helm's note and the sine's carry it", !v.ok && v.told.length === 1 && v.told[0].fight === "oneCannon" && v.told[0].word === "TRAILS" && rd.verdict.told.length === 1
+        && /takeFlyVsSine/.test(fly.note) && /-0\.056/.test(fly.note) && /takeFlyVsSine/.test(sine.note) && /0\.056/.test(sine.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
