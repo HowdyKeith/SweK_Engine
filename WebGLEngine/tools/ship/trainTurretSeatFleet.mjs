@@ -18,7 +18,9 @@
 // WHAT SHIPS: brain/seatTurretGunnerWeightsFleet.json (policy gunnerPolicy) only if on the audit the champion LEADS the 45-degree gunner AND LEADS its start (trainTurretSeatBig.qualifies). The duel page then gains it as a hand (its note carrying the
 //   audit); the by-the-fight button keeps its pick until a study flies the new hand where the button is used.
 // trainTurretSeatBig.finish's log says "the hand gunner" for the other side: here that side is the 45-degree fly-wired gunner.
-// @@READ@@
+// READ 2026-11-21 (brain/seatTurretGunnerWeightsFleet.reading.json; the kept search in brain/rig-results/turretSeatFleet/): IT DOES NOT QUALIFY, AND NOTHING WAS WRITTEN. The search accepted none of its 150 children (train -0.240 -> -0.240; 139 dropped at
+//   the first stage of 60 pairs), so the champion is car-today itself: on the audit it TRAILS the 45-degree fly-wired gunner by 0.248 (z -7.72), and the training bought nothing (+0.000). The forecast (it buys about +0.1) was wrong: in a fleet no move of
+//   up to three weights at sigma 0.5 helped car-today. The page is unchanged; the by-the-fight button keeps the 45-degree gunner in fleets.
 // WHAT IS NOT HERE: one ship a side, escorts, fighters, the bow-on rule, the rationed fight, the fly-wired gunner's own weights.
 "use strict";
 import fs from "node:fs";
