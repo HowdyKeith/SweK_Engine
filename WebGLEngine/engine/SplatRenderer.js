@@ -334,11 +334,11 @@ void main() {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, sq);
     }
 
-    draw(viewMat, projMat, camPos /*, opts */) {
+    draw(viewMat, projMat, camPos, opts = {}) {
         if (!this.visible) return;
-        const gl = this.gl;
+        const gl = this.gl, timer = opts && opts.timer;   // 2026-11-21: `timer` (render/gpuTimerGL.mjs): the re-upload timed as "upload", the draw as "draw", on the card's clock
         const moved = this._sort(camPos[0], camPos[1], camPos[2]);
-        if (moved || this._firstDraw !== false) this._uploadSorted();
+        if (moved || this._firstDraw !== false) { if (timer) timer.begin("upload"); this._uploadSorted(); if (timer) timer.end(); }
         this._firstDraw = false;
 
         gl.useProgram(this.prog);
@@ -356,7 +356,9 @@ void main() {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         gl.depthMask(false);
+        if (timer) timer.begin("draw");
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.splat.count);
+        if (timer) timer.end();
         gl.depthMask(prevDepthMask);
         if (!prevBlend) gl.disable(gl.BLEND);
 

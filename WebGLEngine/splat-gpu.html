@@ -14,7 +14,8 @@
                  merged stand-ins, near parts as real splats; re-cut when the camera moves (WebGPU only)
   ?swlod=/path/scene.swlod  STREAM a packed level-of-detail file: the root first, then the nodes the camera wants, by HTTP Range requests
   The status line shows what the GRAPHICS CARD spent on each pass (keys, sort, draw), by WebGPU timestamp queries (render/gpuTimer.mjs), when the
-  adapter offers them; ?gputimer=0 turns that off.
+  adapter offers them; on the WebGL2 renderer, the re-upload and the draw by EXT_disjoint_timer_query_webgl2 (render/gpuTimerGL.mjs) where the browser offers
+  it; ?gputimer=0 turns either off.
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
                  render/splatSH.mjs; the status line says to what degree); ?sh=0 draws band 0 only
@@ -49,6 +50,7 @@ import { SPLAT_GENERATORS } from "./engine/splatGenerator.js";
 import { parseSplatFile } from "./engine/splatParser.js";
 import { buildLod, selectLod, gatherSplats, openLodStream, httpRange } from "./render/splatLod.mjs";
 import { createGpuTimer, timerLines } from "./render/gpuTimer.mjs";
+import { createGpuTimerGL } from "./render/gpuTimerGL.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
@@ -105,7 +107,13 @@ async function useWebGPU(splat, capacity = splat.count) {
 function useWebGL2(splat) {
     const gl = canvas.getContext("webgl2", { premultipliedAlpha: true }); if (!gl) throw new Error("this browser has neither WebGPU nor WebGL2");
     const r = new SplatRenderer(gl, splat);
-    const d = (view, proj, eye) => { gl.viewport(0, 0, canvas.width, canvas.height); gl.clearColor(0.027, 0.039, 0.063, 1); gl.clear(gl.COLOR_BUFFER_BIT); r.draw(view, proj, eye); return null; };
+    // 2026-11-21 (render/gpuTimerGL.mjs): the re-upload and the draw timed on the card by EXT_disjoint_timer_query_webgl2, where the browser offers it; ?gputimer=0 turns it off
+    const timer = Q.get("gputimer") === "0" ? createGpuTimerGL(null) : createGpuTimerGL(gl); state.gpuTimer = timer.supported ? "on" : Q.get("gputimer") === "0" ? "off" : "this browser offers no EXT_disjoint_timer_query_webgl2";
+    const d = (view, proj, eye) => { gl.viewport(0, 0, canvas.width, canvas.height); gl.clearColor(0.027, 0.039, 0.063, 1); gl.clear(gl.COLOR_BUFFER_BIT); r.draw(view, proj, eye, { timer }); timer.finish();
+        show(); return null; };
+    const show = () => { const t = timer.collect(); if (t.frames) { state.gpuTimes = Object.fromEntries(Object.entries(t.labels).map(([k, v]) => [k, +v.ms.toFixed(3)])); state.gpuTotal = +t.totalMs.toFixed(3); state.gpuFrames = t.frames; state.gpuLines = timerLines(t); } };
+    // a query answers frames later (a slow card, or a software one, more than a few): once the loop stops, keep reading for up to five seconds so the last frames still show
+    d.drain = () => { let n = 0; const tick = () => { show(); paintHud(); if (timer.supported && !state.gpuFrames && n++ < 50) setTimeout(tick, 100); else state.gpuDrained = true; }; tick(); };
     // read in the same task as the draw, before the browser presents (and may clear) the drawing buffer; rows flipped to top-first
     d.read = async () => { const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, raw = new Uint8Array(w * h * 4), px = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
         for (let y = 0; y < h; y++) px.set(raw.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4); return { w, h, px }; };
@@ -115,7 +123,7 @@ function useWebGL2(splat) {
 function resize() { const d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(canvas.clientWidth * d)); canvas.height = Math.max(1, Math.round(canvas.clientHeight * d)); }
 let last = performance.now(), avg = null;
 function paintHud() {
-    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"}${state.shDegree ? ` · harmonics to degree ${state.shDegree}` : ""} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" && state.backend === "webgpu" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
+    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"}${state.shDegree ? ` · harmonics to degree ${state.shDegree}` : ""} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
 }
 function frame() {
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();
@@ -124,7 +132,7 @@ function frame() {
     const now = performance.now(), dt = now - last; last = now; avg = avg == null ? dt : avg * 0.9 + dt * 0.1;
     state.frames++; state.frameMs = avg; if (state.frames >= 3) state.ready = true;
     if (state.frames % 15 === 0 || state.frames === 1) paintHud();
-    if (!(STILL > 0 && state.frames >= STILL)) requestAnimationFrame(frame); else { state.stopped = true; paintHud(); }
+    if (!(STILL > 0 && state.frames >= STILL)) requestAnimationFrame(frame); else { state.stopped = true; paintHud(); if (draw && draw.drain) draw.drain(); }
 }
 
 // ---- level of detail: a cut of the octree, re-made when the camera has moved or new nodes have arrived, at most every 100 ms ----

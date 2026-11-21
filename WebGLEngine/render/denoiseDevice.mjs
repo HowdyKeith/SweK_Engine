@@ -525,11 +525,15 @@ export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
  */
 export const applyFor = (layers) => { const k = layers[layers.length - 1].kernel; return k === "head" ? "apply_fast" : k === "head_apply" ? "head_apply" : "apply"; };
 
-/** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named. */
+/** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named.
+ *  2026-11-21 -- A MIXED SET: `set` may be an ARRAY of set names, one a layer, and each layer then runs the kernel ITS set gives it (kernelFor with
+ *  that layer's set and the same `last` rule); the kernel apply follows the last layer's kernel, as for a whole set. A set aimed at the slowest
+ *  layers (tools/denoiseLayers.mjs) is one of these: every layer on whichever whole set ran it fastest. */
 export function deviceLayers(net, set = DEFAULT_KERNELS) {
     if (headOf(net) !== "kernel") throw new Error("denoiseDevice: only the kernel-predicting network runs on the device");
+    if (Array.isArray(set) && set.length !== net.layers.length) throw new Error(`denoiseDevice: a mixed set names ${set.length} sets for a network of ${net.layers.length} layers -- one a layer`);
     const out = net.layers.map((L, i) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b),
-                                            kernel: kernelFor(L, set, i === net.layers.length - 1) }));
+                                            kernel: kernelFor(L, Array.isArray(set) ? set[i] : set, i === net.layers.length - 1) }));
     // round 57: a storage layer's io -- f16 in when the layer before it stored f16, f16 out when the layer after it reads f16,
     // which is when that layer is a storage layer too and the pair fits packed (an odd channel count stays f32)
     const P = "fast_unroll_p", cfg = R57_KERNELS.r57p.cfg;

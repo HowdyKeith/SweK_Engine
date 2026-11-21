@@ -711,7 +711,7 @@ export const TODO = [
     },
     {
         id: "gpu-timer-webgl2",
-        status: "open", size: "small", order: 63,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "DONE 2026-11-21: render/gpuTimerGL.mjs (EXT_disjoint_timer_query_webgl2: no nesting, a frame read only when every query has answered, a disjoint clock throws the waiting frames away, a bounded ring, render/gpuTimer.mjs's report), engine/SplatRenderer.js times its re-upload and draw, splat-gpu.html shows them on the WebGL2 renderer and reads the last frames after the loop stops; tools/ship/gpuTimerGL-selfcheck.mjs (a fake context, and the page in headless Chromium with ANGLE on SwiftShader, which offers the extension). Open: the other WebGL2 pages.", size: "small", order: 63,
         title: "The GPU timer on the WebGL2 pages (EXT_disjoint_timer_query_webgl2)",
         why: "Round queued 2026-11-21. render/gpuTimer.mjs times WebGPU passes (splat-gpu.html, fsr.html, denoise.html); the WebGL2 pages show only CPU frame time.",
         note: "A timer with the same contract over the query extension (disjoint frames dropped, results read without stalling), on the WebGL2 splat renderer first; a page gate in headless Chromium (SwiftShader may not offer the extension: then say so, as the WebGPU timer does).",
@@ -720,10 +720,11 @@ export const TODO = [
     {
         id: "denoiser-slow-layers",
         status: "open", size: "medium", order: 64,
+        progress: "2026-11-21: BUILT, NOT YET RUN ON A REAL GPU (no computer was attached to the session). tools/denoiseLayers.mjs times every layer under every kernel set this adapter can build, aims a MIXED set (render/denoiseDevice.mjs's deviceLayers now takes one set a layer) at the slowest layers -- a layer moves only to a DIFFERENT kernel at least 5% faster -- checks its image against the f64 network and times it head to head; tools/denoiseLayers-selfcheck.mjs holds it. On SwiftShader at 64 x 64 the fastest whole set, r18t, already wins every layer by that rule (its slowest layers L1-L3, 22-24% each): a CPU's ranking. The rig's commands: docs/real-hardware-denoiser-layers.md.",
         title: "The denoiser's slowest layers, measured on a real GPU, and a kernel set aimed at them",
         why: "Round queued 2026-11-21. denoise.html now shows each layer's time on the card; on SwiftShader L1 and L2 are the heaviest (about 92 and 129 ms of 458). A software adapter's ranking is not a GPU's.",
         note: "Run tools/ship/realGpuRun.mjs --native --only gpuTimer on the rig for the per-layer times, then aim a kernel set at the slowest layer and time it with the existing timing ladder.",
-        evidence: "node -e 'console.log(\"a real-GPU per-layer reading is kept:\",require(\"fs\").existsSync(\"render/denoiseLayerTimes.real.json\"))'   # false today",
+        evidence: "node -e 'const fs=require(\"fs\");const r=fs.readdirSync(\"render\").filter((f)=>/^denoise-layers-.*\\.json$/.test(f)).map((f)=>JSON.parse(fs.readFileSync(\"render/\"+f,\"utf8\")));console.log(\"a real-GPU per-layer reading is kept:\",r.some((x)=>x.software===false))'   # false today: only the rig can write one",
     },
     {
         id: "playcanvas-next",
