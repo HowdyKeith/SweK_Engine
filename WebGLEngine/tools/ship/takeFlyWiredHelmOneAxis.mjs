@@ -13,6 +13,9 @@
 // FORECAST, for the record: it trails by about 0.07 (the train scores' gap), which can be told in one fight at least.
 // WHAT IS DECIDED: the simpler helm is SAID TO DO AS WELL only if it TRAILS in neither fight; it REPLACES the page's only if it also LEADS in one. Nothing is written but the reading: if it replaces, a file is written by hand from the reading and the
 //   page loads it; if it only does as well, the fly-wired helm's note says the first gain hardly matters; otherwise the note says the first axis is worth what the reading says.
+// READ 2026-11-21 (brain/flyWiredHelmOneAxis.reading.json; the kept arms in brain/rig-results/flyWiredHelmOneAxis/): IT DOES NOT DO AS WELL. With the cannon, the one-axis helm (0, -4) less the page's (-2, -2): -0.170 one ship a side (z -4.22) and
+//   -0.094 in fleets of three (z -3.17), both TRAIL. The forecast (it trails by about 0.07, told in one fight at least) held in sign and was short in size one ship a side. The page's helm is unchanged; the fly-wired helm's note says the first axis is
+//   worth 0.17 one ship a side and 0.09 in fleets.
 // Every arm's leads are kept (brain/rig-results/flyWiredHelmOneAxis/); the reading file (brain/flyWiredHelmOneAxis.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: no cannon, escorts, fighters, the second axis alone at 0, other one-axis gains.
 "use strict";

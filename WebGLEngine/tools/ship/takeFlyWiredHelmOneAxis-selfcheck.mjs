@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: each arm once; the gains pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/flyWiredHelmOneAxis.reading.json; the kept arms in brain/rig-results/flyWiredHelmOneAxis/): IT DOES NOT DO AS WELL. With the cannon, the one-axis helm (0, -4) less the page's (-2, -2): -0.170 one ship a side (z -4.22) and
+//   -0.094 in fleets of three (z -3.17), both TRAIL. The forecast (it trails by about 0.07, told in one fight at least) held in sign and was short in size one ship a side. The page's helm is unchanged; the fly-wired helm's note says the first axis is
+//   worth 0.17 one ship a side and 0.09 in fleets.
 //
 // SABOTAGE LOG: 15 mutants of tools/ship/takeFlyWiredHelmOneAxis.mjs, before any pair was flown: ALL 15 RED the first time (a seed moved, a pair short; another candidate, the old gains without a cannon, the cannon off, a fleet of one, the no-window
 //   gunner in fleets, the old helm file; the gain's sign, a trail at exactly -2 let by, replacing with no lead; a file unchecked; the second read and an unknown option let through; one arm's leads for both).
@@ -106,7 +108,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((a) => [a, k(f, a)])))])), R = (f) => out[f].reading;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: the one-axis helm less the page's -0.170 one ship a side (z -4.22) and -0.094 in fleets of three (z -3.17), both TRAIL; the page's helm +1.775 and +1.757", near(R("one").gain, -0.1700) && near(R("fleet").gain, -0.0943) && TA.word(R("one").gain.z) === "TRAILS" && TA.word(R("fleet").gain.z) === "TRAILS" && near(R("one").page, 1.7749) && R("one").gain.n === 300 && near(R("one").gain, rd.one.reading.gain.mean));
+    const v = G.decide(out);
+    ok("!! WHAT IS DECIDED, as read: it does NOT do as well, so it does not replace; the page's helm keeps -2, -2 and the fly-wired helm's note says what the first axis is worth", !v.asWell && !v.replaces && !rd.verdict.asWell && C.FILES["helm-flywired"].path === "brain/helmFlyWired3WeightsNoCannon.json" && /takeFlyWiredHelmOneAxis/.test(C.HELMS.find((h) => h.id === "flywired").note) && /0\.17 one ship a side/.test(C.HELMS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
