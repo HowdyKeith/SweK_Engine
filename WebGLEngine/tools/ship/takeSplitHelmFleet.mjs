@@ -17,7 +17,8 @@
 // FORECAST, for the record: a small lead, about +0.02, that cannot be told.
 // WHAT IS DECIDED: THE FLEET BUTTON'S HELM BECOMES THE SPLIT HELM if THE SPLIT LESS THE FLY LEADS; otherwise it keeps the fly's helm. Either way the button's
 //   note says so. Nothing is written but the reading; the page is changed by hand only if it is decided.
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelmFleet.reading.json; the kept arms in brain/rig-results/splitHelmFleet/): THE FLEET BUTTON TAKES THE SPLIT HELM. The split less the fly in fleets of three with the cannon:
+//   +0.031 (z 3.68, 1200 pairs, LEADS -- the forecast said about +0.02 and that it could not be told). The fleet button carries the split helm (render/spaceDuelCore.mjs).
 // Every arm's leads are kept (brain/rig-results/splitHelmFleet/); the reading file (brain/splitHelmFleet.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets of two or four, escorts, fighters, other gunners.
 "use strict";

@@ -10,7 +10,8 @@
 //   2  THE STUDY             against a stand-in: two arms, each once; the gain is the split less the fly; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelmFleet.reading.json; the kept arms in brain/rig-results/splitHelmFleet/): THE FLEET BUTTON TAKES THE SPLIT HELM. The split less the fly in fleets of three with the cannon:
+//   +0.031 (z 3.68, 1200 pairs, LEADS -- the forecast said about +0.02 and that it could not be told). The fleet button carries the split helm (render/spaceDuelCore.mjs).
 //
 // SABOTAGE LOG: 8 mutants of tools/ship/takeSplitHelmFleet.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 8 RED the first time
 //   (a seed moved, takeSplitHelm's pairs, the split always the fly, the gain's sign, a lead at exactly 2 let by, not trailing taken for leading, an unknown
@@ -63,7 +64,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `fleetCannon_${a}.json`), "utf8")).leads;
+    const out = { fleetCannon: G.fightReadings({ fly: k("fly"), split: k("split") }) }, R = out.fleetCannon.reading.gain;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: the split less the fly +0.031 in fleets (LEADS, 1200 pairs)", Math.abs(R.mean - 0.0312) < 5e-4 && TA.word(R.z) === "LEADS" && R.n === 1200 && Math.abs(R.mean - rd.fleetCannon.reading.gain.mean) < 1e-12);
+    const v = G.decide(out), fleet = C.presetOf("fleet");
+    ok("!! WHAT IS DECIDED, as read: the split helm; the fleet button carries it, its note saying so", v.split && rd.verdict.split && fleet.choice.helm === "split" && fleet.choice.hand === "flywired" && /takeSplitHelmFleet/.test(fleet.note) && /\+0\.031/.test(fleet.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
