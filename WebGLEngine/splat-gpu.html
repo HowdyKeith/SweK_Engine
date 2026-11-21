@@ -13,6 +13,8 @@
   ?lod=1&budget=300000   LEVEL OF DETAIL (render/splatLod.mjs): the cloud becomes an octree and each frame draws at most `budget` splats, far parts as
                  merged stand-ins, near parts as real splats; re-cut when the camera moves (WebGPU only)
   ?swlod=/path/scene.swlod  STREAM a packed level-of-detail file: the root first, then the nodes the camera wants, by HTTP Range requests
+  The status line shows what the GRAPHICS CARD spent on each pass (keys, sort, draw), by WebGPU timestamp queries (render/gpuTimer.mjs), when the
+  adapter offers them; ?gputimer=0 turns that off.
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   Drop a .ply or .splat file on the page to view it instead (engine/splatParser.js).
   Drag to orbit, wheel to zoom. window.__splatGpu reports { ready, backend, count, frames, frameMs, error }, and __splatGpu.capture() draws one frame and
@@ -44,6 +46,7 @@ import { SplatRenderer } from "./engine/SplatRenderer.js";
 import { SPLAT_GENERATORS } from "./engine/splatGenerator.js";
 import { parseSplatFile } from "./engine/splatParser.js";
 import { buildLod, selectLod, gatherSplats, openLodStream, httpRange } from "./render/splatLod.mjs";
+import { createGpuTimer, timerLines } from "./render/gpuTimer.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
@@ -68,7 +71,9 @@ let draw = null, drawCount = 0;
 async function useWebGPU(splat, capacity = splat.count) {
     if (!navigator.gpu) throw new Error("this browser has no WebGPU");
     const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no WebGPU adapter");
-    const device = await adapter.requestDevice(), ctx = canvas.getContext("webgpu"), format = navigator.gpu.getPreferredCanvasFormat();
+    const wantTimer = Q.get("gputimer") !== "0" && adapter.features.has("timestamp-query");
+    const device = await adapter.requestDevice(wantTimer ? { requiredFeatures: ["timestamp-query"] } : undefined), ctx = canvas.getContext("webgpu"), format = navigator.gpu.getPreferredCanvasFormat();
+    const timer = createGpuTimer(device); state.gpuTimer = timer.supported ? "on" : (Q.get("gputimer") === "0" ? "off" : "this adapter has no timestamp-query");
     ctx.configure({ device, format, alphaMode: "premultiplied", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     device.lost.then((i) => { state.error = "the GPU device was lost: " + i.message; });
     const r = createSplatRendererGPU(device, splat, { format, capacity });
@@ -78,8 +83,10 @@ async function useWebGPU(splat, capacity = splat.count) {
     const d = (view, proj, eye) => {
         if (LOD.on) recut(eye, r);
         const enc = device.createCommandEncoder(), tex = ctx.getCurrentTexture();
-        r.draw(enc, { view, proj, camera: eye, target: tex.createView(), width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1] });
-        device.queue.submit([enc.finish()]); return tex;
+        r.draw(enc, { view, proj, camera: eye, target: tex.createView(), width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1], timer });
+        timer.finish(enc); device.queue.submit([enc.finish()]);
+        timer.collect().then((t) => { if (t.frames) { state.gpuTimes = Object.fromEntries(Object.entries(t.labels).map(([k, v]) => [k, +v.ms.toFixed(3)])); state.gpuTotal = +t.totalMs.toFixed(3); state.gpuFrames = t.frames; state.gpuLines = timerLines(t); } });
+        return tex;
     };
     // the frame's own pixels, read back (RGBA, whatever order the canvas format stores them in)
     d.read = async (tex) => {
@@ -105,7 +112,7 @@ function useWebGL2(splat) {
 function resize() { const d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(canvas.clientWidth * d)); canvas.height = Math.max(1, Math.round(canvas.clientHeight * d)); }
 let last = performance.now(), avg = null;
 function paintHud() {
-    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.error ? "<br>" + state.error : ""}`;
+    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" && state.backend === "webgpu" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
 }
 function frame() {
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();

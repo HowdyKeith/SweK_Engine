@@ -1,209 +1,145 @@
-// WebGLEngine/tools/ship/gpuTimer-selfcheck.mjs -- v4464
+// WebGLEngine/tools/ship/gpuTimer-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/gpuTimer-selfcheck.mjs
+// Run: node tools/ship/gpuTimer-selfcheck.mjs      (about a minute: node-webgpu in child processes, then the page in a headless browser)
+//      node tools/ship/realGpuRun.mjs --native --only gpuTimer      (on a real GPU)
 //
-// Grades gfx/gpuTimer.mjs -- the GPU clock this tree has never had for its newer backend.
+// WHAT THE CARD SPENT, PASS BY PASS, HELD. render/gpuTimer.mjs turns WebGPU timestamp queries into per-label milliseconds without stalling the frame; the splat
+// sort and renderer label their passes keys, sort and draw; splat-gpu.html shows them. Four things hold it:
 //
-// *** THE GATE IS SPLIT THE WAY THE EVIDENCE IS. *** Sections 1-4 are arithmetic and run everywhere: the
-// refusal, the floor, the statistics and the kind selection are pure functions and are graded exactly.
-// Section 5 drives a REAL WebGPU device through tools/ship/webgpuHarness.mjs and is skipped, loudly, when
-// there is none -- a skip that reports itself is a different thing from a check that quietly passes.
+//   1  THE ARITHMETIC   begin and end stamps to milliseconds, passes under one label summed, a backwards pair ignored; the overlay's lines, largest first; a
+//                       device without timestamp-query gives a timer that does nothing and says why; more passes than slots go untimed, not overwritten
+//   2  ON THE DEVICE    node-webgpu (SwiftShader, its clock unrounded): a timed compute pass of known heavy work reads longer than a light one; the splat renderer's
+//                       keys, sort and draw each read a positive time; the sort is 8 radix passes of 3 compute passes each at this size (5 once the scan needs a second level), all under "sort"
+//   3  NO STALL         finish() resolves into a ring of read-back buffers and collect() never waits: while every buffer is still waiting, a frame's times are
+//                       dropped rather than blocking the next frame
+//   4  THE PAGE         splat-gpu.html asks for timestamp-query and shows keys, sort and draw on the card
 //
-// *** AND THE DEVICE IS SwiftShader, WHICH IS A CPU RASTERISER. *** Section 5 proves the MECHANISM: a query
-// set is written, resolved, copied, read back, and the number MOVES WITH THE WORKLOAD. It does not prove any
-// magnitude, and it must not be read as a GPU benchmark. That is stated in the module, here, and in the
-// section's own output, because a number with the word "GPU" beside it is the easiest thing in this tree to
-// misread later.
+// Device cases run in child processes and a SwiftShader abort is retried, as tools/ship/splatSortGPU-selfcheck.mjs's header explains; a wrong answer fails at once.
+// SABOTAGE LOG: see the bottom of this file.
 "use strict";
-
+import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import * as T from "../../gfx/gpuTimer.mjs";
+import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
+import { PRESENT_ARGS, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import * as T from "../../render/gpuTimer.mjs";
 
-const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-let fails = 0;
-const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
-const say = (m) => console.log("  ----  " + m);
-const M = T.MEASURED_AT_V4464;
+const require = createRequire(import.meta.url), SELF = fileURLToPath(import.meta.url), ENG = path.resolve(path.dirname(SELF), "..", "..");
+const ATTEMPTS = 5, CASE_MS = 180000, NATIVE_ABORT = /futex|Fatal glibc|pthread|std::system_error|Invalid argument|Segmentation|Aborted/;
 
-// ---- 1. *** THE REFUSAL: A SUB-FLOOR READING IS NOT A MEASUREMENT AND MUST NOT COME BACK AS ONE *** --------
-{
-    const floor = 150000;
-    const under = T.verdict(T.stats([131962, 142336, 120000]), floor);
-    const over = T.verdict(T.stats([580286, 600000, 560000]), floor);
-    say(`floor ${floor} ns, margin ${M.defaultMargin}: a 131,962 ns median -> resolved ${under.resolved}, ` +
-        `a 580,286 ns median -> resolved ${over.resolved}`);
-    ok("!! *** A READING INSIDE THE FLOOR RETURNS ns: null, NOT A NUMBER ***",
-        under.resolved === false && under.ns === null && /overhead, not the work/.test(under.reason),
-        "this is render/panini.js's rule for a direction with no image, applied to time: 'returning a huge " +
-        "number would look like geometry and would poison any average computed over it'. A caller cannot " +
-        "accidentally average an unresolved reading, because there is no number there to average");
-    ok("...and a reading that clears the floor comes back WITH its spread and sample count, never bare",
-        over.resolved === true && over.ns === 580286 && over.n === 3 && over.spread > 1,
-        // SABOTAGE K DROPPED `spread` FROM THE RESOLVED VERDICT AND THIS LINE THREW ON undefined.toFixed --
-        // the check DID detect it, by crashing, which killed every section after it and reported a stack trace
-        // instead of a name. v4434 hit exactly this ("un-exporting FILTERS crashed rather than failing by
-        // name"). A detail string must never be able to throw: the assertion above is the check, this is prose.
-        `${over.ns} ns over ${over.n} samples, spread ${over.spread == null ? "MISSING" : over.spread.toFixed(3)}`);
-    ok("no floor at all is a REFUSAL, not a default -- an uncalibrated timer must not answer",
-        T.verdict(T.stats([1e9]), null).resolved === false && T.verdict(T.stats([1e9]), null).ns === null &&
-        /calibrateFloor/.test(T.verdict(T.stats([1e9]), null).reason),
-        "a module that invents a floor when it has none would resolve every reading, which is the same as " +
-        "having no floor and not saying so");
-    ok("and no samples is a refusal too",
-        T.verdict(T.stats([]), 1000).resolved === false && T.verdict(null, 1000).ns === null);
-}
-
-// ---- 2. THE FLOOR IS THE MAX OF AN EMPTY PASS, AND THAT CHOICE IS THE POINT --------------------------------
-{
-    say("");
-    const empty = [103841, 142336, 190114];
-    const f = T.calibrateFloor(empty);
-    say(`empty-pass samples ${JSON.stringify(empty)} -> floor ${f} ns (max, not median ${T.median(empty)})`);
-    ok("!! the floor is the MAX of the empty-pass samples, so no empty pass is ever called work",
-        f === 190114 && f > T.median(empty),
-        "a MEDIAN floor would put half the empty passes above it and call them measurements. The floor is the " +
-        "level below which a reading cannot be told from overhead, and half of them can");
-    ok("...and an empty sample set yields no floor rather than zero",
-        T.calibrateFloor([]) === null && T.calibrateFloor(null) === null,
-        "a floor of 0 would resolve everything; null propagates into verdict()'s refusal");
-}
-
-// ---- 3. *** THE MEASUREMENT THAT MADE THIS MODULE: TEN TIMES THE WORK, INSIDE ONE FLOOR *** ----------------
-{
-    say("");
-    const floor = T.calibrateFloor([103841, 142336, 190114]);
-    const v10 = T.verdict(T.stats([M.ns10iters16groups]), floor);
-    const v100 = T.verdict(T.stats([M.ns100iters16groups]), floor);
-    const v1000 = T.verdict(T.stats([M.ns1000iters16groups]), floor);
-    const v128 = T.verdict(T.stats([M.ns1000iters128groups]), floor);
-    say(`10 iters ${M.ns10iters16groups} ns, 100 iters ${M.ns100iters16groups} ns, ` +
-        `1000 iters ${M.ns1000iters16groups} ns, 1000x128 ${M.ns1000iters128groups} ns`);
-    ok("!! *** THE 100-ITERATION PASS CAME BACK FASTER THAN THE 10-ITERATION ONE ***",
-        M.ns100iters16groups < M.ns10iters16groups && M.tenTimesWorkInsideTheFloor === true,
-        "ten times the inner loop, measured on the real device, and the number went DOWN. That is the whole " +
-        "argument for a floor: without one, a caller reads 131,962 ns and believes it timed the loop");
-    ok("...so both of those refuse, and both of the larger ones resolve",
-        v10.resolved === false && v100.resolved === false && v1000.resolved === true && v128.resolved === true,
-        "the floor separates the two pairs exactly where the physics does -- the two that are overhead, and " +
-        "the two where the work dominates");
-    const ratio = M.ns1000iters128groups / M.ns1000iters16groups;
-    ok("and eight times the groups is SUBLINEAR, which is a finding rather than a defect",
-        ratio > 4 && ratio < 8,
-        `${ratio.toFixed(2)}x for 8x the dispatch -- fixed cost is still a visible part of the larger pass too. ` +
-        "Reported, because a reader who expected 8 should learn where the other 1.6 went");
-    ok("one configuration read 1.83x apart with nothing changed, so one sample is never a measurement",
-        Math.abs(M.worstOneConfigSpread - 190114 / 103841) < 0.01 && M.worstOneConfigSpread > 1.5,
-        "190,114 against 103,841, same shader, same size, same session. stats() reports spread for this reason");
-}
-
-// ---- 4. KIND SELECTION, WHICH MUST NOT BE OBTAINABLE BY ASSERTING IT ---------------------------------------
-{
-    say("");
-    ok("a backend gets a timer only when it really carries the feature",
-        T.timerKindFor("webgpu", { features: ["timestamp-query"] }) === "webgpu-timestamp" &&
-        T.timerKindFor("webgpu", { features: [] }) === "none" &&
-        T.timerKindFor("webgl2", { extensions: ["EXT_disjoint_timer_query_webgl2"] }) === "webgl2-ext" &&
-        T.timerKindFor("webgl2", { extensions: [] }) === "none" &&
-        T.timerKindFor("null", { features: ["timestamp-query"] }) === "none",
-        "and every kind it can return is in TIMER_KINDS: " + T.TIMER_KINDS.join(", "));
-    ok("!! a backwards timestamp pair is null, never a negative duration",
-        T.elapsedFrom([100n, 50n]) === null && T.elapsedFrom([50n, 100n]) === 50 && T.elapsedFrom([5n, 5n]) === null,
-        "disjoint or reordered queries produce a backwards pair. A negative number presented as a duration is " +
-        "the same species of lie as a huge number presented as geometry");
-    ok("!! the WebGL2 side needs BOTH available and not-disjoint, which is the half that is easy to drop",
-        T.glReadable({ available: true, disjoint: false }) === true &&
-        T.glReadable({ available: true, disjoint: true }) === false &&
-        T.glReadable({ available: false, disjoint: false }) === false,
-        "a DISJOINT result is not a slow frame, it is NO frame -- the GPU was interrupted and the counter is " +
-        "meaningless. ui/SystemPerfMonitor.js has had this right since long before gfx/device.js existed");
-    ok("timestampWrites refuses a descriptor that would write both ends to one slot",
-        (() => { try { T.timestampWrites({}, 0, 0); return false; } catch { return true; } })() &&
-        T.timestampWrites({}, 0, 1).endOfPassWriteIndex === 1);
-    ok("median does not sort the caller's array",
-        (() => { const a = [3, 1, 2]; T.median(a); return a[0] === 3 && a[2] === 2; })(),
-        "a stats helper with a side effect on its input is a trap somebody finds at 2am");
-}
-
-const DEVICE_SCRIPT = `async () => {
-    const ad = await navigator.gpu.requestAdapter();
-    if (!ad) return { adapter: "none", hasTs: false };
-    const hasTs = ad.features.has("timestamp-query");
-    if (!hasTs) return { adapter: (ad.info && ad.info.architecture) || "?", hasTs: false };
-    const dev = await ad.requestDevice({ requiredFeatures: ["timestamp-query"] });
-    const src = (iters) => \`@group(0) @binding(0) var<storage, read_write> o: array<f32>;
-      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) {
-        var a = f32(g.x); for (var i = 0u; i < \${iters}u; i++) { a = a * 1.0000001 + 0.000001; } o[g.x] = a; }\`;
-    async function timeIt(iters, groups) {
-      const pipe = dev.createComputePipeline({ layout: "auto",
-        compute: { module: dev.createShaderModule({ code: src(iters) }), entryPoint: "main" } });
-      const buf = dev.createBuffer({ size: groups * 64 * 4, usage: GPUBufferUsage.STORAGE });
-      const bg = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: buf } }] });
-      const qs = dev.createQuerySet({ type: "timestamp", count: 2 });
-      const rs = dev.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
-      const rd = dev.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-      const enc = dev.createCommandEncoder();
-      const p = enc.beginComputePass({ timestampWrites: { querySet: qs, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } });
-      p.setPipeline(pipe); p.setBindGroup(0, bg); p.dispatchWorkgroups(groups); p.end();
-      enc.resolveQuerySet(qs, 0, 2, rs, 0); enc.copyBufferToBuffer(rs, 0, rd, 0, 16);
-      dev.queue.submit([enc.finish()]);
-      await rd.mapAsync(GPUMapMode.READ);
-      const t = new BigUint64Array(rd.getMappedRange().slice(0)); rd.unmap();
-      return Number(t[1] - t[0]);
-    }
-    const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
-    const emptyRuns = []; for (let k = 0; k < 5; k++) emptyRuns.push(await timeIt(1, 1));
-    const lightRuns = []; for (let k = 0; k < 3; k++) lightRuns.push(await timeIt(10, 16));
-    const heavyRuns = []; for (let k = 0; k < 3; k++) heavyRuns.push(await timeIt(1000, 128));
-    return { adapter: (ad.info && ad.info.architecture) || "?", hasTs: true,
-             floor: Math.max(...emptyRuns), light: med(lightRuns), heavy: med(heavyRuns) };
-  }`;
-
-// ---- 5. THE REAL DEVICE. SKIPPED LOUDLY WHEN THERE IS NONE, AND NEVER SILENTLY PASSED -----------------------
-{
-    say("");
-    let skip = null, H = null;
-    try { H = await import("./webgpuHarness.mjs"); skip = H.webgpuSkipReason(); }
-    catch (e) { skip = "harness unavailable: " + String(e && e.message).slice(0, 80); }
-    if (skip) {
-        say(`SKIPPED, and this is reported rather than passed: ${skip}`);
-        ok("the device section declares its own absence instead of going quiet",
-            typeof skip === "string" && skip.length > 0,
-            "a section that vanishes when its dependency is missing is a check that cannot fail, which this " +
-            "tree has shipped before and now names");
-    } else {
-        const r = await H.runInEngineOrigin({ engineRoot: ENG, timeoutMs: 180000, script: DEVICE_SCRIPT });
-        if (!r.ok) {
-            ok("the real device ran the timestamp probe", false, String(r.reason).slice(0, 160));
-        } else {
-            const d = r.result;
-            say(`adapter ${d.adapter}, timestamp-query ${d.hasTs}; empty-pass floor ${d.floor} ns; ` +
-                `light ${d.light} ns, heavy ${d.heavy} ns`);
-            ok("!! *** THE MECHANISM WORKS ON A REAL DEVICE: WRITTEN, RESOLVED, COPIED, READ BACK ***",
-                d.hasTs === true && Number.isFinite(d.heavy) && d.heavy > 0,
-                "a query set really is written by the pass and really does come back as two nanosecond stamps");
-            ok("!! ...and the number MOVES WITH THE WORKLOAD, which is what makes it a clock and not a constant",
-                d.heavy > d.floor * 2 && d.heavy / Math.max(d.light, 1) > 1.5,
-                `heavy/light = ${(d.heavy / Math.max(d.light, 1)).toFixed(2)}x. A timer that returns the same ` +
-                "number for every workload would pass every check above and measure nothing");
-            ok("the module's verdict agrees with the device: the heavy pass resolves, the empty one never does",
-                T.verdict(T.stats([d.heavy]), d.floor).resolved === true &&
-                T.verdict(T.stats([d.floor]), d.floor).resolved === false,
-                "the pure half and the device half are held against each other rather than each against itself");
-            // *** SABOTAGE M DELETED THE SwiftShader CAVEAT FROM THE MODULE AND COST ZERO RED. *** Nothing
-            // held the recorded provenance against the observed one, so MEASURED_AT_V4464.device could be
-            // rewritten to "a real GPU" and every check still passed -- and the numbers in that table would
-            // then read as a GPU's. The caveat is the most important sentence in the module and it was the
-            // one thing not checked. It is checked against the DEVICE ITSELF now, not against its own spelling.
-            ok("!! *** THE MODULE'S RECORDED DEVICE MATCHES THE DEVICE THAT PRODUCED THE NUMBERS ***",
-                typeof M.device === "string" && M.device.toLowerCase().includes(String(d.adapter).toLowerCase()),
-                `module records "${M.device}", adapter reports "${d.adapter}". A provenance line that cannot ` +
-                "disagree with reality is decoration: rewriting it to 'a real GPU' passed every other check here");
-            say(`  NOT A GPU BENCHMARK: this adapter is ${d.adapter}. SwiftShader is a CPU rasteriser, so the ` +
-                "MECHANISM is proven and the MAGNITUDE is a software device's. The rig has its own floor.");
+async function child(kind) {
+    configureVulkanIcd(); const { mod } = resolveWebgpu(require);
+    const gpu = mod.create([FINE_CLOCK_FLAG]), ad = await gpu.requestAdapter(), G = mod.globals || globalThis;
+    if (!ad.features.has("timestamp-query")) { console.log("RESULT " + JSON.stringify({ kind, noFeature: true })); process.exit(0); }
+    const dev = await ad.requestDevice({ requiredFeatures: ["timestamp-query"] }), U = G.GPUBufferUsage, M = G.GPUMapMode;
+    let out;
+    if (kind === "work") {
+        // two compute passes of the same kernel, 1 and 64 iterations of a dependent loop over 65536 cells: the heavy one must read longer
+        const code = `@group(0) @binding(0) var<storage, read_write> b: array<f32>; struct P { n: u32 }; @group(0) @binding(1) var<uniform> p: P;
+            @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3<u32>) { var x = b[g.x]; for (var i = 0u; i < p.n * 64u; i++) { x = sin(x) * 1.0001 + 0.5; } b[g.x] = x; }`;
+        const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: dev.createShaderModule({ code }), entryPoint: "main" } }), buf = dev.createBuffer({ size: 65536 * 4, usage: U.STORAGE });
+        const uni = (n) => { const u = dev.createBuffer({ size: 16, usage: U.UNIFORM | U.COPY_DST }); dev.queue.writeBuffer(u, 0, new Uint32Array([n, 0, 0, 0])); return u; }, light = uni(1), heavy = uni(64);
+        const t = T.createGpuTimer(dev, { usage: U, mapMode: M });
+        for (let f = 0; f < 3; f++) {
+            const enc = dev.createCommandEncoder();
+            for (const [label, u] of [["light", light], ["heavy", heavy]]) { const cp = enc.beginComputePass({ timestampWrites: t.writes(label) }); cp.setPipeline(pipe); cp.setBindGroup(0, dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: buf } }, { binding: 1, resource: { buffer: u } }] })); cp.dispatchWorkgroups(1024); cp.end(); }
+            t.finish(enc); dev.queue.submit([enc.finish()]); await t.collect();
         }
+        await new Promise((r) => setTimeout(r, 200)); const st = await t.collect();
+        out = { kind, frames: st.frames, light: st.labels.light && st.labels.light.last, heavy: st.labels.heavy && st.labels.heavy.last };
+    } else if (kind === "splats") {
+        const { createSplatRendererGPU } = await import("../../render/splatRendererGPU.mjs"), { SPLAT_GENERATORS } = await import("../../engine/splatGenerator.js");
+        const c = SPLAT_GENERATORS.nebula({ count: 5000 }), r = createSplatRendererGPU(dev, c, { usage: U, mapMode: M }), t = T.createGpuTimer(dev, { usage: U, mapMode: M });
+        const tex = dev.createTexture({ size: [64, 64], format: "rgba8unorm", usage: G.GPUTextureUsage.RENDER_ATTACHMENT }), view = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -3, 1]), proj = new Float32Array([1.5, 0, 0, 0, 0, 1.5, 0, 0, 0, 0, -1.002, -1, 0, 0, -0.1, 0]);
+        let passes = 0; const counting = { writes: (l) => { passes++; return t.writes(l); } };
+        for (let f = 0; f < 3; f++) { const enc = dev.createCommandEncoder(); r.draw(enc, { view, proj, camera: [0, 0, 3 + f * 0.01], target: tex.createView(), width: 64, height: 64, clear: [0, 0, 0, 1], timer: f === 0 ? counting : t }); t.finish(enc); dev.queue.submit([enc.finish()]); await t.collect(); }
+        await new Promise((r2) => setTimeout(r2, 200)); const st = await t.collect();
+        out = { kind, passesFirstFrame: passes, labels: Object.fromEntries(Object.entries(st.labels).map(([k, v]) => [k, v.last])), frames: st.frames };
+    } else if (kind === "stall") {
+        // finish three frames without collecting: the ring (3) fills; a fourth frame's times are dropped, and finish() never waits
+        const t = T.createGpuTimer(dev, { usage: U, mapMode: M, ring: 3 }), t0 = Date.now(); let dropped = 0;
+        for (let f = 0; f < 4; f++) { const enc = dev.createCommandEncoder(), cp = enc.beginComputePass({ timestampWrites: t.writes("p") }); cp.end(); const before = Date.now(); t.finish(enc); if (Date.now() - before > 50) dropped = -1; dev.queue.submit([enc.finish()]); }
+        const st = await t.collect(); out = { kind, frames: st.frames, waitedMs: Date.now() - t0 };
     }
+    console.log("RESULT " + JSON.stringify(out)); process.exit(0);
 }
 
-console.log("gpuTimer-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
-process.exit(fails ? 1 : 0);
+let fails = 0;
+function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
+const section = async (fn) => { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
+const aborts = [];
+function runCase(kind) {
+    for (let a = 1; a <= ATTEMPTS; a++) {
+        const r = spawnSync(process.execPath, [SELF, "--child", kind], { encoding: "utf8", timeout: CASE_MS }), line = (r.stdout || "").split("\n").find((l) => l.startsWith("RESULT "));
+        if (line) return JSON.parse(line.slice(7));
+        if (r.error && r.error.code === "ETIMEDOUT") return { crashed: "timed out" };
+        const why = ((r.stderr || "") + (r.stdout || "")).trim().split("\n").filter(Boolean).pop() || `exit ${r.status}`;
+        if (!NATIVE_ABORT.test(why) && r.signal == null && r.status !== 134 && r.status !== 139) return { crashed: why };
+        aborts.push(`${kind}: ${why.slice(0, 80)}`);
+    }
+    return null;
+}
+
+if (process.argv[2] === "--child") await child(process.argv[3]);
+else {
+    console.log("gpuTimer-selfcheck -- what the card spent, pass by pass, on screen\n");
+    console.log("1. THE ARITHMETIC");
+    await section(() => {
+        const d = T.durationsOf(new BigInt64Array([1000000n, 3000000n, 5000000n, 5500000n, 9000000n, 9250000n, 8n, 4n]), ["a", "b", "b", "c"]);
+        ok("!! stamps to milliseconds: begin to end, passes under one label summed, a backwards pair ignored", d.a === 2 && d.b === 0.75 && d.c === undefined);
+        const lines = T.timerLines({ supported: true, frames: 3, labels: { keys: { ms: 0.43 }, sort: { ms: 110.08 }, draw: { ms: 2302.2 } }, totalMs: 2412.71 });
+        ok("!! the overlay: one line a label, largest first, then the total on the card; unsupported and empty say so", lines.length === 4 && /^draw/.test(lines[0]) && /^keys/.test(lines[2]) && /total.*2412\.71 ms on the card/.test(lines[3]) && /no timestamp-query/.test(T.timerLines({ supported: false })[0]) && /waiting/.test(T.timerLines({ supported: true, labels: {} })[0]));
+        const none = T.createGpuTimer({ features: new Set() });
+        ok("!! a device without timestamp-query gets a timer that does nothing (no slots, finish and collect harmless)", !none.supported && none.writes("x") === undefined && (none.finish({}), true) && none.stats().supported === false);
+        let made = 0; const fake = { features: new Set(["timestamp-query"]), createQuerySet: () => ({ destroy() {} }), createBuffer: () => { made++; return { destroy() {} }; } }, t = T.createGpuTimer(fake, { capacity: 2, usage: { QUERY_RESOLVE: 1, COPY_SRC: 2, COPY_DST: 4, MAP_READ: 8 } });
+        const w = [t.writes("a"), t.writes("b"), t.writes("c")];
+        ok("!! slots: each pass a begin and an end index; MORE PASSES THAN SLOTS GO UNTIMED rather than overwrite one", w[0].beginningOfPassWriteIndex === 0 && w[0].endOfPassWriteIndex === 1 && w[1].beginningOfPassWriteIndex === 2 && w[2] === undefined && made === 4);
+    });
+    const skip = headlessGpuSkipReason(require);
+    if (skip) console.log(`\n2-3. SKIPPED: ${skip}`);
+    else {
+        console.log("2. ON THE DEVICE (node-webgpu)");
+        await section(() => {
+            const w = runCase("work");
+            if (w && w.noFeature) { console.log("  ----  this adapter has no timestamp-query: nothing to time here"); return; }
+            ok("!! A HEAVY PASS READS LONGER THAN A LIGHT ONE: the same kernel at 64 iterations against 1, timed on the card", w && !w.crashed && w.frames >= 2 && w.light > 0 && w.heavy > 2 * w.light, w ? JSON.stringify(w) : "aborted every time");
+            const s = runCase("splats");
+            ok("!! THE SPLAT RENDERER'S PASSES: keys, sort and draw each read a positive time; the first frame is 1 + 24 + 1 timed passes (keys; 8 radix passes of histogram, one-level scan and reorder for 5000 splats; draw)", s && !s.crashed && s.labels.keys > 0 && s.labels.sort > 0 && s.labels.draw > 0 && s.passesFirstFrame === 26, s ? JSON.stringify(s) : "aborted every time");
+        });
+        console.log("3. NO STALL");
+        await section(() => {
+            const s = runCase("stall");
+            ok("!! four frames finished into a ring of three without collecting: none waited, and three frames' times came back (the fourth was dropped, not waited for)", s && !s.crashed && s.frames === 3, s ? JSON.stringify(s) : "aborted every time");
+        });
+        if (aborts.length) console.log(`  ----  the software renderer ABORTED ${aborts.length} time(s) and those runs were repeated: ${aborts.slice(0, 3).join(" | ")}`);
+    }
+    console.log("4. THE PAGE");
+    const wskip = webgpuSkipReason(require);
+    if (wskip) console.log(`  ----  skipped: ${wskip}`);
+    else await section(async () => {
+        const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript" };
+        const srv = http.createServer((q, r) => { const f = path.join(ENG, decodeURIComponent(q.url.split("?")[0])); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
+        await new Promise((res) => srv.listen(0, "127.0.0.1", res));
+        const { chromium } = resolvePlaywright(require), browser = await chromium.launch({ args: [...PRESENT_ARGS], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), p = await browser.newPage({ viewport: { width: 320, height: 200 } }), errors = [];
+        p.on("pageerror", (e) => errors.push(e.message));
+        await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=10000&still=6`);
+        await p.waitForFunction(() => window.__splatGpu && (window.__splatGpu.stopped || window.__splatGpu.error), null, { timeout: 90000 });
+        await new Promise((r) => setTimeout(r, 500));
+        const st = await p.evaluate(() => ({ ...window.__splatGpu, capture: undefined })), hud = await p.evaluate(() => document.getElementById("hud").textContent);
+        if (st.gpuTimer && st.gpuTimer !== "on") console.log(`  ----  the page's adapter: ${st.gpuTimer}`);
+        else ok("!! splat-gpu.html asks for timestamp-query and shows keys, sort and draw on the card, with no page error", st.gpuTimer === "on" && st.gpuTimes && st.gpuTimes.keys > 0 && st.gpuTimes.sort > 0 && st.gpuTimes.draw > 0 && /on the card/.test(hud) && errors.length === 0, JSON.stringify({ gpuTimes: st.gpuTimes, frames: st.gpuFrames, errors }));
+        await browser.close(); srv.close();
+    });
+    console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
+    process.exit(fails === 0 ? 0 : 1);
+}
+
+// SABOTAGE LOG:
+// 10 mutants, 8 of render/gpuTimer.mjs and 2 of render/splatSortGPU.mjs, each in a hard-linked copy of the tree: ALL 10 RED (passes under one label not summed,
+// microseconds for milliseconds, a backwards pair kept, smallest first, an overflowing pass overwriting a slot, a full ring forcing a slot free (caught by
+// section 4's page, NOT by section 3: section 3 shows nothing waited, not that a busy slot was left alone), a device without the feature taken for one with
+// it, one write index for begin and end; the sort's passes untimed, the keys pass labelled "sort").

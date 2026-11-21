@@ -240,23 +240,24 @@ export function createGpuRadixSort(device, { capacity, bits = 32, usage = global
     const result = io(passes - 1)[3];   // the values buffer the last pass writes
 
     /** Encode the depth keys of `count` splats from `positions` (a GPUBuffer of x,y,z f32 triples) into the sort's key buffer. */
-    function encodeDepthKeys(encoder, positions, count, { camera, origin = [0, 0, 0], scale = 1 }) {
+    function encodeDepthKeys(encoder, positions, count, { camera, origin = [0, 0, 0], scale = 1, timer = null }) {
         const [x, y] = grid(Math.ceil(count / 256));
         device.queue.writeBuffer(depthUni, 0, new Float32Array([camera[0], camera[1], camera[2], 0, origin[0], origin[1], origin[2], scale]));
         device.queue.writeBuffer(depthUni, 32, new Uint32Array([count, x * 256, 0, 0]));
-        const cp = encoder.beginComputePass(); cp.setPipeline(P.depth); cp.setBindGroup(0, group(P.depth, [positions, keysA, depthUni])); cp.dispatchWorkgroups(x, y); cp.end();
+        const cp = encoder.beginComputePass(timer ? { timestampWrites: timer.writes("keys") } : undefined); cp.setPipeline(P.depth); cp.setBindGroup(0, group(P.depth, [positions, keysA, depthUni])); cp.dispatchWorkgroups(x, y); cp.end();
     }
     /** Encode the sort of the first `count` keys in the key buffer. Afterwards `indices` holds the permutation, ascending by key. */
-    function encode(encoder, count) {
+    function encode(encoder, count, { timer = null } = {}) {   // `timer` (render/gpuTimer.mjs): every pass of the sort timed under the label "sort"
+        const tw = () => (timer ? { timestampWrites: timer.writes("sort") } : undefined);
         if (!(count > 0 && count <= capacity)) throw new Error(`splatSortGPU: count ${count} is outside 1-${capacity}`);
         const wg = Math.ceil(count / PER_WORKGROUP), lv = scanLevels(BUCKETS * wg), [gx, gy] = grid(wg);
         device.queue.writeBuffer(sortUni, 0, new Uint32Array([wg, count, 0, 0]));
         lv.forEach((n, l) => device.queue.writeBuffer(scanUnis[l], 0, new Uint32Array([n, 0, 0, 0])));
         for (let p = 0; p < passes; p++) {
-            let cp = encoder.beginComputePass(); cp.setPipeline(P.hist[p]); cp.setBindGroup(0, G.hist[p]); cp.dispatchWorkgroups(gx, gy); cp.end();
-            for (let l = 0; l < lv.length; l++) { const [sx, sy] = grid(Math.ceil(lv[l] / SCAN_ITEMS)); cp = encoder.beginComputePass(); cp.setPipeline(P.scan); cp.setBindGroup(0, G.scan[l]); cp.dispatchWorkgroups(sx, sy); cp.end(); }
-            for (let l = lv.length - 2; l >= 0; l--) { const [sx, sy] = grid(Math.ceil(lv[l] / SCAN_ITEMS)); cp = encoder.beginComputePass(); cp.setPipeline(P.add); cp.setBindGroup(0, G.add[l]); cp.dispatchWorkgroups(sx, sy); cp.end(); }
-            cp = encoder.beginComputePass(); cp.setPipeline(P.reorder[p]); cp.setBindGroup(0, G.reorder[p]); cp.dispatchWorkgroups(gx, gy); cp.end();
+            let cp = encoder.beginComputePass(tw()); cp.setPipeline(P.hist[p]); cp.setBindGroup(0, G.hist[p]); cp.dispatchWorkgroups(gx, gy); cp.end();
+            for (let l = 0; l < lv.length; l++) { const [sx, sy] = grid(Math.ceil(lv[l] / SCAN_ITEMS)); cp = encoder.beginComputePass(tw()); cp.setPipeline(P.scan); cp.setBindGroup(0, G.scan[l]); cp.dispatchWorkgroups(sx, sy); cp.end(); }
+            for (let l = lv.length - 2; l >= 0; l--) { const [sx, sy] = grid(Math.ceil(lv[l] / SCAN_ITEMS)); cp = encoder.beginComputePass(tw()); cp.setPipeline(P.add); cp.setBindGroup(0, G.add[l]); cp.dispatchWorkgroups(sx, sy); cp.end(); }
+            cp = encoder.beginComputePass(tw()); cp.setPipeline(P.reorder[p]); cp.setBindGroup(0, G.reorder[p]); cp.dispatchWorkgroups(gx, gy); cp.end();
         }
     }
     async function readBack(src, count) {

@@ -121,12 +121,12 @@ export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", u
     };
     Object.defineProperty(self, "count", { get: () => n });
     /** Sort on the card if the camera moved, then draw the cloud into `target` (a GPUTextureView), back to front. */
-    self.draw = (encoder, { view, proj, camera, target, width, height, clear = null }) => {
+    self.draw = (encoder, { view, proj, camera, target, width, height, clear = null, timer = null }) => {   // `timer`: render/gpuTimer.mjs, passes labelled keys, sort, draw
         const key = camera.join() + "|" + self.position.join() + "|" + self.scale;
-        if (key !== self._last) { sorter.encodeDepthKeys(encoder, B.pos, n, { camera, origin: self.position, scale: self.scale }); sorter.encode(encoder, n); self._last = key; }
+        if (key !== self._last) { sorter.encodeDepthKeys(encoder, B.pos, n, { camera, origin: self.position, scale: self.scale, timer }); sorter.encode(encoder, n, { timer }); self._last = key; }
         const f = new Float32Array(40); f.set(view, 0); f.set(proj, 16); f.set([self.position[0], self.position[1], self.position[2], self.scale, width, height, 0, 0], 32);
         device.queue.writeBuffer(frame, 0, f);
-        const rp = encoder.beginRenderPass({ colorAttachments: [{ view: target, loadOp: clear ? "clear" : "load", clearValue: clear || [0, 0, 0, 0], storeOp: "store" }] });
+        const rp = encoder.beginRenderPass({ colorAttachments: [{ view: target, loadOp: clear ? "clear" : "load", clearValue: clear || [0, 0, 0, 0], storeOp: "store" }], ...(timer && timer.writes ? (() => { const w = timer.writes("draw"); return w ? { timestampWrites: w } : {}; })() : {}) });
         rp.setPipeline(pipeline); rp.setBindGroup(0, bind); rp.draw(4, n); rp.end();
     };
     self.destroy = () => { for (const b of Object.values(B)) b.destroy(); frame.destroy(); sorter.destroy(); };
