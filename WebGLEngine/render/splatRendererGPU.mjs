@@ -96,20 +96,30 @@ fn fs(v: VOut) -> @location(0) vec4<f32> {
  * A splat cloud on `device`, drawn into a `format` target. `splat` is engine/splatParser.js's shape: { count, positions, scales, colors, opacities, quats }
  * (Float32Arrays: 3, 3, 3, 1, 4 per splat). Returns { draw(encoder, { view, proj, camera, target, width, height, clear? }), sorter, position, scale, destroy }.
  */
-export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode } = {}) {
-    const U = usage, n = splat.count;
+export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode, capacity = splat.count } = {}) {
+    const U = usage; let n = splat.count;   // `capacity` (2026-11-21, render/splatLod.mjs): room for a cut of a bigger cloud; update() swaps the splats drawn
     if (!(n > 0)) throw new Error("splatRendererGPU: an empty cloud");
+    if (!(capacity >= n)) throw new Error(`splatRendererGPU: capacity ${capacity} is less than the cloud's ${n} splats`);
     const lens = { positions: 3, scales: 3, colors: 3, opacities: 1, quats: 4 };
     for (const [k, w] of Object.entries(lens)) if (!splat[k] || splat[k].length !== n * w) throw new Error(`splatRendererGPU: splat.${k} must hold ${w} numbers a splat (${n * w})`);
-    const data = (arr) => { const b = device.createBuffer({ size: Math.max(16, arr.byteLength), usage: U.STORAGE | U.COPY_DST }); device.queue.writeBuffer(b, 0, arr); return b; };
-    const B = { pos: data(splat.positions), scl: data(splat.scales), col: data(splat.colors), opa: data(splat.opacities), rot: data(splat.quats) };
+    const W = { pos: 3, scl: 3, col: 3, opa: 1, rot: 4 }, F = { pos: "positions", scl: "scales", col: "colors", opa: "opacities", rot: "quats" };
+    const B = Object.fromEntries(Object.entries(W).map(([k, w]) => [k, device.createBuffer({ size: Math.max(16, capacity * w * 4), usage: U.STORAGE | U.COPY_DST })]));
+    const upload = (c) => { for (const k of Object.keys(W)) device.queue.writeBuffer(B[k], 0, c[F[k]], 0, c.count * W[k]); };
+    upload(splat);
     const frame = device.createBuffer({ size: 160, usage: U.UNIFORM | U.COPY_DST });
-    const sorter = createGpuRadixSort(device, { capacity: n, usage: U, mapMode });
+    const sorter = createGpuRadixSort(device, { capacity, usage: U, mapMode });
     const module = device.createShaderModule({ code: SPLAT_WGSL });
     const blend = { color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }, alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" } };
     const pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module, entryPoint: "vs" }, fragment: { module, entryPoint: "fs", targets: [{ format, blend }] }, primitive: { topology: "triangle-strip" } });
     const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [frame, sorter.indices, B.pos, B.scl, B.col, B.opa, B.rot].map((buffer, binding) => ({ binding, resource: { buffer } })) });
-    const self = { sorter, position: [0, 0, 0], scale: 1, _last: null };
+    const self = { sorter, position: [0, 0, 0], scale: 1, _last: null, capacity };
+    /** Draw a different set of splats from now on (a level-of-detail cut): at most `capacity`, written over the old; the next draw re-sorts. */
+    self.update = (c) => {
+        if (!(c.count > 0 && c.count <= capacity)) throw new Error(`splatRendererGPU.update: ${c.count} splats is outside 1-${capacity}`);
+        for (const [k, w] of Object.entries(lens)) if (!c[k] || c[k].length < c.count * w) throw new Error(`splatRendererGPU.update: splat.${k} must hold ${w} numbers a splat`);
+        upload(c); n = c.count; self._last = null;
+    };
+    Object.defineProperty(self, "count", { get: () => n });
     /** Sort on the card if the camera moved, then draw the cloud into `target` (a GPUTextureView), back to front. */
     self.draw = (encoder, { view, proj, camera, target, width, height, clear = null }) => {
         const key = camera.join() + "|" + self.position.join() + "|" + self.scale;

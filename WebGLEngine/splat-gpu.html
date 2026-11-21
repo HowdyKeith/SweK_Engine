@@ -10,6 +10,9 @@
   ?n=200000      how many splats in the generated cloud (default 50000)
   ?gen=nebula    sphereCloud | ribbon | nebula (engine/splatGenerator.js)
   ?backend=webgl2  force the CPU-sorted WebGL2 renderer
+  ?lod=1&budget=300000   LEVEL OF DETAIL (render/splatLod.mjs): the cloud becomes an octree and each frame draws at most `budget` splats, far parts as
+                 merged stand-ins, near parts as real splats; re-cut when the camera moves (WebGPU only)
+  ?swlod=/path/scene.swlod  STREAM a packed level-of-detail file: the root first, then the nodes the camera wants, by HTTP Range requests
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   Drop a .ply or .splat file on the page to view it instead (engine/splatParser.js).
   Drag to orbit, wheel to zoom. window.__splatGpu reports { ready, backend, count, frames, frameMs, error }, and __splatGpu.capture() draws one frame and
@@ -40,6 +43,7 @@ import { createSplatRendererGPU } from "./render/splatRendererGPU.mjs";
 import { SplatRenderer } from "./engine/SplatRenderer.js";
 import { SPLAT_GENERATORS } from "./engine/splatGenerator.js";
 import { parseSplatFile } from "./engine/splatParser.js";
+import { buildLod, selectLod, gatherSplats, openLodStream, httpRange } from "./render/splatLod.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
@@ -61,17 +65,18 @@ function cloud() {
 }
 
 let draw = null, drawCount = 0;
-async function useWebGPU(splat) {
+async function useWebGPU(splat, capacity = splat.count) {
     if (!navigator.gpu) throw new Error("this browser has no WebGPU");
     const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no WebGPU adapter");
     const device = await adapter.requestDevice(), ctx = canvas.getContext("webgpu"), format = navigator.gpu.getPreferredCanvasFormat();
     ctx.configure({ device, format, alphaMode: "premultiplied", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     device.lost.then((i) => { state.error = "the GPU device was lost: " + i.message; });
-    const r = createSplatRendererGPU(device, splat, { format });
+    const r = createSplatRendererGPU(device, splat, { format, capacity });
     const info = adapter.info || {};
     state.adapter = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ") || "unknown adapter";
     state.format = format;
     const d = (view, proj, eye) => {
+        if (LOD.on) recut(eye, r);
         const enc = device.createCommandEncoder(), tex = ctx.getCurrentTexture();
         r.draw(enc, { view, proj, camera: eye, target: tex.createView(), width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1] });
         device.queue.submit([enc.finish()]); return tex;
@@ -100,7 +105,7 @@ function useWebGL2(splat) {
 function resize() { const d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(canvas.clientWidth * d)); canvas.height = Math.max(1, Math.round(canvas.clientHeight * d)); }
 let last = performance.now(), avg = null;
 function paintHud() {
-    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.count.toLocaleString()} splats · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.error ? "<br>" + state.error : ""}`;
+    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.error ? "<br>" + state.error : ""}`;
 }
 function frame() {
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();
@@ -112,7 +117,25 @@ function frame() {
     if (!(STILL > 0 && state.frames >= STILL)) requestAnimationFrame(frame); else { state.stopped = true; paintHud(); }
 }
 
+// ---- level of detail: a cut of the octree, re-made when the camera has moved or new nodes have arrived, at most every 100 ms ----
+const LOD = { on: false, lod: null, stream: null, budget: Math.max(1000, Number(Q.get("budget")) || 300000), lastEye: null, lastAt: 0, dirty: true, cloud: null, cut: null };
+function recut(eye, r) {
+    const now = performance.now(), moved = !LOD.lastEye || Math.hypot(eye[0] - LOD.lastEye[0], eye[1] - LOD.lastEye[1], eye[2] - LOD.lastEye[2]) > cam.dist * 0.01;
+    if (!(LOD.dirty || moved) || now - LOD.lastAt < 100) return;
+    LOD.lastEye = eye.slice(); LOD.lastAt = now; LOD.dirty = false;
+    const cut = LOD.cut = selectLod(LOD.lod, { eye, fovy: 0.9, height: canvas.height }, { budget: LOD.budget });
+    LOD.cloud = gatherSplats(LOD.lod, cut, LOD.cloud); r.update(LOD.cloud); state.drawn = LOD.cloud.count; state.nodes = cut.nodes.length;
+    if (LOD.stream && cut.wanted.length) LOD.stream.load(cut.wanted.slice(0, 24)).then(() => { LOD.dirty = true; state.loaded = LOD.lod.nodes.filter((n) => n.loaded).length; }).catch((e) => { state.error = "streaming: " + (e.message || e); });
+}
+async function showLod(lodOrStream) {
+    LOD.on = true; LOD.lod = lodOrStream.lod || lodOrStream; LOD.stream = lodOrStream.lod ? lodOrStream : null;
+    state.lod = true; state.count = LOD.lod.count; state.budget = LOD.budget; state.loaded = LOD.lod.nodes.filter((n) => n.loaded).length; state.nodeCount = LOD.lod.nodes.length;
+    const b = LOD.lod.nodes[0].bounds; cam.target = b.slice(0, 3); cam.dist = Math.max(0.5, 3.2 * b[3]);
+    const first = gatherSplats(LOD.lod, selectLod(LOD.lod, { eye: eyeOf(), height: canvas.height }, { budget: LOD.budget }));
+    draw = await useWebGPU(first, Math.max(first.count, Math.min(LOD.budget, LOD.lod.count))); state.backend = "webgpu";
+}
 async function show(splat) {
+    if (Q.get("lod") === "1" && navigator.gpu && Q.get("backend") !== "webgl2") { try { return await showLod(buildLod(splat)); } catch (e) { state.fallback = "level of detail: " + (e.message || e); LOD.on = false; } }
     state.count = splat.count;
     if (splat.bbox && splat.bbox.center) { cam.target = splat.bbox.center.slice(); cam.dist = Math.max(0.5, 1.6 * Math.max(...splat.bbox.size)); }
     const want = Q.get("backend") === "webgl2" ? "webgl2" : "webgpu";
@@ -140,7 +163,7 @@ state.capture = async (cols = 32, rows = 20) => {
 };
 
 resize();
-show(cloud()).then(() => requestAnimationFrame(frame), (e) => { state.error = String(e.message || e); hud.textContent = state.error; });
+(Q.get("swlod") ? openLodStream(httpRange(Q.get("swlod"))).then(showLod) : show(cloud())).then(() => requestAnimationFrame(frame), (e) => { state.error = String(e.message || e); hud.textContent = state.error; });
 </script>
 </body>
 </html>
