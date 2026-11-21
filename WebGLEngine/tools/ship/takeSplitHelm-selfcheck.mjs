@@ -10,7 +10,9 @@
 //   2  THE STUDY             against a stand-in: four arms, each once; the gain is the split less the fly; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelm.reading.json; the kept arms in brain/rig-results/splitHelm/): THE BEST-SHIP BUTTON TAKES THE SPLIT HELM. The split less the fly, the cannon on: one ship a side +0.055 (z 3.88, 1200 pairs,
+//   LEADS -- the forecast's 0.05, and the third study in which the sine led the fly's circuit with the cannon); fleets of three +0.010 (z 0.68, 600 pairs, cannot be told -- the forecast said about 0.03). The page gains the split helm
+//   (render/spaceDuelCore.mjs, `byCannon`: helm-sine with the cannon, helm-flywired without) and the best-ship button carries it.
 //
 // SABOTAGE LOG: 13 mutants of tools/ship/takeSplitHelm.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 13 RED the first time
 //   (a seed moved, old pairs, a quarter of the pairs short; the split always the sine, always the fly; the gain's sign; a lead at exactly 2 let by, a trail
@@ -51,7 +53,7 @@ await section(async () => {
     ok("!! WITHOUT THE CANNON THE SPLIT HELM IS THE FLY'S HELM: the same jobs, so their difference is zero by construction and nothing is flown for it", G.splitArmOf("oneNone") === "fly" && G.splitArmOf("fleetNone") === "fly" && G.splitArmOf("oneCannon") === "sine"
         && JSON.stringify(G.jobsOf("oneNone", "split", b, [p])) === JSON.stringify(G.jobsOf("oneNone", "fly", b, [p])) && JSON.stringify(G.jobsOf("fleetNone", "split", b, [FV.SETS.fleetNone[0]])) === JSON.stringify(G.jobsOf("fleetNone", "fly", b, [FV.SETS.fleetNone[0]])));
     const best = C.PRESETS.find((x) => x.id === "best");
-    ok("!! THE BUTTON AS IT IS: the best ship carries the fly's cannon-aware helm", best.choice.helm === "flywired" || best.choice.helm === "split");
+    ok("!! THE BUTTON: the best ship carries the fly's cannon-aware helm, or since this study's reading the split helm", best.choice.helm === "flywired" || best.choice.helm === "split");
 });
 
 console.log("2. THE STUDY (flown by a stand-in)");
@@ -70,7 +72,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ fly: k(f, "fly"), split: k(f, "split") })])), R = (f) => out[f].reading.gain;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: the split less the fly +0.055 one ship a side (LEADS, 1200 pairs), +0.010 in fleets (CANNOT BE TOLD, 600 pairs)", near(R("oneCannon"), 0.0551) && TA.word(R("oneCannon").z) === "LEADS" && R("oneCannon").n === 1200 && near(R("fleetCannon"), 0.0097) && TA.word(R("fleetCannon").z) === "CANNOT BE TOLD" && R("fleetCannon").n === 600
+        && G.FIGHTS.every((f) => Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12));
+    const v = G.decide(out), best = C.PRESETS.find((x) => x.id === "best"), split = C.HELMS.find((h) => h.id === "split");
+    ok("!! WHAT IS DECIDED, as read: the split helm; the page has it (the sine with the cannon, the fly's circuit without) and the best-ship button carries it, its note saying so", v.split && rd.verdict.split && best.choice.helm === "split" && split && split.byCannon.on === "helm-sine" && split.byCannon.off === "helm-flywired" && /takeSplitHelm/.test(best.note) && /\+0\.055/.test(split.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

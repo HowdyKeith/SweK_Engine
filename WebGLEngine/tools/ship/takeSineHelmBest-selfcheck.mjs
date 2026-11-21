@@ -46,7 +46,7 @@ await section(async () => {
     ok("!! THE JOBS ARE takeFlyVsSine's on these pairs: the fly's helm and the sine's, the button's gunner by the fight", G.FIGHTS.every((f) => G.ARMS.every((a) => JSON.stringify(G.jobsOf(f, a, b, L(f))) === JSON.stringify(FV.jobsOf(f, a, b, L(f))))) && G.jobsOf("oneCannon", "sine", b)[0].x.helmNet.wiring === "sine~odd"
         && G.jobsOf("oneCannon", "fly", b)[0].seed === 1501001 && G.jobsOf("fleetNone", "fly", b).length === 600 && G.jobsOf("fleetNone", "fly", b)[0].opts.ships === 3 && !G.jobsOf("fleetNone", "fly", b)[0].x.cannon);
     const best = C.PRESETS.find((p) => p.id === "best");
-    ok("!! THE BUTTON AS IT IS: the best ship carries the by-the-fight hand under a helm, the cannon on; the two helms are the page's", best.choice.hand === "bysize" && best.choice.cannon === true && ["flywired", "sine"].includes(best.choice.helm) && C.FILES["helm-flywired"].path.endsWith(path.basename(FV.FILES.fly)) && C.FILES["helm-sine"].path.endsWith(path.basename(FV.FILES.sine)));
+    ok("!! THE BUTTON AS IT IS: the best ship carries the by-the-fight hand under a helm, the cannon on; the two helms are the page's", best.choice.hand === "bysize" && best.choice.cannon === true && ["flywired", "sine", "split"].includes(best.choice.helm) && C.FILES["helm-flywired"].path.endsWith(path.basename(FV.FILES.fly)) && C.FILES["helm-sine"].path.endsWith(path.basename(FV.FILES.sine)));
 });
 
 console.log("2. THE STUDY (flown by a stand-in)");
@@ -70,7 +70,7 @@ await section(() => {
     ok("!! RE-DERIVED FROM THE KEPT ARMS: the fly less the sine -0.048 and -0.048 with the cannon (both TRAIL), +0.057 one ship a side without it (LEADS), +0.004 in fleets without it (CANNOT BE TOLD)", near(R("oneCannon"), -0.0479) && TA.word(R("oneCannon").z) === "TRAILS" && near(R("fleetCannon"), -0.0480) && TA.word(R("fleetCannon").z) === "TRAILS"
         && near(R("oneNone"), 0.0572) && TA.word(R("oneNone").z) === "LEADS" && near(R("fleetNone"), 0.0041) && TA.word(R("fleetNone").z) === "CANNOT BE TOLD" && G.FIGHTS.every((f) => Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12) && R("oneCannon").n === 1200 && R("fleetNone").n === 600);
     const v = G.decide(out), best = C.PRESETS.find((p) => p.id === "best"), fly = C.HELMS.find((h) => h.id === "flywired"), sine = C.HELMS.find((h) => h.id === "sine");
-    ok("!! WHAT IS DECIDED, as read: the fly leads one ship a side without the cannon, so the best-ship button keeps the fly's helm; its note and both helms' say so", !v.sine && v.helm === "flywired" && rd.verdict.helm === "flywired" && best.choice.helm === "flywired"
+    ok("!! WHAT IS DECIDED, as read: the fly leads one ship a side without the cannon, so the best-ship button keeps the fly's helm; its note and both helms' say so", !v.sine && v.helm === "flywired" && rd.verdict.helm === "flywired" && (best.choice.helm === "flywired" || best.choice.helm === "split")   /* this study kept the fly; tools/ship/takeSplitHelm.mjs then moved the button to the split helm */
         && [best, fly, sine].every((x) => /takeSineHelmBest/.test(x.note)) && /\+0\.057/.test(best.note));
 });
 

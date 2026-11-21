@@ -20,7 +20,9 @@
 // WHAT IS DECIDED: THE BEST-SHIP BUTTON'S HELM BECOMES THE SPLIT HELM if THE SPLIT LESS THE FLY LEADS one ship a side AND does not TRAIL in fleets;
 //   otherwise the button keeps the fly's helm. Either way the notes of the button and both helms say so. Nothing is written but the reading; the page
 //   gains the split helm (a helm entry that names one file with the cannon and another without) by hand only if it is decided.
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelm.reading.json; the kept arms in brain/rig-results/splitHelm/): THE BEST-SHIP BUTTON TAKES THE SPLIT HELM. The split less the fly, the cannon on: one ship a side +0.055 (z 3.88, 1200 pairs,
+//   LEADS -- the forecast's 0.05, and the third study in which the sine led the fly's circuit with the cannon); fleets of three +0.010 (z 0.68, 600 pairs, cannot be told -- the forecast said about 0.03). The page gains the split helm
+//   (render/spaceDuelCore.mjs, `byCannon`: helm-sine with the cannon, helm-flywired without) and the best-ship button carries it.
 // Every arm's leads are kept (brain/rig-results/splitHelm/); the reading file (brain/splitHelm.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, the fleet button (fleets only, where the sine was told once and not once), other weights.
 "use strict";
