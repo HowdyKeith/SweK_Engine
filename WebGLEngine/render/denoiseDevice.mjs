@@ -700,12 +700,16 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     };
     return {
         layers, kernels,
-        async run(x, { keep = false } = {}) {
+        /** 2026-11-21: `timer` (render/gpuTimer.mjs) times each pass on the card -- layer i as "L<i> <kernel>", the image kernel as "apply" -- read back by its collect(). */
+        passLabels: [...layers.map((L, i) => `L${i} ${L.kernel}`), ...(apply === "head_apply" ? [] : ["apply"])],
+        async run(x, { keep = false, timer = null } = {}) {
             if (x.length !== H * W * C) throw new Error(`denoiseDevice: an input of ${x.length} values for ${H} x ${W} x ${C}`);
             const t0 = (globalThis.performance ?? Date).now();
             dev.queue.writeBuffer(xBuf, 0, Float32Array.from(x));
             const enc = dev.createCommandEncoder();
-            for (const s of steps) { const pass = enc.beginComputePass(); pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(...s.wg); pass.end(); }
+            const labels = [...layers.map((L, i) => `L${i} ${L.kernel}`), ...(apply === "head_apply" ? [] : ["apply"])];
+            steps.forEach((s, i) => { const w = timer && timer.writes ? timer.writes(labels[i] || "pass") : undefined; const pass = enc.beginComputePass(w ? { timestampWrites: w } : {}); pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(...s.wg); pass.end(); });
+            if (timer && timer.finish) timer.finish(enc);
             dev.queue.submit([enc.finish()]);
             const y = await readBack(yBuf, H * W * 3);
             const ms = (globalThis.performance ?? Date).now() - t0;

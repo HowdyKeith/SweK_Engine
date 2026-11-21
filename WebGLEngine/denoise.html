@@ -48,7 +48,7 @@
     <label>Reference <select id="refspp"><option value="64">64 spp</option><option value="256" selected>256 spp</option><option value="1024">1024 spp (slow)</option></select></label>
     <button id="go">Render and denoise</button>
   </div>
-  <div id="status" class="sub">idle</div>
+  <div id="status" class="sub" style="white-space:pre-line">idle</div>
 
   <div class="row">
     <figure><canvas id="cNoisy" width="64" height="64"></canvas><figcaption>noisy, 4 spp <span class="n" id="eNoisy"></span></figcaption></figure>
@@ -126,6 +126,7 @@ import { decodeNet, createDeviceDenoiser, timingLadder, TIMED_SETS, PAGE_KERNELS
 import { VARIANTS, jobFor, measure } from "/render/denoiseCompile.mjs";
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { requestDevice } from "/gfx/device.js";
+import { createGpuTimer, timerLines } from "/render/gpuTimer.mjs";
 import { timeHalfChain } from "/render/denoiseUpscaleGPU.mjs";
 import { uthFor, UTH_NET } from "/render/learnedUpscaleTemporalGPU.mjs";
 
@@ -151,7 +152,7 @@ const randomSeed = () => { let s; do { s = 990000 + Math.floor(Math.random() * 9
 $("seed").value = randomSeed();
 $("reseed").onclick = () => { $("seed").value = randomSeed(); };
 
-let shipped = null, net = null, netName = null, device = null, denoiser = null, deviceNote = "";
+let shipped = null, net = null, netName = null, device = null, denoiser = null, deviceNote = "", gpuTimer = null;
 // the network, once (round 50, section 120): ?net=<name> names it -- for the gates and the rig -- else PAGE_NETWORKS_BY_ADAPTER by this
 // adapter's key, else the shipped one. An unknown name is refused by name; a response that is not ok says so instead of being parsed
 async function loadNet() {
@@ -171,7 +172,8 @@ async function setup() {
         if (!navigator.gpu) throw new Error(noGpu());
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error("no WebGPU adapter");
-        device = await adapter.requestDevice();
+        device = await adapter.requestDevice(adapter.features.has("timestamp-query") && new URLSearchParams(location.search).get("gputimer") !== "0" ? { requiredFeatures: ["timestamp-query"] } : undefined);
+        gpuTimer = createGpuTimer(device); window.__denoiseGpuTimer = gpuTimer;   // 2026-11-21: each pass of the network timed on the card (render/gpuTimer.mjs)
         // the page's own kernel set, apart from what node and the gates default to: section 61's for an adapter it measured
         // (by platform, vendor and architecture), else PAGE_KERNELS, section 46's page rule's
         const info = adapter.info || {}, key = pageAdapterKey(info, navigator.userAgentData), kernels = pageKernelsFor(key);
@@ -196,9 +198,11 @@ $("go").onclick = async () => {
         const tRender = performance.now() - t0;
         status("denoising..."); await frame();
         const yf = jointBilateral(x, N, N, shipped.filter);
-        let yn, tNet, agree = "";
+        let yn, tNet, agree = "", gpuLines = "";
         if (denoiser) {
-            const out = await denoiser.run(x);
+            const out = await denoiser.run(x, { timer: gpuTimer });
+            await device.queue.onSubmittedWorkDone(); const gst = await gpuTimer.collect();
+            gpuLines = gst.supported && gst.frames ? "\n" + timerLines({ ...gst, labels: Object.fromEntries(Object.entries(gst.labels).map(([k, v]) => [k, { ms: v.last, last: v.last }])), totalMs: Object.values(gst.labels).reduce((a, v) => a + v.last, 0) }).join("\n") : gst.supported ? "" : "\nGPU timer: this device has no timestamp-query";
             yn = out.y; tNet = out.ms;
             // the page checks itself: the device's image against the f64 network on the CPU, every value
             const y64 = denoise(net, x, N, N).y;
@@ -209,7 +213,7 @@ $("go").onclick = async () => {
         const e = (y) => relMSE(y, I.ref).toFixed(4);
         $("eNoisy").textContent = e(I.input); $("eFilter").textContent = e(yf); $("eNet").textContent = e(yn); $("eRef").textContent = `(${sppRef} spp)`;
         $("netCap").firstChild.textContent = `network, ${deviceNote} `;
-        status(`${family} ${seed}: rendered in ${(tRender / 1000).toFixed(1)} s; the network ran ${deviceNote} in ${tNet.toFixed(0)} ms${agree}`);
+        status(`${family} ${seed}: rendered in ${(tRender / 1000).toFixed(1)} s; the network ran ${deviceNote} in ${tNet.toFixed(0)} ms${agree}${gpuLines}`);
     } catch (e) { status("failed: " + e.message); }
     finally { $("go").disabled = false; }
 };

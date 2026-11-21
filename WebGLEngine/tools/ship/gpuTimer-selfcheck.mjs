@@ -12,7 +12,9 @@
 //                       keys, sort and draw each read a positive time; the sort is 8 radix passes of 3 compute passes each at this size (5 once the scan needs a second level), all under "sort"
 //   3  NO STALL         finish() resolves into a ring of read-back buffers and collect() never waits: while every buffer is still waiting, a frame's times are
 //                       dropped rather than blocking the next frame
-//   4  THE PAGE         splat-gpu.html asks for timestamp-query and shows keys, sort and draw on the card
+//   4  THE PAGE         splat-gpu.html asks for timestamp-query and shows keys, sort and draw on the card. 2026-11-21, OTHER PAGES: fsr.html shows EASU and RCAS
+//                       (gfx/device.js frame({ timer, labels })); denoise.html puts each layer's time on its status line (render/denoiseDevice.mjs
+//                       run({ timer })); section 2 holds the denoiser's run on node-webgpu: every pass labelled and timed, the image bit for bit unchanged
 //
 // Device cases run in child processes and a SwiftShader abort is retried, as tools/ship/splatSortGPU-selfcheck.mjs's header explains; a wrong answer fails at once.
 // SABOTAGE LOG: see the bottom of this file.
@@ -59,6 +61,14 @@ async function child(kind) {
         for (let f = 0; f < 3; f++) { const enc = dev.createCommandEncoder(); r.draw(enc, { view, proj, camera: [0, 0, 3 + f * 0.01], target: tex.createView(), width: 64, height: 64, clear: [0, 0, 0, 1], timer: f === 0 ? counting : t }); t.finish(enc); dev.queue.submit([enc.finish()]); await t.collect(); }
         await new Promise((r2) => setTimeout(r2, 200)); const st = await t.collect();
         out = { kind, passesFirstFrame: passes, labels: Object.fromEntries(Object.entries(st.labels).map(([k, v]) => [k, v.last])), frames: st.frames };
+    } else if (kind === "denoiser") {
+        // render/denoiseDevice.mjs's run() with a timer: every pass under its layer's label, each a positive time, and the image bit for bit the untimed run's
+        const { createDeviceDenoiser, timingInput } = await import("../../render/denoiseDevice.mjs"), { makeDenoiser } = await import("../../render/denoiseNet.mjs");
+        const net = makeDenoiser(3, "he", "kernel", 10, "large"), h = 24, w = 24, x = timingInput(h, w, 10, 7), D = await createDeviceDenoiser(dev, net, { H: h, W: w, C: 10, kernels: "r12" });   // r12: the image kernel is its own pass ("apply")
+        const plain = (await D.run(x)).y, t = T.createGpuTimer(dev, { usage: U, mapMode: M }), timed = (await D.run(x, { timer: t })).y;
+        await dev.queue.onSubmittedWorkDone(); await new Promise((r) => setTimeout(r, 100)); const st = await t.collect();
+        let same = plain.length === timed.length; for (let i = 0; same && i < plain.length; i++) if (plain[i] !== timed[i]) same = false;
+        out = { kind, same, want: D.passLabels, labels: Object.fromEntries(Object.entries(st.labels).map(([k, v]) => [k, v.last])), frames: st.frames }; D.destroy();
     } else if (kind === "stall") {
         // finish three frames without collecting: the ring (3) fills; a fourth frame's times are dropped, and finish() never waits
         const t = T.createGpuTimer(dev, { usage: U, mapMode: M, ring: 3 }), t0 = Date.now(); let dropped = 0;
@@ -110,6 +120,10 @@ else {
             const s = runCase("splats");
             ok("!! THE SPLAT RENDERER'S PASSES: keys, sort and draw each read a positive time; the first frame is 1 + 24 + 1 timed passes (keys; 8 radix passes of histogram, one-level scan and reorder for 5000 splats; draw)", s && !s.crashed && s.labels.keys > 0 && s.labels.sort > 0 && s.labels.draw > 0 && s.passesFirstFrame === 26, s ? JSON.stringify(s) : "aborted every time");
         });
+        await section(() => {
+            const d = runCase("denoiser");
+            ok("!! THE DENOISER'S PASSES ON THE CARD: render/denoiseDevice.mjs's run({ timer }) times every pass under its layer's label (its passLabels: L0.. and apply), each a positive time, and the image is bit for bit the untimed run's", d && !d.crashed && d.same && d.frames === 1 && d.want.length >= 3 && d.want.includes("apply") && d.want.every((l) => d.labels[l] > 0) && Object.keys(d.labels).length === new Set(d.want).size, d && JSON.stringify(d));
+        });
         console.log("3. NO STALL");
         await section(() => {
             const s = runCase("stall");
@@ -132,6 +146,21 @@ else {
         const st = await p.evaluate(() => ({ ...window.__splatGpu, capture: undefined })), hud = await p.evaluate(() => document.getElementById("hud").textContent);
         if (st.gpuTimer && st.gpuTimer !== "on") console.log(`  ----  the page's adapter: ${st.gpuTimer}`);
         else ok("!! splat-gpu.html asks for timestamp-query and shows keys, sort and draw on the card, with no page error", st.gpuTimer === "on" && st.gpuTimes && st.gpuTimes.keys > 0 && st.gpuTimes.sort > 0 && st.gpuTimes.draw > 0 && /on the card/.test(hud) && errors.length === 0, JSON.stringify({ gpuTimes: st.gpuTimes, frames: st.gpuFrames, errors }));
+        const fsrSrc = fs.readFileSync(path.join(ENG, "fx", "fsr", "fsrGPU.js"), "utf8");
+        ok("!! FSR's labels name the passes they time: fsr1 dispatches EASU then RCAS and labels them easu, rcas in that order; easu() and rcas() alone label theirs", /pass\.dispatch\(this\.pEasu, g\);\s*pass\.dispatch\(this\.pRcas, g\);[\s\S]{0,80}_frameOpts\(\["easu", "rcas"\]\)/.test(fsrSrc) && /dispatch\(this\.pEasu, g\); pass\.clear\(\[0, 0, 0, 1\]\); \}, this\._frameOpts\(\["easu"\]\)/.test(fsrSrc) && /dispatch\(this\.pRcas, g\); pass\.clear\(\[0, 0, 0, 1\]\); \}, this\._frameOpts\(\["rcas"\]\)/.test(fsrSrc));
+        // fsr.html: EASU and RCAS through gfx/device.js's frame({ timer, labels }) into a timer on device.gpu, shown under the engine's line
+        const f = await browser.newPage({ viewport: { width: 900, height: 700 } }), ferr = []; f.on("pageerror", (e) => ferr.push(e.message));
+        await f.goto(`http://127.0.0.1:${srv.address().port}/fsr.html`);
+        await f.waitForFunction(() => window.__fsrGpuTimer && window.__fsrGpuTimer.stats().frames > 0 && /on the card/.test(document.getElementById("gpuTimes").textContent), null, { timeout: 90000 }).catch(() => {});
+        const fs2 = await f.evaluate(() => ({ st: window.__fsrGpuTimer ? window.__fsrGpuTimer.stats() : null, text: document.getElementById("gpuTimes").textContent, engine: document.getElementById("engine").textContent }));
+        ok("!! fsr.html times EASU and RCAS on the card (gfx/device.js frame({ timer, labels })) and shows them under the engine's line, with no page error", fs2.st && fs2.st.labels.easu && fs2.st.labels.easu.ms > 0 && fs2.st.labels.rcas && fs2.st.labels.rcas.ms > 0 && /easu/.test(fs2.text) && /on the card/.test(fs2.text) && ferr.length === 0, JSON.stringify({ labels: fs2.st && fs2.st.labels, text: fs2.text.slice(0, 120), engine: fs2.engine.slice(0, 80), errors: ferr.slice(0, 2) }));
+        // denoise.html: one denoise at 64 spp reference; the status line carries each layer's time on the card
+        const dn = await browser.newPage({ viewport: { width: 900, height: 700 } }), derr = []; dn.on("pageerror", (e) => derr.push(e.message));
+        await dn.goto(`http://127.0.0.1:${srv.address().port}/denoise.html`);
+        await dn.evaluate(() => { document.getElementById("refspp").value = "64"; document.getElementById("go").click(); });
+        await dn.waitForFunction(() => /rendered in|failed/.test(document.getElementById("status").textContent), null, { timeout: 180000 }).catch(() => {});
+        const dt = await dn.evaluate(() => ({ text: document.getElementById("status").textContent, st: window.__denoiseGpuTimer ? window.__denoiseGpuTimer.stats() : null }));
+        ok("!! denoise.html times the network's passes on the card and puts each layer's time on its status line, with no page error", dt.st && dt.st.supported && dt.st.frames === 1 && Object.keys(dt.st.labels).some((k) => /^L0 /.test(k)) && /^L0 .* ms$/m.test(dt.text) && /on the card/.test(dt.text) && derr.length === 0, JSON.stringify({ text: dt.text.slice(-260), errors: derr.slice(0, 2) }));
         await browser.close(); srv.close();
     });
     console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
@@ -142,4 +171,7 @@ else {
 // 10 mutants, 8 of render/gpuTimer.mjs and 2 of render/splatSortGPU.mjs, each in a hard-linked copy of the tree: ALL 10 RED (passes under one label not summed,
 // microseconds for milliseconds, a backwards pair kept, smallest first, an overflowing pass overwriting a slot, a full ring forcing a slot free (caught by
 // section 4's page, NOT by section 3: section 3 shows nothing waited, not that a busy slot was left alone), a device without the feature taken for one with
-// it, one write index for begin and end; the sort's passes untimed, the keys pass labelled "sort").
+// it, one write index for begin and end; the sort's passes untimed, the keys pass labelled "sort"). 2026-11-21, the other pages: 8 more, 3 of gfx/device.js, 2 of
+// fx/fsr/fsrGPU.js, 3 of render/denoiseDevice.mjs: ALL 8 RED (the labels ignored, the timer never finished, every pass on one slot; the FSR timer unused, its
+// labels swapped -- caught only once the source check was added, as both passes read a positive time either way; the denoiser's timer unfinished, one label
+// for every pass, passLabels missing the apply pass -- caught only once the case used r12, whose image kernel is a pass of its own).
