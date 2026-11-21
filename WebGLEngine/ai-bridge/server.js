@@ -2621,7 +2621,8 @@ const fleetBridge = require("./fleetBridge.js");
 const subAquariumBridge = require("./subAquariumBridge.js"); // UNNUMBERED -- the sub aquarium: peers send their subs here; the FISH BRAIN / FLY BRAIN chips poll its health routes
 const subAquarium = subAquariumBridge.createBridge({ root: path.resolve(__dirname, "..") });
 const exportBridge = require("./exportBridge.js");
-const aiUsageBridge = require("./aiUsageBridge.js");   // the dock's AI usage-limit gauges: GET /ai/usage
+const aiUsageBridge = require("./aiUsageBridge.js");
+const tvpipeBridge = require("./tvpipeBridge.js");   // SweK to a TV (AirPlay, Chromecast) through tvpipe: /tv/*   // the dock's AI usage-limit gauges: GET /ai/usage
 const codemapBridge = require("./codemapBridge.js");   // v2519 -- the tree as a 3D city, coloured by the vNNNN markers it already carries   // /export/mp4 : webm clip -> YouTube-ready mp4 + description sidecar   // v2221 — POST /fleet/announce : when a peer sails into/out of the fleet, fan the event out to peers as an announcement. Trusted requests only: it broadcasts.
 const httpRange = require("./httpRange.js");   // v2208 — RFC 7233 byte ranges: seeking in a <video>, a page out of a CBZ, a television.
 const jellyfinBridge = require("./jellyfinBridge.js");   // v2209 — detect + link a media LIBRARY. Not a transport: live LAN streams go through go2rtc.
@@ -12522,6 +12523,18 @@ ${text.replace(/'/g, "''")}
     // BRACE it sits inside is not, and nothing about reading the handler tells you that. It is the same family as
     // the v2760 EDITING LAW (an insertion that landed inside a multi-line import) -- an edit placed by position
     // rather than by scope. Both compile. Both are silent.
+    // /tv/* -- SweK to a TV through tvpipe (Apple TV / AirPlay, Chromecast / Google Cast): see ai-bridge/tvpipeBridge.js for every route and what it
+    // refuses. Trusted callers only: each route puts something on somebody's television.
+    if (req.url.split("?")[0].startsWith("/tv/")) {
+        const p = req.url.split("?")[0];
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only: this puts a picture on a television" }, 403); return; }
+        if (p === "/tv/status" && req.method === "GET") { sendJson(tvpipeBridge.status()); return; }
+        if (p === "/tv/devices" && req.method === "GET") { const t = new URL(req.url, "http://x").searchParams.get("timeout"); tvpipeBridge.devices({ timeout: t ? Number(t) : undefined }).then(sendJson, (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); return; }
+        if (req.method === "POST" && (p === "/tv/share" || p === "/tv/play" || p === "/tv/pattern")) { readJson((d) => { tvpipeBridge.start(p.slice(4), d || {}).then(sendJson, (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); }); return; }
+        if (req.method === "POST" && p === "/tv/stop") { readJson((d) => { tvpipeBridge.stop(d && d.id).then((ids) => sendJson({ ok: true, stopped: ids }), (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); }); return; }
+        if (req.method === "POST" && p === "/tv/pin") { readJson((d) => sendJson(tvpipeBridge.answerPin(d && d.id, d && d.pin))); return; }
+        sendJson({ ok: false, error: "no such /tv/ route" }, 404); return;
+    }
     // GET /ai/usage -- how much of the Claude Code and Codex subscription limits is used (five-hour session and week), for the dock's
     // CLAUDE 5H / CLAUDE WK / CODEX 5H / CODEX WK gauges. See ai-bridge/aiUsageBridge.js: it borrows each CLI's own sign-in READ-ONLY, never
     // returns or logs a token, and caches for two minutes (?force=1 skips that). Trusted callers only, because it spends this machine's sign-ins.
