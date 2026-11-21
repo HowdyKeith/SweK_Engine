@@ -9,7 +9,9 @@
 //   1  THE SHADER        it compiles; it carries engine/SplatRenderer.js's math term for term (the conic, the 3σ square, the one-pixel blur, the culls, the
 //                        alpha floor and cap); it reads splat order[instance], not instance; it writes premultiplied colour for its blend
 //   2  THE PICTURE       on node-webgpu: 40 overlapping splats at 96 x 96 against a CPU evaluation of exactly that math (f64, the same back-to-front order),
-//                        pixel by pixel; and how far the WebGL2 renderer's unpremultiplied blend is from it
+//                        pixel by pixel; and how far the WebGL2 renderer's unpremultiplied blend is from it. THE TIGHT SQUARES (2026-11-21): a faint 4,000-splat
+//                        cloud drawn with the old 3σ squares and the tight ones is no further from the CPU's picture; the size cap does change pixels (so it
+//                        is off); and on the card's own clock (render/gpuTimer.mjs) the draw pass takes at least 15% less (25% on SwiftShader)
 //   3  THE ORDER         a near red splat over a far blue one: red on top from one side, and after the camera crosses to the other side WITHOUT re-uploading
 //                        anything, blue on top -- the card re-sorted and the draw read the new order
 //
@@ -18,14 +20,16 @@
 //
 // SABOTAGE LOG: 13 mutants of render/splatRendererGPU.mjs, each in a hard-linked copy of the tree: ALL 13 RED (the instance read instead of order[instance],
 // straight colour under the premultiplied blend, no blur, the conic's sign, a 2σ square, the quaternion's order, scales not in log space, no sigmoid, never
-// re-sorting after the first frame, the origin ignored, no alpha cap, an attribute unchecked, an additive blend).
+// re-sorting after the first frame, the origin ignored, no alpha cap, an attribute unchecked, an additive blend). 2026-11-21, the tight squares: 6 more, ALL 6
+// RED (k always 3, k too tight, the wrong floor in the log, the opacity cull too high, loose by default, the size cap ignored).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason } from "./headlessGpu.mjs";
+import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
+import { createGpuTimer } from "../../render/gpuTimer.mjs";
 import * as R from "../../render/splatRendererGPU.mjs";
 import * as C from "../../render/splatSort.mjs";
 
@@ -108,7 +112,21 @@ async function child(kind) {
         const img = new Uint8Array(W * H * 4); for (let y = 0; y < H; y++) img.set(raw.subarray(y * padded, y * padded + W * 4), y * W * 4); return { img, view };
     };
     let out;
-    if (kind === "compile") {
+    if (kind === "speed") {
+        // THE CARD'S OWN CLOCK: the same faint cloud, 256 x 256, the draw pass timed by render/gpuTimer.mjs, loose squares and tight, frames interleaved, medians
+        const gpu2 = mod.create([FINE_CLOCK_FLAG]), ad2 = await gpu2.requestAdapter(), d2 = await ad2.requestDevice({ requiredFeatures: ["timestamp-query"] }), S = 256;
+        const tgt = d2.createTexture({ size: [S, S], format: "rgba8unorm", usage: G.GPUTextureUsage.RENDER_ATTACHMENT });
+        const n = 6000, sc = scene(n); for (let i = 0; i < n; i++) { sc.opacities[i] = -4 + 2.5 * ((i * 0.618034) % 1); for (let k = 0; k < 3; k++) sc.scales[i * 3 + k] = Math.log(0.15); }
+        const mk = (tight) => { const r = R.createSplatRendererGPU(d2, sc, { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode, tight }); r.position = CAMERA.origin; r.scale = CAMERA.scale; return r; };
+        const arms = { loose: mk(false), tight: mk(true) }, ms = { loose: [], tight: [] }, view = lookAt(CAMERA.eye, CAMERA.at), pr = perspective(CAMERA.fovy, 1, 0.05, 50);
+        for (let f = 0; f < 24; f++) for (const a of f % 2 ? ["tight", "loose"] : ["loose", "tight"]) {
+            const t = createGpuTimer(d2, { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode }), enc = d2.createCommandEncoder();
+            arms[a].draw(enc, { view, proj: pr, camera: CAMERA.eye, target: tgt.createView(), width: S, height: S, clear: [0, 0, 0, 0], timer: t }); t.finish(enc); d2.queue.submit([enc.finish()]);
+            await d2.queue.onSubmittedWorkDone(); const st = await t.collect(); if (f >= 4 && st.labels.draw) ms[a].push(st.labels.draw.last); t.destroy();
+        }
+        const med = (v) => { const x = v.slice().sort((p, q) => p - q); return x.length ? x[x.length >> 1] : null; };
+        out = { kind, looseMs: med(ms.loose), tightMs: med(ms.tight), frames: ms.loose.length };
+    } else if (kind === "compile") {
         const ci = await dev.createShaderModule({ code: R.SPLAT_WGSL }).getCompilationInfo();
         out = { kind, errors: ci.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`) };
     } else if (kind === "picture") {
@@ -118,6 +136,15 @@ async function child(kind) {
         for (let p = 0; p < W * H; p++) for (let k = 0; k < 4; k++) { const g = img[p * 4 + k] / 255, d = Math.abs(g - ref[p * 4 + k]); sum += d; max = Math.max(max, d); n++; if (k < 3) sumGl += Math.abs(Math.min(1, refWebgl[p * 4 + k]) - ref[p * 4 + k]); }
         for (let p = 0; p < W * H; p++) if (ref[p * 4 + 3] > 0.05) covered++;
         out = { kind, mean: sum / n, max, covered, meanWebglBlend: sumGl / (W * H * 3) };
+    } else if (kind === "tight") {
+        // THE SAME PICTURE, LESS FILL: a faint, overlapping cloud (most splats at opacity 0.02-0.2) drawn with the old 3-sigma squares and with the tight ones
+        const n = 4000, s = scene(n); for (let i = 0; i < n; i++) { s.opacities[i] = -4 + 2.5 * ((i * 0.618034) % 1); for (let k = 0; k < 3; k++) s.scales[i * 3 + k] = Math.log(0.15); }
+        for (let i = 0; i < 300; i++) s.opacities[i] = -7;   // under the floor (sigmoid < 0.003): never drawn
+        let viewOf = null; const run = async (opts) => { const r = R.createSplatRendererGPU(dev, s, { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode, ...opts }); r.position = CAMERA.origin; r.scale = CAMERA.scale; const { img, view } = await shoot(r, CAMERA.eye); viewOf = view; return img; };
+        const loose = await run({ tight: false }), tightImg = await run({}), capped = await run({ maxRadiusPx: 4 });
+        let same = 0, maxd = 0, capDiff = 0, sum = 0; for (let k = 0; k < loose.length; k++) { const d = Math.abs(loose[k] - tightImg[k]); if (d === 0) same++; sum += d; maxd = Math.max(maxd, d); capDiff += Math.abs(loose[k] - capped[k]); }
+        const ref = cpuRender(s, viewOf, proj, { ...CAMERA }), errOf = (img) => { let e = 0; for (let k = 0; k < img.length; k++) e += Math.abs(img[k] / 255 - ref[k]); return e / img.length * 255; };
+        out = { kind, looseErr: errOf(loose), tightErr: errOf(tightImg), identical: same / loose.length, maxDiff: maxd, meanDiff: sum / loose.length, capMean: capDiff / loose.length, defaultTight: R.createSplatRendererGPU(dev, scene(4), { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode }).tight === true };
     } else if (kind === "order") {
         // a red splat at z +0.4 and a blue one at z -0.4, both opaque and wide, on the axis
         const s = { count: 2, positions: new Float32Array([0, 0, 0.4, 0, 0, -0.4]), scales: new Float32Array(6).fill(Math.log(0.3)), colors: new Float32Array([1, 0, 0, 0, 0, 1]), opacities: new Float32Array([6, 6]), quats: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0]) };
@@ -153,7 +180,7 @@ else {
     console.log("1. THE SHADER");
     await section(() => {
         const w = R.SPLAT_WGSL, gl = fs.readFileSync(path.join(ENG, "engine", "SplatRenderer.js"), "utf8");
-        const terms = [["the near cull", /if \(z < 0\.01\)/], ["the one-pixel blur", /2\.0 \/ (u_viewport|F\.viewport)\.y/], ["the conic", /vec3(<f32>)?\(c, -b, a\) \/ det/], ["the 3-sigma radius", /3\.0 \* sqrt\(max\(/], ["the determinant cull", /if \(det <= 0\.0\)/],
+        const terms = [["the near cull", /if \(z < 0\.01\)/], ["the one-pixel blur", /2\.0 \/ (u_viewport|F\.viewport)\.y/], ["the conic", /vec3(<f32>)?\(c, -b, a\) \/ det/], ["the 3-sigma radius", /3\.0 \* sqrt\(max\(|select\(3\.0, min\(3\.0, sqrt\(2\.0 \* log/], ["the determinant cull", /if \(det <= 0\.0\)/],
             ["the alpha cap", /min\(0\.99, v[._]opacity \* exp\(power\)\)/], ["the alpha floor", /if \(alpha < 0\.003\)/], ["the power", /-0\.5 \* \(v[._]conic\.x \* v[._]offset\.x \* v[._]offset\.x\s*\+\s*v[._]conic\.z \* v[._]offset\.y \* v[._]offset\.y\)\s*-\s*v[._]conic\.y \* v[._]offset\.x \* v[._]offset\.y/]];
         const missing = terms.filter(([, re]) => !re.test(w) || !re.test(gl)).map(([n]) => n);
         ok("!! engine/SplatRenderer.js's math, term for term, in both files: the near cull, the blur, the conic, the 3σ radius, the determinant cull, the alpha cap and floor, the power", missing.length === 0, missing.join(", "));
@@ -171,6 +198,15 @@ else {
             const p = runCase("picture");
             ok("!! THE PICTURE IS THE CPU'S: 40 splats at 96 x 96, mean difference under 1/255 a channel, none over 6/255, and the splats cover the frame", p && !p.crashed && !p.validation && p.mean < 1 / 255 && p.max <= 6 / 255 && p.covered > W * H * 0.2, p ? (p.crashed || `mean ${(p.mean * 255).toFixed(3)}/255, max ${(p.max * 255).toFixed(1)}/255, ${p.covered} px covered${p.validation ? " REJECTED " + p.validation : ""}`) : "aborted every time");
             if (p && !p.crashed) console.log(`  ----  measured, not held: the WebGL2 renderer's OLD unpremultiplied blend (before 2026-11-21) is ${(p.meanWebglBlend * 255).toFixed(1)}/255 a channel away from this picture on average -- the halo it had, fixed in engine/SplatRenderer.js the same day`);
+        });
+        await section(() => {
+            const t = runCase("tight");
+            ok("!! TIGHT SQUARES LOSE NOTHING: a faint overlapping cloud (4,000 splats) drawn with the old 3-sigma squares and the tight ones, both against the CPU's f64 picture -- the tight one is no further from it (within 0.05 of a level), and the two differ by rounding only (the offset is interpolated over a smaller quad: no byte by more than 2 levels, the mean under 0.2); tight is the default", t && !t.crashed && !t.validation && t.tightErr <= t.looseErr + 0.05 && t.maxDiff <= 2 && t.meanDiff < 0.2 && t.defaultTight, t ? JSON.stringify(t) : "aborted every time");
+            ok("!! ...and the size cap, off by default, DOES change pixels when asked for (4 px), which is why it is not on", t && !t.crashed && t.capMean > 0.5, t && `capped: ${t.capMean.toFixed(2)} levels a channel away`);
+        });
+        await section(() => {
+            const t = runCase("speed");
+            ok("!! ...AND IT IS FASTER ON THE CARD'S OWN CLOCK: the draw pass of a faint 6,000-splat cloud at 256 x 256, timed by render/gpuTimer.mjs over 20 interleaved frames, takes at least 15% less with the tight squares", t && !t.crashed && t.frames >= 20 && t.tightMs > 0 && t.tightMs < 0.85 * t.looseMs, t && (t.crashed || `median draw ${t.looseMs.toFixed(2)} ms loose, ${t.tightMs.toFixed(2)} ms tight (${(100 * (1 - t.tightMs / t.looseMs)).toFixed(0)}% less) on ${t.adapter}`));
         });
         console.log("3. THE ORDER");
         await section(() => {

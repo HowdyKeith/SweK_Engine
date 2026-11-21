@@ -17,13 +17,19 @@
 // faint edge (alpha 0.01) adds its colour at full strength and every splat gets a bright halo out to its 3σ square. "Over" back to front is
 // colour·alpha + below·(1 - alpha); with that blend the colour must be premultiplied, and here it is. The gate measures the difference.
 //
+// FASTER, THE SAME PICTURE (2026-11-21, Keith: "4"; the GPU timer, render/gpuTimer.mjs, put ~90% of the card's time in the draw). Two cuts that change NO pixel:
+//   a splat whose opacity is under the alpha floor (0.003) can never draw a pixel, so it is skipped in the vertex shader; and a splat's square is cut from
+//   3 sigma to the distance where ITS alpha falls under the floor, sqrt(2 ln(opacity / 0.003)) sigma, when that is less (a splat at opacity 0.05 needs 2.4
+//   sigma, 36% less area) -- every pixel cut was one the fragment shader discarded. `tight: false` restores the old squares, for measuring. One cut that DOES
+//   change pixels, off unless asked: `maxRadiusPx` caps a splat's on-screen radius (a splat right in front of the camera covering the whole screen).
+//
 // WHAT IS NOT HERE: spherical harmonics (band 0 only, as in the WebGL2 renderer), a page that uses it, level of detail and streaming (the backlog's next
 // item), and a time on a real GPU.
 "use strict";
 import { createGpuRadixSort } from "./splatSortGPU.mjs";
 
 export const SPLAT_WGSL = `
-struct Frame { view: mat4x4<f32>, proj: mat4x4<f32>, offset: vec4<f32>, viewport: vec4<f32> };   // offset.w = the cloud's scale
+struct Frame { view: mat4x4<f32>, proj: mat4x4<f32>, offset: vec4<f32>, viewport: vec4<f32> };   // offset.w = the cloud's scale; viewport = (width, height, tight 0|1, max radius in px or 0)
 @group(0) @binding(0) var<uniform> F: Frame;
 @group(0) @binding(1) var<storage, read> order: array<u32>;      // the sorted indices, back to front (splatSortGPU)
 @group(0) @binding(2) var<storage, read> pos: array<f32>;        // x, y, z
@@ -49,6 +55,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     o.clip = vec4<f32>(2.0, 2.0, 2.0, 1.0); o.offset = vec2<f32>(0.0); o.conic = vec3<f32>(0.0); o.color = vec3<f32>(0.0); o.opacity = 0.0;
     let corner = vec2<f32>(select(-1.0, 1.0, (vi & 1u) == 1u), select(-1.0, 1.0, (vi & 2u) == 2u));   // a triangle strip: (-1,-1) (1,-1) (-1,1) (1,1)
     let i = order[ii];
+    let op = 1.0 / (1.0 + exp(-opa[i]));
+    if (F.viewport.z > 0.5 && op < 0.003) { return o; }   // under the alpha floor everywhere: it can draw no pixel
     let ws = F.offset.w;
     let worldP = vec3<f32>(pos[i*3u], pos[i*3u+1u], pos[i*3u+2u]) * ws + F.offset.xyz;
     let viewP = F.view * vec4<f32>(worldP, 1.0);
@@ -72,14 +80,17 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     if (det <= 0.0) { return o; }
     let mid = 0.5 * (a + c);
     let disc = max(0.0, mid*mid - det);
-    let radius = 3.0 * sqrt(max(mid + sqrt(disc), mid - sqrt(disc)));
+    // 3 sigma, or -- tight -- the distance where this splat's alpha falls under the floor, if that is less; then the optional on-screen cap
+    let k = select(3.0, min(3.0, sqrt(2.0 * log(max(op, 0.003) / 0.003))), F.viewport.z > 0.5);
+    var radius = k * sqrt(max(mid + sqrt(disc), mid - sqrt(disc)));
+    if (F.viewport.w > 0.0) { radius = min(radius, F.viewport.w * 2.0 / F.viewport.y); }
     var clipP = F.proj * viewP;
     clipP = vec4<f32>(clipP.xy + corner * radius * clipP.w, clipP.zw);
     o.clip = clipP;
     o.offset = corner * radius;
     o.conic = vec3<f32>(c, -b, a) / det;
     o.color = vec3<f32>(col[i*3u], col[i*3u+1u], col[i*3u+2u]);
-    o.opacity = 1.0 / (1.0 + exp(-opa[i]));
+    o.opacity = op;
     return o;
 }
 
@@ -96,7 +107,7 @@ fn fs(v: VOut) -> @location(0) vec4<f32> {
  * A splat cloud on `device`, drawn into a `format` target. `splat` is engine/splatParser.js's shape: { count, positions, scales, colors, opacities, quats }
  * (Float32Arrays: 3, 3, 3, 1, 4 per splat). Returns { draw(encoder, { view, proj, camera, target, width, height, clear? }), sorter, position, scale, destroy }.
  */
-export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode, capacity = splat.count } = {}) {
+export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode, capacity = splat.count, tight = true, maxRadiusPx = 0 } = {}) {
     const U = usage; let n = splat.count;   // `capacity` (2026-11-21, render/splatLod.mjs): room for a cut of a bigger cloud; update() swaps the splats drawn
     if (!(n > 0)) throw new Error("splatRendererGPU: an empty cloud");
     if (!(capacity >= n)) throw new Error(`splatRendererGPU: capacity ${capacity} is less than the cloud's ${n} splats`);
@@ -112,7 +123,7 @@ export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", u
     const blend = { color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }, alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" } };
     const pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module, entryPoint: "vs" }, fragment: { module, entryPoint: "fs", targets: [{ format, blend }] }, primitive: { topology: "triangle-strip" } });
     const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [frame, sorter.indices, B.pos, B.scl, B.col, B.opa, B.rot].map((buffer, binding) => ({ binding, resource: { buffer } })) });
-    const self = { sorter, position: [0, 0, 0], scale: 1, _last: null, capacity };
+    const self = { sorter, position: [0, 0, 0], scale: 1, _last: null, capacity, tight, maxRadiusPx };
     /** Draw a different set of splats from now on (a level-of-detail cut): at most `capacity`, written over the old; the next draw re-sorts. */
     self.update = (c) => {
         if (!(c.count > 0 && c.count <= capacity)) throw new Error(`splatRendererGPU.update: ${c.count} splats is outside 1-${capacity}`);
@@ -124,7 +135,7 @@ export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", u
     self.draw = (encoder, { view, proj, camera, target, width, height, clear = null, timer = null }) => {   // `timer`: render/gpuTimer.mjs, passes labelled keys, sort, draw
         const key = camera.join() + "|" + self.position.join() + "|" + self.scale;
         if (key !== self._last) { sorter.encodeDepthKeys(encoder, B.pos, n, { camera, origin: self.position, scale: self.scale, timer }); sorter.encode(encoder, n, { timer }); self._last = key; }
-        const f = new Float32Array(40); f.set(view, 0); f.set(proj, 16); f.set([self.position[0], self.position[1], self.position[2], self.scale, width, height, 0, 0], 32);
+        const f = new Float32Array(40); f.set(view, 0); f.set(proj, 16); f.set([self.position[0], self.position[1], self.position[2], self.scale, width, height, self.tight ? 1 : 0, self.maxRadiusPx || 0], 32);
         device.queue.writeBuffer(frame, 0, f);
         const rp = encoder.beginRenderPass({ colorAttachments: [{ view: target, loadOp: clear ? "clear" : "load", clearValue: clear || [0, 0, 0, 0], storeOp: "store" }], ...(timer && timer.writes ? (() => { const w = timer.writes("draw"); return w ? { timestampWrites: w } : {}; })() : {}) });
         rp.setPipeline(pipeline); rp.setBindGroup(0, bind); rp.draw(4, n); rp.end();
