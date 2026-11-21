@@ -22,6 +22,10 @@
 //                               height, fps }; the bridge answers { type: "started", session } or { type: "error", error }; each later message is BINARY:
 //                               one flags byte (1 = keyframe), the timestamp in microseconds (u64, little-endian), then the access unit in Annex B. When tvpipe
 //                               asks for a keyframe (a TV joined, a packet was lost) the page is sent { type: "keyframe" }. Closing the socket ends the stream.
+//                               SOUND TOO (Keith: "an 'audio too' option"): start with audio: { sampleRate, channels } and send frames with flags bit 2 set,
+//                               interleaved s16 PCM; they go to tvpipe's writeAudio. When the stream ends the page is told why ({ type: "ended", why }): the TV's
+//                               own user ended it, a receiver dropped out and did not come back, a failure. Every session keeps its last receiver events
+//                               (connected, lost, reconnected, gave-up, ended, failed), and /tv/status shows them: the dock's TV OFF reads them.
 // `to` is a receiver name (or a unique prefix), "airplay:NAME" / "cast:NAME", an address, "browser" (tvpipe's own player page on this machine), or a list
 // of up to MAX_TARGETS of those, played in sync. A new session to a TV already showing one stops the old one first: a TV shows one thing.
 //
@@ -80,7 +84,12 @@ const _realEnsure = ensureSdk;
 function _useEnsure(fn) { ensureSdk = fn || _realEnsure; }   // the gate's seam: no real npm in a self-check
 
 // ---- sessions ----
-const sessions = new Map(), pins = new Map();
+const sessions = new Map(), pins = new Map(), MAX_EVENTS = 20;
+/** Note what happened to a session, newest last, at most MAX_EVENTS: receivers connecting, dropping out, coming back, the TV's own user ending it. */
+function noteEvent(rec, e) { rec.events = rec.events || []; rec.events.push({ at: new Date().toISOString(), ...e }); if (rec.events.length > MAX_EVENTS) rec.events.splice(0, rec.events.length - MAX_EVENTS); }
+/** A receiver event from the SDK onto a session: its state, and the event log. */
+// only `connected` carries the protocol and the delay: later events keep them
+function onReceiver(rec, r) { const was = rec.receivers.get(r.name) || {}; rec.receivers.set(r.name, { protocol: r.protocol || was.protocol || null, state: r.state, error: r.error || null, delayMs: r.delayMs ?? r.delay_ms ?? was.delayMs ?? null }); noteEvent(rec, { receiver: r.name, state: r.state, protocol: r.protocol || null, error: r.error || null }); }
 let _seq = 0;
 // receivers and info are read from the SDK's session as well, at the time of asking: a stream() session resolves only once its receivers have
 // connected, so their "receiver" events have already fired before a listener can be attached, and the SDK keeps the state on the session
@@ -88,7 +97,7 @@ function publicOf(s) {
     const live = s.session || {}, rec = new Map(s.receivers);
     if (live.receivers && typeof live.receivers.forEach === "function") live.receivers.forEach((v, k) => { if (!rec.has(k)) rec.set(k, { protocol: v.protocol || null, state: v.state, error: v.error || null }); });
     return { id: s.id, kind: s.kind, to: s.to, source: s.source, state: s.state, startedAt: s.startedAt, endedAt: s.endedAt || null, error: s.error || null,
-        receivers: Object.fromEntries(rec), playerUrl: s.playerUrl || live.playerUrl || null, info: s.info || live.info || null, frames: s.frames || 0, backedUp: s.backedUp || 0 };
+        receivers: Object.fromEntries(rec), playerUrl: s.playerUrl || live.playerUrl || null, info: s.info || live.info || null, frames: s.frames || 0, audioFrames: s.audioFrames || 0, backedUp: s.backedUp || 0, events: (s.events || []).slice(-10) };
 }
 function status() { return { ok: true, installed: !!_sdk, why: _sdk ? undefined : _sdkWhy || `not loaded yet (${INSTALL_HINT})`, sessions: [...sessions.values()].map(publicOf), pins: [...pins.values()].map((p) => ({ id: p.id, name: p.name, address: p.address })) }; }
 
@@ -144,14 +153,14 @@ async function start(kind, body = {}, { importer } = {}) {
     if (Number.isFinite(body.latency)) opts.latency = Math.max(5, Math.min(2000, Number(body.latency)));
     try {
         const s = kind === "share" ? await sdk.share(src, opts) : kind === "play" ? await sdk.play(src, opts) : await sdk.testPattern(opts);
-        rec.session = s; rec.state = "playing"; rec.info = s.info || null; rec.playerUrl = s.playerUrl || null;
+        rec.session = s; rec.state = "playing"; rec.info = s.info || null; rec.playerUrl = s.playerUrl || null; noteEvent(rec, { state: "playing" });
         if (s.on) {
-            s.on("receiver", (r) => rec.receivers.set(r.name, { protocol: r.protocol || null, state: r.state, error: r.error || null }));
+            s.on("receiver", (r) => onReceiver(rec, r));
             s.on("error", (e) => { rec.error = errorOf(e); });
         }
         if (s.receivers && typeof s.receivers.forEach === "function") s.receivers.forEach((v, k) => rec.receivers.set(k, { protocol: v.protocol || null, state: v.state, error: v.error || null }));
-        Promise.resolve(s.done).then(() => { if (rec.state !== "stopped") { rec.state = "ended"; rec.endedAt = new Date().toISOString(); } },
-            (e) => { rec.state = "failed"; rec.error = errorOf(e); rec.endedAt = new Date().toISOString(); });
+        Promise.resolve(s.done).then(() => { if (rec.state !== "stopped") { rec.state = "ended"; rec.endedAt = new Date().toISOString(); noteEvent(rec, { state: "ended" }); } },
+            (e) => { rec.state = "failed"; rec.error = errorOf(e); rec.endedAt = new Date().toISOString(); noteEvent(rec, { state: "failed", error: rec.error.message }); });
         return { ok: true, session: publicOf(rec) };
     } catch (e) {
         rec.state = "failed"; rec.error = errorOf(e); rec.endedAt = new Date().toISOString();
@@ -168,17 +177,30 @@ function checkLive(o = {}) {
     if (!(fps >= 1 && fps <= 60)) return { ok: false, why: "1 to 60 frames a second" };
     return { ok: true, width: w, height: h, fps };
 }
+/** A live stream's sound: 8000 to 96000 Hz, one or two channels. Pure. */
+function checkAudio(a = {}) {
+    const r = Number(a.sampleRate), c = Number(a.channels);
+    if (!(Number.isInteger(r) && r >= 8000 && r <= 96000)) return { ok: false, why: "audio sampleRate must be 8000 to 96000" };
+    if (!(c === 1 || c === 2)) return { ok: false, why: "audio channels must be 1 or 2" };
+    return { ok: true, audio: { sampleRate: r, channels: c } };
+}
+/** Why a session ended, in a sentence, from its last receiver events: the TV's own user, a dropped connection, a failure, or a stop here. Pure. */
+function lastWhy(rec) {
+    const ev = (rec.events || []).slice().reverse().find((e) => e.receiver && e.state !== "connected" && e.state !== "reconnected");
+    if (!ev) return rec.state === "stopped" ? "stopped here" : "the stream ended";
+    return { ended: `${ev.receiver} ended it (from the TV)`, "gave-up": `${ev.receiver} dropped out and did not come back`, failed: `${ev.receiver} failed${ev.error ? ": " + ev.error : ""}`, lost: `${ev.receiver} dropped out`, stopped: "stopped here" }[ev.state] || `${ev.receiver}: ${ev.state}`;
+}
 /** One binary message from the page: flags (1 = keyframe), the timestamp in microseconds (u64 LE), then the access unit. Pure. */
 function parseLiveFrame(buf) {
     const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
     if (b.length < 10) return null;
-    return { keyframe: (b[0] & 1) === 1, ptsUs: Number(b.readBigUInt64LE(1)), au: b.subarray(9) };
+    return { keyframe: (b[0] & 1) === 1, audio: (b[0] & 2) === 2, ptsUs: Number(b.readBigUInt64LE(1)), au: b.subarray(9) };
 }
 /** Serve one /tv/live socket: start on its first message, then feed every frame to tvpipe; the socket closing ends the stream. */
 function attachLive(ws, { importer } = {}) {
     let rec = null, s = null, waitingKey = false, ended = false;
     const send = (o) => { try { ws.send(JSON.stringify(o)); } catch { /* the page has gone */ } };
-    const finish = async () => { if (ended) return; ended = true; if (s) { try { await s.end(); } catch { try { await s.stop(); } catch { /* already over */ } } } if (rec && rec.state !== "failed") { rec.state = "stopped"; rec.endedAt = new Date().toISOString(); } };
+    const finish = async () => { if (ended) return; ended = true; if (rec) noteEvent(rec, { state: "stopped" }); if (s) { try { await s.end(); } catch { try { await s.stop(); } catch { /* already over */ } } } if (rec && rec.state !== "failed") { rec.state = "stopped"; rec.endedAt = new Date().toISOString(); } };
     ws.on("close", () => { finish(); });
     ws.on("message", async (data, isBinary) => {
         if (!isBinary) {
@@ -186,21 +208,22 @@ function attachLive(ws, { importer } = {}) {
             if (m.type !== "start" || rec) return send({ type: "error", error: rec ? "already started" : "the first message is { type: 'start', to, width, height, fps }" });
             const T = checkTarget(m.to); if (!T.ok) return send({ type: "error", error: T.why });
             const L = checkLive(m); if (!L.ok) return send({ type: "error", error: L.why });
+            const A = m.audio ? checkAudio(m.audio) : { ok: true, audio: null }; if (!A.ok) return send({ type: "error", error: A.why });
             const sdk = await loadSdk(importer); if (!sdk) return send({ type: "error", error: _sdkWhy });
             const want = new Set(T.to.map((t) => t.toLowerCase()));
             for (const o of sessions.values()) if ((o.state === "playing" || o.state === "starting") && o.to.some((t) => want.has(t.toLowerCase()))) await stop(o.id);
-            rec = { id: `tv-${++_seq}`, kind: "live", to: T.to, source: `canvas ${L.width}x${L.height}@${L.fps}`, state: "starting", startedAt: new Date().toISOString(), receivers: new Map(), session: null };
+            rec = { id: `tv-${++_seq}`, kind: "live", to: T.to, source: `canvas ${L.width}x${L.height}@${L.fps}${A.audio ? ` with sound ${A.audio.sampleRate} Hz x${A.audio.channels}` : ""}`, state: "starting", startedAt: new Date().toISOString(), receivers: new Map(), session: null };
             sessions.set(rec.id, rec);
             try {
-                s = await sdk.stream({ to: T.to.length === 1 ? T.to[0] : T.to, video: { width: L.width, height: L.height, fps: L.fps, codec: "h264" }, onPin: (r) => _askPin(r, rec.id) });
-                rec.session = s; rec.state = "playing"; rec.info = s.info || null;
+                s = await sdk.stream({ to: T.to.length === 1 ? T.to[0] : T.to, video: { width: L.width, height: L.height, fps: L.fps, codec: "h264" }, ...(A.audio ? { audio: A.audio } : {}), onPin: (r) => _askPin(r, rec.id) });
+                rec.session = s; rec.state = "playing"; rec.info = s.info || null; rec.audio = A.audio; noteEvent(rec, { state: "playing" });
                 if (s.on) {
                     s.on("keyframe", () => { waitingKey = true; send({ type: "keyframe" }); });
                     rec.askKeyframe = () => { waitingKey = true; send({ type: "keyframe" }); };   // the same request, for a caller that needs a fresh picture now
-                    s.on("receiver", (r) => rec.receivers.set(r.name, { protocol: r.protocol || null, state: r.state, error: r.error || null }));
+                    s.on("receiver", (r) => onReceiver(rec, r));
                     s.on("error", (e) => { rec.error = errorOf(e); });
                 }
-                Promise.resolve(s.done).then(() => { if (rec.state === "playing") { rec.state = "ended"; rec.endedAt = new Date().toISOString(); } send({ type: "ended" }); try { ws.close(); } catch { /* gone */ } },
+                Promise.resolve(s.done).then(() => { if (rec.state === "playing") { rec.state = "ended"; rec.endedAt = new Date().toISOString(); noteEvent(rec, { state: "ended" }); } send({ type: "ended", why: lastWhy(rec) }); try { ws.close(); } catch { /* gone */ } },
                     (e) => { rec.state = "failed"; rec.error = errorOf(e); rec.endedAt = new Date().toISOString(); send({ type: "error", error: rec.error.message, code: rec.error.code }); try { ws.close(); } catch { /* gone */ } });
                 send({ type: "started", session: publicOf(rec) });
             } catch (e) { rec.state = "failed"; rec.error = errorOf(e); send({ type: "error", error: rec.error.message, code: rec.error.code }); try { ws.close(); } catch { /* gone */ } }
@@ -208,6 +231,12 @@ function attachLive(ws, { importer } = {}) {
         }
         if (!s || rec.state !== "playing") return;
         const f = parseLiveFrame(data); if (!f) return;
+        // SOUND (flags bit 2): interleaved s16 little-endian PCM, whole frames of the channels the start named; never dropped (tvpipe's rule for audio)
+        if (f.audio) {
+            if (!rec.audio || f.au.length % (2 * rec.audio.channels) !== 0) return;
+            const pcm = new Int16Array(f.au.length / 2); for (let i = 0; i < pcm.length; i++) pcm[i] = f.au.readInt16LE(i * 2);
+            s.writeAudio(pcm, f.ptsUs); rec.audioFrames = (rec.audioFrames || 0) + 1; return;
+        }
         // after tvpipe asked for a keyframe, frames that cannot start a picture are dropped until one arrives: the TV could not decode them anyway
         if (waitingKey && !f.keyframe) return;
         if (f.keyframe) waitingKey = false;
@@ -229,4 +258,4 @@ async function devices({ timeout = DISCOVER_MS, importer } = {}) {
 function _sessionsForTest() { return sessions; }
 function _reset() { sessions.clear(); pins.clear(); _sdk = null; _sdkWhy = ""; _seq = 0; }
 
-module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, checkLive, parseLiveFrame, errorOf, loadSdk, status, devices, start, stop, answerPin, attachLive, _useSdk, _useEnsure, _reset, _sessionsForTest };
+module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, checkLive, checkAudio, lastWhy, parseLiveFrame, errorOf, loadSdk, status, devices, start, stop, answerPin, attachLive, _useSdk, _useEnsure, _reset, _sessionsForTest };

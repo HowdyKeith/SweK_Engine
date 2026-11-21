@@ -247,6 +247,17 @@ function _makeWeatherGauge(cfg, scale) {
 // worse than no flag." So the cell renders DISABLED with a reason in its tooltip rather than inviting a click
 // that cannot work -- and the recorder's own capabilities() is asked rather than assumed, because
 // captureStream + MediaRecorder are not secure-context gated but the codecs can still be missing.
+// THE TV ROW'S SHARED STATE: TV OFF shows what the TV says (ui/tvOut.js describe(): who is connected, who dropped out, the TV's own user ending it), and TO
+// TV / LIVE TV go back to their labels when their session ends. One watcher for the row, started by a TV click or by finding a session already playing.
+const _tv = { cells: {}, stopWatch: null };
+async function _tvWatch() {
+    if (_tv.stopWatch) return;
+    const tv = await import("./tvOut.js");
+    _tv.stopWatch = tv.watch((d) => {
+        const off = _tv.cells.tvoff; if (off) { off.setLabel(d.caption); off.btn.title = d.title; off.btn.style.borderColor = d.color || off.color; off.btn.style.color = d.color || off.color; }
+        if (d.state === "off") { for (const k of ["tv", "tvlive"]) { const c = _tv.cells[k]; if (c && c.busy) { c.busy = false; c.setLabel(c.label); } } _tv.stopWatch = null; }
+    });
+}
 function _makeActionCell(cfg, scale) {
     scale = scale || 1;
     const color = RING_COLORS[cfg.color] || RING_COLORS.cyan;
@@ -322,16 +333,24 @@ function _makeActionCell(cfg, scale) {
         // THIS PAGE ON A TV (ui/tvOut.js, imported on the first click): TO TV mirrors the page, LIVE TV streams its canvas, TV OFF stops both.
         // Each failure is said on the button and in its tooltip -- tvpipe not installed, no TV found, no canvas, no WebCodecs -- never a silent no-op.
         const label = cfg.label || cfg.action.toUpperCase(), say = (t, tip) => { setLabel(t); if (tip) btn.title = tip; };
+        _tv.cells[cfg.action] = { btn, setLabel, label, color, busy: false };
+        // TV OFF looks once, on mount, for a session already playing (another page or tab started it), and watches it if there is one
+        if (cfg.action === "tvoff" && typeof fetch === "function") fetch("/tv/status", { cache: "no-store" }).then((r) => r.json()).then((st) => { if (st && (st.sessions || []).some((x) => x.state === "playing")) _tvWatch(); }).catch(() => {});
         btn.title = { tv: "Mirror this page to a TV (Apple TV, Chromecast) through tvpipe", tvlive: "Stream this page's canvas live to a TV: encoded here, less delay than mirroring", tvoff: "Stop what this computer is sending to a TV" }[cfg.action];
         if (cfg.action === "tvlive" && typeof document !== "undefined" && !document.querySelector("canvas")) disable("nothing to stream: this page has no <canvas>");
         else btn.onclick = async () => {
             try {
                 const tv = await import("./tvOut.js");
-                if (cfg.action === "tvoff") { const ids = await tv.stopTv(); say(ids.length ? "STOPPED" : "NOTHING ON", ""); setTimeout(() => setLabel(label), 2500); return; }
-                const to = await tv.pickTv(btn); if (!to) return;
+                if (cfg.action === "tvoff") { const ids = await tv.stopTv(); say(ids.length ? "STOPPED" : "NOTHING ON", ""); btn.style.borderColor = color; btn.style.color = color; setTimeout(() => setLabel(label), 2500); return; }
+                const pick = await tv.pickTv(btn, { audioOption: cfg.action === "tvlive" }); if (!pick) return;
+                const to = typeof pick === "string" ? pick : pick.to;
                 say("...");
                 if (cfg.action === "tv") { await tv.sharePage(to); say("ON " + to.toUpperCase().slice(0, 8), "Mirroring this page to " + to + " -- TV OFF stops it"); }
-                else { const live = await tv.startLive(to); say("LIVE", `Streaming the canvas to ${to} (${live.stats().codec}, ${live.stats().width} x ${live.stats().height}) -- TV OFF stops it`); }
+                else {
+                    const live = await tv.startLive(to, { audio: !!pick.audio }), st = live.stats();
+                    say(st.audio ? "LIVE+SOUND" : "LIVE", `Streaming the canvas to ${to} (${st.codec}, ${st.width} x ${st.height}${st.audio ? ", with this tab's sound" : ""})${st.audioWhy ? " -- " + st.audioWhy : ""} -- TV OFF stops it`);
+                }
+                _tv.cells[cfg.action].busy = true; _tvWatch();
             } catch (e) { say("FAILED", "To TV failed: " + ((e && e.message) || e)); setTimeout(() => setLabel(label), 4000); }
         };
     } else if (cfg.action === "clip") {
