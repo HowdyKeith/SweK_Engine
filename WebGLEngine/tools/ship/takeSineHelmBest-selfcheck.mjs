@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: eight arms, each once; the gain pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/sineHelmBest.reading.json; the kept arms in brain/rig-results/sineHelmBest/): THE BUTTON KEEPS THE FLY'S HELM. The fly less the sine: one ship a side with the cannon -0.048 (z -3.30, TRAILS, as forecast and as takeFlyVsSine
+//   read); fleets of three with it -0.048 (z -3.44, TRAILS -- the forecast said it could not be told); one ship a side WITHOUT it +0.057 (z 2.67, LEADS -- the forecast said it could not be told), and that lead keeps the fly; fleets without it
+//   +0.004 (z 0.27, cannot be told). WITH THE CANNON THE SINE IS AHEAD AT BOTH SIZES, WITHOUT IT THE FLY IS AHEAD ONE SHIP A SIDE. The notes of both helms and of the button say so.
 //
 // SABOTAGE LOG: 13 mutants of tools/ship/takeSineHelmBest.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 13 RED the first time (a seed moved, takeFlyVsSine's pairs, half the pairs of a fight, the jobs on
 //   takeFlyVsSine's pairs, the fly on both arms; a trail at exactly -2 let by, a lead of the fly let by, the sine on a lead, the sine always, a trail elsewhere taken for a lead, the wrong helm named; an unknown option and a second read let
@@ -63,7 +65,13 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ fly: k(f, "fly"), sine: k(f, "sine") })])), R = (f) => out[f].reading.gain;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: the fly less the sine -0.048 and -0.048 with the cannon (both TRAIL), +0.057 one ship a side without it (LEADS), +0.004 in fleets without it (CANNOT BE TOLD)", near(R("oneCannon"), -0.0479) && TA.word(R("oneCannon").z) === "TRAILS" && near(R("fleetCannon"), -0.0480) && TA.word(R("fleetCannon").z) === "TRAILS"
+        && near(R("oneNone"), 0.0572) && TA.word(R("oneNone").z) === "LEADS" && near(R("fleetNone"), 0.0041) && TA.word(R("fleetNone").z) === "CANNOT BE TOLD" && G.FIGHTS.every((f) => Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12) && R("oneCannon").n === 1200 && R("fleetNone").n === 600);
+    const v = G.decide(out), best = C.PRESETS.find((p) => p.id === "best"), fly = C.HELMS.find((h) => h.id === "flywired"), sine = C.HELMS.find((h) => h.id === "sine");
+    ok("!! WHAT IS DECIDED, as read: the fly leads one ship a side without the cannon, so the best-ship button keeps the fly's helm; its note and both helms' say so", !v.sine && v.helm === "flywired" && rd.verdict.helm === "flywired" && best.choice.helm === "flywired"
+        && [best, fly, sine].every((x) => /takeSineHelmBest/.test(x.note)) && /\+0\.057/.test(best.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

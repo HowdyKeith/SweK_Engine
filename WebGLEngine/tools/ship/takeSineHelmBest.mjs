@@ -13,7 +13,9 @@
 // FORECAST, for the record: one ship a side with the cannon the sine leads again, by about 0.05 (the fly TRAILS); the other three cannot be told.
 // WHAT IS DECIDED: THE BEST-SHIP BUTTON'S HELM BECOMES THE SINE TWIN ("sine") if THE FLY LESS THE SINE TRAILS one ship a side with the cannon AND LEADS IN NO FIGHT; otherwise the button keeps the fly's helm. Either way the notes of both helms and of
 //   the button say so. Nothing is written but the reading; the page is changed by hand to what is decided. The fleet button, a fleets-only loadout, is not decided here.
-// @@READ@@
+// READ 2026-11-21 (brain/sineHelmBest.reading.json; the kept arms in brain/rig-results/sineHelmBest/): THE BUTTON KEEPS THE FLY'S HELM. The fly less the sine: one ship a side with the cannon -0.048 (z -3.30, TRAILS, as forecast and as takeFlyVsSine
+//   read); fleets of three with it -0.048 (z -3.44, TRAILS -- the forecast said it could not be told); one ship a side WITHOUT it +0.057 (z 2.67, LEADS -- the forecast said it could not be told), and that lead keeps the fly; fleets without it
+//   +0.004 (z 0.27, cannot be told). WITH THE CANNON THE SINE IS AHEAD AT BOTH SIZES, WITHOUT IT THE FLY IS AHEAD ONE SHIP A SIDE. The notes of both helms and of the button say so.
 // Every arm's leads are kept (brain/rig-results/sineHelmBest/); the reading file (brain/sineHelmBest.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, the gunners' own read-outs (tools/ship/takeSineTwins.mjs), other weights for the sine.
 "use strict";
