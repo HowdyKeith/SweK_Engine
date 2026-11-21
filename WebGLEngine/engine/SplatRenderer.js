@@ -175,7 +175,11 @@ void main() {
     if (power > 0.0) discard;   // outside ellipse (numerical)
     float alpha = min(0.99, v_opacity * exp(power));
     if (alpha < 0.003) discard; // negligible contribution
-    fragColor = vec4(v_color, alpha);
+    // PREMULTIPLIED (2026-11-21), because draw() blends with (ONE, ONE_MINUS_SRC_ALPHA), which is "over" only for premultiplied colour.
+    // Until then this wrote vec4(v_color, alpha), so a faint edge (alpha 0.01) added its colour at FULL strength and overlapping splats
+    // washed toward white: on tools/ship/splatRendererGPU-selfcheck.mjs's 40-splat scene that blend sat 159/255 a channel from the
+    // correct picture. render/SplatRenderer.js blends with SRC_ALPHA and never had it; render/splatRendererGPU.mjs is premultiplied too.
+    fragColor = vec4(v_color * alpha, alpha);
 }`;
 
         const compile = (src, type) => {

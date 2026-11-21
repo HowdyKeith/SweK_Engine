@@ -158,7 +158,7 @@ else {
         const missing = terms.filter(([, re]) => !re.test(w) || !re.test(gl)).map(([n]) => n);
         ok("!! engine/SplatRenderer.js's math, term for term, in both files: the near cull, the blur, the conic, the 3σ radius, the determinant cull, the alpha cap and floor, the power", missing.length === 0, missing.join(", "));
         ok("!! it reads splat order[instance] -- the card's sorted list -- never the instance itself", /let i = order\[ii\];/.test(w) && !/pos\[ii/.test(w) && /var<storage, read> order: array<u32>/.test(w));
-        ok("!! it writes PREMULTIPLIED colour for its (one, one-minus-src-alpha) blend; the WebGL2 renderer does not", /return vec4<f32>\(v\.color \* alpha, alpha\)/.test(w) && /srcFactor: "one", dstFactor: "one-minus-src-alpha"/.test(fs.readFileSync(path.join(ENG, "render", "splatRendererGPU.mjs"), "utf8")) && /fragColor = vec4\(v_color, alpha\)/.test(gl) && /blendFunc\(gl\.ONE, gl\.ONE_MINUS_SRC_ALPHA\)/.test(gl));
+        ok("!! it writes PREMULTIPLIED colour for its (one, one-minus-src-alpha) blend, and so, since 2026-11-21, does the WebGL2 renderer with the same blend", /return vec4<f32>\(v\.color \* alpha, alpha\)/.test(w) && /srcFactor: "one", dstFactor: "one-minus-src-alpha"/.test(fs.readFileSync(path.join(ENG, "render", "splatRendererGPU.mjs"), "utf8")) && /fragColor = vec4\(v_color \* alpha, alpha\)/.test(gl) && !/fragColor = vec4\(v_color, alpha\)/.test(gl) && /blendFunc\(gl\.ONE, gl\.ONE_MINUS_SRC_ALPHA\)/.test(gl));
         ok("!! a cloud with a missing or short attribute is refused by name", (() => { try { R.createSplatRendererGPU({}, { ...scene(4), quats: new Float32Array(3) }, { usage: {} }); return false; } catch (e) { return /splat\.quats/.test(e.message); } })());
     });
     const skip = headlessGpuSkipReason(require);
@@ -170,7 +170,7 @@ else {
             ok("!! the shader compiles on the device", c && !c.crashed && c.errors.length === 0, c ? (c.crashed || c.errors.join("; ") || c.adapter) : "aborted every time");
             const p = runCase("picture");
             ok("!! THE PICTURE IS THE CPU'S: 40 splats at 96 x 96, mean difference under 1/255 a channel, none over 6/255, and the splats cover the frame", p && !p.crashed && !p.validation && p.mean < 1 / 255 && p.max <= 6 / 255 && p.covered > W * H * 0.2, p ? (p.crashed || `mean ${(p.mean * 255).toFixed(3)}/255, max ${(p.max * 255).toFixed(1)}/255, ${p.covered} px covered${p.validation ? " REJECTED " + p.validation : ""}`) : "aborted every time");
-            if (p && !p.crashed) console.log(`  ----  measured, not held: the WebGL2 renderer's unpremultiplied blend is ${(p.meanWebglBlend * 255).toFixed(1)}/255 a channel away from this picture on average (the halo its header's note describes; render/SplatRenderer.js, the other WebGL2 renderer, blends with SRC_ALPHA and has no such halo)`);
+            if (p && !p.crashed) console.log(`  ----  measured, not held: the WebGL2 renderer's OLD unpremultiplied blend (before 2026-11-21) is ${(p.meanWebglBlend * 255).toFixed(1)}/255 a channel away from this picture on average -- the halo it had, fixed in engine/SplatRenderer.js the same day`);
         });
         console.log("3. THE ORDER");
         await section(() => {
