@@ -16,6 +16,8 @@
   The status line shows what the GRAPHICS CARD spent on each pass (keys, sort, draw), by WebGPU timestamp queries (render/gpuTimer.mjs), when the
   adapter offers them; ?gputimer=0 turns that off.
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
+  ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
+                 render/splatSH.mjs; the status line says to what degree); ?sh=0 draws band 0 only
   Drop a .ply or .splat file on the page to view it instead (engine/splatParser.js).
   Drag to orbit, wheel to zoom. window.__splatGpu reports { ready, backend, count, frames, frameMs, error }, and __splatGpu.capture() draws one frame and
   returns its pixels sampled on a grid, for tools/ship/splatGpuPage-selfcheck.mjs (a headless browser here composites no WebGPU canvas, so a screenshot
@@ -76,7 +78,8 @@ async function useWebGPU(splat, capacity = splat.count) {
     const timer = createGpuTimer(device); state.gpuTimer = timer.supported ? "on" : (Q.get("gputimer") === "0" ? "off" : "this adapter has no timestamp-query");
     ctx.configure({ device, format, alphaMode: "premultiplied", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     device.lost.then((i) => { state.error = "the GPU device was lost: " + i.message; });
-    const r = createSplatRendererGPU(device, splat, { format, capacity });
+    const r = createSplatRendererGPU(device, splat, { format, capacity, ...(Q.get("sh") === "0" ? { sh: false } : {}) });
+    state.shDegree = r.shDegree;   // a .ply with f_rest: colour from where the camera stands (render/splatSH.mjs); ?sh=0 draws band 0 only
     const info = adapter.info || {};
     state.adapter = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ") || "unknown adapter";
     state.format = format;
@@ -112,7 +115,7 @@ function useWebGL2(splat) {
 function resize() { const d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(canvas.clientWidth * d)); canvas.height = Math.max(1, Math.round(canvas.clientHeight * d)); }
 let last = performance.now(), avg = null;
 function paintHud() {
-    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" && state.backend === "webgpu" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
+    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"}${state.shDegree ? ` · harmonics to degree ${state.shDegree}` : ""} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · drag to orbit, wheel to zoom, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" && state.backend === "webgpu" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
 }
 function frame() {
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();
@@ -170,7 +173,7 @@ state.capture = async (cols = 32, rows = 20) => {
 };
 
 resize();
-(Q.get("swlod") ? openLodStream(httpRange(Q.get("swlod"))).then(showLod) : show(cloud())).then(() => requestAnimationFrame(frame), (e) => { state.error = String(e.message || e); hud.textContent = state.error; });
+(Q.get("swlod") ? openLodStream(httpRange(Q.get("swlod"))).then(showLod) : Q.get("ply") ? fetch(Q.get("ply")).then((r) => { if (!r.ok) throw new Error(`${Q.get("ply")}: HTTP ${r.status}`); return r.arrayBuffer(); }).then((b) => show(parseSplatFile(b, Q.get("ply")))) : show(cloud())).then(() => requestAnimationFrame(frame), (e) => { state.error = String(e.message || e); hud.textContent = state.error; });
 </script>
 </body>
 </html>

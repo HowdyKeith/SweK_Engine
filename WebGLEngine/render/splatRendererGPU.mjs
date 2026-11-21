@@ -27,9 +27,10 @@
 // item), and a time on a real GPU.
 "use strict";
 import { createGpuRadixSort } from "./splatSortGPU.mjs";
+import { SH_WGSL, SH_K } from "./splatSH.mjs";
 
 export const SPLAT_WGSL = `
-struct Frame { view: mat4x4<f32>, proj: mat4x4<f32>, offset: vec4<f32>, viewport: vec4<f32> };   // offset.w = the cloud's scale; viewport = (width, height, tight 0|1, max radius in px or 0)
+struct Frame { view: mat4x4<f32>, proj: mat4x4<f32>, offset: vec4<f32>, viewport: vec4<f32>, eye: vec4<f32> };   // offset.w = the cloud's scale; viewport = (width, height, tight 0|1, max radius in px or 0); eye = (camera xyz, SH coefficients a channel)
 @group(0) @binding(0) var<uniform> F: Frame;
 @group(0) @binding(1) var<storage, read> order: array<u32>;      // the sorted indices, back to front (splatSortGPU)
 @group(0) @binding(2) var<storage, read> pos: array<f32>;        // x, y, z
@@ -37,6 +38,8 @@ struct Frame { view: mat4x4<f32>, proj: mat4x4<f32>, offset: vec4<f32>, viewport
 @group(0) @binding(4) var<storage, read> col: array<f32>;        // r, g, b
 @group(0) @binding(5) var<storage, read> opa: array<f32>;        // pre-sigmoid opacity
 @group(0) @binding(6) var<storage, read> rot: array<f32>;        // quaternion w, x, y, z
+@group(0) @binding(7) var<storage, read> shc: array<f32>;        // spherical harmonics beyond band 0, coefficient by coefficient (render/splatSH.mjs)
+${SH_WGSL}
 
 struct VOut { @builtin(position) clip: vec4<f32>, @location(0) offset: vec2<f32>, @location(1) conic: vec3<f32>, @location(2) color: vec3<f32>, @location(3) opacity: f32 };
 
@@ -89,7 +92,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     o.clip = clipP;
     o.offset = corner * radius;
     o.conic = vec3<f32>(c, -b, a) / det;
-    o.color = vec3<f32>(col[i*3u], col[i*3u+1u], col[i*3u+2u]);
+    o.color = max(vec3<f32>(0.0), vec3<f32>(col[i*3u], col[i*3u+1u], col[i*3u+2u]) + shRest(i, u32(F.eye.w), normalize(worldP - F.eye.xyz)));   // the colour from where the camera stands
     o.opacity = op;
     return o;
 }
@@ -107,7 +110,7 @@ fn fs(v: VOut) -> @location(0) vec4<f32> {
  * A splat cloud on `device`, drawn into a `format` target. `splat` is engine/splatParser.js's shape: { count, positions, scales, colors, opacities, quats }
  * (Float32Arrays: 3, 3, 3, 1, 4 per splat). Returns { draw(encoder, { view, proj, camera, target, width, height, clear? }), sorter, position, scale, destroy }.
  */
-export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode, capacity = splat.count, tight = true, maxRadiusPx = 0 } = {}) {
+export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", usage = globalThis.GPUBufferUsage, mapMode = globalThis.GPUMapMode, capacity = splat.count, tight = true, maxRadiusPx = 0, sh: shOpt } = {}) {
     const U = usage; let n = splat.count;   // `capacity` (2026-11-21, render/splatLod.mjs): room for a cut of a bigger cloud; update() swaps the splats drawn
     if (!(n > 0)) throw new Error("splatRendererGPU: an empty cloud");
     if (!(capacity >= n)) throw new Error(`splatRendererGPU: capacity ${capacity} is less than the cloud's ${n} splats`);
@@ -115,15 +118,22 @@ export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", u
     for (const [k, w] of Object.entries(lens)) if (!splat[k] || splat[k].length !== n * w) throw new Error(`splatRendererGPU: splat.${k} must hold ${w} numbers a splat (${n * w})`);
     const W = { pos: 3, scl: 3, col: 3, opa: 1, rot: 4 }, F = { pos: "positions", scl: "scales", col: "colors", opa: "opacities", rot: "quats" };
     const B = Object.fromEntries(Object.entries(W).map(([k, w]) => [k, device.createBuffer({ size: Math.max(16, capacity * w * 4), usage: U.STORAGE | U.COPY_DST })]));
-    const upload = (c) => { for (const k of Object.keys(W)) device.queue.writeBuffer(B[k], 0, c[F[k]], 0, c.count * W[k]); };
+    // SPHERICAL HARMONICS (2026-11-21, render/splatSH.mjs): a cloud that carries `sh` and `shDegree` (engine/splatParser.js from a .ply with f_rest) gets a
+    // buffer for them and view-dependent colour; `sh: false` draws band 0 only. A cut passed to update() without sh draws band 0 until one with sh comes.
+    const shK = (c) => (c && c.sh && SH_K[c.shDegree]) || 0, K0 = shOpt === false ? 0 : shK(splat);
+    if (K0 && splat.sh.length < n * K0 * 3) throw new Error(`splatRendererGPU: splat.sh must hold ${K0 * 3} numbers a splat at degree ${splat.shDegree}`);
+    const shBuf = device.createBuffer({ size: Math.max(16, capacity * K0 * 12), usage: U.STORAGE | U.COPY_DST });
+    let K = K0;
+    const upload = (c) => { for (const k of Object.keys(W)) device.queue.writeBuffer(B[k], 0, c[F[k]], 0, c.count * W[k]); K = K0 && shK(c) === K0 ? K0 : 0; if (K) device.queue.writeBuffer(shBuf, 0, c.sh, 0, c.count * K * 3); };
     upload(splat);
-    const frame = device.createBuffer({ size: 160, usage: U.UNIFORM | U.COPY_DST });
+    const frame = device.createBuffer({ size: 176, usage: U.UNIFORM | U.COPY_DST });
     const sorter = createGpuRadixSort(device, { capacity, usage: U, mapMode });
     const module = device.createShaderModule({ code: SPLAT_WGSL });
     const blend = { color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }, alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" } };
     const pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module, entryPoint: "vs" }, fragment: { module, entryPoint: "fs", targets: [{ format, blend }] }, primitive: { topology: "triangle-strip" } });
-    const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [frame, sorter.indices, B.pos, B.scl, B.col, B.opa, B.rot].map((buffer, binding) => ({ binding, resource: { buffer } })) });
+    const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [frame, sorter.indices, B.pos, B.scl, B.col, B.opa, B.rot, shBuf].map((buffer, binding) => ({ binding, resource: { buffer } })) });
     const self = { sorter, position: [0, 0, 0], scale: 1, _last: null, capacity, tight, maxRadiusPx };
+    Object.defineProperty(self, "shDegree", { get: () => (K === 15 ? 3 : K === 8 ? 2 : K === 3 ? 1 : 0) });
     /** Draw a different set of splats from now on (a level-of-detail cut): at most `capacity`, written over the old; the next draw re-sorts. */
     self.update = (c) => {
         if (!(c.count > 0 && c.count <= capacity)) throw new Error(`splatRendererGPU.update: ${c.count} splats is outside 1-${capacity}`);
@@ -135,11 +145,11 @@ export function createSplatRendererGPU(device, splat, { format = "rgba8unorm", u
     self.draw = (encoder, { view, proj, camera, target, width, height, clear = null, timer = null }) => {   // `timer`: render/gpuTimer.mjs, passes labelled keys, sort, draw
         const key = camera.join() + "|" + self.position.join() + "|" + self.scale;
         if (key !== self._last) { sorter.encodeDepthKeys(encoder, B.pos, n, { camera, origin: self.position, scale: self.scale, timer }); sorter.encode(encoder, n, { timer }); self._last = key; }
-        const f = new Float32Array(40); f.set(view, 0); f.set(proj, 16); f.set([self.position[0], self.position[1], self.position[2], self.scale, width, height, self.tight ? 1 : 0, self.maxRadiusPx || 0], 32);
+        const f = new Float32Array(44); f.set(view, 0); f.set(proj, 16); f.set([self.position[0], self.position[1], self.position[2], self.scale, width, height, self.tight ? 1 : 0, self.maxRadiusPx || 0, camera[0], camera[1], camera[2], K], 32);
         device.queue.writeBuffer(frame, 0, f);
         const rp = encoder.beginRenderPass({ colorAttachments: [{ view: target, loadOp: clear ? "clear" : "load", clearValue: clear || [0, 0, 0, 0], storeOp: "store" }], ...(timer && timer.writes ? (() => { const w = timer.writes("draw"); return w ? { timestampWrites: w } : {}; })() : {}) });
         rp.setPipeline(pipeline); rp.setBindGroup(0, bind); rp.draw(4, n); rp.end();
     };
-    self.destroy = () => { for (const b of Object.values(B)) b.destroy(); frame.destroy(); sorter.destroy(); };
+    self.destroy = () => { for (const b of Object.values(B)) b.destroy(); shBuf.destroy(); frame.destroy(); sorter.destroy(); };
     return self;
 }

@@ -11,7 +11,8 @@
 //   2  THE PICTURE       on node-webgpu: 40 overlapping splats at 96 x 96 against a CPU evaluation of exactly that math (f64, the same back-to-front order),
 //                        pixel by pixel; and how far the WebGL2 renderer's unpremultiplied blend is from it. THE TIGHT SQUARES (2026-11-21): a faint 4,000-splat
 //                        cloud drawn with the old 3σ squares and the tight ones is no further from the CPU's picture; the size cap does change pixels (so it
-//                        is off); and on the card's own clock (render/gpuTimer.mjs) the draw pass takes at least 15% less (25% on SwiftShader)
+//                        is off); and on the card's own clock (render/gpuTimer.mjs) the draw pass takes at least 15% less (25% on SwiftShader). THE
+//                        HARMONICS: a degree-3 cloud from two sides against the CPU's picture with render/splatSH.mjs's colour for each eye
 //   3  THE ORDER         a near red splat over a far blue one: red on top from one side, and after the camera crosses to the other side WITHOUT re-uploading
 //                        anything, blue on top -- the card re-sorted and the draw read the new order
 //
@@ -21,7 +22,10 @@
 // SABOTAGE LOG: 13 mutants of render/splatRendererGPU.mjs, each in a hard-linked copy of the tree: ALL 13 RED (the instance read instead of order[instance],
 // straight colour under the premultiplied blend, no blur, the conic's sign, a 2σ square, the quaternion's order, scales not in log space, no sigmoid, never
 // re-sorting after the first frame, the origin ignored, no alpha cap, an attribute unchecked, an additive blend). 2026-11-21, the tight squares: 6 more, ALL 6
-// RED (k always 3, k too tight, the wrong floor in the log, the opacity cull too high, loose by default, the size cap ignored).
+// RED (k always 3, k too tight, the wrong floor in the log, the opacity cull too high, loose by default, the size cap ignored). The harmonics: 5 more, 4 RED
+// (the direction reversed, the coefficient count not sent, the eye not placed, sh: false ignored); ONE GREEN AND EQUIVALENT HERE: the floor at 0 removed --
+// an 8-bit unorm target clamps the fragment's output to 0..1 before blending, so a negative colour already lands at 0 (it would not on a float target).
+// The speed check is a timing claim: run this gate on its own -- three copies at once on one machine starved SwiftShader and failed it for every mutant.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -30,6 +34,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
 import { createGpuTimer } from "../../render/gpuTimer.mjs";
+import { viewColors } from "../../render/splatSH.mjs";
 import * as R from "../../render/splatRendererGPU.mjs";
 import * as C from "../../render/splatSort.mjs";
 
@@ -88,7 +93,7 @@ export function cpuRender(s, view, proj, { origin, scale, eye }, { premultiply =
             const power = -0.5 * (conic[0] * dx * dx + conic[2] * dy * dy) - conic[1] * dx * dy; if (power > 0) continue;
             const al = Math.min(0.99, opac * Math.exp(power)); if (al < 0.003) continue;
             const o = (py * W + px) * 4, f = premultiply ? al : 1;
-            for (let k = 0; k < 3; k++) img[o + k] = col[k] * f + img[o + k] * (1 - al);
+            for (let k = 0; k < 3; k++) img[o + k] = Math.min(1, col[k] * f + img[o + k] * (1 - al));   // an 8-bit target holds no more than 1 after each blend (harmonics can push a colour past 1)
             img[o + 3] = al + img[o + 3] * (1 - al);
         }
     }
@@ -145,6 +150,21 @@ async function child(kind) {
         let same = 0, maxd = 0, capDiff = 0, sum = 0; for (let k = 0; k < loose.length; k++) { const d = Math.abs(loose[k] - tightImg[k]); if (d === 0) same++; sum += d; maxd = Math.max(maxd, d); capDiff += Math.abs(loose[k] - capped[k]); }
         const ref = cpuRender(s, viewOf, proj, { ...CAMERA }), errOf = (img) => { let e = 0; for (let k = 0; k < img.length; k++) e += Math.abs(img[k] / 255 - ref[k]); return e / img.length * 255; };
         out = { kind, looseErr: errOf(loose), tightErr: errOf(tightImg), identical: same / loose.length, maxDiff: maxd, meanDiff: sum / loose.length, capMean: capDiff / loose.length, defaultTight: R.createSplatRendererGPU(dev, scene(4), { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode }).tight === true };
+    } else if (kind === "sh") {
+        // THE COLOUR FROM WHERE YOU STAND: the 40 splats with degree-3 harmonics (15 coefficients a channel, +-0.35), seen from two sides; each picture against
+        // the CPU's f64 picture with render/splatSH.mjs's viewColors as each splat's colour, and against the same cloud drawn with sh: false
+        const base = scene(), K = 15, sc = { ...base, shDegree: 3, sh: new Float32Array(base.count * K * 3) }, h = (i) => { const x = Math.sin(i * 3.1337 + 1.7) * 9631.123; return x - Math.floor(x); };
+        for (let k = 0; k < sc.sh.length; k++) sc.sh[k] = (h(k) - 0.5) * 0.7;
+        sc.colors = base.colors.map((v) => v * 0.3);   // dark base colours, so the harmonics push many channels below 0 and the floor is exercised
+        const eyes = [CAMERA.eye, [-2.6, 1.2, 1.6]], res = [];
+        for (const eye of eyes) {
+            const mk = (o) => { const r = R.createSplatRendererGPU(dev, sc, { usage: G.GPUBufferUsage, mapMode: G.GPUMapMode, ...o }); r.position = CAMERA.origin; r.scale = CAMERA.scale; return r; };
+            const r = mk({}), { img, view } = await shoot(r, eye), flat = await shoot(mk({ sh: false }), eye);
+            const ref = cpuRender({ ...sc, colors: viewColors(sc, eye, { origin: CAMERA.origin, scale: CAMERA.scale }) }, view, proj, { ...CAMERA, eye });
+            let sum = 0, max = 0, off = 0; for (let k = 0; k < img.length; k++) { const d = Math.abs(img[k] / 255 - ref[k]); sum += d; max = Math.max(max, d); off += Math.abs(img[k] - flat.img[k]); }
+            res.push({ mean: sum / img.length * 255, max: max * 255, fromFlat: off / img.length, degree: r.shDegree });
+        }
+        out = { kind, views: res };
     } else if (kind === "order") {
         // a red splat at z +0.4 and a blue one at z -0.4, both opaque and wide, on the axis
         const s = { count: 2, positions: new Float32Array([0, 0, 0.4, 0, 0, -0.4]), scales: new Float32Array(6).fill(Math.log(0.3)), colors: new Float32Array([1, 0, 0, 0, 0, 1]), opacities: new Float32Array([6, 6]), quats: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0]) };
@@ -207,6 +227,10 @@ else {
         await section(() => {
             const t = runCase("speed");
             ok("!! ...AND IT IS FASTER ON THE CARD'S OWN CLOCK: the draw pass of a faint 6,000-splat cloud at 256 x 256, timed by render/gpuTimer.mjs over 20 interleaved frames, takes at least 15% less with the tight squares", t && !t.crashed && t.frames >= 20 && t.tightMs > 0 && t.tightMs < 0.85 * t.looseMs, t && (t.crashed || `median draw ${t.looseMs.toFixed(2)} ms loose, ${t.tightMs.toFixed(2)} ms tight (${(100 * (1 - t.tightMs / t.looseMs)).toFixed(0)}% less) on ${t.adapter}`));
+        });
+        await section(() => {
+            const t = runCase("sh");
+            ok("!! SPHERICAL HARMONICS: a degree-3 cloud from two sides is, each time, the CPU's picture with render/splatSH.mjs's colour for that eye (mean under 1 level, none over 6), and visibly not the band-0 picture (over 2 levels a channel on average)", t && !t.crashed && !t.validation && t.views.length === 2 && t.views.every((v) => v.degree === 3 && v.mean < 1 && v.max <= 6 && v.fromFlat > 2), t && (t.crashed || JSON.stringify(t.views.map((v) => ({ mean: +v.mean.toFixed(3), max: +v.max.toFixed(1), fromFlat: +v.fromFlat.toFixed(2) })))));
         });
         console.log("3. THE ORDER");
         await section(() => {

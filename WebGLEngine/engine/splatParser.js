@@ -7,7 +7,9 @@
 // with position, scale, rotation (quaternion), color (SH band 0), and
 // opacity.
 //
-// We deliberately skip the higher SH coefficients (f_rest_*, 45 values
+// (Until 2026-11-21 we skipped the higher SH coefficients -- f_rest_*, 45 values;
+// they are kept now when present, see below and render/splatSH.mjs.)
+// Originally: we deliberately skip the higher SH coefficients (f_rest_*, 45 values
 // per splat for SH degree 3). That gives view-dependent lighting which
 // most casual usage doesn't need, and skipping cuts file size by ~10×
 // during import. The base diffuse color (f_dc_0/1/2) is sufficient for
@@ -128,6 +130,13 @@ export function parsePly(arrayBuffer) {
     const colors    = new Float32Array(count * 3);
     const opacities = new Float32Array(count);
     const dv = new DataView(arrayBuffer, headerEnd);
+    // 2026-11-21 (render/splatSH.mjs): the higher spherical-harmonic bands ARE kept now when the file has them (f_rest_0.. 9, 24 or 45 of them), as `sh`
+    // coefficient by coefficient, each an (r, g, b) triple -- the file stores them channel by channel. Any other count of f_rest is left unread.
+    const nRest = props.filter((p) => /^f_rest_\d+$/.test(p.name)).length;
+    const shDegree = nRest === 9 ? 1 : nRest === 24 ? 2 : nRest === 45 ? 3 : 0, shK = nRest / 3;
+    let restOff = null;
+    if (shDegree) { restOff = []; for (let r = 0; r < nRest; r++) { const o = offsets["f_rest_" + r]; if (!o) { restOff = null; break; } restOff.push(o); } }
+    const sh = restOff ? new Float32Array(count * nRest) : null;
 
     const SH_C0 = 0.28209479177387814;  // base SH coefficient (Y_00)
     const bMin = [Infinity, Infinity, Infinity];
@@ -167,12 +176,14 @@ export function parsePly(arrayBuffer) {
         colors[i * 3 + 2] = Math.max(0, Math.min(1, b * SH_C0 + 0.5));
 
         opacities[i] = _readProp(dv, base + offsets.opacity.off, offsets.opacity.type);
+        if (sh) for (let c = 0; c < 3; c++) for (let j = 0; j < shK; j++) { const o = restOff[c * shK + j]; sh[(i * shK + j) * 3 + c] = _readProp(dv, base + o.off, o.type); }
     }
 
     const center = [(bMin[0] + bMax[0]) / 2, (bMin[1] + bMax[1]) / 2, (bMin[2] + bMax[2]) / 2];
     const size   = [bMax[0] - bMin[0], bMax[1] - bMin[1], bMax[2] - bMin[2]];
     return {
         count, positions, scales, quats, colors, opacities,
+        ...(sh ? { sh, shDegree } : {}),
         bbox: { min: bMin, max: bMax, center, size },
     };
 }

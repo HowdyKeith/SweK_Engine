@@ -20,6 +20,8 @@
 //   runs here; on a box that prefers bgra8unorm (Windows, macOS) section 3 REPORTS rather than asserts, so a swapped picture would show there as a large difference, not as a red row.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
+import { writePly } from "../../engine/plyWriter.mjs";
 import http from "node:http";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -47,14 +49,15 @@ const skip = webgpuSkipReason(require);
 if (skip) console.log(`\n2-3. SKIPPED: ${skip}`);
 else {
     const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json" };
-    const srv = http.createServer((q, r) => { const f = path.join(ENG, decodeURIComponent(q.url.split("?")[0])); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
+    const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "splatpage-"));
+    const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split("?")[0]); if (u.startsWith("/__tmp/")) { const t = path.join(TMP, path.basename(u)); if (fs.existsSync(t)) { r.writeHead(200, { "Content-Type": "application/octet-stream" }); return r.end(fs.readFileSync(t)); } } const f = path.join(ENG, u); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
     await new Promise((res) => srv.listen(0, "127.0.0.1", res));
     const { chromium } = resolvePlaywright(require), browser = await chromium.launch({ args: [...PRESENT_ARGS], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) });
-    const open = async (be) => {
+    const open = async (be, extra = "") => {
         const p = await browser.newPage({ viewport: { width: 320, height: 200 } }), errors = []; p.on("pageerror", (e) => errors.push(e.message));
-        await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=20000&still=3${be ? "&backend=" + be : ""}`);
+        await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=20000&still=3${be ? "&backend=" + be : ""}${extra}`);
         await p.waitForFunction(() => window.__splatGpu && (window.__splatGpu.stopped || window.__splatGpu.error), null, { timeout: 90000 });
-        const r = await p.evaluate(async () => { const s = window.__splatGpu; return { state: { ready: s.ready, backend: s.backend, count: s.count, frames: s.frames, error: s.error, adapter: s.adapter || null, format: s.format || null, fallback: s.fallback || null }, cap: s.error ? null : await s.capture() }; });
+        const r = await p.evaluate(async () => { const s = window.__splatGpu; return { state: { shDegree: s.shDegree || 0, hud: document.getElementById("hud") ? document.getElementById("hud").textContent : "", ready: s.ready, backend: s.backend, count: s.count, frames: s.frames, error: s.error, adapter: s.adapter || null, format: s.format || null, fallback: s.fallback || null }, cap: s.error ? null : await s.capture() }; });
         await p.close(); return { ...r, errors };
     };
     let gpu = null, gl = null;
@@ -74,7 +77,17 @@ else {
         if (process.platform === "linux") ok("!! ONE PICTURE: the card's sort and draw against the CPU's sort and WebGL2's draw, within 1 level on average and 8 at worst", mean != null && mean <= 1 && max <= 8, detail);
         else console.log(`  ----  reported, not asserted (two rasterisers under ${PRESENT_ARGS.join(" ")}): ${detail}`);
     });
-    await browser.close(); srv.close();
+    console.log("4. A CAPTURE WITH HARMONICS");
+    await section(async () => {
+        // 3,000 splats with degree-3 harmonics, written by engine/plyWriter.mjs, opened by URL: the page reads f_rest, says so, and draws it differently from band 0
+        const hh = (i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+        fs.writeFileSync(path.join(TMP, "sh.ply"), writePly(Array.from({ length: 3000 }, (_, i) => ({ x: (hh(i) - 0.5) * 3, y: (hh(i + 1e4) - 0.5) * 3, z: (hh(i + 2e4) - 0.5) * 3, scale: [-3, -3, -3], rot: [1, 0, 0, 0], color: [0, 0, 0], opacity: 2, rest: Array.from({ length: 45 }, (_, r) => (hh(i * 50 + r) - 0.5) * 2) }))));
+        const a = await open(null, "&ply=/__tmp/sh.ply"), b = await open(null, "&ply=/__tmp/sh.ply&sh=0");
+        let diff = 0; if (a.cap && b.cap) for (let k = 0; k < a.cap.grid.length; k++) diff += Math.abs(a.cap.grid[k] - b.cap.grid[k]);
+        ok("!! ?ply= opens a .ply with f_rest: 3,000 splats, harmonics to degree 3 on the status line, no page error", a.state.count === 3000 && a.state.shDegree === 3 && /harmonics to degree 3/.test(a.state.hud) && !a.state.error && a.errors.length === 0, JSON.stringify({ count: a.state.count, sh: a.state.shDegree, error: a.state.error, errors: a.errors }));
+        ok("!! ...and ?sh=0 draws band 0 only, a visibly different picture (over 4 levels a sample on average)", b.state.shDegree === 0 && !/harmonics/.test(b.state.hud) && diff / (a.cap ? a.cap.grid.length : 1) > 4, `${(diff / (a.cap ? a.cap.grid.length : 1)).toFixed(1)} levels a sample apart`);
+    });
+    await browser.close(); srv.close(); fs.rmSync(TMP, { recursive: true, force: true });
 }
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
