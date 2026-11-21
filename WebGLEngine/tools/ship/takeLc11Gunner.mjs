@@ -33,7 +33,11 @@
 //   reading goes in the fly-wired gunner's note.
 //   For the record only (no page change), against the orientation that beat LC10a or, if none did, the one with the larger mean over LC10a: LC11'S PLACES are CREDITED if it leads
 //   lc11:flat somewhere and trails it nowhere; LC11'S WIRING if the same against lc11:shuffled:4242; and whether it can be told from the sine.
-// @@READ@@
+// READ 2026-11-21 (brain/lc11Gunner.reading.json; the kept arms in brain/rig-results/lc11Gunner/): LC11 DOES NOT BEAT LC10a: NOTHING SHIPS. One ship a side, where the circuit lays
+//   the gun all the way, BOTH LC11 orientations TRAIL LC10a (medial -0.036, z -2.38; lateral -0.112, z -3.56); in fleets of three neither can be told from it (-0.005, +0.009).
+//   On the record (judged on medial, the larger mean): LC11's PLACES ARE CREDITED (medial less flat +0.116, z 3.52 one ship a side; -0.013, z -1.85 in fleets), its WIRING IS NOT
+//   (against the shuffle +0.041, z 1.93, a weak control as registered), and it cannot be told from the sine (-0.007, -0.005). The forecast said LC11 could not be told from
+//   LC10a; one ship a side it is worse. The fly-wired gunner's note says so.
 // Every arm's leads are kept (brain/rig-results/lc11Gunner/); the reading file (brain/lc11Gunner.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: no cannon, escorts and fighters (the hand's, in every arm alike), other shuffle seeds, other LC types, DNp35's behaviour, a trained circuit.
 "use strict";

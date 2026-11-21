@@ -12,7 +12,11 @@
 //   3  THE STUDY       against a stand-in: every arm once; the differences pair by pair; what is decided; the command's refusals
 //   4  WHAT WAS FOUND  once flown: the kept reading and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/lc11Gunner.reading.json; the kept arms in brain/rig-results/lc11Gunner/): LC11 DOES NOT BEAT LC10a: NOTHING SHIPS. One ship a side, where the circuit lays
+//   the gun all the way, BOTH LC11 orientations TRAIL LC10a (medial -0.036, z -2.38; lateral -0.112, z -3.56); in fleets of three neither can be told from it (-0.005, +0.009).
+//   On the record (judged on medial, the larger mean): LC11's PLACES ARE CREDITED (medial less flat +0.116, z 3.52 one ship a side; -0.013, z -1.85 in fleets), its WIRING IS NOT
+//   (against the shuffle +0.041, z 1.93, a weak control as registered), and it cannot be told from the sine (-0.007, -0.005). The forecast said LC11 could not be told from
+//   LC10a; one ship a side it is worse. The fly-wired gunner's note says so.
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -85,7 +89,10 @@ await section(async () => {
 console.log("4. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const r = JSON.parse(fs.readFileSync(G.READING, "utf8")), near = (a, b) => Math.abs(a - b) < 5e-4, R = (f, k) => r[f].reading[k];
+    ok("!! THE KEPT READING IS THE ONE PINNED: one ship a side both LC11 orientations TRAIL LC10a (medial -0.036, z -2.38; lateral -0.112, z -3.56); in fleets neither is told (-0.005, +0.009)", near(R("one", "lc11:medial less lc10").mean, -0.03611) && near(R("one", "lc11:medial less lc10").z, -2.3843) && near(R("one", "lc11:lateral less lc10").mean, -0.11158) && near(R("one", "lc11:lateral less lc10").z, -3.5614) && near(R("fleet3", "lc11:medial less lc10").mean, -0.00456) && near(R("fleet3", "lc11:lateral less lc10").mean, 0.00871) && Math.abs(R("fleet3", "lc11:medial less lc10").z) < 2 && Math.abs(R("fleet3", "lc11:lateral less lc10").z) < 2);
+    ok("!! ...and what it decided is what the page does: nothing ships (both buttons still fly their gunner over LC10a, no wiring); on the record medial's places credited (+0.116, z 3.52), its wiring not, not told from the sine; the note says so", r.verdict.beats === false && r.verdict.wiring === null && r.verdict.judged === "lc11:medial" && r.verdict.placesCredited && !r.verdict.wiringCredited && !r.verdict.toldFromSine && near(R("one", "lc11:medial less lc11:flat").mean, 0.11555)
+        && C.PRESETS.every((p) => !JSON.stringify(p.choice).includes("lc11")) && /takeLc11Gunner/.test(C.HANDS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
