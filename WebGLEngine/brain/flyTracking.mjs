@@ -55,6 +55,9 @@
 import * as LC from "./lc10Topology.mjs";
 import * as SY from "./lc10Synapses.mjs";
 import * as PL from "./lc10Places.mjs";
+import * as LC11 from "./lc11Topology.mjs";
+import * as SY11 from "./lc11Synapses.mjs";
+import * as PL11 from "./lc11Places.mjs";
 import * as ST from "./seatTurretGunner.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
 
@@ -140,6 +143,46 @@ function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, han
     return Object.freeze({ name, amplitude, sticky, motion, ...(motion ? { smooth, from } : {}), elevated: pitchRaw !== null, Sp, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT: count, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
 }
 const FLY_M = circuitOf(matrixOf(), { front: 1 }), LIBS = new Map();
+
+/** ANY EYE-TO-DESCENDING-NEURON PATHWAY, THE SAME MODEL (2026-11-21; Keith: "register and build it" -- the LC11 gunner). The circuit above, over a pathway given
+ *  as data: its baked topology, synapses and places, the eye's cell type and the descending neuron read out (right less left), and `sense` (+1 or -1) -- which
+ *  way round that read-out is taken. Over LC10a/DNa02 with sense +1 it IS circuitOf above to the bit (the gate holds it); nothing else here is new. */
+export function pathwayOf({ topo, syn, places, eye, dn, sense = 1 }) {
+    const n = topo.NEURON_ORDER.length, types = topo.NEURON_TYPES, soma = syn.NEURON_SOMA, eyeL = [], eyeR = [];
+    types.forEach((t, i) => { if (t === eye) (soma[i] === "L" ? eyeL : eyeR).push(i); });
+    const dnL = types.findIndex((t, i) => t === dn && soma[i] === "L"), dnR = types.findIndex((t, i) => t === dn && soma[i] === "R");
+    if (dnL < 0 || dnR < 0 || !eyeL.length || !eyeR.length) throw new Error(`flyTracking.pathwayOf: no ${eye} cells or no ${dn} a side in this topology`);
+    function matrix(retarget = null) {
+        const rows = Array.from({ length: n }, () => new Map()), total = new Float64Array(n);
+        topo.EDGES.forEach(([to0, from], k) => { const to = retarget ? retarget(types[from], to0) : to0, c = syn.EDGE_COUNTS[k]; rows[to].set(from, (rows[to].get(from) || 0) + signOf(syn.NEURON_NT[from]) * c); total[to] += c; });
+        const start = new Int32Array(n + 1), src = [], val = [];
+        for (let i = 0; i < n; i++) { start[i] = src.length; for (const [j, v] of [...rows[i]].sort((a, b) => a[0] - b[0])) { src.push(j); val.push(v / total[i]); } }
+        start[n] = src.length;
+        return { start, src: Int32Array.from(src), val: Float64Array.from(val) };
+    }
+    function retarget(seed) {
+        const rng = mulberry(seed), byType = {}, maps = new Map(); types.forEach((t, i) => (byType[t] ||= []).push(i));
+        return (sourceType, to) => { const key = sourceType + ">" + types[to]; if (!maps.has(key)) { const cs = byType[types[to]], p = cs.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } maps.set(key, new Map(cs.map((v, k) => [v, p[k]]))); } return maps.get(key).get(to); };
+    }
+    function circuit(M, { front = 1, flat = false, baseline = BASELINE } = {}) {
+        const drive = (h, e, add) => { const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places.ACROSS[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
+            if (wl > 0) for (const i of eyeL) h[i] = (add ? h[i] : 0) + wl * g(i); if (wr > 0) for (const i of eyeR) h[i] = (add ? h[i] : 0) + wr * g(i); };
+        const run = (h) => { for (let s = 0; s < STEPS; s++) { const y = new Float64Array(n); for (let i = 0; i < n; i++) { let a = h[i] + (i === dnL || i === dnR ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; } return h; };
+        const cells = (e) => { const h = new Float64Array(n); drive(h, e, false); return run(h); };
+        const raw = (e) => { const h = cells(e); return sense * (h[dnR] - h[dnL]); };
+        const rawMany = (es) => { const h = new Float64Array(n); for (const e of es) drive(h, e, true); const o = run(h); return sense * (o[dnR] - o[dnL]); };
+        return { cells, raw, rawMany };
+    }
+    return Object.freeze({ n, eye, dn, sense, eyeL, eyeR, dnL, dnR, matrix, retarget, circuit });
+}
+export const LC10_PATHWAY = pathwayOf({ topo: LC, syn: SY, places: PL, eye: "LC10a", dn: "DNa02" });
+/** THE SMALL-OBJECT PATHWAY (brain/lc11Topology.mjs: 143 LC11 onto three GABA relays and DNp35, vendor/male-cns/PROVENANCE.md). DNp35 is NOT KNOWN AS A
+ *  STEERING NEURON: reading its right less left as the gun's turn is a modelling choice, registered in tools/ship/takeLc11Gunner.mjs, and so is `sense` --
+ *  LC11_SENSE is the way round that makes the gun turn TOWARD a target at a quarter turn, as LC10a's DNa02 read-out does (chosen once, from the circuit's
+ *  own read-out at 90 degrees, before any fight; the gate pins it). */
+export const LC11_SENSE = (() => { const p = pathwayOf({ topo: LC11, syn: SY11, places: PL11, eye: "LC11", dn: "DNp35" }), c = p.circuit(p.matrix(), { front: 1 }), lc10 = LC10_PATHWAY.circuit(LC10_PATHWAY.matrix(), { front: 1 });
+    const odd = (r) => (r(Math.PI / 2) - r(-Math.PI / 2)) / 2; return Math.sign(odd(c.raw)) === Math.sign(odd(lc10.raw)) ? 1 : -1; })();
+export const LC11_PATHWAY = pathwayOf({ topo: LC11, syn: SY11, places: PL11, eye: "LC11", dn: "DNp35", sense: LC11_SENSE });
 /** The library for a wiring NAME: "fly:medial", "fly:lateral", "flat", "shuffled:<seed>", "sine". See the header. */
 export function wiringOf(name = "fly:medial") {
     if (LIBS.has(name)) return LIBS.get(name);
@@ -150,8 +193,10 @@ export function wiringOf(name = "fly:medial") {
     else if (name === "sine") lib = libraryOf(name, (e) => -Math.sin(Math.max(-Math.PI / 2, Math.min(Math.PI / 2, e))));
     else if (m) { const c = circuitOf(matrixOf(retargetOf(Number(m[1]))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
     else if (/^unneighboured:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(unneighbourOf(Number(String(name).slice(14)))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^lc11:(medial|lateral|flat)$/.test(String(name))) { const k = String(name).slice(5), c = LC11_PATHWAY.circuit(LC11_PATHWAY.matrix(), k === "flat" ? { flat: true } : { front: k === "medial" ? 1 : -1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^lc11:shuffled:\d+$/.test(String(name))) { const c = LC11_PATHWAY.circuit(LC11_PATHWAY.matrix(LC11_PATHWAY.retarget(Number(String(name).slice(14)))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
     else if (/^scrambled:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(), { front: 1, places: scrambledPlaces(Number(String(name).slice(10))) }); lib = libraryOf(name, c.raw, c.cells); }
-    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>" or "unneighboured:<seed>" (got ${name})`);
+    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>", "unneighboured:<seed>", or over LC11 "lc11:medial", "lc11:lateral", "lc11:flat", "lc11:shuffled:<seed>" (got ${name})`);
     LIBS.set(name, lib); return lib;
 }
 const MAIN = wiringOf("fly:medial");
