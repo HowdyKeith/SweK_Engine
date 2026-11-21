@@ -19,7 +19,9 @@
 // WHAT IS DECIDED: car-today stays the escorts pick at every ration where it does NOT TRAIL. If it TRAILS at one ration or more, the button gains a ration-aware
 //   escorts pick: the 45-degree gunner one ship a side with escorts at rations AT OR BELOW the largest ration where car-today trailed (render/spaceDuelCore.mjs's
 //   sideOf is then told the fight's ration). Either way the by-the-fight hand's note gives every ration's reading.
-// @@READ@@
+// READ 2026-11-21 (brain/carTodayRations.reading.json; the kept arms in brain/rig-results/carTodayRations/): THE ESCORTS PICK STAYS AT EVERY RATION. Car-today less the 45-degree gunner, under the split helm:
+//   whole magazines +0.083 (z 2.08, LEADS), a half +0.123 (z 3.32, LEADS), a quarter +0.187 (z 4.40, LEADS), an eighth +0.042 (z 0.79, cannot be told), a sixteenth -0.080 (z -1.52, cannot be told). It trails
+//   nowhere, as forecast; the forecast said the rationed fights could not be told, and a half and a quarter lead. The lead does fade at the two scarcest rations. The by-the-fight hand's note gives every ration.
 // Every arm's leads are kept (brain/rig-results/carTodayRations/); the reading file (brain/carTodayRations.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: six escorts, the pilot's escorts, fleets, one ship with nothing else, the fly's helm.
 "use strict";

@@ -10,7 +10,9 @@
 //   2  THE STUDY             against a stand-in: ten arms, each once; the gain pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/carTodayRations.reading.json; the kept arms in brain/rig-results/carTodayRations/): THE ESCORTS PICK STAYS AT EVERY RATION. Car-today less the 45-degree gunner, under the split helm:
+//   whole magazines +0.083 (z 2.08, LEADS), a half +0.123 (z 3.32, LEADS), a quarter +0.187 (z 4.40, LEADS), an eighth +0.042 (z 0.79, cannot be told), a sixteenth -0.080 (z -1.52, cannot be told). It trails
+//   nowhere, as forecast; the forecast said the rationed fights could not be told, and a half and a quarter lead. The lead does fade at the two scarcest rations. The by-the-fight hand's note gives every ration.
 //
 // SABOTAGE LOG: 14 mutants of tools/ship/takeCarTodayRations.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 14 RED the first time
 //   (a seed moved; a ration not the page's; the fly's helm, the sine without its wiring; six escorts, the ration dropped, the plain side armed; the gain's sign,
@@ -66,7 +68,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), alt: k(f, "alt") })])), R = (f) => out[f].reading.gain;
+    const want = { r1: [0.0828, "LEADS"], r2: [0.1231, "LEADS"], r4: [0.1872, "LEADS"], r8: [0.0419, "CANNOT BE TOLD"], r16: [-0.0803, "CANNOT BE TOLD"] };
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: car-today less the 45-degree gunner +0.083, +0.123, +0.187 (LEAD), +0.042, -0.080 (cannot be told) from whole magazines to a sixteenth", G.FIGHTS.every((f) => near(R(f), want[f][0]) && TA.word(R(f).z) === want[f][1] && R(f).n === 300 && Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12));
+    const v = G.decide(out), h = C.HANDS.find((x) => x.id === "bysize");
+    ok("!! WHAT IS DECIDED, as read: car-today trails nowhere, so the escorts pick stays; the by-the-fight hand's note gives every ration", !v.changes && !rd.verdict.changes && h.bySize.escorts === "car-today" && /takeCarTodayRations/.test(h.note) && /\+0\.187/.test(h.note) && /-0\.080/.test(h.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
