@@ -118,7 +118,12 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8")), rec = (seed) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `s${seed}.json`), "utf8"));
+    const start = G.brainsOf().start.weights, w = blob.weights, moved = w.map((v, i) => Math.fround(v) !== Math.fround(start[i]) ? i : -1).filter((i) => i >= 0), near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    ok("!! THE KEPT SEARCHES: each accepted 2 of 150 from the start, train -0.067 -> +0.052 (9400) and +0.057 (9401); the file is the champion's record, 9401", [9400, 9401].every((s) => rec(s).accepted.length === 2 && rec(s).startHash === rec(9400).startHash && Math.abs(rec(s).startTrain + 0.0674) < 5e-4) && Math.abs(rec(9400).train - 0.0522) < 5e-4 && Math.abs(rec(9401).train - 0.0571) < 5e-4 && rd.champion === 9401 && rec(9401).weights.map((v) => Math.fround(v)).join() === w.map((v) => Math.fround(v)).join());
+    ok("!! TWO WEIGHTS MOVED: synapse 101 and output 1's weight from hidden unit 8, both from 0", moved.join() === [ST.synapseAt(101), ST.outputAt(1, 8)].join() && moved.every((i) => start[i] === 0) && ST.synapsesUsed(w) === ST.synapsesUsed(start) + 1, moved.join());
+    ok("!! THE READING, read once: it LEADS the no-window fly-wired gunner by +0.051 (z 2.12); the start TRAILS it (-0.065); the training bought +0.117 (z 6.24), all through its synapse; it qualifies", near(rd.reading.lead, 0.0514) && TA.word(rd.reading.lead.z) === "LEADS" && near(rd.reading.start, -0.0653) && TA.word(rd.reading.start.z) === "TRAILS" && near(rd.reading.training, 0.1167) && near(rd.reading.synapses, 0.1167) && rd.reading.lead.n === 600 && rd.verdict.ok && B.qualifies(rd.reading).ok);
+    ok("!! THE PAGE CARRIES IT as the hand car-today, its note the audit and what it was NOT flown in", (() => { const h = C.HANDS.find((x) => x.id === "car-today"); return h && C.FILES[h.file].path === "brain/seatTurretGunnerWeightsToday.json" && /\+0\.051/.test(h.note) && /NOT flown where the by-the-fight button is used/.test(h.note) && /trainTurretSeatToday/.test(h.note); })());
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

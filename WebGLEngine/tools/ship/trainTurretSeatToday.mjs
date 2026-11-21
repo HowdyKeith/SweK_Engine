@@ -16,7 +16,10 @@
 // WHAT SHIPS: brain/seatTurretGunnerWeightsToday.json (policy seatTurretGunner) only if on the audit the champion LEADS the fly-wired gunner AND LEADS its start (trainTurretSeatBig.qualifies). The duel page then gains it as a hand (its note carrying the audit); the
 //   by-the-fight button keeps its pick until a study flies the new hand where the button is used.
 // trainTurretSeatBig.finish's log says "the hand gunner" for the other side: here that side is the no-window fly-wired gunner.
-// @@READ@@
+// READ 2026-11-21 (brain/seatTurretGunnerWeightsToday.reading.json; the kept searches in brain/rig-results/turretSeatToday/): IT QUALIFIES, and the forecast was wrong. Each search accepted 2 of 150 children (train -0.067 -> +0.052 and +0.057); held-out +0.083 (z 2.53) and +0.088 (z 2.60),
+//   the champion seed 9401: two weights moved from the start, synapse 101 of the Giant Fiber Circuit and output 1's weight from hidden unit 8 (0 -> 0.475 and 0 -> 0.707). On the 600 audit pairs, read once: against the no-window fly-wired gunner +0.051 (se 0.024, z 2.12): LEADS;
+//   the start -0.065 (z -2.70): TRAILS; WHAT THE TRAINING BOUGHT +0.117 (se 0.019, z 6.24): LEADS; its synapses the same +0.117 (with the synapse ablated the champion IS the start: the output weight it moved only carries what the synapse puts there).
+//   The duel page gains it as the hand `car-today`; the by-the-fight button keeps its pick.
 // WHAT IS NOT HERE: fleets, escorts, fighters, the rationed fight, the bow-on rule, the fly-wired gunner's own weights.
 "use strict";
 import fs from "node:fs";
