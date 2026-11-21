@@ -84,9 +84,19 @@ await section(async () => {
         && (await pending).ok && S.calls[0].kind === "pin" && S.calls[0].pin === "4321" && B.status().pins.length === 0);
     const dv = await B.devices();
     ok("!! devices: tvpipe's discovery, each reduced to name, model, addresses, protocols, video, paired, pin (nothing else passed on)", dv.ok && dv.devices[0].name === "Living Room" && dv.devices[0].pin === true && dv.devices[0].paired === false && !("airplay" in dv.devices[0]));
-    B._reset();
+    B._reset(); const ensured = []; B._useEnsure(() => { ensured.push(1); return { ok: false, need: "tvpipe-sdk" }; });
     const none = await B.start("pattern", { to: "browser" }, { importer: async () => { throw new Error("Cannot find package"); } });
-    ok("!! NO SDK is a reason naming how to install it, not a crash; /tv/status says not installed", !none.ok && /npm install @tvpipe\/sdk/.test(none.error) && B.status().installed === false && /npm install/.test(B.status().why));
+    ok("!! NO SDK, Auto-Install off: the registry is asked, and the reason names both ways to install it; not a crash; /tv/status says not installed", !none.ok && ensured.length === 1 && /npm install @tvpipe\/sdk/.test(none.error) && /Auto-Install/.test(none.error) && B.status().installed === false && /npm install/.test(B.status().why));
+    B._reset(); B._useEnsure(() => ({ ok: true, installing: true, auto: true }));
+    const first = await B.start("pattern", { to: "browser" }, { importer: async () => { throw new Error("Cannot find package"); } });
+    ok("!! NO SDK, Auto-Install on: FIRST USE STARTS THE INSTALL and says to try again in a minute", !first.ok && /being installed for first use/.test(first.error));
+    B._reset(); B._useEnsure(() => ({ ok: false, lastErr: "exit 1 -- npm ERR! network" }));
+    const broke = await B.start("pattern", { to: "browser" }, { importer: async () => { throw new Error("Cannot find package"); } });
+    ok("!! a first-use install that FAILED says so, with npm's error", !broke.ok && /did not install: exit 1/.test(broke.error));
+    const A = require("./autoInstall.js"), e = A.REGISTRY.find((x) => x.id === "tvpipe-sdk");
+    ok("!! THE REGISTRY ENTRY: a small dep (eligible for auto-install), detected in THIS folder's node_modules, installed there with --prefix (not -g), through cmd /c on Windows", e && e.tier === "dep" && e.detect.kind === "file" && e.detect.path === path.join(HERE, "node_modules", "@tvpipe", "sdk", "package.json")
+        && e.install.kind === "cmd" && e.install.unix.join(" ").startsWith(`npm install --prefix ${HERE}`) && e.install.win.slice(0, 5).join(" ") === `cmd /c npm install --prefix` && e.install.win[5] === HERE && e.install.unix.some((x) => /^@tvpipe\/sdk@/.test(x)) && e.est.downloadMB <= 100);
+    B._useEnsure(null);
     await B.stop(); B._reset();
 });
 
@@ -122,3 +132,6 @@ process.exit(fails === 0 ? 0 : 1);
 // failure ignored, the error code dropped, the wrong PIN passed on, discovery passed on whole, no SDK thrown, stop-all stopping none, receiver events
 // ignored). Also run by hand, not here: a real page shared to tvpipe's browser receiver through start("share") came out as 1080p30 H.264 with audio,
 // the receiver connected (Playwright's Chromium, which as root needs --no-sandbox: a sandbox quirk, not a SweK one).
+// FIRST-USE INSTALL (2026-11-21): 6 more mutants, ALL RED (the registry entry installed with -g, made a devtool so it never auto-installs, spawning npm.cmd on
+// Windows; the bridge never asking the registry, not saying an install started, hiding npm's error). And run for real here: with @tvpipe/ moved out of
+// node_modules, autoInstall.run("tvpipe-sdk") took detect from "missing" to "installed" (sdk + linux-x64 in ai-bridge/node_modules, package.json untouched).

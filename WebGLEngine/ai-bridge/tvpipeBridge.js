@@ -64,9 +64,20 @@ async function loadSdk(importer = (m) => import(m)) {
     const major = Number(process.versions.node.split(".")[0]);
     if (major < 22) { _sdkWhy = `tvpipe's SDK needs Node 22 or newer (this is ${process.versions.node})`; return null; }
     try { _sdk = await importer("@tvpipe/sdk"); _sdkWhy = ""; return _sdk; }
-    catch (e) { _sdkWhy = `@tvpipe/sdk is not installed: ${INSTALL_HINT}`; return null; }
+    catch (e) {
+        // FIRST USE: ask the bridge's Auto-Install registry (ai-bridge/autoInstall.js, entry "tvpipe-sdk"). With Auto-Install on (Settings, or this item
+        // opted in) it starts the install and says so; otherwise it says how. Either way this call fails now and the next one, once npm is done, works.
+        let r = null; try { r = ensureSdk(); } catch { /* no registry: the hint below */ }
+        _sdkWhy = r && r.installing ? "tvpipe is being installed for first use (about 10 MB): try again in a minute"
+            : r && r.ok === false && r.lastErr ? `@tvpipe/sdk did not install: ${r.lastErr}`
+            : `@tvpipe/sdk is not installed: ${INSTALL_HINT}, or turn on Auto-Install in Settings and it installs itself on first use`;
+        return null;
+    }
 }
 function _useSdk(sdk) { _sdk = sdk; _sdkWhy = ""; }   // the gate's stand-in
+let ensureSdk = () => { const A = require("./autoInstall.js"), r = A.ensure("tvpipe-sdk"), st = A.status("tvpipe-sdk"); return { ...r, lastErr: st.lastErr }; };
+const _realEnsure = ensureSdk;
+function _useEnsure(fn) { ensureSdk = fn || _realEnsure; }   // the gate's seam: no real npm in a self-check
 
 // ---- sessions ----
 const sessions = new Map(), pins = new Map();
@@ -218,4 +229,4 @@ async function devices({ timeout = DISCOVER_MS, importer } = {}) {
 function _sessionsForTest() { return sessions; }
 function _reset() { sessions.clear(); pins.clear(); _sdk = null; _sdkWhy = ""; _seq = 0; }
 
-module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, checkLive, parseLiveFrame, errorOf, loadSdk, status, devices, start, stop, answerPin, attachLive, _useSdk, _reset, _sessionsForTest };
+module.exports = { MAX_TARGETS, PIN_WAIT_MS, MAX_SESSIONS, INSTALL_HINT, checkTarget, checkUrl, checkPin, checkLive, parseLiveFrame, errorOf, loadSdk, status, devices, start, stop, answerPin, attachLive, _useSdk, _useEnsure, _reset, _sessionsForTest };
