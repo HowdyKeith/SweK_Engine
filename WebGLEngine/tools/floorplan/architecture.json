@@ -1,0 +1,712 @@
+{
+  "$schema": "floorplan/architecture@1",
+  "project": {
+    "name": "SweK Engine",
+    "summary": "A browser game and simulation engine with hundreds of pages (3D worlds, physics, ship duels, avatars, home dashboards), a local Node server (the ai-bridge) that connects the pages to AI models, the home, phones and installers, and a large set of self-checks and research studies that hold every claim to a measurement.",
+    "entrypoints": [
+      "WebGLEngine/main.js",
+      "WebGLEngine/ai-bridge/server.js",
+      "WebGLEngine/index.html",
+      "WebGLEngine/server.html"
+    ]
+  },
+  "ignore": [
+    "WebGLEngine/vendor/**",
+    "**/node_modules/**",
+    "WebGLEngine/ai-bridge/kaggle_templates/**"
+  ],
+  "nodes": [
+    {
+      "id": "pages",
+      "label": "The pages",
+      "kind": "ui",
+      "summary": "Every page you open in the browser: the main engine, the hubs, and hundreds of single-purpose demos, games and dashboards.",
+      "paths": [
+        "WebGLEngine/*.html",
+        "WebGLEngine/*.js",
+        "WebGLEngine/*.mjs",
+        "WebGLEngine/demos/**",
+        "WebGLEngine/demos_code/**",
+        "WebGLEngine/portfolio/**",
+        "WebGLEngine/experiments/**"
+      ],
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ]
+    },
+    {
+      "id": "pages.main",
+      "parent": "pages",
+      "label": "Main engine page",
+      "kind": "feature",
+      "summary": "The big engine page and its startup script, which wires the world, physics, brains and panels together.",
+      "paths": [
+        "WebGLEngine/main.js",
+        "WebGLEngine/index.html"
+      ]
+    },
+    {
+      "id": "pages.hubs",
+      "parent": "pages",
+      "label": "Hubs and control panels",
+      "kind": "feature",
+      "summary": "The pages that lead to everything else: the server control page, the home page, the panels board and the install panel host.",
+      "paths": [
+        "WebGLEngine/server.html",
+        "WebGLEngine/home.html",
+        "WebGLEngine/panels.html",
+        "WebGLEngine/board.html",
+        "WebGLEngine/codemap.html"
+      ]
+    },
+    {
+      "id": "pages.demos",
+      "parent": "pages",
+      "label": "Demo scripts",
+      "kind": "feature",
+      "summary": "Scripted showcases and diagnostics that run the engine end to end.",
+      "paths": [
+        "WebGLEngine/demos/**",
+        "WebGLEngine/demos_code/**",
+        "WebGLEngine/portfolio/**",
+        "WebGLEngine/experiments/**"
+      ]
+    },
+    {
+      "id": "pages.games",
+      "parent": "pages",
+      "label": "Ship games (EV and BZ)",
+      "kind": "feature",
+      "summary": "Two self-contained games inside the engine: an Escape-Velocity-style space trader and a tank battle.",
+      "paths": [
+        "WebGLEngine/ev/**",
+        "WebGLEngine/bz/**"
+      ]
+    },
+    {
+      "id": "engine",
+      "label": "Engine core",
+      "kind": "library",
+      "summary": "The shared machinery every page draws on: drawing to the screen, effects, the world and terrain, sound, text, input and the entity system.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/engine/**",
+        "WebGLEngine/core/**"
+      ]
+    },
+    {
+      "id": "engine.render",
+      "parent": "engine",
+      "label": "Rendering",
+      "kind": "library",
+      "summary": "Draws every frame on the graphics card (WebGPU and WebGL): denoising, upscaling, frame generation, lighting and shaders.",
+      "paths": [
+        "WebGLEngine/render/**",
+        "WebGLEngine/shaders/**",
+        "WebGLEngine/gfx/**",
+        "WebGLEngine/gpu/**",
+        "WebGLEngine/camera/**"
+      ]
+    },
+    {
+      "id": "engine.fx",
+      "parent": "engine",
+      "label": "Visual effects",
+      "kind": "library",
+      "summary": "Effects layered on a scene: avatar looks, FSR upscaling, voxelizing, nebulae, fractures, wormholes.",
+      "paths": [
+        "WebGLEngine/fx/**"
+      ]
+    },
+    {
+      "id": "engine.world",
+      "parent": "engine",
+      "label": "Worlds and terrain",
+      "kind": "library",
+      "summary": "Builds the places the engine shows: voxel chunks, terrain, oceans, maps, dungeons and the meshes they are made of.",
+      "paths": [
+        "WebGLEngine/world/**",
+        "WebGLEngine/voxel/**",
+        "WebGLEngine/mesh/**",
+        "WebGLEngine/maps/**",
+        "WebGLEngine/dungeon/**",
+        "WebGLEngine/water/**",
+        "WebGLEngine/atmosphere/**",
+        "WebGLEngine/wasm-terrain/**",
+        "WebGLEngine/worker/**"
+      ]
+    },
+    {
+      "id": "engine.base",
+      "parent": "engine",
+      "label": "Engine foundations",
+      "kind": "library",
+      "summary": "The building blocks underneath: the entity system, commands, maths, input, animation, navigation, sound and text.",
+      "paths": [
+        "WebGLEngine/engine/**",
+        "WebGLEngine/core/**",
+        "WebGLEngine/math/**",
+        "WebGLEngine/input/**",
+        "WebGLEngine/anim/**",
+        "WebGLEngine/nav/**",
+        "WebGLEngine/audio/**",
+        "WebGLEngine/media/**",
+        "WebGLEngine/text/**",
+        "WebGLEngine/utils/**",
+        "WebGLEngine/debug/**",
+        "WebGLEngine/data/**",
+        "WebGLEngine/editor/**",
+        "WebGLEngine/rig/**",
+        "WebGLEngine/meta/**",
+        "WebGLEngine/analysis/**"
+      ]
+    },
+    {
+      "id": "engine.net",
+      "parent": "engine",
+      "label": "Networking and multiplayer",
+      "kind": "library",
+      "summary": "How a page finds the local server and shares a game or a picture with other machines.",
+      "paths": [
+        "WebGLEngine/net/**",
+        "WebGLEngine/multiplayer/**",
+        "WebGLEngine/bridge/**"
+      ]
+    },
+    {
+      "id": "physics",
+      "label": "Physics and simulation",
+      "kind": "library",
+      "summary": "The physical models the pages run: rigid bodies, cloth and soft bodies, fluids, particles, heat, electromagnetism, black holes and whole-world simulations.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/physics/**"
+      ]
+    },
+    {
+      "id": "physics.solids",
+      "parent": "physics",
+      "label": "Bodies, cloth and mechanics",
+      "kind": "library",
+      "summary": "Solid things moving and colliding: position-based dynamics, mechanics, box physics, characters and meshes.",
+      "paths": [
+        "WebGLEngine/physics/xpbd/**",
+        "WebGLEngine/physics/mechanics/**",
+        "WebGLEngine/physics/box3d/**",
+        "WebGLEngine/physics/character/**",
+        "WebGLEngine/physics/mesh/**"
+      ]
+    },
+    {
+      "id": "physics.fluids",
+      "parent": "physics",
+      "label": "Fluids and particles",
+      "kind": "library",
+      "summary": "Water, smoke, sand and molecules: particle fluids, material-point and molecular-dynamics methods, lattice fluids.",
+      "paths": [
+        "WebGLEngine/physics/mpm/**",
+        "WebGLEngine/physics/sph/**",
+        "WebGLEngine/physics/md/**",
+        "WebGLEngine/fluid/**",
+        "WebGLEngine/simulation/lbm/**"
+      ]
+    },
+    {
+      "id": "physics.fields",
+      "parent": "physics",
+      "label": "Fields, heat and space",
+      "kind": "library",
+      "summary": "Things that spread through space: electromagnetism, heat, black holes, and scans through a body (tomography).",
+      "paths": [
+        "WebGLEngine/physics/em/**",
+        "WebGLEngine/physics/thermal/**",
+        "WebGLEngine/physics/blackhole/**",
+        "WebGLEngine/physics/tomography/**",
+        "WebGLEngine/physics/render/**",
+        "WebGLEngine/simulation/tomo/**",
+        "WebGLEngine/simulation/cosmo/**",
+        "WebGLEngine/simulation/em/**"
+      ]
+    },
+    {
+      "id": "physics.worldsim",
+      "parent": "physics",
+      "label": "World simulations",
+      "kind": "library",
+      "summary": "Whole scenarios that run over time: populations, civilisations, monsters, cells, the game of life.",
+      "paths": [
+        "WebGLEngine/simulation/**",
+        "WebGLEngine/sim/**",
+        "WebGLEngine/cell-tracking/**"
+      ]
+    },
+    {
+      "id": "brain",
+      "label": "Brains and AI",
+      "kind": "library",
+      "summary": "What makes things decide: connectome-wired brains (the fly-wired gunners and helms), learning agents, the ship duel that tests them, and the AI agents that command the world.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/brain/**",
+        "WebGLEngine/brains/**"
+      ]
+    },
+    {
+      "id": "brain.duel",
+      "parent": "brain",
+      "label": "Ship duels and gunners",
+      "kind": "feature",
+      "summary": "The battleship duel, the gunner and helm networks the duel page carries, and the trained pilot.",
+      "paths": [
+        "WebGLEngine/brain/battleship*",
+        "WebGLEngine/brain/seat*",
+        "WebGLEngine/brain/fly*",
+        "WebGLEngine/brain/helm*",
+        "WebGLEngine/brain/pilot*",
+        "WebGLEngine/brain/peerBrain*"
+      ]
+    },
+    {
+      "id": "brain.learn",
+      "parent": "brain",
+      "label": "Learning",
+      "kind": "library",
+      "summary": "Reinforcement learning and the training loops brains are improved with.",
+      "paths": [
+        "WebGLEngine/brain/rl/**",
+        "WebGLEngine/brain/agent/**",
+        "WebGLEngine/brain/tf/**"
+      ]
+    },
+    {
+      "id": "brain.agents",
+      "parent": "brain",
+      "label": "World agents",
+      "kind": "library",
+      "summary": "Agents that act inside the world: they queue up commands, pass them on, and drive faces and expressions.",
+      "paths": [
+        "WebGLEngine/ai/**",
+        "WebGLEngine/face/**"
+      ]
+    },
+    {
+      "id": "ui",
+      "label": "Shared page widgets",
+      "kind": "ui",
+      "summary": "Panels and widgets many pages share: gauges, the docked status bar, settings, the install panel, avatars and chat.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/ui/**"
+      ]
+    },
+    {
+      "id": "ui.install",
+      "parent": "ui",
+      "label": "Install panel",
+      "kind": "feature",
+      "summary": "Lists every tool, model and app SweK can install and runs the install through the local server.",
+      "paths": [
+        "WebGLEngine/ui/installPanel.js"
+      ]
+    },
+    {
+      "id": "ui.gauges",
+      "parent": "ui",
+      "label": "Gauges and dock",
+      "kind": "feature",
+      "summary": "The docked gauges, the stats bar and the dials that show the machine's state.",
+      "paths": [
+        "WebGLEngine/ui/*[Gg]auge*",
+        "WebGLEngine/ui/dock*"
+      ]
+    },
+    {
+      "id": "bridge",
+      "label": "Local server (ai-bridge)",
+      "kind": "service",
+      "summary": "The Node server that runs on your own machine: it connects the pages to AI models, your home, your phone and TV, and runs installs on request.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/ai-bridge/**",
+        "WebGLEngine/integrations/**",
+        "WebGLEngine/ha/**",
+        "WebGLEngine/android/**",
+        "WebGLEngine/tv/**",
+        "WebGLEngine/vba/**",
+        "WebGLEngine/petfbi/**"
+      ]
+    },
+    {
+      "id": "bridge.server",
+      "parent": "bridge",
+      "label": "The server itself",
+      "kind": "service",
+      "summary": "The one big server file that receives every request from the pages and hands it to the right helper.",
+      "paths": [
+        "WebGLEngine/ai-bridge/server.js"
+      ]
+    },
+    {
+      "id": "bridge.install",
+      "parent": "bridge",
+      "label": "Installers",
+      "kind": "feature",
+      "summary": "Runs the install catalog: installs from GitHub releases, apps, Python and model downloads, with checks on which machines each one can run on.",
+      "paths": [
+        "WebGLEngine/ai-bridge/*[Ii]nstall*",
+        "WebGLEngine/ai-bridge/installers/**",
+        "WebGLEngine/ai-bridge/platformRequires.js",
+        "WebGLEngine/ai-bridge/catalogSnapshot.mjs"
+      ]
+    },
+    {
+      "id": "bridge.home",
+      "parent": "bridge",
+      "label": "Home, phone and TV",
+      "kind": "feature",
+      "summary": "Talks to Home Assistant, Android phones, TVs and devices found on the network.",
+      "paths": [
+        "WebGLEngine/ai-bridge/*{ha,Ha,android,Android,mdns,tv,Tv,camera,Camera,govee,Govee,alexa,Alexa}*",
+        "WebGLEngine/ha/**",
+        "WebGLEngine/android/**",
+        "WebGLEngine/tv/**"
+      ],
+      "exclude": [
+        "WebGLEngine/ai-bridge/*[Ii]nstall*"
+      ]
+    },
+    {
+      "id": "bridge.models",
+      "parent": "bridge",
+      "label": "AI model helpers",
+      "kind": "feature",
+      "summary": "Connects to local and cloud AI models: Ollama, Gemini, Whisper, MLX, Voxtral and others.",
+      "paths": [
+        "WebGLEngine/ai-bridge/*{ollama,Ollama,gemini,Gemini,whisper,Whisper,mlx,Mlx,voxtral,Voxtral,llm,Llm,model,Model}*"
+      ]
+    },
+    {
+      "id": "bridge.scrapers",
+      "parent": "bridge",
+      "label": "Scrapers",
+      "kind": "feature",
+      "summary": "Fetches pages and data from the web for the engine's feeds.",
+      "paths": [
+        "WebGLEngine/ai-bridge/scrapers/**"
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "Ship and research tools",
+      "kind": "script",
+      "summary": "Command-line tools for releasing versions and for the registered studies that decide what the pages carry.",
+      "exclude": [
+        "**/*-selfcheck.mjs"
+      ],
+      "paths": [
+        "WebGLEngine/tools/**"
+      ]
+    },
+    {
+      "id": "tools.studies",
+      "parent": "tools",
+      "label": "Registered studies",
+      "kind": "script",
+      "summary": "Each study is written down before it is flown, read once, and decides one thing on the page (the take* and train* tools).",
+      "paths": [
+        "WebGLEngine/tools/ship/take*",
+        "WebGLEngine/tools/ship/train*",
+        "WebGLEngine/tools/ship/pairPool*",
+        "WebGLEngine/tools/ship/pairsTaken*"
+      ]
+    },
+    {
+      "id": "tools.ship",
+      "parent": "tools",
+      "label": "Release and checking tools",
+      "kind": "script",
+      "summary": "Version bumps, the changelog, claim checks, the gate sweeps and the real-GPU runs.",
+      "paths": [
+        "WebGLEngine/tools/ship/**"
+      ]
+    },
+    {
+      "id": "tools.roundhouse",
+      "parent": "tools",
+      "label": "Roundhouse",
+      "kind": "script",
+      "summary": "Peer rounds: experiments run across machines and their reports.",
+      "paths": [
+        "WebGLEngine/tools/roundhouse/**"
+      ]
+    },
+    {
+      "id": "tools.renderqa",
+      "parent": "tools",
+      "label": "Render QA",
+      "kind": "script",
+      "summary": "Opens pages in a headless browser, screenshots them and checks the picture.",
+      "paths": [
+        "WebGLEngine/tools/render-qa/**"
+      ]
+    },
+    {
+      "id": "gates",
+      "label": "Self-checks",
+      "kind": "test",
+      "summary": "Every *-selfcheck file: a gate that holds one file's claims and must pass before a version ships. About a third of all the code.",
+      "paths": [
+        "**/*-selfcheck.mjs"
+      ]
+    },
+    {
+      "id": "companions",
+      "label": "Companion apps",
+      "kind": "ui",
+      "summary": "Smaller apps beside the engine: Home Assistant add-on, Tasker phone bridge, the K-pop listener, a Raycast extension, the cloud meeting server and helper libraries.",
+      "paths": [
+        "HomeAssistant/**",
+        "TaskerBridge/**",
+        "KPop Listener/**",
+        "raycast-extension/**",
+        "cloud/**",
+        "agent-skills/**",
+        "strict-libm/**",
+        "PetFBI/**",
+        "Root Utils/**",
+        "diso_tools/**",
+        ".claude/**",
+        "*.sh"
+      ]
+    },
+    {
+      "id": "companions.cloud",
+      "parent": "companions",
+      "label": "Cloud meeting server",
+      "kind": "service",
+      "summary": "A small server in the cloud that lets SweK machines find each other and open video connections.",
+      "paths": [
+        "cloud/**",
+        "Root Utils/**"
+      ]
+    },
+    {
+      "id": "companions.home",
+      "parent": "companions",
+      "label": "Home and phone apps",
+      "kind": "ui",
+      "summary": "The Home Assistant add-on and the Tasker bridge for an Android phone.",
+      "paths": [
+        "HomeAssistant/**",
+        "TaskerBridge/**"
+      ]
+    },
+    {
+      "id": "three",
+      "label": "three.js",
+      "kind": "external",
+      "summary": "The 3D library most pages draw with (kept in vendor/).",
+      "packages": [
+        "npm:three",
+        "three"
+      ]
+    },
+    {
+      "id": "playwright",
+      "label": "Headless browser (Playwright)",
+      "kind": "external",
+      "summary": "Runs pages in Chromium for the gates and render QA.",
+      "packages": [
+        "npm:playwright",
+        "playwright",
+        "npm:playwright-core"
+      ]
+    },
+    {
+      "id": "python",
+      "label": "Python science stack",
+      "kind": "external",
+      "summary": "numpy, pandas, scipy and torch, used by the Python helpers.",
+      "packages": [
+        "pypi:numpy",
+        "pypi:pandas",
+        "pypi:scipy",
+        "pypi:torch"
+      ]
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini",
+      "kind": "external",
+      "summary": "Google's AI model, called from the server.",
+      "hosts": [
+        "generativelanguage.googleapis.com"
+      ]
+    },
+    {
+      "id": "github",
+      "label": "GitHub",
+      "kind": "external",
+      "summary": "Where installs and releases are fetched from.",
+      "hosts": [
+        "github.com",
+        "api.github.com",
+        "raw.githubusercontent.com"
+      ]
+    },
+    {
+      "id": "mqtt",
+      "label": "MQTT",
+      "kind": "external",
+      "summary": "The way home devices send each other messages.",
+      "packages": [
+        "npm:mqtt",
+        "mqtt"
+      ]
+    },
+    {
+      "id": "homeassistant",
+      "label": "Home Assistant",
+      "kind": "external",
+      "summary": "Your home's automation hub, reached by the server."
+    }
+  ],
+  "edges": [
+    {
+      "from": "pages",
+      "to": "bridge.server",
+      "kind": "http",
+      "label": "requests to 127.0.0.1",
+      "description": "Pages call the local server on this machine for AI, home devices and installs."
+    },
+    {
+      "from": "ui.install",
+      "to": "bridge.install",
+      "kind": "http",
+      "label": "/install/exec",
+      "description": "The install panel asks the server to run a catalog row."
+    },
+    {
+      "from": "bridge.home",
+      "to": "homeassistant",
+      "kind": "http",
+      "label": "REST and websockets"
+    },
+    {
+      "from": "tools.studies",
+      "to": "pages",
+      "kind": "config",
+      "label": "decides what the page carries",
+      "description": "A study's reading changes the duel page's picks and notes by hand, as registered."
+    }
+  ],
+  "annotations": [
+    {
+      "path": "WebGLEngine/main.js",
+      "note": "About 3.7 MB: the scan does not read it, and it is far over the size an AI can edit safely.",
+      "tags": [
+        "hotspot"
+      ]
+    },
+    {
+      "path": "WebGLEngine/ai-bridge/server.js",
+      "note": "The single entry for every request from the pages; most features add a route here.",
+      "tags": [
+        "hotspot"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "install",
+      "title": "Installing a tool from the panel",
+      "steps": [
+        {
+          "node": "ui.install",
+          "note": "You tick a row in the install panel and press Install."
+        },
+        {
+          "node": "bridge.server",
+          "note": "The page sends the row's id to the local server."
+        },
+        {
+          "node": "bridge.install",
+          "note": "The server re-reads the catalog, checks the row can run on this machine, and runs its commands."
+        },
+        {
+          "node": "github",
+          "note": "Most rows clone a repository or download a release from GitHub."
+        }
+      ]
+    },
+    {
+      "id": "study",
+      "title": "How a study changes the duel page",
+      "steps": [
+        {
+          "node": "tools.studies",
+          "note": "A study is written down with its pairs, its arms and what it will decide, before anything is flown."
+        },
+        {
+          "node": "gates",
+          "note": "Its gate holds that registration, and broken copies of the study are tried against the gate until every one is caught."
+        },
+        {
+          "node": "brain.duel",
+          "note": "The study flies the duels through the brains, thousands of pairs at a time."
+        },
+        {
+          "node": "pages",
+          "note": "The reading is pinned once, and the page's picks and notes change as the study registered."
+        }
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "node": "pages",
+      "title": "What SweK is",
+      "note": "Hundreds of pages that run in your browser: worlds, physics, games and dashboards."
+    },
+    {
+      "node": "pages.main",
+      "title": "The main engine",
+      "note": "The biggest page, and the one that wires most of the rest together."
+    },
+    {
+      "node": "engine",
+      "title": "The shared engine",
+      "note": "Drawing, worlds, effects and the building blocks every page uses."
+    },
+    {
+      "node": "physics",
+      "title": "Physics",
+      "note": "The simulations: bodies, fluids, fields and whole worlds."
+    },
+    {
+      "node": "brain",
+      "title": "Brains",
+      "note": "What makes ships and agents decide, and the duels that test them."
+    },
+    {
+      "node": "bridge",
+      "title": "The local server",
+      "note": "Runs on your machine and connects pages to AI, your home and installers."
+    },
+    {
+      "node": "gates",
+      "title": "The self-checks",
+      "note": "A third of the code is gates that hold the rest to what it claims."
+    }
+  ]
+}
