@@ -15,7 +15,8 @@
 // REGISTERED 2026-11-21, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: each arm against the plain ship; CAR-TODAY LESS THE OTHER, pair by pair.
 // FORECAST, for the record: against the pilot's escorts car-today trails a little (the fly-wired gunner led the car's against the pilot's fighters) and cannot be told; rationed it cannot be told with escorts and leads a little without the cannon.
 // WHAT IS DECIDED, as takeButtonOneHard: each pick HOLDS if car-today TRAILS the other in no fight of it (a lead is not needed: it is the pick already); where it trails, the by-the-fight hand's note says so. Nothing is written but the reading.
-// @@READ@@
+// READ 2026-11-21 (brain/buttonHardToday.reading.json; the kept arms in brain/rig-results/buttonHardToday/): THE PICKS HOLD. Car-today less the pick before it: against four pilot-flown escorts a side -0.074 (z -1.53, CANNOT BE TOLD -- the forecast);
+//   with two escorts on a quarter ration +0.144 (z 3.21, LEADS -- the forecast said it could not be told); without a cannon on a quarter ration +0.051 (z 1.48, CANNOT BE TOLD -- the forecast said a small lead). The by-the-fight hand's note says so.
 // Every arm's leads are kept (brain/rig-results/buttonHardToday/); the reading file (brain/buttonHardToday.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: fleets (their pick is unchanged: tools/ship/takeButtonOneHard.mjs, takePresetsHard.mjs), the pilot's escorts without the cannon, other rations, the pilot on one side only.
 "use strict";

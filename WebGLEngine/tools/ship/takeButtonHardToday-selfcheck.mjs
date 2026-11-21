@@ -8,7 +8,8 @@
 //   2  THE STUDY             against a stand-in: six arms, each once; the gain pair by pair; what is decided, each pick apart; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/buttonHardToday.reading.json; the kept arms in brain/rig-results/buttonHardToday/): THE PICKS HOLD. Car-today less the pick before it: against four pilot-flown escorts a side -0.074 (z -1.53, CANNOT BE TOLD -- the forecast);
+//   with two escorts on a quarter ration +0.144 (z 3.21, LEADS -- the forecast said it could not be told); without a cannon on a quarter ration +0.051 (z 1.48, CANNOT BE TOLD -- the forecast said a small lead). The by-the-fight hand's note says so.
 //
 // SABOTAGE LOG: 19 mutants of tools/ship/takeButtonHardToday.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 19 RED the first time (a seed moved, takeButtonOneHard's pairs; no pilot, the pilot on side X only, two
 //   pilot escorts, whole magazines with escorts, half rations, the cannon on where it is off, the plain side always armed, the no-window gunner with escorts, the 45-degree one alone, no helm; the gain's sign, a trail at exactly -2 let by, a pick
@@ -68,7 +69,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), alt: k(f, "alt") })])), R = (f) => out[f].reading;
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: car-today less the other -0.074 against the pilot's escorts (CANNOT BE TOLD), +0.144 rationed with escorts (LEADS), +0.051 rationed without a cannon (CANNOT BE TOLD)", near(R("escortsPilot").gain, -0.0741) && TA.word(R("escortsPilot").gain.z) === "CANNOT BE TOLD" && near(R("escortsRationed").gain, 0.1438) && TA.word(R("escortsRationed").gain.z) === "LEADS" && near(R("oneRationedNone").gain, 0.0505) && TA.word(R("oneRationedNone").gain.z) === "CANNOT BE TOLD" && G.FIGHTS.every((f) => R(f).gain.n === 300 && Math.abs(R(f).gain.mean - rd[f].reading.gain.mean) < 1e-12));
+    const v = G.decide(out), h = C.HANDS.find((x) => x.id === "bysize");
+    ok("!! WHAT IS DECIDED, as read: both picks hold; the by-the-fight hand's note says where they were flown", v.ok && v.holds.escorts && v.holds.oneNoCannon && rd.verdict.ok && /takeButtonHardToday/.test(h.note) && /-0\.074/.test(h.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
