@@ -13,6 +13,9 @@
 // FORECAST, for the record: without a cannon the gunners decide more of the fight; car-today and car-big level with the pick one ship a side, behind it in fleets (as with the cannon): the pick holds.
 // WHAT IS DECIDED, each fight apart: the pick holds there unless a car gunner LEADS it; if one does, the button takes, IN A FIGHT WITHOUT A CANNON of that size, the car gunner with the larger lead. Nothing is written but the reading; the page is
 //   changed by hand to what is decided.
+// READ 2026-11-21 (brain/buttonNoCannon.reading.json; the kept arms in brain/rig-results/buttonNoCannon/): ONE SHIP A SIDE IT TAKES CAR-TODAY; IN FLEETS THE PICK HOLDS. One ship a side without a cannon: car-today less the no-window fly-wired gunner
+//   +0.080 (z 2.36, LEADS), car-big less it -0.052 (z -1.72, cannot be told). In fleets of three: car-big -0.444 (z -8.40), car-today -0.321 (z -6.84), both TRAIL. The forecast was wrong one ship a side (car-today leads, not level) and held in fleets.
+//   The by-the-fight button now takes car-today one ship a side with nothing else and no cannon (spaceDuelCore's bySize `oneNoCannon`).
 // Every arm's leads are kept (brain/rig-results/buttonNoCannon/); the reading file (brain/buttonNoCannon.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, the bow-on rule, other helms, the rationed fight.
 "use strict";

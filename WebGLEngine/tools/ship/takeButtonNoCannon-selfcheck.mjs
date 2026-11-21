@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: each arm once; the gains pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/buttonNoCannon.reading.json; the kept arms in brain/rig-results/buttonNoCannon/): ONE SHIP A SIDE IT TAKES CAR-TODAY; IN FLEETS THE PICK HOLDS. One ship a side without a cannon: car-today less the no-window fly-wired gunner
+//   +0.080 (z 2.36, LEADS), car-big less it -0.052 (z -1.72, cannot be told). In fleets of three: car-big -0.444 (z -8.40), car-today -0.321 (z -6.84), both TRAIL. The forecast was wrong one ship a side (car-today leads, not level) and held in fleets.
+//   The by-the-fight button now takes car-today one ship a side with nothing else and no cannon (spaceDuelCore's bySize `oneNoCannon`).
 //
 // SABOTAGE LOG: 16 mutants of tools/ship/takeButtonNoCannon.mjs, before any pair was flown: ALL 16 RED the first time (a seed moved, a pair short; the cannon on either side, no helm, the old helm file, the no-window pick in fleets, a fleet of one,
 //   car-big's file car-today's; the gain's sign, a lead at 1.9, the smaller of two leads taken; a file unchecked; the second read and an unknown option let through; one arm's leads for all).
@@ -105,7 +107,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings(Object.fromEntries(G.ARMS.map((a) => [a, k(f, a)])))])), R = (f) => out[f].reading;
+    ok("!! ONE SHIP A SIDE, re-derived from the kept arms: car-today less the pick +0.080 (z 2.36, LEADS), car-big less it -0.052 (cannot be told)", near(R("one").todayGain, 0.0796) && TA.word(R("one").todayGain.z) === "LEADS" && near(R("one").bigGain, -0.0515) && TA.word(R("one").bigGain.z) === "CANNOT BE TOLD" && R("one").button.n === 300 && near(R("one").button, rd.one.reading.button.mean));
+    ok("!! FLEETS OF THREE: car-big -0.444 (z -8.40) and car-today -0.321 (z -6.84) both TRAIL the 45-degree gunner", near(R("fleet").bigGain, -0.4443) && near(R("fleet").todayGain, -0.3210) && TA.word(R("fleet").bigGain.z) === "TRAILS" && TA.word(R("fleet").todayGain.z) === "TRAILS");
+    const v = G.decide(out);
+    ok("!! WHAT IS DECIDED, as read: one ship a side takes car-today, in fleets the pick holds; THE PAGE'S by-the-fight button carries it (bySize oneNoCannon car-today) and its note says so", v.ok && v.takes.one === "today" && v.takes.fleet === "button" && rd.verdict.takes.one === "today" && rd.verdict.takes.fleet === "button" && C.HANDS.find((h) => h.id === "bysize").bySize.oneNoCannon === "car-today" && /takeButtonNoCannon/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
