@@ -14,7 +14,10 @@
 // FORECAST, for the record: a small lead at both sizes, about +0.03, perhaps not told at 600 pairs.
 // WHAT IS DECIDED: BOTH BUTTONS KEEP THE SPLIT HELM unless it TRAILS at either size; if it trails anywhere, both go back to the fly's helm (a helm that loses
 //   in some fleets the page offers is not the best helm). Either way the buttons' notes say so. Nothing is written but the reading.
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelmSizes.reading.json; the kept arms in brain/rig-results/splitHelmSizes/): BOTH BUTTONS KEEP THE SPLIT HELM. The split less the
+//   fly's helm: fleets of two -0.008 (z -0.45, cannot be told), fleets of four -0.008 (z -0.80, cannot be told). It trails at neither size. The forecast's small
+//   lead did not come: at two and four a side the split and the fly's helm cannot be told apart (both +1.68 to +1.79 over the plain ship); the lead it showed
+//   in fleets of three (+0.031, z 3.68) is not one that grows or holds across sizes.
 // Every arm's leads are kept (brain/rig-results/splitHelmSizes/); the reading file (brain/splitHelmSizes.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, one ship a side and fleets of three (read already), other gunners.
 "use strict";

@@ -10,7 +10,10 @@
 //   2  THE STUDY             against a stand-in: four arms, each once; the gain is the split less the fly; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-21 (brain/splitHelmSizes.reading.json; the kept arms in brain/rig-results/splitHelmSizes/): BOTH BUTTONS KEEP THE SPLIT HELM. The split less the
+//   fly's helm: fleets of two -0.008 (z -0.45, cannot be told), fleets of four -0.008 (z -0.80, cannot be told). It trails at neither size. The forecast's small
+//   lead did not come: at two and four a side the split and the fly's helm cannot be told apart (both +1.68 to +1.79 over the plain ship); the lead it showed
+//   in fleets of three (+0.031, z 3.68) is not one that grows or holds across sizes.
 //
 // SABOTAGE LOG: 8 mutants of tools/ship/takeSplitHelmSizes.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 8 RED the first time
 //   (a seed moved, fleets of three for two, the split always the fly, the gain's sign, a trail at exactly -2 let by, a lead demanded; an unknown option and a
@@ -63,7 +66,10 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const r = JSON.parse(fs.readFileSync(G.READING, "utf8"));
+    const near = (a, b) => Math.abs(a - b) < 5e-4;
+    ok("!! THE KEPT READING IS THE ONE PINNED: the split less the fly's helm -0.008 (z -0.45) in fleets of two and -0.008 (z -0.80) in fleets of four, neither told; both arms lead the plain ship", near(r.fleet2.reading.gain.mean, -0.00805) && near(r.fleet2.reading.gain.z, -0.4466) && near(r.fleet4.reading.gain.mean, -0.00776) && near(r.fleet4.reading.gain.z, -0.8042) && ["fleet2", "fleet4"].every((f) => r[f].reading.fly.z > 2 && r[f].reading.split.z > 2));
+    ok("!! ...and what it decided is what the page does: the split is kept, trailing nowhere, and both the best-ship and fleet presets carry helm \"split\"", r.verdict.keep === true && r.verdict.trails.length === 0 && C.PRESETS.find((p) => p.id === "best").choice.helm === "split" && C.PRESETS.find((p) => p.id === "fleet").choice.helm === "split");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
