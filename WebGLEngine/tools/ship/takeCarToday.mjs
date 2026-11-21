@@ -15,6 +15,9 @@
 // WHAT IS DECIDED, the button's two picks apart (spaceDuelCore's bySize: `one` is one ship a side with nothing else, `fleet` is the rest):
 //   `one` takes car-today if it LEADS in `one`; `fleet` takes it if it LEADS in at least one of `fleet`, `escorts`, `fighters` and TRAILS in none. The bow-on rule fights are read for the hand's note and decide nothing (the button flies the helm).
 //   Nothing is written but the reading; the page is changed by hand to what is decided, and the car-today note says where it was flown.
+// READ 2026-11-21 (brain/carToday.reading.json; the kept arms in brain/rig-results/carToday/): BOTH PICKS HOLD. Car-today less the button's pick, under the cannon-aware helm: one ship a side +0.032 (z 1.67, CANNOT BE TOLD -- the training's +0.051
+//   did not come back on fresh pairs against the plain side); fleets of three -0.177 (z -5.40, TRAILS); one ship with two escorts +0.112 (z 2.47, LEADS); against eight PD fighters -0.013 (z -5.88, TRAILS). Under the bow-on rule: one ship a side +0.030
+//   (CANNOT BE TOLD), fleets -0.335 (z -7.49, TRAILS). `one` keeps the no-window gunner, `fleet` the 45-degree one (it trails in a fleet and against fighters, though it leads with escorts). The forecast had one ship a side a lead and escorts a trail: both wrong.
 // Every arm's leads are kept (brain/rig-results/carToday/); the reading file (brain/carToday.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the other helms, six escorts, the trained pilot's fighters, the rationed fight, the gunner network's own training.
 "use strict";

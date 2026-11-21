@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: twelve arms, each once; the gain pair by pair; what is decided, the button's two picks apart; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/carToday.reading.json; the kept arms in brain/rig-results/carToday/): BOTH PICKS HOLD. Car-today less the button's pick, under the cannon-aware helm: one ship a side +0.032 (z 1.67, CANNOT BE TOLD -- the training's +0.051
+//   did not come back on fresh pairs against the plain side); fleets of three -0.177 (z -5.40, TRAILS); one ship with two escorts +0.112 (z 2.47, LEADS); against eight PD fighters -0.013 (z -5.88, TRAILS). Under the bow-on rule: one ship a side +0.030
+//   (CANNOT BE TOLD), fleets -0.335 (z -7.49, TRAILS). `one` keeps the no-window gunner, `fleet` the 45-degree one (it trails in a fleet and against fighters, though it leads with escorts). The forecast had one ship a side a lead and escorts a trail: both wrong.
 //
 // SABOTAGE LOG: 19 mutants of tools/ship/takeCarToday.mjs, each a copy of the study with this gate (and the command rows) pointed at it, before any pair was flown: ALL 19 RED the first time
 //   (a seed moved, a pair short; a fleet of one, no escorts, a helm under the bow-on rule, none against fighters; the no-window pick with escorts and against fighters, car-today's arm the 45-degree gunner, the cannon off on the plain side;
@@ -100,7 +102,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, arm) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${arm}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4, R = (f) => rd[f].reading;
+    const re = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), button: k(f, "button") }).reading])), want = { one: [0.032, "CANNOT BE TOLD"], fleet: [-0.177, "TRAILS"], escorts: [0.112, "LEADS"], fighters: [-0.013, "TRAILS"], oneFace: [0.030, "CANNOT BE TOLD"], fleetFace: [-0.335, "TRAILS"] };
+    ok("!! AS KEPT AND RE-DERIVED -- BOTH PICKS HOLD: car-today less the pick +0.032 one ship a side (CANNOT BE TOLD), -0.177 in fleets (TRAILS), +0.112 with escorts (LEADS), -0.013 against fighters (TRAILS); +0.030 and -0.335 under the bow-on rule", G.FIGHTS.every((f) => near(R(f).gain, want[f][0]) && rd[f].words.gain === want[f][1] && ["today", "button", "gain"].every((q) => Math.abs(re[f][q].mean - R(f)[q].mean) < 1e-12 && re[f][q].n === 300))
+        && !rd.verdict.ok && !rd.verdict.takes.one && !rd.verdict.takes.fleet && near(R("one").today, 1.801) && near(R("one").button, 1.769));
+    const h = C.HANDS.find((x) => x.id === "bysize"), t = C.HANDS.find((x) => x.id === "car-today");
+    ok("!! AND THE PAGE: the button keeps both picks (the no-window gunner one ship a side, the 45-degree one in a fleet); car-today's note says where it was flown and no longer that it was not", h.bySize.one === "flywired-one" && h.bySize.fleet === "flywired" && /takeCarToday/.test(t.note) && !/NOT flown where the by-the-fight button is used/.test(t.note) && /-0\.177/.test(t.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
