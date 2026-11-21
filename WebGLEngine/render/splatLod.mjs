@@ -17,7 +17,14 @@
 //                                            every node's splats as 14 f32s each. openLodStream fetches the header, then nodes on demand by HTTP Range, the ones
 //                                            the camera wants first; a node not yet here is simply not refined.
 //
-// WHAT IS NOT HERE: PlayCanvas's compressed .sog encoding (this file is plain f32: correct first, small later), spherical harmonics, a worker.
+//   COMPRESSED (the default since 2026-11-21, Keith: "5"): "SWLOD2" and 17 bytes a splat instead of 56, the way PlayCanvas's .sog is small -- each node
+//                                            keeps its own ranges (18 floats: position min and extent, log-scale min and extent, colour min and extent), and
+//                                            each splat is its position as 3 x u16 inside the node's box, its log-scale and colour as 3 x u8 each inside the
+//                                            node's ranges, its opacity as u8 of the sigmoid, and its rotation as "smallest three" in 32 bits (the index of the
+//                                            largest component in 2 bits, the other three in 10 bits each). Decoded to f32 records as each node arrives, so
+//                                            nothing after loading changes. The error is bounded and the gate holds it to its bound.
+//
+// WHAT IS NOT HERE: spherical harmonics, a worker, .sog itself (PlayCanvas's files are read by PlayCanvas).
 "use strict";
 
 export const FLOATS = 14;   // x y z | log-scale x y z | r g b | pre-sigmoid opacity | quaternion w x y z
@@ -101,29 +108,76 @@ export function gatherSplats(lod, cut, into = null) {
     c.count = k; return c;
 }
 
+// ---- the compressed encoding (q17) ----
+export const Q_BYTES = 17, Q_HEAD = 18;   // bytes a splat; floats of a node's ranges
+const clampI = (v, max) => Math.max(0, Math.min(max, Math.round(v)));
+/** A node's f32 records as q17 bytes: 18 f32 of ranges, then 17 bytes a splat. Pure. */
+export function encodeQ(recs) {
+    const n = recs.length / FLOATS, head = new Float32Array(Q_HEAD), out = new Uint8Array(Q_HEAD * 4 + n * Q_BYTES), dv = new DataView(out.buffer);
+    for (const [base, at] of [[0, 0], [3, 6], [6, 12]]) for (let a = 0; a < 3; a++) {
+        let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) { const v = recs[i * FLOATS + base + a]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        head[at + a] = n ? lo : 0; head[at + 3 + a] = n ? hi - lo : 0;
+    }
+    out.set(new Uint8Array(head.buffer), 0);
+    const q = (v, lo, ext, max) => (ext > 0 ? clampI(((v - lo) / ext) * max, max) : 0);
+    for (let i = 0; i < n; i++) {
+        const r = i * FLOATS, o = Q_HEAD * 4 + i * Q_BYTES;
+        for (let a = 0; a < 3; a++) dv.setUint16(o + a * 2, q(recs[r + a], head[a], head[3 + a], 65535), true);
+        for (let a = 0; a < 3; a++) out[o + 6 + a] = q(recs[r + 3 + a], head[6 + a], head[9 + a], 255);
+        for (let a = 0; a < 3; a++) out[o + 9 + a] = q(recs[r + 6 + a], head[12 + a], head[15 + a], 255);
+        out[o + 12] = clampI((1 / (1 + Math.exp(-recs[r + 9]))) * 255, 255);
+        // rotation, smallest three: normalise, drop the largest component (made positive: q and -q are one rotation), keep the others in [-1/sqrt2, 1/sqrt2]
+        let qv = [recs[r + 10], recs[r + 11], recs[r + 12], recs[r + 13]]; const len = Math.hypot(...qv) || 1; qv = qv.map((x) => x / len);
+        let big = 0; for (let k = 1; k < 4; k++) if (Math.abs(qv[k]) > Math.abs(qv[big])) big = k;
+        if (qv[big] < 0) qv = qv.map((x) => -x);
+        let packed = big, shift = 2; for (let k = 0; k < 4; k++) if (k !== big) { packed |= clampI(((qv[k] * Math.SQRT2 + 1) / 2) * 1023, 1023) << shift; shift += 10; }
+        dv.setUint32(o + 13, packed >>> 0, true);
+    }
+    return out;
+}
+/** q17 bytes back to f32 records. Pure. */
+export function decodeQ(bytes) {
+    const b = bytes.byteOffset % 4 ? bytes.slice() : bytes, head = new Float32Array(b.buffer, b.byteOffset, Q_HEAD), n = (b.length - Q_HEAD * 4) / Q_BYTES, dv = new DataView(b.buffer, b.byteOffset, b.byteLength), out = new Float32Array(n * FLOATS);
+    for (let i = 0; i < n; i++) {
+        const r = i * FLOATS, o = Q_HEAD * 4 + i * Q_BYTES;
+        for (let a = 0; a < 3; a++) out[r + a] = head[a] + (dv.getUint16(o + a * 2, true) / 65535) * head[3 + a];
+        for (let a = 0; a < 3; a++) out[r + 3 + a] = head[6 + a] + (b[o + 6 + a] / 255) * head[9 + a];
+        for (let a = 0; a < 3; a++) out[r + 6 + a] = head[12 + a] + (b[o + 9 + a] / 255) * head[15 + a];
+        const al = Math.min(1 - 1e-4, Math.max(1e-4, b[o + 12] / 255)); out[r + 9] = Math.log(al / (1 - al));
+        const packed = dv.getUint32(o + 13, true), big = packed & 3, qv = [0, 0, 0, 0]; let shift = 2, ss = 0;
+        for (let k = 0; k < 4; k++) if (k !== big) { const v = ((((packed >>> shift) & 1023) / 1023) * 2 - 1) / Math.SQRT2; qv[k] = v; ss += v * v; shift += 10; }
+        qv[big] = Math.sqrt(Math.max(0, 1 - ss)); out.set(qv, r + 10);
+    }
+    return out;
+}
+
 // ---- streaming ----
-const MAGIC = "SWLOD1";
-/** One .swlod file's bytes: the magic, a u32 header length, the JSON header (the tree, each node's byte range), every node's records. Pure. */
-export function packLod(lod) {
-    let off = 0; const meta = lod.nodes.map((nd) => { const len = nd.records.length * 4, m = { id: nd.id, parent: nd.parent, children: nd.children, bounds: nd.bounds, leaf: nd.leaf, count: nd.count, offset: off, length: len }; off += len; return m; });
-    const head = new TextEncoder().encode(JSON.stringify({ version: 1, count: lod.count, leafSize: lod.leafSize, proxies: lod.proxies, nodes: meta }));
-    const base = MAGIC.length + 4 + head.length, out = new Uint8Array(base + off); out.set(new TextEncoder().encode(MAGIC), 0); new DataView(out.buffer).setUint32(MAGIC.length, head.length, true); out.set(head, MAGIC.length + 4);
-    for (const nd of lod.nodes) out.set(new Uint8Array(nd.records.buffer, nd.records.byteOffset, nd.records.byteLength), base + meta[nd.id].offset);
+const MAGIC = "SWLOD1", MAGIC_Q = "SWLOD2";
+/** One .swlod file's bytes: the magic, a u32 header length, the JSON header (the tree, each node's byte range), every node's splats -- compressed (q17,
+ *  "SWLOD2") unless `compress` is false (plain f32, "SWLOD1"). Pure. */
+export function packLod(lod, { compress = true } = {}) {
+    const blocks = lod.nodes.map((nd) => (compress ? encodeQ(nd.records) : new Uint8Array(nd.records.buffer, nd.records.byteOffset, nd.records.byteLength)));
+    let off = 0; const meta = lod.nodes.map((nd, i) => { const len = blocks[i].length, m = { id: nd.id, parent: nd.parent, children: nd.children, bounds: nd.bounds, leaf: nd.leaf, count: nd.count, offset: off, length: len }; off += len; return m; });
+    const magic = compress ? MAGIC_Q : MAGIC, head = new TextEncoder().encode(JSON.stringify({ version: compress ? 2 : 1, encoding: compress ? "q17" : "f32", count: lod.count, leafSize: lod.leafSize, proxies: lod.proxies, nodes: meta }));
+    const base = magic.length + 4 + head.length, out = new Uint8Array(base + off); out.set(new TextEncoder().encode(magic), 0); new DataView(out.buffer).setUint32(magic.length, head.length, true); out.set(head, magic.length + 4);
+    blocks.forEach((bl, i) => out.set(bl, base + meta[i].offset));
     return out;
 }
 /** Open a .swlod by Range requests: `fetchRange(start, endInclusive)` resolves to the bytes. Resolves to { lod, load(ids) } with only the root loaded. */
 export async function openLodStream(fetchRange) {
     const pre = await fetchRange(0, MAGIC.length + 3);
-    if (new TextDecoder().decode(pre.subarray(0, MAGIC.length)) !== MAGIC) throw new Error("splatLod: not a .swlod file");
+    const magic = new TextDecoder().decode(pre.subarray(0, MAGIC.length));
+    if (magic !== MAGIC && magic !== MAGIC_Q) throw new Error("splatLod: not a .swlod file");
+    const compressed = magic === MAGIC_Q;
     const hlen = new DataView(pre.buffer, pre.byteOffset).getUint32(MAGIC.length, true), head = JSON.parse(new TextDecoder().decode(await fetchRange(MAGIC.length + 4, MAGIC.length + 3 + hlen)));
     const base = MAGIC.length + 4 + hlen, nodes = head.nodes.map((m) => ({ ...m, records: null, loaded: false })), lod = { nodes, count: head.count, leafSize: head.leafSize, proxies: head.proxies }, inflight = new Map();
     const load = (ids) => Promise.all(ids.map((id) => {
         const nd = nodes[id]; if (nd.loaded) return Promise.resolve(nd); if (inflight.has(id)) return inflight.get(id);
-        const p = fetchRange(base + nd.offset, base + nd.offset + nd.length - 1).then((b) => { nd.records = new Float32Array(b.slice().buffer, 0, nd.length / 4); nd.loaded = true; inflight.delete(id); return nd; });
+        const p = fetchRange(base + nd.offset, base + nd.offset + nd.length - 1).then((b) => { nd.records = compressed ? decodeQ(b) : new Float32Array(b.slice().buffer, 0, nd.length / 4); nd.loaded = true; inflight.delete(id); return nd; });
         inflight.set(id, p); return p;
     }));
     await load([0]);
-    return { lod, load, base };
+    return { lod, load, base, compressed };
 }
 /** Range requests over HTTP for openLodStream. */
 export const httpRange = (url, fetchFn = fetch) => async (a, b) => { const r = await fetchFn(url, { headers: { Range: `bytes=${a}-${b}` } }); if (!(r.status === 206 || r.status === 200)) throw new Error(`splatLod: ${url} answered ${r.status}`); const buf = new Uint8Array(await r.arrayBuffer()); return r.status === 200 ? buf.subarray(a, b + 1) : buf; };

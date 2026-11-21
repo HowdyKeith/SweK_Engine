@@ -64,7 +64,7 @@ await section(() => {
 
 console.log("3. STREAMING");
 await section(async () => {
-    const bytes = L.packLod(lod), asked = [];
+    const bytes = L.packLod(lod, { compress: false }), asked = [];   // the plain f32 file: streaming exactly; the compressed one has its own section
     const fetchRange = async (a, b) => { asked.push([a, b]); return bytes.subarray(a, b + 1); };
     const s = await L.openLodStream(fetchRange), N = s.lod.nodes;
     ok("!! the packed file opens to the same tree, with only the root loaded", N.length === lod.nodes.length && N.every((n, i) => n.parent === lod.nodes[i].parent && n.children.join() === lod.nodes[i].children.join() && n.leaf === lod.nodes[i].leaf) && N.filter((n) => n.loaded).length === 1 && Array.from(N[0].records).join() === Array.from(lod.nodes[0].records).join());
@@ -81,11 +81,46 @@ await section(async () => {
     ok("!! over HTTP: a 206 is the range; a server that ignores Range (200, the whole file) is cut to it", r206.join() === Array.from(bytes.subarray(10, 20)).join() && r200.join() === Array.from(bytes.subarray(10, 20)).join() && await L.httpRange("x", async () => ({ status: 404 }))(0, 1).then(() => false, () => true));
 });
 
+console.log("3b. COMPRESSED (q17, the default)");
+await section(async () => {
+    const plain = L.packLod(lod, { compress: false }), q = L.packLod(lod), s = await L.openLodStream(async (a, b) => q.subarray(a, b + 1));
+    ok("!! the compressed file is SWLOD2, 17 bytes a splat, and at least 2.5 times smaller than plain f32", s.compressed && new TextDecoder().decode(q.subarray(0, 6)) === "SWLOD2" && L.Q_BYTES === 17 && plain.length / q.length >= 2.5, `${(plain.length / 1024).toFixed(0)} KB plain, ${(q.length / 1024).toFixed(0)} KB compressed, ${(plain.length / q.length).toFixed(2)}x`);
+    await s.load(s.lod.nodes.map((n) => n.id));
+    let worst = { pos: 0, scl: 0, col: 0, opa: 0, rot: 0 }, over = 0;
+    for (const nd of lod.nodes) {
+        const a = nd.records, b = s.lod.nodes[nd.id].records, n = a.length / L.FLOATS, ext = (base) => [0, 1, 2].map((k) => { let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) { const v = a[i * L.FLOATS + base + k]; lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo; });
+        const E = { pos: ext(0), scl: ext(3), col: ext(6) }, sig = (x) => 1 / (1 + Math.exp(-x));
+        for (let i = 0; i < n; i++) {
+            const o = i * L.FLOATS;
+            for (let k = 0; k < 3; k++) {
+                const dp = Math.abs(a[o + k] - b[o + k]) / (E.pos[k] / 65535 / 2 + 1e-7), ds = Math.abs(a[o + 3 + k] - b[o + 3 + k]) / (E.scl[k] / 255 / 2 + 1e-7), dc = Math.abs(a[o + 6 + k] - b[o + 6 + k]) / (E.col[k] / 255 / 2 + 1e-7);
+                worst.pos = Math.max(worst.pos, dp); worst.scl = Math.max(worst.scl, ds); worst.col = Math.max(worst.col, dc); if (dp > 1.01 || ds > 1.01 || dc > 1.01) over++;
+            }
+            const da = Math.abs(sig(a[o + 9]) - sig(b[o + 9])); worst.opa = Math.max(worst.opa, da); if (da > 1 / 510 + 1e-4) over++;
+            const qa = a.subarray(o + 10, o + 14), qb = b.subarray(o + 10, o + 14), la = Math.hypot(...qa), dot = Math.abs((qa[0] * qb[0] + qa[1] * qb[1] + qa[2] * qb[2] + qa[3] * qb[3]) / la), deg = (2 * Math.acos(Math.min(1, dot)) * 180) / Math.PI;
+            worst.rot = Math.max(worst.rot, deg); if (deg > 0.25) over++;
+        }
+    }
+    ok("!! EVERY FIELD WITHIN ITS QUANTISATION BOUND: position within half a step of 65535 across its node's extent, log-scale and colour within half a step of 255 across theirs, opacity within 1/510, rotation within a quarter of a degree", over === 0,
+        `worst: position ${worst.pos.toFixed(2)}, scale ${worst.scl.toFixed(2)}, colour ${worst.col.toFixed(2)} (of a half step), opacity ${worst.opa.toFixed(4)}, rotation ${worst.rot.toFixed(3)} degrees`);
+    // ROTATIONS: generated clouds all carry the identity, so the tree's records say nothing about the rotation code; 2000 random rotations do, half of them
+    // with their largest component negative (q and -q are one rotation: the encoder must flip, not drop, the sign)
+    const R = new Float32Array(2000 * L.FLOATS), hh = (i) => { const x = Math.sin(i * 91.7 + 3.1) * 43758.5453; return x - Math.floor(x); };
+    for (let i = 0; i < 2000; i++) { const q = [hh(i) - 0.5, hh(i + 5e3) - 0.5, hh(i + 1e4) - 0.5, hh(i + 2e4) - 0.5], l = Math.hypot(...q), sg = i % 2 ? -1 : 1; R.set(q.map((x) => (sg * x) / l), i * L.FLOATS + 10); R[i * L.FLOATS + 9] = 1; }
+    const RQ = L.decodeQ(L.encodeQ(R)); let worstDeg = 0;
+    for (let i = 0; i < 2000; i++) { const o = i * L.FLOATS, d = Math.abs(R[o + 10] * RQ[o + 10] + R[o + 11] * RQ[o + 11] + R[o + 12] * RQ[o + 12] + R[o + 13] * RQ[o + 13]); worstDeg = Math.max(worstDeg, (2 * Math.acos(Math.min(1, d)) * 180) / Math.PI); }
+    ok("!! 2000 RANDOM ROTATIONS, half with a negative largest component: each comes back within 0.3 degrees (smallest three, 10 bits: rebuilding a small largest component magnifies the error; 8 bits would be about a degree)", worstDeg < 0.3, `worst ${worstDeg.toFixed(3)} degrees`);
+    const single = L.decodeQ(L.encodeQ(new Float32Array([1, 2, 3, -1, -2, -3, 0.2, 0.4, 0.6, 1.5, 0, 0, 0, -1])));
+    ok("!! one splat (every extent zero) comes back exactly where it was; q and -q are the same rotation", single[0] === 1 && single[2] === 3 && single[5] === -3 && Math.abs(single[8] - 0.6) < 1e-6 && Math.abs(Math.abs(single[13]) - 1) < 1e-6);
+    const cut = L.selectLod(s.lod, { eye: [0, 0, 3] }, { budget: 6000 }), cutPlain = L.selectLod(lod, { eye: [0, 0, 3] }, { budget: 6000 });
+    ok("!! the compressed tree cuts the same as the plain one (the cut reads the tree, not the splats)", cut.nodes.join() === cutPlain.nodes.join());
+});
+
 console.log("4. THE PAGE (WebGPU, headless)");
 const skip = webgpuSkipReason(require);
 if (skip) console.log(`  ----  skipped: ${skip}`);
 else await section(async () => {
-    const swlod = L.packLod(L.buildLod(SPLAT_GENERATORS.nebula({ count: 60000 }))), types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript" };
+    const swlod = L.packLod(L.buildLod(SPLAT_GENERATORS.nebula({ count: 60000 })))   /* compressed, the default */, types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript" };
     const srv = http.createServer((q, r) => {
         const u = decodeURIComponent(q.url.split("?")[0]);
         if (u === "/scene.swlod") { const m = /bytes=(\d+)-(\d+)/.exec(q.headers.range || ""); if (!m) { r.writeHead(200); return r.end(Buffer.from(swlod)); } const a = +m[1], b = Math.min(+m[2], swlod.length - 1); r.writeHead(206, { "Content-Range": `bytes ${a}-${b}/${swlod.length}` }); return r.end(Buffer.from(swlod.subarray(a, b + 1))); }
@@ -108,7 +143,7 @@ else await section(async () => {
     let mean = null; if (full.cap && a.cap) { let t = 0; for (let i = 0; i < full.cap.grid.length; i++) t += Math.abs(full.cap.grid[i] - a.cap.grid[i]); mean = t / full.cap.grid.length; }
     ok("!! THE SAME PICTURE FROM A SIXTH OF THE SPLATS: the cut (at most 8000 of 50000) against the whole cloud, on the page's 32 x 20 grid, within 8 levels of 255 on average", mean != null && mean <= 8 && !full.later.lod, `mean ${mean == null ? "-" : mean.toFixed(2)} a channel; ${a.later.drawn} of 50000 drawn; frame ${a.later.frameMs.toFixed(0)} ms against ${full.later.frameMs.toFixed(0)} ms whole (SwiftShader, a CPU: the ratio, not the times)`);
     const b = await open("swlod=/scene.swlod&budget=20000", 3000);
-    ok("!! ?swlod=: a packed file of 60000 splats streamed over HTTP Range: the root first, MORE NODES LOADED AS IT GOES, drawn within the budget, no page error", b.later.backend === "webgpu" && b.later.lod && b.later.count === 60000 && b.first.loaded >= 1 && b.later.loaded > b.first.loaded && b.later.loaded < b.later.nodeCount && b.later.drawn <= 20000 && b.cap && b.cap.lit > 0.1 && !b.later.error && b.errors.length === 0,
+    ok("!! ?swlod=: a packed (compressed) file of 60000 splats streamed over HTTP Range: the root first, MORE NODES LOADED AS IT GOES, drawn within the budget, no page error", b.later.backend === "webgpu" && b.later.lod && b.later.count === 60000 && b.first.loaded >= 1 && b.later.loaded > b.first.loaded && b.later.loaded < b.later.nodeCount && b.later.drawn <= 20000 && b.cap && b.cap.lit > 0.1 && !b.later.error && b.errors.length === 0,
         JSON.stringify({ loadedFirst: b.first.loaded, loadedLater: b.later.loaded, nodes: b.later.nodeCount, drawn: b.later.drawn, error: b.later.error, errors: b.errors.slice(0, 2) }));
     await browser.close(); srv.close();
 });
@@ -121,3 +156,7 @@ process.exit(fails === 0 ? 0 : 1);
 // gate checked the boxes against each other but not the splats against their box, so section 1 now does --, a leaf dropping a splat, stand-ins unbounded,
 // coverage summed instead of combined, colour unweighted, the budget ignored, unloaded nodes refined, the threshold ignored, gathering skipping a splat a node,
 // node byte ranges off by four, no de-duplication of a node asked for twice, the magic unchecked, a 200 not cut to the range, the spread averaged over the axes).
+// COMPRESSION (2026-11-21, Keith: "5"): 8 more mutants of render/splatLod.mjs, ALL 8 RED, two after a fix (positions in 8 bits, colour without its node's range,
+// opacity stored raw, the largest rotation component's sign not fixed -- GREEN at first, and rotations in 8 bits -- GREEN at first: the generated clouds all
+// carry the identity rotation, so section 3b now also round-trips 2000 random rotations, half with a negative largest component --, decoding over 65536,
+// packing always plain, a compressed file read as plain).
