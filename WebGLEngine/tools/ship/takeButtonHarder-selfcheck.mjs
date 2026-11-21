@@ -9,7 +9,10 @@
 //   2  THE STUDY             against a stand-in: sixteen arms, each once; the gain pair by pair; what is decided, each pick its own way; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/buttonHarder.reading.json; the kept arms in brain/rig-results/buttonHarder/): THE PICKS HOLD. Car-today less the 45-degree gunner, one ship a side with escorts: the pilot's escorts without the cannon +0.210 (z 4.91, LEADS --
+//   the forecast said it could not be told); the pilot on side Y only +0.144 (z 2.53, LEADS), on side X only +0.063 (z 1.62, cannot be told); half rations +0.027 (z 0.61), an eighth -0.039 (z -0.69), neither can be told (the forecast had the
+//   eighth leading most: the lead goes as the rounds get scarce). In fleets of three it TRAILS in all three, as forecast: a quarter ration -0.192 (z -5.83), a quarter without the cannon -0.638 (z -9.64), the pilot's escorts -0.262 (z -8.25).
+//   The by-the-fight hand's note says so.
 //
 // SABOTAGE LOG: 22 mutants of tools/ship/takeButtonHarder.mjs, each in a hard-linked copy of the tree, before any pair was flown: ALL 22 RED the first time (a seed moved, old pairs; the pilot off one side of pilotNone, the cannon on there, the pilot
 //   on both sides where it is on one, on the wrong side, the sides swapped in the jobs; a quarter for the half, a sixteenth for the eighth; fleets of two, whole magazines, two pilot escorts; the plain side always armed, no helm; the gain's sign,
@@ -75,7 +78,12 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(G.READING, "utf8")), k = (f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const out = Object.fromEntries(G.FIGHTS.map((f) => [f, G.fightReadings({ today: k(f, "today"), alt: k(f, "alt") })])), R = (f) => out[f].reading.gain;
+    const want = { pilotNone: [0.2099, "LEADS"], pilotTheirs: [0.1442, "LEADS"], pilotOurs: [0.0629, "CANNOT BE TOLD"], escortsHalf: [0.0265, "CANNOT BE TOLD"], escortsEighth: [-0.0388, "CANNOT BE TOLD"], fleetRationed: [-0.1917, "TRAILS"], fleetRationedNone: [-0.6382, "TRAILS"], fleetPilot: [-0.2615, "TRAILS"] };
+    ok("!! RE-DERIVED FROM THE KEPT ARMS: with escorts +0.210, +0.144 (LEAD), +0.063, +0.027, -0.039 (cannot be told); in fleets -0.192, -0.638, -0.262 (TRAIL)", G.FIGHTS.every((f) => near(R(f), want[f][0]) && TA.word(R(f).z) === want[f][1] && R(f).n === 300 && Math.abs(R(f).mean - rd[f].reading.gain.mean) < 1e-12));
+    const v = G.decide(out), h = C.HANDS.find((x) => x.id === "bysize");
+    ok("!! WHAT IS DECIDED, as read: both picks hold; the by-the-fight hand's note says where they were flown", v.ok && v.holds.escorts && v.holds.fleet && rd.verdict.ok && /takeButtonHarder/.test(h.note) && /by 0\.638/.test(h.note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

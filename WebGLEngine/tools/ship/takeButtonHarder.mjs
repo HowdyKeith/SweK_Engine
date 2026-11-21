@@ -21,7 +21,10 @@
 // FORECAST, for the record: with escorts car-today leads in all five (the pilot's escorts cancel, as before, so pilotNone cannot be told); the eighth leads most; in fleets car-today trails in all three.
 // WHAT IS DECIDED, as takeButtonHardToday: THE ESCORTS PICK (car-today) HOLDS if car-today TRAILS in none of the five escorts fights; THE FLEET PICK (the 45-degree gunner) HOLDS if car-today LEADS in none of the three fleet fights. Where a pick
 //   does not hold, the by-the-fight hand's note says where; nothing is written but the reading and the page's picks are not changed by this study.
-// @@READ@@
+// READ 2026-11-21 (brain/buttonHarder.reading.json; the kept arms in brain/rig-results/buttonHarder/): THE PICKS HOLD. Car-today less the 45-degree gunner, one ship a side with escorts: the pilot's escorts without the cannon +0.210 (z 4.91, LEADS --
+//   the forecast said it could not be told); the pilot on side Y only +0.144 (z 2.53, LEADS), on side X only +0.063 (z 1.62, cannot be told); half rations +0.027 (z 0.61), an eighth -0.039 (z -0.69), neither can be told (the forecast had the
+//   eighth leading most: the lead goes as the rounds get scarce). In fleets of three it TRAILS in all three, as forecast: a quarter ration -0.192 (z -5.83), a quarter without the cannon -0.638 (z -9.64), the pilot's escorts -0.262 (z -8.25).
+//   The by-the-fight hand's note says so.
 // Every arm's leads are kept (brain/rig-results/buttonHarder/); the reading file (brain/buttonHarder.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: one ship a side with nothing else (its picks: tools/ship/takeCarTodayNoCannon.mjs, takeButtonHardToday.mjs), fighters, other helms, the bow-on rule, fleets of two or four.
 "use strict";
