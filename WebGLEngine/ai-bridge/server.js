@@ -2621,6 +2621,7 @@ const fleetBridge = require("./fleetBridge.js");
 const subAquariumBridge = require("./subAquariumBridge.js"); // UNNUMBERED -- the sub aquarium: peers send their subs here; the FISH BRAIN / FLY BRAIN chips poll its health routes
 const subAquarium = subAquariumBridge.createBridge({ root: path.resolve(__dirname, "..") });
 const exportBridge = require("./exportBridge.js");
+const aiUsageBridge = require("./aiUsageBridge.js");   // the dock's AI usage-limit gauges: GET /ai/usage
 const codemapBridge = require("./codemapBridge.js");   // v2519 -- the tree as a 3D city, coloured by the vNNNN markers it already carries   // /export/mp4 : webm clip -> YouTube-ready mp4 + description sidecar   // v2221 — POST /fleet/announce : when a peer sails into/out of the fleet, fan the event out to peers as an announcement. Trusted requests only: it broadcasts.
 const httpRange = require("./httpRange.js");   // v2208 — RFC 7233 byte ranges: seeking in a <video>, a page out of a CBZ, a television.
 const jellyfinBridge = require("./jellyfinBridge.js");   // v2209 — detect + link a media LIBRARY. Not a transport: live LAN streams go through go2rtc.
@@ -12521,6 +12522,15 @@ ${text.replace(/'/g, "''")}
     // BRACE it sits inside is not, and nothing about reading the handler tells you that. It is the same family as
     // the v2760 EDITING LAW (an insertion that landed inside a multi-line import) -- an edit placed by position
     // rather than by scope. Both compile. Both are silent.
+    // GET /ai/usage -- how much of the Claude Code and Codex subscription limits is used (five-hour session and week), for the dock's
+    // CLAUDE 5H / CLAUDE WK / CODEX 5H / CODEX WK gauges. See ai-bridge/aiUsageBridge.js: it borrows each CLI's own sign-in READ-ONLY, never
+    // returns or logs a token, and caches for two minutes (?force=1 skips that). Trusted callers only, because it spends this machine's sign-ins.
+    if (req.url.split("?")[0] === "/ai/usage" && req.method === "GET") {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "auth required", why: "AI usage is only shown on this machine's own pages" }); return; }
+        const force = new URL(req.url, "http://x").searchParams.get("force") === "1";
+        aiUsageBridge.usage({ force }).then((j) => sendJson(j), (e) => sendJson({ ok: false, error: String((e && e.message) || e) }));
+        return;
+    }
     if (req.url.split("?")[0] === "/codemap" && req.method === "GET") {
         if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "auth required" }); return; }
         try {

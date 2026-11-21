@@ -26051,7 +26051,7 @@ const _setWxSlide = (on) => { if (on && !_wxSlideTimer) _wxSlideTimer = setInter
 (function registerAvatarSettingsTab() {
     const DC_KEY = "voxelEngine.demoChrome";
     const FAV_KEY = "voxelEngine.kpopFavorites";
-    const GAUGE_SOURCES = ["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "email", "custom", "none"];
+    const GAUGE_SOURCES = ["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "email", "claude5h", "claudeweek", "codex5h", "codexweek", "custom", "none"];
     const RING_COLORS   = ["cyan", "amber", "green", "red", "violet", "white"];
     const TICKER_SOURCES = ["local", "global", "both"];
 
@@ -26200,7 +26200,7 @@ const _setWxSlide = (on) => { if (on && !_wxSlideTimer) _wxSlideTimer = setInter
             { id: `dcG${n}on`, label: `Gauge ${n + 1} on`, hint: n === 0 ? "Show this gauge slot. Off hides it; On restores the auto-default source (CPU / RAM / GPU / SweK Peers / SweK Remote Peers / Battery for slots 1-6) — then pick a specific source below. The SVG dials on server.html and the docked sandbox show all 6; the 3D avatar stage shows only the first 3." : undefined, type: "toggle",
               get: () => load().gauges[n].source !== "none",
               set: (v) => patch(s => s.gauges[n].source = v ? (s.gauges[n].source !== "none" ? s.gauges[n].source : AUTO_SRC[n]) : "none") },
-            { id: `dcG${n}src`, label: `Gauge ${n + 1} source`, hint: n === 0 ? "battery = this device (shows / if no battery) · cpu/ram/gpu = PC bridge (/system/stats) · swekpeers = LAN SweK peer count · swekremotepeers = cloud/remote peer count · email/custom = pushed to the bridge (POST /gauge/set)." : undefined, type: "select",
+            { id: `dcG${n}src`, label: `Gauge ${n + 1} source`, hint: n === 0 ? "battery = this device (shows / if no battery) · cpu/ram/gpu = PC bridge (/system/stats) · swekpeers = LAN SweK peer count · swekremotepeers = cloud/remote peer count · claude5h/claudeweek/codex5h/codexweek = how much of the Claude Code / Codex subscription's five-hour session or week is used (GET /ai/usage; the tooltip says why one is empty) · email/custom = pushed to the bridge (POST /gauge/set)." : undefined, type: "select",
               options: GAUGE_SOURCES, get: () => load().gauges[n].source, set: (v) => patch(s => s.gauges[n].source = v) },
             { id: `dcG${n}col`, label: `Gauge ${n + 1} ring color`, type: "select",
               options: RING_COLORS, get: () => load().gauges[n].color, set: (v) => patch(s => s.gauges[n].color = v) },

@@ -40,7 +40,11 @@ const SOURCE_LABELS = { battery: "BATTERY", cpu: "CPU", ram: "RAM", gpu: "GPU", 
     // as a MORPHABLE CONTENDER for slot 2, competing with the peers row, on ONE page. So the row Keith
     // remembered was real, was live, and was invisible everywhere else. Here it is a source like any other,
     // so every docked page gets it.
-    brains: "BRAINS", solving: "SOLVING" };
+    brains: "BRAINS", solving: "SOLVING",
+    // AI usage limits (ai-bridge/aiUsageBridge.js via GET /ai/usage): how much of the Claude Code / Codex subscription's five-hour session and week is used.
+    claude5h: "CLAUDE 5H", claudeweek: "CLAUDE WK", codex5h: "CODEX 5H", codexweek: "CODEX WK" };
+/** The AI usage sources: source -> [provider, window]. */
+const USAGE_SOURCES = Object.freeze({ claude5h: ["claude", "session"], claudeweek: ["claude", "weekly"], codex5h: ["codex", "session"], codexweek: ["codex", "weekly"] });
 
 // v1666 — packaged 6-gauge default order: CPU, RAM, GPU, SweK Peers, SweK Remote Peers, BATTERY.
 const DEFAULT_GAUGES = [
@@ -66,6 +70,12 @@ const DEFAULT_GAUGES = [
     { action: "record", label: "RECORD",  color: "amber"  },
     { action: "mp4",    label: "MP4",     color: "green"  },
     { action: "clip",   label: "CLIP",    color: "violet" },
+    // ROW 5: AI usage limits. Keith: "add the AI usage limits gauge to the dock". AFTER the action row on purpose: readGaugeConfig pads a saved
+    // config with the defaults past its end, so a dock saved with the twelve cells above gains this row instead of a second copy of the actions.
+    // CODEX WK is a source too, pickable in place of any of these.
+    { source: "claude5h",        color: "amber",  showPct: true  },
+    { source: "claudeweek",      color: "violet", showPct: true  },
+    { source: "codex5h",         color: "green",  showPct: true  },
 ];
 
 function _lighten(hex, amt) {
@@ -401,6 +411,7 @@ function _makeGauge(cfg, scale) {
             hi.style.opacity = online === false ? "0.15" : "1";
             if (txt) txt.textContent = (displayText == null) ? "–" : String(displayText);
         },
+        setTitle(t) { cell.title = t || ""; },   // the AI usage dials say why they are empty, or when the window resets
     };
     return { cell, handle };
 }
@@ -412,7 +423,7 @@ export function mountSvgGaugeSet(host, opts = {}) {
     if (host) host.appendChild(root);
 
     let handles = [];
-    const providerValues = { battery: null, cpu: null, ram: null, gpu: null, swekpeers: null, swekremotepeers: null, batteryNA: false, fps: null, chunks: null, brains: null, solving: null };
+    const providerValues = { battery: null, cpu: null, ram: null, gpu: null, swekpeers: null, swekremotepeers: null, batteryNA: false, fps: null, chunks: null, brains: null, solving: null, usage: {}, usageWhy: "" };
     const gaugeBag = {};
     let _timer = null, _batBound = false;
     const _pollKey = "svgGaugeSet#" + (mountSvgGaugeSet._n = (mountSvgGaugeSet._n || 0) + 1);   // v2771 — unique per mounted set
@@ -470,6 +481,15 @@ export function mountSvgGaugeSet(host, opts = {}) {
                 else h.update(Math.min(100, v * COUNT_RING_SCALE), v, true);
                 continue;
             }
+            // AI usage limits: a percent of the window used. Absent reads "-" and the tooltip says why (not signed in, Keychain, an expired
+            // sign-in, the endpoint changing), never a 0 that would look like an unused subscription.
+            if (USAGE_SOURCES[s]) {
+                const [prov, win] = USAGE_SOURCES[s], r = providerValues.usage[prov], w = r && r.ok ? r[win] : null;
+                if (!w) { h.update(0, "–", false); if (h.setTitle) h.setTitle(r && r.why ? r.why : (r && r.ok ? "no " + win + " limit reported" : providerValues.usageWhy || "waiting for /ai/usage")); continue; }
+                h.update(w.used, Math.round(w.used), true);
+                if (h.setTitle) h.setTitle(Math.round(w.used) + "% of the " + (win === "session" ? "five-hour session" : "week") + " used" + (w.resetsAt ? " · resets " + new Date(w.resetsAt).toLocaleString() : "") + (r.plan ? " · " + r.plan : ""));
+                continue;
+            }
             const g = gaugeBag[s];
             if (!g) { h.update(0, "–", false); continue; }
             const isCount = g.isCount || COUNT_SOURCES.has(s);
@@ -483,7 +503,18 @@ export function mountSvgGaugeSet(host, opts = {}) {
         const needsPeers = handles.some(h => h.source === "swekpeers");
         const needsRemote = handles.some(h => h.source === "swekremotepeers");
         const needsBrains = handles.some(h => h.source === "brains" || h.source === "solving");
-        const needsBag = handles.some(h => !["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "none", "weather", "brains", "solving"].includes(h.source));
+        const needsUsage = handles.some(h => USAGE_SOURCES[h.source]);
+        const needsBag = handles.some(h => !["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "none", "weather", "brains", "solving"].includes(h.source) && !USAGE_SOURCES[h.source]);
+        if (needsUsage) {
+            // one fetch for all four dials; the bridge caches two minutes, so this two-second poll asks each provider at most once in that time
+            try {
+                const r = await fetch("/ai/usage", { cache: "no-store" });
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const j = await r.json();
+                if (!j || j.ok === false) { providerValues.usage = {}; providerValues.usageWhy = (j && (j.why || j.error)) || "/ai/usage answered without readings"; }
+                else { providerValues.usage = { claude: j.claude || null, codex: j.codex || null }; providerValues.usageWhy = ""; }
+            } catch (e) { providerValues.usage = {}; providerValues.usageWhy = "/ai/usage did not answer: " + String((e && e.message) || e); }
+        }
         if (needsBrains) {
             // v4020 -- ONE fetch feeding both dials, and only when a brain dial is actually mounted. Named
             // absence rather than a convincing zero (v3237/v3258, the rule this file already learned twice):
