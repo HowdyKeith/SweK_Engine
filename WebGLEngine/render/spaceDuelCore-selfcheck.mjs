@@ -26,6 +26,8 @@
 // AND FIVE ON THE PRESETS (2026-11-18), on hard-linked copies of the whole tree, all red: P1 the best ship's hand the fly-wired gunner 1 | P2 its helm the steering helm 1 | P3 its cannon off 1 | P4 an unknown preset taken as the first 1 | P5 the report's count 1
 // AND THREE ON THE `fleet` PRESET (2026-11-20), tree copies, all red: P6 its hand the car's gunner 1 | P7 its helm the bow-on rule 1 | P8 its note not saying where it is not for 1
 // AND SIX ON THE `bysize` HAND (2026-11-20), tree copies, all red: Z1 the size ignored 1 | Z2 a fleet from three ships 1 | Z3 createFight not passing the ships 1 | Z4 a side with no count a fleet's 2 | Z5 the best preset the car's gunner 1 | Z6 the two swapped 2
+// AND EIGHT ON ITS NO-CANNON PICK (2026-11-21, tools/ship/takeButtonNoCannon.mjs), tree copies, 7 red: N1 the cannon ignored 3 | N2 the test inverted 3 | N3 the pick before the fleet 1 | N4 car-big as the pick 1 | N5 the pick dropped 1 | N6 the raw choice's
+//   cannon 1 | N7 the sine control given it 1 | N8 the pick with escorts too 0 -- EQUIVALENT: with escorts and no cannon both picks are car-today.
 // AND TWO ON ITS ESCORTS (2026-11-20), tree copies, both red: E1 the escorts ignored 1 | E2 createFight not passing them 1
 // AND THREE ON THE NO-WINDOW HAND (2026-11-20), tree copies, all red: W1 one ship a side the car's gunner 2 | W2 its file the 45-degree one 2 | W3 the no-window gunner in a fleet too 2
 // AND FIVE ON THE SINE TWINS (2026-11-20), tree copies, all red: S1 the sine helm the fly's 2 | S2 the sine gunner the fly's 2 | S3 its one-ship file the 45-degree one 1 | S4 the preset's helm the fly-wired one 1 | S5 the two swapped 1
