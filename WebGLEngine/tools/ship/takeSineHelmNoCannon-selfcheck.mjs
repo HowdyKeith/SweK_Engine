@@ -8,7 +8,9 @@
 //   2  THE STUDY             against a stand-in: the train pairs once a gain, the held-out choice, the audit arms; what ships; the file; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// @@READ@@
+// READ 2026-11-21 (brain/helmFlyWired3WeightsSineNoCannon.reading.json; the kept flights in brain/rig-results/sineHelmNoCannon/): IT SHIPS. On train -0.25 won (1.695; -1 1.678, -2 1.612, 0 1.549, 0.25 1.470, 0.5 0.582, 1 -0.559,
+//   2 -1.229); held out it led 0.25 by +0.253 (z 3.96, 192 pairs). On the audit the sine at -0.25 less 0.25: +0.446 one ship a side (z 7.41), +0.212 in fleets of three (z 5.53), both LEAD. THE FLY LESS THE SINE: +0.021 (z 0.75) and +0.010 (z 0.41),
+//   neither can be told. The forecast held. The page's `sine` helm loads brain/helmFlyWired3WeightsSineNoCannon.json; the fly-wired helm's note says a sine does as well without a cannon.
 //
 // SABOTAGE LOG: 19 mutants of tools/ship/takeSineHelmNoCannon.mjs, before any pair was flown: 18 RED the first time (a seed moved, the audit a pair short, a gain dropped; the sine twin's file the fly's, no sine wiring, the sine on the fly's arm;
 //   the cannon on, a fleet of one, the no-window gunner in fleets; a tie moving the gain, the winner kept although it does not hold, the fly less the sine's sign, a trail at exactly -2 let by, a lead at 1.9; a file unchecked; the second read
@@ -91,7 +93,7 @@ await section(async () => {
         && D.KINDS.every((k) => G.SETS.audit.one.filter((p) => p.kind === k).length === 75 && G.SETS.train.fleet.filter((p) => p.kind === k).length === 24) && new Set(allP.map((p) => `${p.kind}:${p.seed}`)).size === allP.length && others.length > 1000 && [...others, ...big, ...sc, ...tt].every((x) => !mine.has(x)), `${others.length + big.length + sc.length + tt.length} others`);
     const b = G.brainsOf();
     ok("!! EIGHT GAINS, 0.25 (the sine twin's now) among them; the sine's weights are its file's two with a cannon and the gain twice; at 0.25 the page's sine helm file; the fly's arm is the page's fly-wired helm file (-0.25 without a cannon)", G.GAINS.join() === "-2,-1,-0.25,0,0.25,0.5,1,2" && G.SHIPPED === 0.25 && b.sine.weights.join() === "-2,-2,0.25,0.25" && G.weightsOf(1, b.sine.weights).join() === "-2,-2,1,1" && b.fly.weights.join() === "-2,-2,-0.25,-0.25"
-        && C.FILES["helm-sine"].path.endsWith(path.basename(G.FILES.sine)) && C.FILES["helm-flywired"].path.endsWith(path.basename(G.FILES.fly)) && G.SINE === "sine~odd");
+        && (C.FILES["helm-sine"].path.endsWith(path.basename(G.FILES.sine)) || C.FILES["helm-sine"].path.endsWith(path.basename(G.DEFAULT_OUT))) && C.FILES["helm-flywired"].path.endsWith(path.basename(G.FILES.fly)) && G.SINE === "sine~odd");
     const j = (f, arm) => G.jobsOf(f, arm, b, [G.SETS.audit[f][0]])[0], o = j("one", 1), t = j("fleet", 1), fo = j("one", "fly"), ft = j("fleet", "fly");
     ok("!! THE JOBS: NO CANNON on either side; the by-size hand's gunner aboard (the fly's own: no window one a side, 45 degrees in fleets of three) on every arm; the sine twin's arms carry the sine wiring at the gain, the fly's arm none; the plain ship opposite", o.x.network === b.gunOne && b.gunOne.weights[4] === 0 && t.x.network === b.gun && b.gun.weights[4] > 0 && fo.x.network === b.gunOne && ft.x.network === b.gun && o.opts.ships === 1 && t.opts.ships === 3 && ft.opts.ships === 3
         && [o, t, fo, ft].every((q) => q.x.cannon === false && q.y.cannon === false && !q.y.network && !q.y.helmNet && q.x.helmNet.policy === FS.POLICY_ID3 && !q.x.network.wiring) && [o, t].every((q) => q.x.helmNet.wiring === "sine~odd" && q.x.helmNet.weights.join() === "-2,-2,1,1") && [fo, ft].every((q) => q.x.helmNet.wiring === undefined && q.x.helmNet.weights.join() === "-2,-2,-0.25,-0.25")
@@ -126,7 +128,15 @@ console.log("3. WHAT WAS FOUND");
 await section(() => {
     const RF = G.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
     if (!fs.existsSync(RF)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const rd = JSON.parse(fs.readFileSync(RF, "utf8")), blob = JSON.parse(fs.readFileSync(G.DEFAULT_OUT, "utf8")), k = (st, f, a) => JSON.parse(fs.readFileSync(path.join(G.KEPT_DIR, `${st}_${f}_${a}.json`), "utf8")).leads, near = (x, v) => Math.abs(x.mean - v) < 5e-4;
+    const sumTrain = (g) => [...k("train", "one", g), ...k("train", "fleet", g)].reduce((a, b) => a + b, 0) / (G.SETS.train.one.length + G.SETS.train.fleet.length);
+    const sc = Object.fromEntries(G.GAINS.map((g) => [g, sumTrain(g)])), best = [...G.GAINS].sort((x, y) => sc[y] - sc[x])[0];
+    ok("!! THE TRAIN SCORES, re-derived from the kept flights: -0.25 won (1.695) of the eight, 0.25 had 1.470, 2 had -1.229", best === -0.25 && rd.winner === -0.25 && G.GAINS.every((g) => Math.abs(sc[g] - rd.scores[g]) < 1e-9) && Math.abs(sc[-0.25] - 1.6946) < 5e-4 && Math.abs(sc[0.25] - 1.4703) < 5e-4, G.GAINS.map((g) => `${g}:${sc[g].toFixed(3)}`).join(" "));
+    const held = TA.stat([...k("held", "one", -0.25), ...k("held", "fleet", -0.25)].map((v, i) => v - [...k("held", "one", 0.25), ...k("held", "fleet", 0.25)][i]));
+    ok("!! HELD OUT, -0.25 less 0.25 +0.253 (z 3.96, 192 pairs): it holds, the gain is -0.25", near(held, 0.2528) && held.n === 192 && G.holds(held) && rd.gain === -0.25);
+    const au = (f) => { const fl = k("audit", f, "fly"), s = k("audit", f, -0.25), s0 = k("audit", f, 0.25); return { sineGain: TA.stat(s.map((v, i) => v - s0[i])), flyLessSine: TA.stat(fl.map((v, i) => v - s[i])) }; }, o = au("one"), t = au("fleet");
+    ok("!! THE AUDIT, read once: the sine at -0.25 less 0.25 LEADS one ship a side (+0.446, z 7.41) and in fleets (+0.212, z 5.53); THE FLY LESS THE SINE cannot be told in either (+0.021, +0.010); it ships", near(o.sineGain, 0.4461) && TA.word(o.sineGain.z) === "LEADS" && near(t.sineGain, 0.2125) && TA.word(t.sineGain.z) === "LEADS" && near(o.flyLessSine, 0.0207) && near(t.flyLessSine, 0.0102) && TA.word(o.flyLessSine.z) === "CANNOT BE TOLD" && TA.word(t.flyLessSine.z) === "CANNOT BE TOLD" && o.sineGain.n === 300 && rd.verdict.ok);
+    ok("!! THE FILE is [-2, -2, -0.25, -0.25] and THE PAGE'S sine helm loads it; the fly-wired helm's note says a sine does as well without a cannon", blob.policy === FS.POLICY_ID3 && blob.weights.join() === "-2,-2,-0.25,-0.25" && C.FILES["helm-sine"].path === "brain/helmFlyWired3WeightsSineNoCannon.json" && /takeSineHelmNoCannon/.test(C.HELMS.find((h) => h.id === "sine").note) && /takeSineHelmNoCannon/.test(C.HELMS.find((h) => h.id === "flywired").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

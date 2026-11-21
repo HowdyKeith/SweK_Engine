@@ -17,7 +17,9 @@
 // FORECAST, for the record: the sine wants a negative gain too, as the fly did, and wins it held out; the fly less the sine is then level, as with a cannon (tools/ship/takeFlyWiredHelmControl.mjs: -0.06 one a side, +0.01 in fleets).
 // WHAT SHIPS: brain/helmFlyWired3WeightsSineNoCannon.json (policy helmFlyWired3, [-2, -2, the sine's gain, the sine's gain]) if THE SINE'S GAIN LESS 0.25 LEADS in at least one fight and TRAILS in neither; the page's `sine` helm then loads it (with a
 //   cannon the sine twin to the bit). THE FLY LESS THE SINE decides nothing: it is what the fly's helm's note says about its wiring without a cannon.
-// @@READ@@
+// READ 2026-11-21 (brain/helmFlyWired3WeightsSineNoCannon.reading.json; the kept flights in brain/rig-results/sineHelmNoCannon/): IT SHIPS. On train -0.25 won (1.695; -1 1.678, -2 1.612, 0 1.549, 0.25 1.470, 0.5 0.582, 1 -0.559,
+//   2 -1.229); held out it led 0.25 by +0.253 (z 3.96, 192 pairs). On the audit the sine at -0.25 less 0.25: +0.446 one ship a side (z 7.41), +0.212 in fleets of three (z 5.53), both LEAD. THE FLY LESS THE SINE: +0.021 (z 0.75) and +0.010 (z 0.41),
+//   neither can be told. The forecast held. The page's `sine` helm loads brain/helmFlyWired3WeightsSineNoCannon.json; the fly-wired helm's note says a sine does as well without a cannon.
 // Every arm's leads are kept (brain/rig-results/sineHelmNoCannon/); the reading file (brain/helmFlyWired3WeightsSineNoCannon.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the cannon on, the sine twin gunners, escorts, fighters, unequal gains.
 "use strict";
