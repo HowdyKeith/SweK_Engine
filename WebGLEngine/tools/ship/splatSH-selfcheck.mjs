@@ -48,6 +48,14 @@ section(() => {
     ok("!! THE CARD'S TABLE IS THIS TABLE: the WGSL's constants are these 15 numbers, in this order (band 1's two minus signs included)", nums.length === 15 && nums.every((v, i) => (i < 3 ? [-SH.SH_C1, SH.SH_C1, -SH.SH_C1][i] : want[i - 1]) === v), nums.join(", "));
 });
 
+section(() => {
+    const nums = [...SH.SH_GLSL.matchAll(/-?\d+\.\d{6,}/g)].map((m) => Number(m[0])), want = [-SH.SH_C1, SH.SH_C1, -SH.SH_C1, ...SH.SH_C2, ...SH.SH_C3];
+    ok("!! THE WEBGL2 TABLE IS THIS TABLE TOO (2026-11-21): the GLSL's 15 constants are these, in this order, and it reads texel idx * K + j at (t % width, t / width)", nums.length === 15 && nums.every((v, i) => v === want[i]) && new RegExp(`t % ${SH.SH_TEX_WIDTH}u.*t / ${SH.SH_TEX_WIDTH}u`).test(SH.SH_GLSL) && /idx \* uint\(K\) \+ uint\(j\)/.test(SH.SH_GLSL), nums.join(", "));
+    const sh = Float32Array.from({ length: 5000 * 15 * 3 }, (_, i) => i % 997), T = SH.packShTexture(sh, 5000, 15), at = (t) => { const x = t % SH.SH_TEX_WIDTH, y = Math.floor(t / SH.SH_TEX_WIDTH), o = (y * T.width + x) * 4; return [T.data[o], T.data[o + 1], T.data[o + 2]]; };
+    const small = SH.packShTexture(sh, 10, 15);
+    ok("!! THE TEXTURE'S LAYOUT IS THE SHADER'S: 75,000 coefficients in rows of 4,096 texels, each texel (r, g, b) of one coefficient where the shader looks for it; a small cloud one row of exactly its texels", T.width === 4096 && T.height === Math.ceil(75000 / 4096) && [0, 1, 4095, 4096, 74999].every((t) => at(t).join() === [sh[t * 3], sh[t * 3 + 1], sh[t * 3 + 2]].join()) && small.width === 150 && small.height === 1 && small.data.length === 600);
+});
+
 console.log("2. THE FILE");
 section(() => {
     const mk = (n, nRest) => Array.from({ length: n }, (_, i) => ({ x: h(i), y: h(i + 100), z: h(i + 200), scale: [-2, -2.5, -3], rot: [1, 0, 0, 0], color: [0.1, 0.2, 0.3], opacity: 1, ...(nRest ? { rest: Array.from({ length: nRest }, (_, r) => Math.fround((h(i * 97 + r) - 0.5) * 2)) } : {}) }));

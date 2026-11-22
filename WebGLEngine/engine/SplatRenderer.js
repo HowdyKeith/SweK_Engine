@@ -28,11 +28,17 @@
 // For 50k splats on a 1080 that's <0.4ms in the VS budget. Negligible.
 
 import { radixSortIndices, makeSortScratch } from "../render/splatSort.mjs";   // v4264
+import { SH_GLSL, SH_K, packShTexture } from "../render/splatSH.mjs";   // 2026-11-21: spherical harmonics, the WebGPU renderer's table in GLSL
 
 export class SplatRenderer {
-    constructor(gl, splat) {
+    constructor(gl, splat, { sh = true } = {}) {
         this.gl = gl;
         this.splat = splat;
+        // 2026-11-21 -- SPHERICAL HARMONICS: a cloud with `sh` and `shDegree` (engine/splatParser.js from a .ply with f_rest) draws its colour from where the camera
+        // stands, as render/splatRendererGPU.mjs does: its coefficients in a float texture, each instance's original index as an attribute; `sh: false` draws band 0
+        this.shK = sh && splat.sh ? SH_K[splat.shDegree] || 0 : 0;
+        if (this.shK && splat.sh.length < splat.count * this.shK * 3) throw new Error(`SplatRenderer: splat.sh must hold ${this.shK * 3} numbers a splat at degree ${splat.shDegree}`);
+        this.shDegree = this.shK === 15 ? 3 : this.shK === 8 ? 2 : this.shK === 3 ? 1 : 0;
         this.position = [0, 0, 0];
         this.scale = 1.0;
         this.visible = true;
@@ -60,6 +66,10 @@ layout(location = 2) in vec3 a_scale;    // log-space scale
 layout(location = 3) in vec3 a_color;
 layout(location = 4) in float a_opacity; // pre-sigmoid
 layout(location = 5) in vec4 a_quat;     // (w, x, y, z)
+layout(location = 6) in uint a_index;    // the splat's own index, for its spherical harmonics (2026-11-21)
+uniform int u_shK;                       // coefficients a channel beyond band 0 (0: band 0 only)
+uniform vec3 u_eye;                      // the camera, in world space
+${SH_GLSL}
 
 uniform mat4 u_view;
 uniform mat4 u_proj;
@@ -151,7 +161,7 @@ void main() {
 
     // Pass the NDC offset (same units as conic) to the fragment shader
     v_offset = a_corner * radius;
-    v_color = a_color;
+    v_color = max(vec3(0.0), a_color + shRest(a_index, u_shK, normalize(worldP - u_eye)));   // the colour from where the camera stands
     v_opacity = 1.0 / (1.0 + exp(-a_opacity));
 }`;
 
@@ -204,6 +214,9 @@ void main() {
         this.u_off      = gl.getUniformLocation(prog, "u_worldOffset");
         this.u_ws       = gl.getUniformLocation(prog, "u_worldScale");
         this.u_viewport = gl.getUniformLocation(prog, "u_viewport");
+        this.u_shK      = gl.getUniformLocation(prog, "u_shK");
+        this.u_eye      = gl.getUniformLocation(prog, "u_eye");
+        this.u_sh       = gl.getUniformLocation(prog, "u_sh");
     }
 
     _initBuffers() {
@@ -222,6 +235,18 @@ void main() {
         this.bufColor   = gl.createBuffer();
         this.bufOpacity = gl.createBuffer();
         this.bufQuat    = gl.createBuffer();   // v342 — NEW
+        this.bufIndex   = gl.createBuffer();   // 2026-11-21: each instance's own splat index
+        this._sortedIndex = new Uint32Array(s.count);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.bufIndex);
+        gl.bufferData(gl.ARRAY_BUFFER, s.count * 4, gl.DYNAMIC_DRAW);
+        // the coefficients, one texel a coefficient; a 1 x 1 texture when there are none, so the sampler is always bound to something
+        const T = this.shK ? packShTexture(s.sh, s.count, this.shK) : { data: new Float32Array(4), width: 1, height: 1 };
+        this.texSh = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.texSh);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, T.width, T.height, 0, gl.RGBA, gl.FLOAT, T.data);
+        gl.bindTexture(gl.TEXTURE_2D, null);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.bufPos);
         gl.bufferData(gl.ARRAY_BUFFER, s.count * 3 * 4, gl.DYNAMIC_DRAW);
@@ -266,6 +291,11 @@ void main() {
         gl.enableVertexAttribArray(5);
         gl.vertexAttribPointer(5, 4, gl.FLOAT, false, 0, 0);
         gl.vertexAttribDivisor(5, 1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.bufIndex);
+        gl.enableVertexAttribArray(6);
+        gl.vertexAttribIPointer(6, 1, gl.UNSIGNED_INT, 0, 0);   // an integer attribute: the index exactly, at any size
+        gl.vertexAttribDivisor(6, 1);
 
         gl.bindVertexArray(null);
 
@@ -321,6 +351,7 @@ void main() {
             sq[i * 4 + 1] = s.quats[k * 4 + 1];
             sq[i * 4 + 2] = s.quats[k * 4 + 2];
             sq[i * 4 + 3] = s.quats[k * 4 + 3];
+            this._sortedIndex[i] = k;
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, this.bufPos);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, sp);
@@ -332,6 +363,8 @@ void main() {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, so);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.bufQuat);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, sq);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.bufIndex);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this._sortedIndex);
     }
 
     draw(viewMat, projMat, camPos, opts = {}) {
@@ -350,6 +383,9 @@ void main() {
         // Viewport: needed for the ~1-pixel blur term that prevents
         // singular cov2D matrices. Read live so canvas resizes work.
         gl.uniform2f(this.u_viewport, gl.drawingBufferWidth, gl.drawingBufferHeight);
+        gl.uniform1i(this.u_shK, this.shK);
+        gl.uniform3f(this.u_eye, camPos[0], camPos[1], camPos[2]);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texSh); gl.uniform1i(this.u_sh, 0);
 
         const prevBlend = gl.isEnabled(gl.BLEND);
         const prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
@@ -375,5 +411,7 @@ void main() {
         if (this.bufColor)   gl.deleteBuffer(this.bufColor);
         if (this.bufOpacity) gl.deleteBuffer(this.bufOpacity);
         if (this.bufQuat)    gl.deleteBuffer(this.bufQuat);
+        if (this.bufIndex)   gl.deleteBuffer(this.bufIndex);
+        if (this.texSh)      gl.deleteTexture(this.texSh);
     }
 }

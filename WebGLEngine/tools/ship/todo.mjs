@@ -687,7 +687,7 @@ export const TODO = [
     },
     {
         id: "splat-sh-swlod",
-        status: "open", size: "medium", order: 60,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "DONE 2026-11-22: render/splatLod.mjs carries sh through buildLod (a stand-in's: the weighted mean of its splats', the colour's weights), gatherSplats, packLod and openLodStream (f32 plain; compressed one byte a coefficient against the node's own ranges, 17 + 45 bytes a splat at degree 3); tools/splatPack.mjs keeps them from a .ply; a cloud without them packs to the same bytes as before. tools/ship/splatLod-selfcheck.mjs section 3c, splatPack-selfcheck and the page's ?lod=1 and ?swlod= checks.", size: "medium", order: 60,
         title: "Spherical harmonics in the streamed .swlod file and its level-of-detail cut",
         why: "Round queued 2026-11-21 (Keith: 'queue up the other suggested next rounds'). render/splatSH.mjs gives the WebGPU renderer view-dependent colour, but render/splatLod.mjs's packLod/gatherSplats carry no sh, so a streamed capture draws band 0 only.",
         note: "Carry sh through mergeRecords (a stand-in's coefficients: the opacity-weighted mean), the q17 encoding (8-bit per coefficient against a per-leaf range, the way positions are quantised), packLod/openLodStream, tools/splatPack.mjs; gate the round trip and the page against a .ply drawn directly.",
@@ -695,7 +695,7 @@ export const TODO = [
     },
     {
         id: "splat-sh-webgl2",
-        status: "open", size: "small", order: 61,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "DONE 2026-11-22: engine/SplatRenderer.js draws them: render/splatSH.mjs's SH_GLSL (the same 15 constants, gated), the coefficients in an RGBA32F texture, each instance's own index as an integer attribute; sh: false for band 0. The page's WebGL2 picture with harmonics is the WebGPU renderer's within 0.12 of a level on average, 2 at worst (tools/ship/splatGpuPage-selfcheck.mjs).", size: "small", order: 61,
         title: "Spherical harmonics in the WebGL2 splat renderer (the fallback)",
         why: "Round queued 2026-11-21. engine/SplatRenderer.js draws band 0; splat-gpu.html?backend=webgl2 and every page without WebGPU lose the view-dependent colour.",
         note: "The same table as render/splatSH.mjs (GLSL from its constants), coefficients in a float texture; gate against viewColors the way the WebGPU renderer is gated.",

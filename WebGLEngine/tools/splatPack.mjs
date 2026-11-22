@@ -23,7 +23,8 @@ export function pack(arrayBuffer, fileName, { leaf = 256, proxies = 64, plain = 
     const lod = buildLod(cloud, { leafSize: leaf, proxies }), bytes = packLod(lod, { compress: !plain });
     const depthOf = (id) => { let d = 0; for (let n = lod.nodes[id]; n.parent >= 0; n = lod.nodes[n.parent]) d++; return d; };
     const stats = { splats: cloud.count, nodes: lod.nodes.length, leaves: lod.nodes.filter((n) => n.leaf).length, depth: Math.max(...lod.nodes.filter((n) => n.leaf).map((n) => depthOf(n.id))), bytes: bytes.length, plainBytes: plain ? bytes.length : null, compressed: !plain };
-    if (!plain) stats.plainBytes = lod.nodes.reduce((t, n) => t + n.records.length * 4, 0) + (bytes.length - lod.nodes.reduce((t, n) => t + (n.records.length / FLOATS) * 17 + 72, 0));
+    if (!plain) stats.plainBytes = packLod(lod, { compress: false }).length;   // the same tree packed plain: exact, with or without spherical harmonics
+    stats.shDegree = lod.shDegree || 0;
     return { bytes, stats, lod };
 }
 
@@ -40,6 +41,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (!(leaf >= 8 && proxies >= 8)) { console.error("splatPack: --leaf and --proxies must be at least 8"); process.exit(2); }
     const { bytes, stats } = pack(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), path.basename(input), { leaf, proxies, plain: rest.includes("--plain") });
     fs.writeFileSync(output, bytes);
-    console.log(`wrote ${output}: ${stats.splats.toLocaleString()} splats in ${stats.nodes.toLocaleString()} nodes (${stats.leaves.toLocaleString()} leaves, depth ${stats.depth}), ${(stats.bytes / 1e6).toFixed(2)} MB${stats.compressed ? ` -- ${(stats.plainBytes / stats.bytes).toFixed(2)}x smaller than plain f32` : " (plain f32)"}, in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    console.log(`wrote ${output}: ${stats.splats.toLocaleString()} splats in ${stats.nodes.toLocaleString()} nodes${stats.shDegree ? `, harmonics to degree ${stats.shDegree}` : ""} (${stats.leaves.toLocaleString()} leaves, depth ${stats.depth}), ${(stats.bytes / 1e6).toFixed(2)} MB${stats.compressed ? ` -- ${(stats.plainBytes / stats.bytes).toFixed(2)}x smaller than plain f32` : " (plain f32)"}, in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     console.log(`open it: splat-gpu.html?swlod=/${path.relative(process.cwd(), output).split(path.sep).join("/")}&budget=300000`);
 }

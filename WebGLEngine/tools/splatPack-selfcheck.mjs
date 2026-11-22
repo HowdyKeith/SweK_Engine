@@ -48,6 +48,14 @@ await section(async () => {
         `${(plain.bytes.length / 1024).toFixed(0)} KB plain, ${(q.bytes.length / 1024).toFixed(0)} KB compressed, stats say ${(q.stats.plainBytes / q.stats.bytes).toFixed(2)}x`);
 });
 
+await section(async () => {
+    // 2026-11-22: a capture with harmonics keeps them through the pack, compressed, and the stats say so
+    const gs = gaussians.slice(0, 2000).map((g, i) => ({ ...g, rest: Array.from({ length: 45 }, (_, r) => Math.fround((h(i * 50 + r + 9e4) - 0.5) * 2)) })), pb = writePly(gs), buf = pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength);
+    const q = P.pack(buf, "sh.ply", { leaf: 128 }), plain = P.pack(buf, "sh.ply", { leaf: 128, plain: true }), s = await L.openLodStream(async (a, b) => q.bytes.subarray(a, b + 1)); await s.load(s.lod.nodes.map((n) => n.id));
+    let leaves = 0; for (const n of s.lod.nodes.filter((x) => x.leaf)) leaves += n.sh.length / 45;
+    ok("!! A .ply WITH HARMONICS PACKS WITH THEM: degree 3 in the stats and in the file, every splat's coefficients in the leaves, the plain size the plain file's to the byte", q.stats.shDegree === 3 && s.lod.shDegree === 3 && leaves === 2000 && q.stats.plainBytes === plain.bytes.length && q.bytes.length < plain.bytes.length, `${(plain.bytes.length / q.bytes.length).toFixed(2)}x smaller`);
+});
+
 console.log("2. THE COMMAND");
 await section(() => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "splatpack-")), ply = path.join(tmp, "scene.ply"); fs.writeFileSync(ply, plyBytes);

@@ -64,3 +64,28 @@ fn shRest(i: u32, K: u32, d: vec3<f32>) -> vec3<f32> {
     for (var j = 0u; j < K; j++) { let p = (i * K + j) * 3u; o += b[j] * vec3<f32>(shc[p], shc[p + 1u], shc[p + 2u]); }
     return o;
 }`;
+
+/** The same table in GLSL ES 3.0, for engine/SplatRenderer.js (2026-11-21): shRest(idx, K, d) reads splat idx's coefficients from `u_sh`, an RGBA32F texture
+ *  SH_TEX_WIDTH texels wide holding one coefficient's (r, g, b) a texel, texel number idx * K + j (packShTexture below lays it out). */
+export const SH_TEX_WIDTH = 4096;
+export const SH_GLSL = `
+uniform highp sampler2D u_sh;
+vec3 shCoef(uint t) { return texelFetch(u_sh, ivec2(int(t % ${SH_TEX_WIDTH}u), int(t / ${SH_TEX_WIDTH}u)), 0).rgb; }
+vec3 shRest(uint idx, int K, vec3 d) {
+    if (K == 0) return vec3(0.0);
+    float x = d.x, y = d.y, z = d.z, xx = x * x, yy = y * y, zz = z * z;
+    float b[15];
+    b[0] = ${f(-SH_C1)} * y; b[1] = ${f(SH_C1)} * z; b[2] = ${f(-SH_C1)} * x;
+    b[3] = ${f(SH_C2[0])} * x * y; b[4] = ${f(SH_C2[1])} * y * z; b[5] = ${f(SH_C2[2])} * (2.0 * zz - xx - yy); b[6] = ${f(SH_C2[3])} * x * z; b[7] = ${f(SH_C2[4])} * (xx - yy);
+    b[8] = ${f(SH_C3[0])} * y * (3.0 * xx - yy); b[9] = ${f(SH_C3[1])} * x * y * z; b[10] = ${f(SH_C3[2])} * y * (4.0 * zz - xx - yy); b[11] = ${f(SH_C3[3])} * z * (2.0 * zz - 3.0 * xx - 3.0 * yy);
+    b[12] = ${f(SH_C3[4])} * x * (4.0 * zz - xx - yy); b[13] = ${f(SH_C3[5])} * z * (xx - yy); b[14] = ${f(SH_C3[6])} * x * (xx - 3.0 * yy);
+    vec3 o = vec3(0.0);
+    for (int j = 0; j < 15; j++) { if (j >= K) break; o += b[j] * shCoef(idx * uint(K) + uint(j)); }
+    return o;
+}`;
+/** A cloud's `sh` (K coefficients a channel, coefficient by coefficient) as the texture's texels: { data (Float32Array RGBA), width, height }. Pure. */
+export function packShTexture(sh, n, K) {
+    const texels = Math.max(1, n * K), width = Math.min(SH_TEX_WIDTH, texels), height = Math.ceil(texels / width), data = new Float32Array(width * height * 4);   // one row while it fits: then texel t is at (t, 0); past a row, rows of SH_TEX_WIDTH
+    for (let t = 0; t < n * K; t++) { data[t * 4] = sh[t * 3]; data[t * 4 + 1] = sh[t * 3 + 1]; data[t * 4 + 2] = sh[t * 3 + 2]; }
+    return { data, width, height };
+}

@@ -116,6 +116,32 @@ await section(async () => {
     ok("!! the compressed tree cuts the same as the plain one (the cut reads the tree, not the splats)", cut.nodes.join() === cutPlain.nodes.join());
 });
 
+console.log("3c. SPHERICAL HARMONICS THROUGH THE TREE AND THE FILE (2026-11-21)");
+await section(async () => {
+    const base = SPLAT_GENERATORS.nebula({ count: 3000 }), K = 15, W = K * 3, hh = (i) => { const x = Math.sin(i * 7.77 + 1.3) * 9137.5; return x - Math.floor(x); };
+    const c = { ...base, shDegree: 3, sh: new Float32Array(base.count * W).map((_, i) => (hh(i) - 0.5) * 0.8) }, lod = L.buildLod(c, { leafSize: 128, proxies: 64 });
+    const row = (r, j) => Array.from(r.subarray(j * L.FLOATS, (j + 1) * L.FLOATS)).join(), shRow = (sh, j) => Array.from(sh.subarray(j * W, (j + 1) * W)).join();
+    const src = new Map(); for (let i = 0; i < c.count; i++) src.set([...c.positions.subarray(i * 3, i * 3 + 3), ...c.scales.subarray(i * 3, i * 3 + 3), ...c.colors.subarray(i * 3, i * 3 + 3), c.opacities[i], ...c.quats.subarray(i * 4, i * 4 + 4)].join(), shRow(c.sh, i));
+    let leafOk = lod.shDegree === 3, seen = 0; for (const nd of lod.nodes.filter((n) => n.leaf)) for (let j = 0; j < nd.records.length / L.FLOATS; j++) { seen++; if (src.get(row(nd.records, j)) !== shRow(nd.sh, j)) leafOk = false; }
+    ok("!! EVERY LEAF SPLAT KEEPS ITS OWN COEFFICIENTS, bit for bit, beside its record (all 3,000); every node has 3K numbers a splat", leafOk && seen === 3000 && lod.nodes.every((n) => n.sh.length === (n.records.length / L.FLOATS) * W));
+    const kid = lod.nodes.find((n) => n.leaf && n.records.length / L.FLOATS > 70), m = L.mergeNode(kid.records, kid.bounds, 8, kid.sh, K);
+    // the same weights as the colour: so a stand-in's sh is to its splats' sh what its colour is to their colours -- check through a coefficient that copies the red channel
+    const tied = kid.sh.slice(); for (let j = 0; j < kid.records.length / L.FLOATS; j++) tied[j * W] = kid.records[j * L.FLOATS + 6]; const mt = L.mergeNode(kid.records, kid.bounds, 8, tied, K);
+    let same = mt.records.length / L.FLOATS === mt.sh.length / W; for (let j = 0; j < mt.records.length / L.FLOATS; j++) if (Math.abs(mt.sh[j * W] - mt.records[j * L.FLOATS + 6]) > 1e-6) same = false;
+    ok("!! A STAND-IN'S COEFFICIENTS ARE ITS SPLATS' MEANS WITH THE SAME WEIGHTS AS ITS COLOUR (a coefficient set equal to each splat's red comes out equal to the stand-in's red), one set a stand-in", same && m.sh.length === (m.records.length / L.FLOATS) * W && m.records.length < kid.records.length && JSON.stringify(Array.from(m.records)) === JSON.stringify(Array.from(L.mergeRecords(kid.records, kid.bounds, 8))));
+    const cut = L.selectLod(lod, { eye: [0, 0, 6], fovy: 0.9, height: 720 }, { budget: 1500 }), g = L.gatherSplats(lod, cut);
+    let gOk = g.shDegree === 3 && g.sh.length >= g.count * W, k = 0; for (const id of cut.nodes) { const nd = lod.nodes[id]; for (let j = 0; j < nd.records.length / L.FLOATS; j++, k++) if (shRow(g.sh, k) !== shRow(nd.sh, j) || g.positions[k * 3] !== nd.records[j * L.FLOATS]) gOk = false; }
+    ok("!! THE CUT HANDS THEM ON: gatherSplats' sh is each drawn splat's own, in the same order as its positions, at degree 3", gOk && k === g.count);
+    const open = async (bytes) => { const st = await L.openLodStream(async (a, b) => bytes.subarray(a, b + 1)); await st.load(st.lod.nodes.map((n) => n.id)); return st; };
+    const plain = await open(L.packLod(lod, { compress: false }));
+    ok("!! PLAIN (.swlod f32): the file opens at degree 3 and every node's coefficients come back bit for bit", plain.lod.shDegree === 3 && lod.nodes.every((n) => JSON.stringify(Array.from(plain.lod.nodes[n.id].sh)) === JSON.stringify(Array.from(n.sh)) && JSON.stringify(Array.from(plain.lod.nodes[n.id].records)) === JSON.stringify(Array.from(n.records))));
+    const qb = L.packLod(lod), q = await open(qb); let worst = 0, bound = 0;
+    for (const n of lod.nodes) for (let t = 0; t < W; t++) { let lo = Infinity, hi = -Infinity; for (let j = 0; j < n.sh.length / W; j++) { lo = Math.min(lo, n.sh[j * W + t]); hi = Math.max(hi, n.sh[j * W + t]); } const half = (hi - lo) / 255 / 2 + 1e-6; for (let j = 0; j < n.sh.length / W; j++) { const e = Math.abs(q.lod.nodes[n.id].sh[j * W + t] - n.sh[j * W + t]); worst = Math.max(worst, e / half); } bound = Math.max(bound, half); }
+    const noSh = L.buildLod(base, { leafSize: 128, proxies: 64 }), hdr = (b) => new TextDecoder().decode(b.subarray(10, 10 + new DataView(b.buffer, b.byteOffset).getUint32(6, true)));
+    ok("!! COMPRESSED (the default): each coefficient within half a step of its node's own range (one byte each), the records as before; 17 + 45 bytes a splat at degree 3", q.compressed && q.lod.shDegree === 3 && worst <= 1 && lod.nodes.every((n) => JSON.stringify(Array.from(q.lod.nodes[n.id].records)) === JSON.stringify(Array.from(L.decodeQ(L.encodeQ(n.records))))) && Math.abs(qb.length - L.packLod({ ...lod, shDegree: undefined }).length - lod.nodes.reduce((t, n) => t + n.sh.length + 8 * W, 0) - (hdr(qb).length - hdr(L.packLod({ ...lod, shDegree: undefined })).length)) === 0, `worst ${worst.toFixed(3)} of half a step`);
+    ok("!! A CLOUD WITHOUT THEM PACKS AS BEFORE: no sh in the tree, nothing about them in the file's header, plain or compressed", noSh.shDegree === undefined && noSh.nodes.every((n) => n.sh === undefined) && !/shDegree|shOffset/.test(hdr(L.packLod(noSh))) && !/shDegree|shOffset/.test(hdr(L.packLod(noSh, { compress: false }))));
+});
+
 console.log("4. THE PAGE (WebGPU, headless)");
 const skip = webgpuSkipReason(require);
 if (skip) console.log(`  ----  skipped: ${skip}`);
@@ -160,3 +186,7 @@ process.exit(fails === 0 ? 0 : 1);
 // opacity stored raw, the largest rotation component's sign not fixed -- GREEN at first, and rotations in 8 bits -- GREEN at first: the generated clouds all
 // carry the identity rotation, so section 3b now also round-trips 2000 random rotations, half with a negative largest component --, decoding over 65536,
 // packing always plain, a compressed file read as plain).
+// SPHERICAL HARMONICS (2026-11-22, section 3c): 9 more mutants of render/splatLod.mjs, ALL 9 RED (a leaf's coefficients out of order, a stand-in's not weighted as
+// its colour, the cut not handing them on, 4 bits for 8, one range for every node, the coefficient block's offset lost, the degree dropped from the header, sh fields
+// written for a cloud without them, the degree not kept on the tree). And 5 of engine/SplatRenderer.js's harmonics, held by tools/ship/splatGpuPage-selfcheck.mjs:
+// ALL 5 RED (the harmonics ignored, the direction reversed, the index not sorted with the splats, sh: false ignored, the eye not set).

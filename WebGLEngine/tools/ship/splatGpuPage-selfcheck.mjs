@@ -22,6 +22,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import { writePly } from "../../engine/plyWriter.mjs";
+import { parsePly } from "../../engine/splatParser.js";
+import { buildLod, packLod } from "../../render/splatLod.mjs";
 import http from "node:http";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -86,6 +88,17 @@ else {
         let diff = 0; if (a.cap && b.cap) for (let k = 0; k < a.cap.grid.length; k++) diff += Math.abs(a.cap.grid[k] - b.cap.grid[k]);
         ok("!! ?ply= opens a .ply with f_rest: 3,000 splats, harmonics to degree 3 on the status line, no page error", a.state.count === 3000 && a.state.shDegree === 3 && /harmonics to degree 3/.test(a.state.hud) && !a.state.error && a.errors.length === 0, JSON.stringify({ count: a.state.count, sh: a.state.shDegree, error: a.state.error, errors: a.errors }));
         ok("!! ...and ?sh=0 draws band 0 only, a visibly different picture (over 4 levels a sample on average)", b.state.shDegree === 0 && !/harmonics/.test(b.state.hud) && diff / (a.cap ? a.cap.grid.length : 1) > 4, `${(diff / (a.cap ? a.cap.grid.length : 1)).toFixed(1)} levels a sample apart`);
+        // 2026-11-21: THE WEBGL2 RENDERER DRAWS THE HARMONICS TOO -- the same capture, the same camera, against the card's picture and against its own band 0
+        const g = await open("webgl2", "&ply=/__tmp/sh.ply"), g0 = await open("webgl2", "&ply=/__tmp/sh.ply&sh=0");
+        let dm = 0, dmax = 0, d0 = 0; if (a.cap && g.cap && g0.cap) for (let k = 0; k < a.cap.grid.length; k++) { const d = Math.abs(a.cap.grid[k] - g.cap.grid[k]); dm += d; dmax = Math.max(dmax, d); d0 += Math.abs(g.cap.grid[k] - g0.cap.grid[k]); }
+        const nG = a.cap ? a.cap.grid.length : 1;
+        ok("!! ON WEBGL2 TOO: harmonics to degree 3 on the status line, no page error, and ?sh=0 a visibly different picture (over 4 levels a sample)", g.state.backend === "webgl2" && g.state.shDegree === 3 && /harmonics to degree 3/.test(g.state.hud) && !g.state.error && g.errors.length === 0 && g0.state.shDegree === 0 && d0 / nG > 4, `${(d0 / nG).toFixed(1)} levels a sample from its band 0; ${JSON.stringify({ sh: g.state.shDegree, error: g.state.error, errors: g.errors.slice(0, 2) })}`);
+        if (process.platform === "linux") ok("!! ...AND THE SAME PICTURE AS THE CARD'S: WebGL2's harmonics against the WebGPU renderer's, on the 32 x 20 grid, within 1 level on average and 8 at worst", dm / nG <= 1 && dmax <= 8, `mean ${(dm / nG).toFixed(2)}, worst ${dmax}`);
+        else console.log(`  ----  reported, not asserted (two rasterisers): mean ${(dm / nG).toFixed(2)}, worst ${dmax}`);
+        // 2026-11-22: AND THROUGH THE LEVEL OF DETAIL -- the same capture cut by ?lod=1, and packed to a compressed .swlod (render/splatLod.mjs) and streamed by ?swlod=
+        const plyBuf = fs.readFileSync(path.join(TMP, "sh.ply")); fs.writeFileSync(path.join(TMP, "sh.swlod"), packLod(buildLod(parsePly(plyBuf.buffer.slice(plyBuf.byteOffset, plyBuf.byteOffset + plyBuf.byteLength)), { leafSize: 128 })));
+        const lodSh = await open(null, "&ply=/__tmp/sh.ply&lod=1&budget=1500"), strSh = await open(null, "&swlod=/__tmp/sh.swlod&budget=1500");
+        ok("!! THE LEVEL OF DETAIL CARRIES THEM: ?lod=1 on the capture and ?swlod= of it packed and compressed both draw harmonics to degree 3, within the budget, with no page error", [lodSh, strSh].every((x) => x.state.shDegree === 3 && /harmonics to degree 3/.test(x.state.hud) && /splats drawn \(budget 1,500/.test(x.state.hud) && !x.state.error && x.errors.length === 0), JSON.stringify([lodSh, strSh].map((x) => ({ sh: x.state.shDegree, error: x.state.error, errors: x.errors.slice(0, 2), hud: x.state.hud.slice(0, 90) }))));
     });
     await browser.close(); srv.close(); fs.rmSync(TMP, { recursive: true, force: true });
 }

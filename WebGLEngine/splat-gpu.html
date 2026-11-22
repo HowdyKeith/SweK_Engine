@@ -18,7 +18,7 @@
   it; ?gputimer=0 turns either off.
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
-                 render/splatSH.mjs; the status line says to what degree); ?sh=0 draws band 0 only
+                 render/splatSH.mjs, on either renderer; the status line says to what degree); ?sh=0 draws band 0 only
   Drop a .ply or .splat file on the page to view it instead (engine/splatParser.js).
   Drag to orbit, wheel to zoom. window.__splatGpu reports { ready, backend, count, frames, frameMs, error }, and __splatGpu.capture() draws one frame and
   returns its pixels sampled on a grid, for tools/ship/splatGpuPage-selfcheck.mjs (a headless browser here composites no WebGPU canvas, so a screenshot
@@ -106,7 +106,8 @@ async function useWebGPU(splat, capacity = splat.count) {
 }
 function useWebGL2(splat) {
     const gl = canvas.getContext("webgl2", { premultipliedAlpha: true }); if (!gl) throw new Error("this browser has neither WebGPU nor WebGL2");
-    const r = new SplatRenderer(gl, splat);
+    const r = new SplatRenderer(gl, splat, Q.get("sh") === "0" ? { sh: false } : {});
+    state.shDegree = r.shDegree;   // 2026-11-21: the WebGL2 renderer draws the harmonics too
     // 2026-11-21 (render/gpuTimerGL.mjs): the re-upload and the draw timed on the card by EXT_disjoint_timer_query_webgl2, where the browser offers it; ?gputimer=0 turns it off
     const timer = Q.get("gputimer") === "0" ? createGpuTimerGL(null) : createGpuTimerGL(gl); state.gpuTimer = timer.supported ? "on" : Q.get("gputimer") === "0" ? "off" : "this browser offers no EXT_disjoint_timer_query_webgl2";
     const d = (view, proj, eye) => { gl.viewport(0, 0, canvas.width, canvas.height); gl.clearColor(0.027, 0.039, 0.063, 1); gl.clear(gl.COLOR_BUFFER_BIT); r.draw(view, proj, eye, { timer }); timer.finish();
