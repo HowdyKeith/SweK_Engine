@@ -24,6 +24,13 @@
 // FORECAST, for the record: both tell the side, ipsilaterally, in both orientations (their direct synapses onto their descending neurons are all on their own side); LC4's
 //   orientations alike (it feeds DNp04 with no gradient across its sheet); the relay does not decide LPLC2's side, as it did not decide LC6's; LPLC2's index weaker than LC4's
 //   (the crossing relay pulls the other way).
+// READ 2026-11-22 (brain/loomBenchGF.reading.json): BOTH TELL THE SIDE, IPSILATERALLY, in both orientations -- LC4 onto DNp04 +0.43 to +0.45 (medial and lateral alike to two
+//   places, as forecast: no gradient across its sheet), LPLC2 onto the Giant Fiber +0.32 to +0.41 (medial) and +0.40 to +0.42 (lateral), weaker than LC4, as forecast. THE RELAY
+//   DOES NOT DECIDE LPLC2'S SIDE: cut, LPLC2 is MORE ipsilateral (+0.35 to +0.44 and +0.44 to +0.46) -- PVLP151's crossing synapses pull against the direct route and lose, exactly
+//   as they do for LC6. On the record: places do not matter to the side for either (flat: +0.70 and +0.61); the wiring's particulars do not for LC4 (shuffled, still ipsilateral,
+//   weaker: +0.17 to +0.19) but DO for LPLC2 (shuffled, it turns CONTRALATERAL, -0.14 to -0.18, as LC6 did). Every forecast held.
+//   THE FOUR LOOMING PATHWAYS SIDE BY SIDE (the two benches, 30 to 90 degrees): LC6 +0.15 to +0.24, LC16 +0.37 to +0.49, LC4 +0.43 to +0.45, LPLC2 +0.32 to +0.42 -- all four tell
+//   a loom's side from its own side; in this model the Giant Fiber's inputs tell it no worse than the dark-looming cells.
 // WHAT CHANGES: nothing in the game. The reading goes into vendor/male-cns/PROVENANCE.md beside the circuits and in the evade seat's draft (stage 2 has not been flown).
 "use strict";
 import fs from "node:fs";

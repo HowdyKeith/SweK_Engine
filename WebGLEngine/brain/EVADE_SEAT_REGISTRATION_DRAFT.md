@@ -115,6 +115,11 @@ ships a side, with no reflex:
 So the threat has to be redefined before anything is registered. The choices are Keith's (see the reply of 2026-11-22). Every number above was measured on fights with NO
 reflex, so choosing from them biases nothing that will be flown.
 
+## The second loom bench, read before any stage of the seat was flown (2026-11-22)
+
+`tools/ship/takeLoomBenchGF.mjs`: LC4 and LPLC2 also tell a loom's side from its own side (+0.43 to +0.45 and +0.32 to +0.42), as LC6 and LC16 do; PVLP151 decides none of them.
+It changes nothing in the registration (`tools/ship/takeEvadeSeat.mjs`, committed before this reading).
+
 ## What must be built before anything flies (none of it is built yet)
 
 * ~~The four pathways baked and their positions pinned~~ -- DONE 2026-11-22 (`brain/lc4*.mjs`, `brain/lplc2*.mjs`; gate sections 10-12).

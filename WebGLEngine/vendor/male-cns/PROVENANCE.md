@@ -189,6 +189,11 @@ are visual projection types, so neither is the other's relay, though each feeds 
 PVLP151's synapses onto the Giant Fiber mostly cross the midline (582 of 603), as its synapses onto DNp103 do. Pinned by `brain/maleCnsCircuits-selfcheck.mjs` section 11.
 What the evade seat would do with them is a draft: `brain/EVADE_SEAT_REGISTRATION_DRAFT.md`.
 
+**The second loom bench (registered, read once, 2026-11-22; `tools/ship/takeLoomBenchGF.mjs`, `brain/loomBenchGF.reading.json`):** the first bench's model and rules over these
+two. Both tell a loom's side IPSILATERALLY in both orientations (LC4 onto DNp04 +0.43 to +0.45, LPLC2 onto the Giant Fiber +0.32 to +0.42); PVLP151 does not decide LPLC2's side
+(cut, it is more ipsilateral, as for LC6); places do not matter to the side for either; shuffled, LC4 keeps its side and LPLC2 turns contralateral. All four looming pathways
+pinned here tell a loom's side from its own side.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,
