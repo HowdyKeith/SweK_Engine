@@ -18,6 +18,8 @@
   it; ?gputimer=0 turns either off.
   ?aa=smaa       SMAA 1x on the WebGPU renderer (render/smaaPassGPU.mjs); ?aa=t2x adds the two-frame temporal resolve (jittered frames averaged while the camera
                  is still; when it moves, the history reprojected by the plane through the orbit target, or dropped with &reproject=0)
+  ?gizmo=1       move, turn and scale the cloud about its centre with render/gizmo.mjs's gizmo (1 move, 2 turn, 3 scale, X world or local; the scale is uniform), and a
+                 view cube (top right) to look from a face, an edge or a corner. Held by tools/ship/splatGizmo-selfcheck.mjs
   ?spin=0.003    turn the orbit by this many radians each frame (to see the temporal resolve on a moving camera; the gate drives it)
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
@@ -60,14 +62,16 @@ import { createCameraControls, bindCameraControls } from "./render/cameraControl
 import { createSmaaGPU } from "./render/smaaPassGPU.mjs";
 import { jitterProjection } from "./render/jitter.mjs";
 import { mat4Multiply, mat4Invert, transform4 } from "./render/motionVectors.mjs";
+import * as G from "./render/gizmo.mjs";
+import { createGizmoOverlay } from "./render/gizmoOverlay.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
-const STILL = Number(Q.get("still")) || 0, SPIN = Number(Q.get("spin")) || 0;
+const STILL = Number(Q.get("still")) || 0, SPIN = Number(Q.get("spin")) || 0, GIZMO = Q.get("gizmo") === "1";
 const controls = createCameraControls({ up: "y", yaw: 0.6, pitch: 0.25, distance: 3.2, target: [0, 0, 0], fovY: 0.9, damping: Q.get("ease") === "0" ? 0 : 0.98, minDistance: 0.05 });
 let focusSphere = null;   // the cloud's bounding sphere, for F
 /** Aim the camera at a sphere at once (a newly opened cloud), keeping the view's direction. */
-const frameOn = (center, radius, scale) => { controls.goal.target = center.slice(); controls.goal.distance = Math.max(0.5, scale); controls.snap(); focusSphere = { center: center.slice(), radius }; };
+const frameOn = (center, radius, scale) => { controls.goal.target = center.slice(); controls.goal.distance = Math.max(0.5, scale); controls.snap(); focusSphere = { center: center.slice(), radius }; Object.assign(cloudXf, { pivot: center.slice(), position: center.slice(), rotation: [0, 0, 0, 1], scale: [1, 1, 1] }); if (gizmoOv) gizmoOv.transform = { position: cloudXf.position.slice(), rotation: cloudXf.rotation.slice(), scale: cloudXf.scale.slice() }; };
 
 function lookAt(eye, at, up = [0, 1, 0]) {
     const sub = (a, b) => a.map((v, i) => v - b[i]), norm = (a) => { const l = Math.hypot(...a) || 1; return a.map((v) => v / l); };
@@ -77,6 +81,24 @@ function lookAt(eye, at, up = [0, 1, 0]) {
 }
 function perspective(fovy, aspect, near, far) { const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far); return new Float32Array([f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0]); }
 function eyeOf() { return controls.pose().eye; }
+// ---- ?gizmo=1 (2026-11-22): the cloud MOVED, TURNED and SCALED by render/gizmo.mjs's gizmo, about its own centre. M = T(position) R(rotation) S(s) T(-centre); the renderer draws
+// with view x M and is handed the eye in the cloud's own frame (M^-1 eye), so its depth sort and its view-dependent colour stay the cloud's. THE SCALE IS UNIFORM (s, the cube root
+// of the three handles' product): splats are sorted by distance and a Gaussian's footprint comes from the view, so one number scales the whole cloud.
+let gizmoOv = null;   // set below, once the camera's listeners are bound
+const cloudXf = state.cloudXf = { pivot: [0, 0, 0], position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] };
+function cloudModel() {
+    const [x, y, z, w] = cloudXf.rotation, s = Math.cbrt(Math.abs(cloudXf.scale[0] * cloudXf.scale[1] * cloudXf.scale[2])) || 1, c = cloudXf.pivot, t = cloudXf.position;
+    const R = [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)];
+    const m = new Float32Array([R[0] * s, R[1] * s, R[2] * s, 0, R[3] * s, R[4] * s, R[5] * s, 0, R[6] * s, R[7] * s, R[8] * s, 0, 0, 0, 0, 1]);
+    for (let r = 0; r < 3; r++) m[12 + r] = t[r] - (m[r] * c[0] + m[4 + r] * c[1] + m[8 + r] * c[2]);
+    return m;
+}
+/** The camera as the renderer is to see it: the view times the cloud's model, the eye in the cloud's frame. With no gizmo, as they were. */
+function cloudView(view, eye) {
+    if (!GIZMO) return [view, eye];
+    const M = cloudModel(), q = transform4(mat4Invert(M), eye[0], eye[1], eye[2], 1);
+    return [mat4Multiply(view, M), [q[0] / q[3], q[1] / q[3], q[2] / q[3]]];
+}
 const camTarget = () => controls.pose().target;
 
 function cloud() {
@@ -161,8 +183,9 @@ function frame() {
     if (SPIN) { controls.orbit(SPIN, 0); controls.snap(); }
     const tnow = performance.now(); camInput.tick(Math.min(0.1, (tnow - lastTick) / 1000)); lastTick = tnow;   // the held keys, then the easing
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();
-    const eye = eyeOf(), view = lookAt(eye, camTarget()), proj = perspective(0.9, canvas.width / canvas.height, 0.01, 200);
-    try { draw(view, proj, eye); } catch (e) { state.error = String(e.message || e); }
+    const eye = eyeOf(), view = lookAt(eye, camTarget()), proj = perspective(0.9, canvas.width / canvas.height, 0.01, 200), [cv, ce] = cloudView(view, eye);
+    try { draw(cv, proj, ce); } catch (e) { state.error = String(e.message || e); }
+    if (gizmoOv) gizmoOv.draw(G.viewOf({ viewProj: mat4Multiply(proj, view), eye, fovY: 0.9, width: canvas.clientWidth, height: canvas.clientHeight, zRange: "gl" }));
     const now = performance.now(), dt = now - last; last = now; avg = avg == null ? dt : avg * 0.9 + dt * 0.1;
     state.frames++; state.frameMs = avg; if (state.frames >= 3) state.ready = true;
     if (state.frames % 15 === 0 || state.frames === 1) paintHud();
@@ -196,6 +219,9 @@ async function show(splat) {
 }
 
 const camInput = bindCameraControls(canvas, controls, { focusOn: () => focusSphere });
+// the gizmo after the camera's listeners: it takes the pointer first anyway, in the capture phase (render/gizmoOverlay.mjs)
+gizmoOv = state.gizmo = GIZMO ? createGizmoOverlay(canvas, { controls, up: "y", cubeOffset: [14, 96], onChange: (t) => Object.assign(cloudXf, { position: t.position.slice(), rotation: t.rotation.slice(), scale: t.scale.slice() }) }) : null;
+if (gizmoOv) gizmoOv.transform = { position: cloudXf.position.slice(), rotation: cloudXf.rotation.slice(), scale: cloudXf.scale.slice() };
 window.addEventListener("keydown", (e) => { if (e.code === "KeyC" && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || ""))) { controls.mode = controls.mode === "orbit" ? "fly" : "orbit"; paintHud(); } });
 state.camera = { controls, input: camInput };
 const drop = document.getElementById("drop");
@@ -206,7 +232,7 @@ addEventListener("drop", async (e) => { e.preventDefault(); drop.style.display =
 
 /** Draw one frame now and return its pixels sampled on a cols x rows grid (pixel centres), RGB 0-255, plus how much of the frame is not background. */
 state.capture = async (cols = 32, rows = 20) => {
-    const eye = eyeOf(), view = lookAt(eye, camTarget()), proj = perspective(0.9, canvas.width / canvas.height, 0.01, 200), tex = draw(view, proj, eye), { w, h, px } = await draw.read(tex);
+    const eye = eyeOf(), view = lookAt(eye, camTarget()), proj = perspective(0.9, canvas.width / canvas.height, 0.01, 200), [cv, ce] = cloudView(view, eye), tex = (state.drawEye = ce, draw(cv, proj, ce)), { w, h, px } = await draw.read(tex);   // drawEye: the eye the renderer was handed (the cloud's frame), for the gate
     const grid = []; let lit = 0;
     for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const x = Math.floor(((i + 0.5) / cols) * w), y = Math.floor(((j + 0.5) / rows) * h), o = (y * w + x) * 4; grid.push(px[o], px[o + 1], px[o + 2]); }
     for (let o = 0; o < px.length; o += 4) if (Math.abs(px[o] - 7) + Math.abs(px[o + 1] - 10) + Math.abs(px[o + 2] - 16) > 24) lit++;

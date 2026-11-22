@@ -20,7 +20,7 @@ import { axesOf as camAxes } from "./cameraControls.mjs";
 const COLORS = { x: "#ef5b5b", y: "#6fd36f", z: "#5b8cff", view: "#d7dbe6", uniform: "#d7dbe6", xy: "#5b8cff", yz: "#ef5b5b", zx: "#6fd36f", hover: "#ffd84a" };
 const FACES = [{ n: [1, 0, 0], label: "X" }, { n: [-1, 0, 0], label: "-X" }, { n: [0, 1, 0], label: "Y" }, { n: [0, -1, 0], label: "-Y" }, { n: [0, 0, 1], label: "Z" }, { n: [0, 0, -1], label: "-Z" }];
 
-export function createGizmoOverlay(target, { controls = null, up = "y", mode = "translate", space = "world", snap = null, size = 96, onChange = null, viewCube = true, cubeSize = 96 } = {}) {
+export function createGizmoOverlay(target, { controls = null, up = "y", mode = "translate", space = "world", snap = null, size = 96, onChange = null, viewCube = true, cubeSize = 96, cubeOffset = [10, 10] } = {}) {
     const doc = target.ownerDocument, cv = doc.createElement("canvas"), ctx = cv.getContext("2d");
     cv.className = "gizmo-overlay"; cv.style.cssText = "position:absolute;pointer-events:none;z-index:4";
     target.parentNode.insertBefore(cv, target.nextSibling);
@@ -30,7 +30,7 @@ export function createGizmoOverlay(target, { controls = null, up = "y", mode = "
         cv.style.left = `${target.offsetLeft}px`; cv.style.top = `${target.offsetTop}px`; cv.style.width = `${r.width}px`; cv.style.height = `${r.height}px`;
         if (cv.width !== Math.round(r.width * d) || cv.height !== Math.round(r.height * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
         return { w: r.width, h: r.height, d, ox: r.left, oy: r.top, pr }; };
-    const cubeBox = (w) => ({ x: w - cubeSize - 10, y: 10, s: cubeSize });
+    const cubeBox = (w) => ({ x: w - cubeSize - cubeOffset[0], y: cubeOffset[1], s: cubeSize });   // `cubeOffset` [right, top] in pixels (a page with a bar across its top moves it down)
     const cubeRot = () => { if (!controls) return null; const p = controls.pose ? controls.pose() : controls.now; return G.viewRotationOf(camAxes(p.yaw, p.pitch, up).back, up === "z" ? [0, 0, 1] : [0, 1, 0]); };
     const cubeAt = (x, y, w) => { if (!viewCube || !controls) return null; const b = cubeBox(w); if (x < b.x || x > b.x + b.s || y < b.y || y > b.y + b.s) return null; const u = ((x - b.x) / b.s) * 2 - 1, v = 1 - ((y - b.y) / b.s) * 2; return G.viewCubePick(cubeRot(), u, v); };
     const local = (e) => { const r = target.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width }; };
