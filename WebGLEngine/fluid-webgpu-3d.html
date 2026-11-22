@@ -35,6 +35,7 @@
 <div id="note">3D hybrid FLIP/PIC on a staggered MAC grid: trilinear atomic particle&rarr;grid splat, Jacobi pressure projection, grid&rarr;particle FLIP/PIC blend, RK2 advection. Compute mirrors the unit-tested <b>fluid/flip3d.mjs</b>. Drag to orbit, scroll to zoom. Drop boxes and balls: each becomes a moving SOLID (amber marker) that the fluid splashes off "glass" shades particles as refractive liquid-glass droplets (impostor spheres, fresnel + fake refraction + chromatic tint) &mdash; the technique from the liquid-glass shaders, written directly.mdash; the 3D one-way rigid coupling, mirroring the unit-tested flip3d.mjs. "glass" shades droplets as refractive liquid-glass.</div>
 <script type="module">
 import { adapterOptions } from "/ui/webgpuProbe.mjs";
+import { createCameraControls, bindCameraControls } from "/render/cameraControls.mjs";   // 2026-11-22: the shared camera
 const NX = 48, NY = 48, NZ = 48;
 const N_U = (NX + 1) * NY * NZ, N_V = NX * (NY + 1) * NZ, N_W = NX * NY * (NZ + 1), N_C = NX * NY * NZ;
 const MAX_P = 260000, SCALE = 16384.0;
@@ -533,11 +534,14 @@ async function init() {
     device.queue.writeBuffer(bufParams, 0, f); }
 
   // ---- camera ----
-  let yaw = 0.7, pitch = 0.5, dist = NX * 1.9;
+  // 2026-11-22: render/cameraControls.mjs in place of this page's own drag and wheel -- the same eye formula about the tank's centre, drag feel (0.008 rad a pixel), pitch range
+  // (-1.4 to 1.4) and zoom range (0.7 to 4 tank widths); right or shift-drag pans, F frames the tank, W A S D Q E fly
+  const controls = createCameraControls({ up: "y", yaw: 0.7, pitch: 0.5, distance: NX * 1.9, target: [NX / 2, NY / 2, NZ / 2], fovY: 1.05, minPitch: -1.4, maxPitch: 1.4, minDistance: NX * 0.7, maxDistance: NX * 4 });
+  let camInput = null, lastTick = performance.now();
   function writeCam() {
-    const cx = NX / 2, cy = NY / 2, cz = NZ / 2;
-    const eye = [cx + dist * Math.cos(pitch) * Math.sin(yaw), cy + dist * Math.sin(pitch), cz + dist * Math.cos(pitch) * Math.cos(yaw)];
-    const view = M.lookAt(eye, [cx, cy, cz], [0, 1, 0]);
+    const tnow = performance.now(); if (camInput) camInput.tick(Math.min(0.1, (tnow - lastTick) / 1000)); lastTick = tnow;
+    const pose = controls.pose(), eye = pose.eye;
+    const view = M.lookAt(eye, pose.target, [0, 1, 0]);
     const proj = M.persp(1.05, cvs.width / cvs.height, 0.5, 1000);
     const vp = M.mul(proj, view);
     // camera right/up in world (from view matrix rows)
@@ -601,12 +605,8 @@ async function init() {
     depthTex = device.createTexture({ size: [cvs.width, cvs.height], format: "depth24plus", usage: GPUTextureUsage.RENDER_ATTACHMENT }); }
   addEventListener("resize", resize); resize();
 
-  // orbit controls
-  let drag = false, lx = 0, ly = 0;
-  cvs.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; cvs.setPointerCapture(e.pointerId); });
-  cvs.addEventListener("pointerup", e => { drag = false; });
-  cvs.addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - lx) * 0.008; pitch = Math.max(-1.4, Math.min(1.4, pitch + (e.clientY - ly) * 0.008)); lx = e.clientX; ly = e.clientY; });
-  cvs.addEventListener("wheel", e => { e.preventDefault(); dist = Math.max(NX * 0.7, Math.min(NX * 4, dist * (1 + e.deltaY * 0.001))); }, { passive: false });
+  camInput = bindCameraControls(cvs, controls, { focusOn: () => ({ center: [NX / 2, NY / 2, NZ / 2], radius: Math.hypot(NX, NY, NZ) / 2 }) });
+  window.__camera = { controls, input: camInput };
 
   document.getElementById("drop").onclick = () => presets.drop();
   document.getElementById("dam").onclick = () => presets.dam();

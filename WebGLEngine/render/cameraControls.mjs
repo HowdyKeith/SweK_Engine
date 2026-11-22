@@ -17,12 +17,13 @@
 //                                held keys and calls update. detach() removes every listener.
 //
 // THE UP AXIS IS A CHOICE: "y" (eye = target + d (cos p sin y, sin p, cos p cos y), the splat page's) or "z" (eye = target + d (cos p sin y, -cos p cos y, sin p), the orrery's
-// render/orbitCamera.mjs). Pitch is held short of the poles by POLE_MARGIN so a lookAt basis never collapses; the distance is held within [minDistance, maxDistance].
+// render/orbitCamera.mjs). Pitch is held short of the poles by POLE_MARGIN so a lookAt basis never collapses (and within [minPitch, maxPitch] when a page gives them);
+// the distance is held within [minDistance, maxDistance].
 // NOT HERE: inertia after release (the easing is toward where the input put the target, nothing more), roll, a first-person collision, gamepads.
 "use strict";
 
 export const POLE_MARGIN = 0.02;
-export const DEFAULTS = Object.freeze({ up: "y", yaw: 0, pitch: 0.3, distance: 3, target: [0, 0, 0], damping: 0.98, minDistance: 1e-3, maxDistance: 1e5, fovY: 0.9, margin: 1.1, flySpeed: 1, mode: "orbit" });
+export const DEFAULTS = Object.freeze({ up: "y", yaw: 0, pitch: 0.3, distance: 3, target: [0, 0, 0], damping: 0.98, minDistance: 1e-3, maxDistance: 1e5, fovY: 0.9, margin: 1.1, flySpeed: 1, mode: "orbit", minPitch: null, maxPitch: null });
 /** PlayCanvas's easing (src/extras/input/math.js): the share of the way to go this step, for a damping per millisecond. Pure. */
 export const damp = (damping, dt) => 1 - Math.pow(damping, dt * 1e3);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v)), wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -39,15 +40,16 @@ export function axesOf(yaw, pitch, up = "y") {
 export function createCameraControls(opts = {}) {
     const o = { ...DEFAULTS, ...opts };
     if (o.up !== "y" && o.up !== "z") throw new Error(`cameraControls: up is "y" or "z" (got ${o.up})`);
-    const pitchMax = Math.PI / 2 - POLE_MARGIN, dist = (d) => clamp(d, o.minDistance, o.maxDistance);
-    const goal = { target: [...o.target], yaw: o.yaw, pitch: clamp(o.pitch, -pitchMax, pitchMax), distance: dist(o.distance) }, now = { target: [...goal.target], yaw: goal.yaw, pitch: goal.pitch, distance: goal.distance };
+    // 2026-11-22: a page may hold the pitch to its own range (an ocean seen from above only, say), always inside the poles' margin
+    const pole = Math.PI / 2 - POLE_MARGIN, pitchMin = clamp(o.minPitch ?? -pole, -pole, pole), pitchMax = clamp(o.maxPitch ?? pole, pitchMin, pole), dist = (d) => clamp(d, o.minDistance, o.maxDistance);
+    const goal = { target: [...o.target], yaw: o.yaw, pitch: clamp(o.pitch, pitchMin, pitchMax), distance: dist(o.distance) }, now = { target: [...goal.target], yaw: goal.yaw, pitch: goal.pitch, distance: goal.distance };
     const eyeOf = (p) => { const b = axesOf(p.yaw, p.pitch, o.up).back; return p.target.map((t, i) => t + p.distance * b[i]); };
     const c = {
         get mode() { return o.mode; }, set mode(m) { if (m !== "orbit" && m !== "fly") throw new Error(`cameraControls: a mode is "orbit" or "fly" (got ${m})`); o.mode = m; },
         options: o, goal, now,
-        orbit(dYaw, dPitch) { goal.yaw += dYaw; goal.pitch = clamp(goal.pitch + dPitch, -pitchMax, pitchMax); return c; },
+        orbit(dYaw, dPitch) { goal.yaw += dYaw; goal.pitch = clamp(goal.pitch + dPitch, pitchMin, pitchMax); return c; },
         /** FLY: turn about the eye -- the target swings round it, the eye stays put. */
-        look(dYaw, dPitch) { const eye = eyeOf(goal); goal.yaw += dYaw; goal.pitch = clamp(goal.pitch + dPitch, -pitchMax, pitchMax); const b = axesOf(goal.yaw, goal.pitch, o.up).back; goal.target = eye.map((e, i) => e - goal.distance * b[i]); return c; },
+        look(dYaw, dPitch) { const eye = eyeOf(goal); goal.yaw += dYaw; goal.pitch = clamp(goal.pitch + dPitch, pitchMin, pitchMax); const b = axesOf(goal.yaw, goal.pitch, o.up).back; goal.target = eye.map((e, i) => e - goal.distance * b[i]); return c; },
         pan(dx, dy) { const a = axesOf(goal.yaw, goal.pitch, o.up), s = goal.distance; goal.target = goal.target.map((t, i) => t - (a.right[i] * dx - a.up[i] * dy) * s); return c; },
         zoom(factor) { if (factor > 0 && Number.isFinite(factor)) goal.distance = dist(goal.distance * factor); return c; },
         /** FLY: eye and target together along the view's right, up and forward (the forward is the way the camera faces), in world units. */
