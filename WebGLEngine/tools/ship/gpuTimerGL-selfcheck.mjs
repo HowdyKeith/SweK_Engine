@@ -105,3 +105,4 @@ process.exit(fails === 0 ? 0 : 1);
 // frame read first, the WebGL1 extension's name, no smoothing, and destroy() leaving the reuse pool -- the last GREEN at first, as the check never pooled a query before
 // destroying; it does now); 2 of engine/SplatRenderer.js (the draw untimed, the re-upload untimed); 3 of splat-gpu.html (no read-back after the loop stops, ?gputimer=0
 // ignored, the timer not handed to the renderer).
+// 2026-11-22: onFrame never called -- RED (the check that each frame's own times arrive, oldest first).

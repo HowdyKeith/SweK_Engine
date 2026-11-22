@@ -133,4 +133,8 @@ await section(async () => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 12 mutants, ALL 12 RED. 10 of render/gpuTimerAuto.js, each in a hard-linked copy of the tree (the first context timed, not the largest; a canvas
+// off the page counted; the query not held open between boundaries; the page's requestAnimationFrame wrapped; ?gputimer=0 ignored; the timer never moving; busy never
+// kept; the overlay shown with no context; idle judged by the smoothed time; the size not refreshed -- the last GREEN until the test page grew its canvas after the
+// context was made). 2 of the pages, against section 1 (the line taken out of cube.html; the line moved after sky.html's module script -- moved only to BEFORE it
+// at first, which left it first and was no mutant at all).
