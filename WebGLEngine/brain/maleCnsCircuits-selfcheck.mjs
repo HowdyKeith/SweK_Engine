@@ -8,6 +8,9 @@
 //
 // AND WHERE THE TRACKING CELLS' DENDRITES ARE (section 5: vendor/male-cns/lc10-positions.json): a place for each LC10a cell off the release's per-synapse file, that the places lie on a sheet, and a gradient along it in which of the two pathways a cell feeds.
 //
+// AND WHERE THE DARK-LOOMING CELLS' DENDRITES ARE (section 9, 2026-11-22: lc6-positions.json, lc16-positions.json): the same sheet a side; LC6 feeds PVLP151 from the sheet's
+// lateral end and DNp103 from its medial end; LC16 feeds pIP1 from the lateral end. Read off the files here (node), not by a separate script: the figures were printed first, then written in.
+//
 // NO SABOTAGE LOG: there is no module here to break -- the gate reads data. Its numbers were read off the files by a separate script (python, in the session that vendored them) and written here by hand; a file that is re-extracted and differs turns it red.
 "use strict";
 import fs from "node:fs";
@@ -101,6 +104,25 @@ section(() => {
     for (const side of ["L", "R"]) { const cells = P.cells.filter((c) => c.somaSide === side), ax = axes(cells.map((c) => c.centroid)), v2 = ax.vec[1], medial = Math.sign(midX - ax.mean[0]), s = Math.sign(v2[0]) === medial ? 1 : -1, along = cells.map((c) => s * [0, 1, 2].reduce((a, i) => a + (c.centroid[i] - ax.mean[i]) * v2[i], 0)); R[side] = { ax, c: corr(cells.map((c) => w.get(c.bodyId) || 0), along) }; }
     ok("!! THE DENDRITES OF A SIDE LIE ON A SHEET, the two sides' the same size to a twentieth: the third spread under a third of the second (standard deviations of about 6,000, 2,900 and 840 voxels)", ["L", "R"].every((sd) => R[sd].ax.sd[2] < R[sd].ax.sd[1] / 3 && R[sd].ax.sd[1] < R[sd].ax.sd[0]) && Math.abs(R.L.ax.sd[0] / R.R.ax.sd[0] - 1) < 0.05 && Math.abs(R.L.ax.sd[1] / R.R.ax.sd[1] - 1) < 0.05, `spreads L ${R.L.ax.sd.map((v) => Math.round(v)).join(", ")}; R ${R.R.ax.sd.map((v) => Math.round(v)).join(", ")}`);
     ok("!! AND DNp35 DRAWS FROM ONE END OF THE SHEET'S SECOND AXIS, THE SAME WAY ON BOTH SIDES: with the axis pointed toward the midline, an LC11 cell's synapses onto DNp35 FALL along it (correlation -0.71 on the left, -0.56 on the right) -- the lateral end's cells feed it most. WHICH PART OF THE VISUAL FIELD THAT END IS, IS NOT IN THE DATA USED HERE AND IS NOT CLAIMED", R.L.c < -0.6 && R.R.c < -0.45, `${R.L.c.toFixed(2)}, ${R.R.c.toFixed(2)}`);
+});
+
+console.log("9. WHERE THE DARK-LOOMING CELLS' DENDRITES ARE (vendor/male-cns/lc6-positions.json, lc16-positions.json, by tools/maleCnsDendritePositions.py, 2026-11-22)");
+section(() => {
+    const sheet = (X, file, type, targets) => {
+        const P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${file}`, import.meta.url), "utf8")), lc = X.v.neurons.filter((n) => n.type === type), midX = (P.outputCentres.L[0] + P.outputCentres.R[0]) / 2, R = { P, lc, side: {} };
+        for (const side of ["L", "R"]) {
+            const cells = P.cells.filter((c) => c.somaSide === side), ax = axes(cells.map((c) => c.centroid)), v2 = ax.vec[1], s = Math.sign(v2[0]) === Math.sign(midX - ax.mean[0]) ? 1 : -1, along = cells.map((c) => s * [0, 1, 2].reduce((a, i) => a + (c.centroid[i] - ax.mean[i]) * v2[i], 0));
+            R.side[side] = { ax, c: Object.fromEntries(targets.map((t) => { const w = new Map(); for (const e of X.E) if (e.a.type === type && e.b.type === t) w.set(e.a.bodyId, (w.get(e.a.bodyId) || 0) + e.w); return [t, corr(cells.map((c) => w.get(c.bodyId) || 0), along)]; })) };
+        }
+        R.flat = ["L", "R"].every((sd) => R.side[sd].ax.sd[2] < R.side[sd].ax.sd[1] / 3 && R.side[sd].ax.sd[1] < R.side[sd].ax.sd[0]) && [0, 1].every((k) => Math.abs(R.side.L.ax.sd[k] / R.side.R.ax.sd[k] - 1) < 0.05);
+        R.whole = P.type === type && P.cells.length === lc.length && P.cells.map((c) => c.bodyId).join() === lc.map((n) => n.bodyId).join() && P.cells.every((c, i) => c.somaSide === lc[i].somaSide && c.dendrite <= c.sites && c.centroid.every(Number.isFinite)) && P.sources.partners.sha256 === "43748c76db13e339e9eeb6f4d56e98aab704a4f7fa8bf3cb916b323000070d04";
+        return R;
+    };
+    const A = sheet(K6, "lc6-positions.json", "LC6", ["PVLP151", "DNp103"]), B = sheet(K16, "lc16-positions.json", "LC16", ["pIP1"]), sum = (R, k) => R.P.cells.reduce((a, c) => a + c[k], 0), f = (R, t) => ["L", "R"].map((sd) => R.side[sd].c[t].toFixed(2)).join(" / ");
+    ok("!! a place for every LC6 (124) and LC16 (182) cell, in the circuits' order, each from at least 224 dendrite sites, off the same per-synapse file as LC10a's and LC11's: 89,166 input sites for LC6 (69,585 dendrite), 98,241 for LC16 (75,744)", A.whole && B.whole && sum(A, "sites") === 89166 && sum(A, "dendrite") === 69585 && sum(B, "sites") === 98241 && sum(B, "dendrite") === 75744 && [A, B].every((R) => R.P.cells.every((c) => c.dendrite >= 224)));
+    ok("!! BOTH TYPES' DENDRITES LIE ON A SHEET A SIDE, the two sides the same size to a twentieth (standard deviations of about 5,400, 2,950 and 700 voxels; LC10a's and LC11's are the same shape)", A.flat && B.flat, ["L", "R"].map((sd) => `LC6 ${sd} ${A.side[sd].ax.sd.map((x) => x.toFixed(0)).join("/")}, LC16 ${sd} ${B.side[sd].ax.sd.map((x) => x.toFixed(0)).join("/")}`).join("; "));
+    ok("!! LC6 FEEDS ITS TWO TARGETS FROM OPPOSITE ENDS OF THE SHEET'S SECOND AXIS (pointed toward the midline): PVLP151 from the lateral end (correlation -0.58 left, -0.70 right), DNp103's direct input from the medial end -- clearly on the left (+0.42), weakly on the right (+0.21)", A.side.L.c.PVLP151 < -0.5 && A.side.R.c.PVLP151 < -0.5 && A.side.L.c.DNp103 > 0.35 && A.side.R.c.DNp103 > 0.15, `PVLP151 ${f(A, "PVLP151")}; DNp103 ${f(A, "DNp103")}`);
+    ok("!! LC16 FEEDS pIP1 FROM THE LATERAL END, as LC11 feeds DNp35 (-0.55 left, -0.46 right). WHICH PART OF THE VISUAL FIELD EITHER END IS, IS NOT IN THE DATA USED HERE AND IS NOT CLAIMED", B.side.L.c.pIP1 < -0.4 && B.side.R.c.pIP1 < -0.4, `pIP1 ${f(B, "pIP1")}`);
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
