@@ -16,6 +16,8 @@
   The status line shows what the GRAPHICS CARD spent on each pass (keys, sort, draw), by WebGPU timestamp queries (render/gpuTimer.mjs), when the
   adapter offers them; on the WebGL2 renderer, the re-upload and the draw by EXT_disjoint_timer_query_webgl2 (render/gpuTimerGL.mjs) where the browser offers
   it; ?gputimer=0 turns either off.
+  ?aa=smaa       SMAA 1x on the WebGPU renderer (render/smaaPassGPU.mjs); ?aa=t2x adds the two-frame temporal resolve (jittered frames averaged while the camera
+                 is still, the history dropped when it moves)
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
                  render/splatSH.mjs, on either renderer; the status line says to what degree); ?sh=0 draws band 0 only
@@ -54,6 +56,8 @@ import { buildLod, selectLod, gatherSplats, openLodStream, httpRange } from "./r
 import { createGpuTimer, timerLines } from "./render/gpuTimer.mjs";
 import { createGpuTimerGL } from "./render/gpuTimerGL.mjs";
 import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
+import { createSmaaGPU } from "./render/smaaPassGPU.mjs";
+import { jitterProjection } from "./render/jitter.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
@@ -87,7 +91,10 @@ async function useWebGPU(splat, capacity = splat.count) {
     const timer = createGpuTimer(device); state.gpuTimer = timer.supported ? "on" : (Q.get("gputimer") === "0" ? "off" : "this adapter has no timestamp-query");
     ctx.configure({ device, format, alphaMode: "premultiplied", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     device.lost.then((i) => { state.error = "the GPU device was lost: " + i.message; });
-    const r = createSplatRendererGPU(device, splat, { format, capacity, ...(Q.get("sh") === "0" ? { sh: false } : {}) });
+    // 2026-11-22: ?aa=smaa | t2x -- the splats drawn into SMAA's input (rgba8unorm), then SMAA (and the temporal resolve) into the canvas
+    const aaMode = ["smaa", "t2x"].includes(Q.get("aa")) ? Q.get("aa") : null, aa = aaMode ? createSmaaGPU(device, { width: canvas.width, height: canvas.height, outputFormat: format, temporal: aaMode === "t2x" }) : null;
+    state.aa = aaMode || "off";
+    const r = createSplatRendererGPU(device, splat, { format: aa ? "rgba8unorm" : format, capacity, ...(Q.get("sh") === "0" ? { sh: false } : {}) });
     state.shDegree = r.shDegree;   // a .ply with f_rest: colour from where the camera stands (render/splatSH.mjs); ?sh=0 draws band 0 only
     const info = adapter.info || {};
     state.adapter = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ") || "unknown adapter";
@@ -95,6 +102,14 @@ async function useWebGPU(splat, capacity = splat.count) {
     const d = (view, proj, eye) => {
         if (LOD.on) recut(eye, r);
         const enc = device.createCommandEncoder(), tex = ctx.getCurrentTexture();
+        if (aa) {
+            aa.resize(canvas.width, canvas.height);
+            const key = eye.join() + "|" + Array.from(proj).join(), moved = key !== d.lastKey; d.lastKey = key;   // the history is dropped whenever the camera moves (no motion vectors)
+            const [jx, jy] = aa.jitter(), jp = aa.temporal ? jitterProjection(proj, jx, jy, canvas.width, canvas.height) : proj;
+            state.aaJitter = [jx, jy];   // the subpixel offset this frame was drawn at (T2x), for the gate
+            r.draw(enc, { view, proj: jp, camera: eye, target: aa.inputView, width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1], timer });
+            aa.encode(enc, tex.createView(), { moved });
+        } else
         r.draw(enc, { view, proj, camera: eye, target: tex.createView(), width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1], timer });
         timer.finish(enc); device.queue.submit([enc.finish()]);
         timer.collect().then((t) => { if (t.frames) { state.gpuTimes = Object.fromEntries(Object.entries(t.labels).map(([k, v]) => [k, +v.ms.toFixed(3)])); state.gpuTotal = +t.totalMs.toFixed(3); state.gpuFrames = t.frames; state.gpuLines = timerLines(t); } });
@@ -131,7 +146,7 @@ function useWebGL2(splat) {
 function resize() { const d = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.round(canvas.clientWidth * d)); canvas.height = Math.max(1, Math.round(canvas.clientHeight * d)); }
 let last = performance.now(), avg = null;
 function paintHud() {
-    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"}${state.shDegree ? ` · harmonics to degree ${state.shDegree}` : ""} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · ${controls.mode === "fly" ? "FLY: drag to look, W A S D Q E to move" : "drag to orbit, right-drag to pan, wheel to zoom"}, F to frame, C for ${controls.mode === "fly" ? "orbit" : "fly"}, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
+    hud.innerHTML = `<b>${state.backend === "webgpu" ? "WebGPU" : "WebGL2"}</b> · ${state.lod ? `${(state.drawn || 0).toLocaleString()} of ${state.count.toLocaleString()} splats drawn (budget ${state.budget.toLocaleString()}${LOD.stream ? `, ${state.loaded} of ${state.nodeCount} nodes loaded` : ""})` : state.count.toLocaleString() + " splats"}${state.shDegree ? ` · harmonics to degree ${state.shDegree}` : ""}${state.aa && state.aa !== "off" ? ` · ${state.aa === "t2x" ? "SMAA T2x" : "SMAA"}` : ""} · ${avg == null ? "-" : avg.toFixed(1)} ms a frame<br><span class="dim">${state.backend === "webgpu" ? "sorted and drawn on the card (" + state.adapter + ")" : "sorted on the CPU, re-uploaded each move" + (state.fallback ? " -- no WebGPU here: " + state.fallback : "")} · ${controls.mode === "fly" ? "FLY: drag to look, W A S D Q E to move" : "drag to orbit, right-drag to pan, wheel to zoom"}, F to frame, C for ${controls.mode === "fly" ? "orbit" : "fly"}, drop a .ply or .splat</span>${state.gpuLines ? `<br><span class="dim" style="font-family:ui-monospace,monospace;white-space:pre">${state.gpuLines.join("\n")}</span>` : state.gpuTimer && state.gpuTimer !== "on" ? `<br><span class="dim">GPU timer: ${state.gpuTimer}</span>` : ""}${state.error ? "<br>" + state.error : ""}`;
 }
 let lastTick = performance.now();
 function frame() {
