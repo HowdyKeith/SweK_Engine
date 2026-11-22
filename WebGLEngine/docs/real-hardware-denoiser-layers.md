@@ -14,30 +14,30 @@ A GPU may rank them differently. `tools/denoiseLayers.mjs` measures it where it 
 
 It writes one JSON report and never overwrites one. Nothing is sent anywhere.
 
-## Run it (Windows, on each GPU; from a command prompt in the verified clone)
+## Run it (Windows, on each GPU; from a command prompt)
+
+A fresh clone of the branch, in a folder of its own (your verified clone is left alone):
 
 ```
-cd WebGLEngine
-git pull --ff-only origin claude/epic-cori-2hm1my
+cd /d %USERPROFILE%
+git clone --branch claude/epic-cori-2hm1my --single-branch https://github.com/HowdyKeith/SweK_Engine.git SweK_Layers
+cd SweK_Layers\WebGLEngine
+set SWEK_WEBGPU=
+npm install -g webgpu@0.6.2
 node tools/denoiseLayers-selfcheck.mjs
-node tools/denoiseLayers.mjs --size 512
-node tools/denoiseLayers.mjs --size 1024
+node tools/denoiseLayers.mjs --size 512 --out render\denoise-layers-512.json
+node tools/denoiseLayers.mjs --size 1024 --out render\denoise-layers-1024.json
 ```
+
+`npm install -g webgpu@0.6.2` is the tree's pin since section 70; skip it if that GPU already has it (`npm ls -g webgpu`). On the second
+GPU use other names (`--out render\denoise-layers-512-intel.json` and so on): the report files are never overwritten.
 
 - The self-check must end `ALL PASS`. On a machine whose node-webgpu reaches the GPU it times on the GPU; its 16 x 16 run is
   only a smoke test.
 - Each run prints the adapter on its first line. **If it says SOFTWARE ADAPTER, it did not reach the GPU**; stop and send that.
-- Each run writes `render/denoise-layers-<adapter>.json`. A second run of the same size needs `--out` with another name
-  (it refuses to overwrite): for example `--out render/denoise-layers-<adapter>-1024.json`.
-- **Under FXC** (node-webgpu 0.6.0 as pinned) the sets FXC cannot build are left out by name, as the compile gate does. To time
-  them too, run the same two commands under node-webgpu 0.6.2's DXC, as round 19 did:
-
-```
-npm install --no-audit --no-fund --prefix "%TEMP%\swek-webgpu-0.6.2" webgpu@0.6.2
-set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
-node tools/denoiseLayers.mjs --size 512 --out render/denoise-layers-dxc-512.json
-set SWEK_WEBGPU=
-```
+- Without `--out` a run writes `render/denoise-layers-<adapter>.json`, so a second size would be refused: give each run its own `--out`.
+- On 0.6.2 the native runs compile with DXC on D3D12, which builds every set. A console on an older node-webgpu compiles with FXC, and
+  the sets FXC cannot build are left out by name, as the compile gate does.
 
 ## What to send back
 
