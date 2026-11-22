@@ -9,7 +9,7 @@
 //                      colour of the fog's own light (albedo 1) is left as it is; the jitter spreads 64 pixels' starts over [0, 1)
 //   2  THE PHASE       Henyey-Greenstein integrates to 1 over the sphere and is brightest looking toward the light for g > 0 (forward scattering), flat for g = 0
 //   3  WEBGL2          the GLSL pass over a known colour and DEPTH_COMPONENT32F texture (a ramp of depths and a band of sky), read back: every pixel within 2 levels of
-//                      fogCPU's -- jitter, height, sky at maxDistance and all
+//                      fogCPU's -- jitter, height, sky at maxDistance and all; again with maxDistance beyond the far plane
 //   4  WEBGPU          the WGSL pass over a known colour and a depth32float written by a draw, read back: the same, with 0..1 depth
 //   5  THE PAGE        gizmo-demo.html ?fog=1: the sky (nothing drawn there) is exactly fogCPU's at maxDistance; on the ground the fog's change grows with distance
 //
@@ -34,11 +34,12 @@ const norm = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l); };
 const mul4 = (a, b) => { const o = new Float64Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
 const T4 = (m, v) => [0, 1, 2, 3].map((r) => m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2] + m[12 + r] * v[3]);
 const W = 160, H = 100, EYE = [0.3, 1.6, 4.2], ZO = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 1];
-const PARAMS = { density: 0.12, falloff: 1.5, baseHeight: 0.2, albedo: 0.8, ambient: [0.35, 0.4, 0.45], lightDir: [0.4, 0.7, -0.5], lightColor: [0.3, 0.27, 0.22], g: 0.5, maxDistance: 40, steps: 24, jitter: true };
+const PARAMS0 = { density: 0.12, falloff: 1.5, baseHeight: 0.2, albedo: 0.8, ambient: [0.35, 0.4, 0.45], lightDir: [0.4, 0.7, -0.5], lightColor: [0.3, 0.27, 0.22], g: 0.5, maxDistance: 40, steps: 24, jitter: true };
+const PARAMS = PARAMS0, FAR_SKY = { ...PARAMS0, falloff: 0, density: 0.01, maxDistance: 150 };   // the sky past the far plane (100): only a sky sent to maxDistance gets this right
 const depthAt = (x, yTop) => (yTop < H * 0.25 ? 1 : Math.fround(0.95 + 0.0499 * (x / W) + 0.0004 * (yTop / H)));   // a ramp of depths, the top quarter sky
 const colorAt = (x, yTop) => [Math.round((x / W) * 255), Math.round((yTop / H) * 255), 128];
 /** What fogCPU says for pixel (x, yTop), its jitter taken at the backend's own pixel coordinates (jy). */
-function expected(vp, inv, x, yTop, jy, zo) {
+function expected(vp, inv, x, yTop, jy, zo, PARAMS = PARAMS0) {
     const d = depthAt(x, yTop), nx = ((x + 0.5) / W) * 2 - 1, ny = 1 - ((yTop + 0.5) / H) * 2, w = T4(inv, [nx, ny, zo ? d : d * 2 - 1, 1]), p = w.slice(0, 3).map((v) => v / w[3]), f = T4(inv, [nx, ny, 1, 1]);
     const sky = d >= 1, dir = norm(sky ? f.slice(0, 3).map((v, i) => v / f[3] - EYE[i]) : p.map((v, i) => v - EYE[i])), dist = sky ? PARAMS.maxDistance : Math.hypot(...p.map((v, i) => v - EYE[i]));
     return F.fogCPU(PARAMS, { origin: EYE, dir, distance: dist, color: colorAt(x, yTop).map((v) => v / 255), px: x, py: jy }).map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255));
@@ -97,7 +98,7 @@ window.__ready = true;
 const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split("?")[0]); if (u === "/__fog.html") { r.writeHead(200, { "Content-Type": "text/html" }); return r.end(PAGE); } const f = path.join(ENG, u); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
 await new Promise((res) => srv.listen(0, "127.0.0.1", res));
 const { chromium } = resolvePlaywright(require);
-const compare = (px, vp, inv, zo, bottomUp) => { let worst = 0, sky = 0, n = 0; for (let yt = 0; yt < H; yt++) for (let x = 0; x < W; x++) { const row = bottomUp ? H - 1 - yt : yt, got = px.slice((row * W + x) * 4, (row * W + x) * 4 + 3), want = expected(vp, inv, x, yt, bottomUp ? H - 1 - yt : yt, zo); worst = Math.max(worst, ...got.map((v, i) => Math.abs(v - want[i]))); n++; if (depthAt(x, yt) >= 1) sky++; } return { worst, sky, n }; };
+const compare = (px, vp, inv, zo, bottomUp, P = PARAMS0) => { let worst = 0, sky = 0, n = 0; for (let yt = 0; yt < H; yt++) for (let x = 0; x < W; x++) { const row = bottomUp ? H - 1 - yt : yt, got = px.slice((row * W + x) * 4, (row * W + x) * 4 + 3), want = expected(vp, inv, x, yt, bottomUp ? H - 1 - yt : yt, zo, P); worst = Math.max(worst, ...got.map((v, i) => Math.abs(v - want[i]))); n++; if (depthAt(x, yt) >= 1) sky++; } return { worst, sky, n }; };
 
 console.log("3. WEBGL2 (ANGLE on SwiftShader)");
 await section(async () => {
@@ -106,6 +107,8 @@ await section(async () => {
     const vp = mul4(perspective(0.9, W / H, 0.1, 100), lookAt(EYE, [0, 0.4, 0])), inv = invert4(vp), r = await p.evaluate(([i, e, pr]) => window.__gl(i, e, pr), [Array.from(inv), EYE, PARAMS]);
     const c = compare(r.px, vp, inv, false, true);
     ok("!! THE GLSL PASS IS fogCPU's: every one of 16,000 pixels within 2 levels -- a ramp of depths, the sky band at maxDistance, the jitter at WebGL2's bottom-up pixels", r.err === 0 && pe.length === 0 && c.worst <= 2 && c.sky > 3000, `worst ${c.worst} levels; ${c.sky} sky pixels; ${pe[0] || ""}`);
+    const r2 = await p.evaluate(([i, e, pr]) => window.__gl(i, e, pr), [Array.from(inv), EYE, FAR_SKY]), c2 = compare(r2.px, vp, inv, false, true, FAR_SKY);
+    ok("!! ...and with maxDistance (150) beyond the far plane (100), the sky is fogged to maxDistance, not to the far plane", r2.err === 0 && c2.worst <= 2, `worst ${c2.worst} levels`);
     await browser.close();
 });
 
@@ -145,4 +148,8 @@ srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 13 mutants of render/volumetricFog.mjs, each in a hard-linked copy of the tree: ALL 13 RED -- the CPU step not energy-conserving, the density not falling
+// with height, the closed form's split at the base height dropped, the phase not normalised, the phase's sign flipped, GLSL reading 0..1 depth as NDC, GLSL not sending the
+// sky to maxDistance (GREEN at first: with the far plane beyond maxDistance the two agree; a run with maxDistance past the far plane now tells them apart), GLSL's jitter not
+// at the pixel's corner, GLSL taking height on z for a y-up page, WGSL not attenuating the scene, WGSL treating 0..1 depth as -1..1, WGSL dropping the albedo, and the light
+// colour divided by 4 pi a second time.
