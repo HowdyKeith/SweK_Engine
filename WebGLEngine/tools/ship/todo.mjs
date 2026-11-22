@@ -728,7 +728,7 @@ export const TODO = [
     },
     {
         id: "playcanvas-next",
-        status: "open", size: "medium", order: 65,
+        status: "done", version: "UNNUMBERED (chosen at ship time)", outcome: "DONE 2026-11-22, BOTH: (1) SMAA -- render/smaaPass.js, PlayCanvas's SMAA 1x in GLSL ES 3.0 with its lookup tables vendored (vendor/smaa/, MIT), main.js's anti-aliasing slot takes it when the GFX panel's SMAA toggle is on; against an 8 x 8 supersampled truth its edge error is 13.6-13.8 levels, the aliased frame's 29.7-30.7, FXAA's 19-20 (tools/ship/smaaPass-selfcheck.mjs). (2) CAMERA CONTROLLERS -- render/cameraControls.mjs (orbit, fly, focus over one eased pose; bindCameraControls for the DOM), splat-gpu.html its first user (tools/ship/cameraControls-selfcheck.mjs). Open: SMAA for WebGPU pages; the other eleven pages' cameras.", size: "medium", order: 65,
         title: "PlayCanvas backlog, next lift: SMAA or the shared camera controllers",
         why: "Round queued 2026-11-21 from render/BACKLOG_2026-11-21_PLAYCANVAS.md (`smaa`, `camera-controllers`, both open).",
         note: "Pick one with Keith; each is a row of that backlog with its PlayCanvas source path.",
