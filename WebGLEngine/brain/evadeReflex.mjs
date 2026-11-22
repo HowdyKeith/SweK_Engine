@@ -4,14 +4,16 @@
 // Keith: "start that now" (after "Screen first", ten circuit arms, DNp04 for LC4). It sits after a ship's helm (brain/battleshipDuel.mjs's helmPilot: the rule, the hand rule, the
 // helm network, then this) and changes what the helm asked for only while there is a THREAT. All of it is HAND-SET, NOT THE FLY'S, and was set before anything flew.
 //
-//   THE THREAT   threatOf(body, enemies): of the enemy capital ships (brain/spaceArena.mjs's ctx.enemies; not fighters, not shots), the one with the shortest TIME TO
-//                CONTACT -- range over closing speed -- among those closing, within REACH (1,500 m) and under TAU0 (4 s). Its BEARING in the hull's frame (x the nose, z up, y
-//                the hull's LEFT: positive to the left) and its ELEVATION (positive above the hull's plane). None: the reflex does nothing at all.
+//   THE THREAT   (Keith, 2026-11-22: "Rounds on a hitting course" -- the draft's closing SHIPS never came under 21.7 s in any fight, so a 4 s trigger never fired; see the
+//                draft.) threatOf(body, rounds, radius): of the enemy rounds in flight (brain/spaceArena.mjs's ctx.rounds), those whose straight path, relative to the hull,
+//                passes within the hull's RADIUS (its aimRadius, 6 m) of its centre, the one that gets there FIRST, under TAU0 (2 s). Its BEARING in the hull's frame (x the
+//                nose, z up, y the hull's LEFT: positive to the left) and ELEVATION (positive above the hull's plane): where it is coming FROM. None: the reflex does nothing.
 //   THE ACTIONS  (a share of the hull's own torque limit, FRACTION 0.5, as every helm here adds; the result goes back through the arena's own limits)
 //      turn      a yaw torque AWAY from the threat: -FRACTION x tanh(2 S) about z, S positive for a threat on the left
 //      burst     the thrust raised toward everything the pods give: rule + (max - rule) x E
 //      climb     a pitch torque away from the threat's elevation: nose DOWN (+ about y) if it is above the hull's plane, UP if level or below; x E
-//      jink      a yaw torque of the full FRACTION, its sign swapped every JINK_HALF (0.5 s) while the threat lasts, the first swing AWAY; a new threat starts it again
+//      jink      a yaw torque of the full FRACTION, its sign swapped every JINK_HALF (0.5 s) while there is a threat, the first swing AWAY; a tick with no threat ends
+//                it, and the next threat starts it again
 //   THE READ-OUT (S the side, E the strength)
 //      "sine"    S = sin(bearing), E = 1 -- no circuit (stage 1, and stage 2's control)
 //      "<type>:<orientation>"  type lc6 | lc16 | lc4 | lplc2, orientation medial | lateral | flat | shuffled:<seed>: brain/flyTracking.mjs pathwayOf over the type's baked circuit
@@ -41,7 +43,7 @@ import * as LPT from "./lplc2Topology.mjs";
 import * as LPS from "./lplc2Synapses.mjs";
 import * as LPP from "./lplc2Places.mjs";
 
-export const TAU0 = 4, REACH = 1500, FRACTION = 0.5, JINK_HALF = 0.5;
+export const TAU0 = 2, FRACTION = 0.5, JINK_HALF = 0.5;
 export const ACTIONS = Object.freeze(["turn", "burst", "climb", "jink"]);
 export const TYPES = Object.freeze({
     lc6: { topo: LC6T, syn: LC6S, places: LC6P, eye: "LC6", dn: "DNp103" },
@@ -53,15 +55,15 @@ const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a
 /** A world vector in the hull's frame (the quaternion is [w, x, y, z]). */
 export const toBody = (q, v) => RB.rotateByQuat([q[0], -q[1], -q[2], -q[3]], v);
 
-/** The threat: the closing enemy capital ship with the shortest time to contact, under tau0 and within reach; null when there is none. */
-export function threatOf(body, enemies = [], { tau0 = TAU0, reach = REACH } = {}) {
+/** The threat: the enemy round on a course passing within `radius` of the hull's centre that gets there first, under tau0; null when there is none. */
+export function threatOf(body, rounds = [], { tau0 = TAU0, radius = 6 } = {}) {
     let best = null;
-    for (const e of enemies) {
-        const d = sub(e.body.pos, body.pos), range = len(d); if (!(range > 0) || range >= reach) continue;
-        const closing = -dot(sub(e.body.vel, body.vel), d) / range; if (!(closing > 0)) continue;
-        const ttc = range / closing; if (ttc >= tau0 || (best && ttc >= best.ttc)) continue;
+    for (const r of rounds) {
+        const d = sub(r.pos, body.pos), v = sub(r.vel, body.vel), vv = dot(v, v); if (!(vv > 0)) continue;
+        const t = -dot(d, v) / vv; if (!(t > 0) || t >= tau0 || (best && t >= best.ttc)) continue;
+        const miss = len([d[0] + v[0] * t, d[1] + v[1] * t, d[2] + v[2] * t]); if (miss >= radius) continue;
         const b = toBody(body.q, d);
-        best = { id: e.id, ttc, range, closing, bearing: Math.atan2(b[1], b[0]), elevation: Math.atan2(b[2], Math.hypot(b[0], b[1])) };
+        best = { ttc: t, miss, range: len(d), bearing: Math.atan2(b[1], b[0]), elevation: Math.atan2(b[2], Math.hypot(b[0], b[1])) };
     }
     return best;
 }
@@ -96,18 +98,18 @@ export function readoutOf(name) {
 }
 
 /** One ship's reflex. */
-export function createReflex({ action, wiring = "sine", tau0 = TAU0, reach = REACH, dt = DT } = {}) {
+export function createReflex({ action, wiring = "sine", tau0 = TAU0, dt = DT } = {}) {
     if (!ACTIONS.includes(action)) throw new Error(`evadeReflex.createReflex: an action is ${ACTIONS.join(", ")} (got ${action})`);
-    const R = readoutOf(wiring), jink = { id: null, t: 0, first: -1 };
+    const R = readoutOf(wiring), jink = { on: false, t: 0, first: -1 };
     function reflex(out, ctx) {
-        const th = threatOf(ctx.body, ctx.enemies || [], { tau0, reach });
-        if (!th) { jink.id = null; reflex.last = null; return out; }
+        const th = threatOf(ctx.body, ctx.rounds || [], { tau0, radius: ctx.ship.aimRadius });
+        if (!th) { jink.on = false; reflex.last = null; return out; }
         const lim = ctx.ship.maxAlpha, I = ctx.body.I, S = R.S(th.bearing), E = R.E(th.bearing), torque = out.torque.slice(); let thrust = out.thrust, value = 0;
         if (action === "turn") { value = -Math.tanh(2 * S); torque[2] += FRACTION * lim * I[2] * value; }
         else if (action === "burst") { value = E; thrust = out.thrust + Math.max(0, ctx.thrustMax - out.thrust) * E; }
         else if (action === "climb") { value = (th.elevation > 0 ? 1 : -1) * E; torque[1] += FRACTION * lim * I[1] * value; }
         else {
-            if (jink.id !== th.id) { jink.id = th.id; jink.t = 0; jink.first = S > 0 ? -1 : S < 0 ? 1 : -1; }
+            if (!jink.on) { jink.on = true; jink.t = 0; jink.first = S > 0 ? -1 : S < 0 ? 1 : -1; }
             value = jink.first * (Math.floor(jink.t / JINK_HALF + 1e-9) % 2 === 0 ? 1 : -1); torque[2] += FRACTION * lim * I[2] * value; jink.t += dt;
         }
         reflex.last = { threat: th, S, E, value };
