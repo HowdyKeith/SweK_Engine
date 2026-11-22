@@ -10,7 +10,9 @@
 //   2  THE STUDY             against a stand-in: six arms, each once; the differences pair by pair; what is decided; the command's refusals
 //   3  WHAT WAS FOUND        once flown: the kept reading, and the page as decided
 //
-// @@READ@@
+// READ 2026-11-22 (brain/fleetHandSizes.reading.json; the kept arms in brain/rig-results/fleetHandSizes/): THE FLEET HAND STAYS. The fly-wired gunner less car-today: fleets of
+//   two +0.078 (z 3.55, LEADS), fleets of four +0.152 (z 9.53, LEADS) -- as forecast, and the lead GROWS with the fleet; against its own sine twin +0.002 (z 1.38) and +0.001
+//   (z 1.97), cannot be told, as in fleets of three: what the button's gunner needs from the circuit is that it swings the gun the right way. The fleet note says so.
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -64,7 +66,9 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(G.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    // @@FOUND@@
+    const r = JSON.parse(fs.readFileSync(G.READING, "utf8")), near = (a, b) => Math.abs(a - b) < 5e-4, R = (f, k) => r[f].reading[k];
+    ok("!! THE KEPT READING IS THE ONE PINNED: the fly-wired gunner leads car-today by +0.078 (z 3.55) in fleets of two and +0.152 (z 9.53) in fours, and cannot be told from its sine twin (+0.002, +0.001)", near(R("fleet2", "overToday").mean, 0.07779) && near(R("fleet2", "overToday").z, 3.5467) && near(R("fleet4", "overToday").mean, 0.1519) && near(R("fleet4", "overToday").z, 9.5345) && Math.abs(R("fleet2", "overSine").z) < 2 && Math.abs(R("fleet4", "overSine").z) < 2);
+    ok("!! ...and what it decided is what the page does: no change -- the fleet button carries the fly-wired hand and the by-size hand's fleet pick is the fly-wired gunner; the fleet note gives both sizes", r.verdict.change === false && r.verdict.fleetHand === "flywired" && C.presetOf("fleet").choice.hand === "flywired" && C.HANDS.find((h) => h.id === "bysize").bySize.fleet === "flywired" && /takeFleetHandSizes/.test(C.presetOf("fleet").note));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

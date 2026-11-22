@@ -17,7 +17,9 @@
 // WHAT IS DECIDED: the fleet button and the by-size hand keep the fly-wired gunner in fleets UNLESS CAR-TODAY LEADS IT (the fly less car-today at z <= -2) at either size and
 //   trails it at neither (z >= 2); then both take car-today in fleets (the by-size hand's `fleet` pick becomes car-today and the fleet button carries the by-size hand). The
 //   sine twin is a control: read, said, never a change.
-// @@READ@@
+// READ 2026-11-22 (brain/fleetHandSizes.reading.json; the kept arms in brain/rig-results/fleetHandSizes/): THE FLEET HAND STAYS. The fly-wired gunner less car-today: fleets of
+//   two +0.078 (z 3.55, LEADS), fleets of four +0.152 (z 9.53, LEADS) -- as forecast, and the lead GROWS with the fleet; against its own sine twin +0.002 (z 1.38) and +0.001
+//   (z 1.97), cannot be told, as in fleets of three: what the button's gunner needs from the circuit is that it swings the gun the right way. The fleet note says so.
 // Every arm's leads are kept (brain/rig-results/fleetHandSizes/); the reading file (brain/fleetHandSizes.reading.json) is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: escorts, fighters, one ship a side and fleets of three (read already), other helms, no cannon.
 "use strict";
