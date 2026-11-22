@@ -18,7 +18,7 @@
 <script type="module">
 import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
 import { perspective, lookAt } from "./render/gpuDriven.mjs";
-import { createClusteredLightingGPU, clusteredWGSL, ZO } from "./render/clusteredLights.mjs";
+import { createClusteredLightingGPU, clusteredWGSL, ZO, makeCookieAtlas } from "./render/clusteredLights.mjs";
 import { sceneOf } from "./render/lightsDemoScene.mjs";
 
 const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsGpu = { ready: false, frames: 0, error: null };
@@ -54,9 +54,11 @@ const depthCode = `${OBJ}
 const litMod = device.createShaderModule({ code: litCode }), depthMod = device.createShaderModule({ code: depthCode });
 const lit = device.createRenderPipeline({ layout: "auto", vertex: { module: litMod, entryPoint: "vs", buffers: VB }, fragment: { module: litMod, entryPoint: "fs", targets: [{ format: FORMAT }] }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" } });
 const depthPipe = device.createRenderPipeline({ layout: "auto", vertex: { module: depthMod, entryPoint: "vs", buffers: VB }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
-const lighting = state.lighting = createClusteredLightingGPU(device, { maxLights: Math.max(80, N + 8), cells: [16, 6, 16], maxPerCell: 48, atlasSize: 2048, slots: 4 });
+const lighting = state.lighting = createClusteredLightingGPU(device, { maxLights: Math.max(80, N + 8), cells: [16, 6, 16], viewCells: [16, 9, 24], space: Q.get("clusters") === "world" ? "world" : "view", maxPerCell: 48, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 28 });
+const COOKIES = makeCookieAtlas(256), OPTS = { sun: Q.get("sun") !== "0", cookie: Q.get("cookie") !== "0" };
 const camBuf = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-const litBG0 = device.createBindGroup({ layout: lit.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: camBuf } }, { binding: 1, resource: { buffer: objBuf } }] }), litBG1 = lighting.bindGroupFor(lit, 1);
+const litBG0 = device.createBindGroup({ layout: lit.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: camBuf } }, { binding: 1, resource: { buffer: objBuf } }] });
+let litBG1 = null, litBGVersion = -1;
 const faceBGs = lighting.faceBuffers.map((b) => device.createBindGroup({ layout: depthPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }, { binding: 1, resource: { buffer: objBuf } }] }));
 
 const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pitch: 0.55, distance: 13, target: [0, 0.4, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
@@ -68,8 +70,9 @@ async function frame() {
     const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
     const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
     if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d) || !depthTex) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); if (depthTex) depthTex.destroy(); depthTex = device.createTexture({ size: [cv.width, cv.height], format: "depth24plus", usage: GPUTextureUsage.RENDER_ATTACHMENT }); }
-    const t = T0 ?? (now - start) / 1000, lights = state.lights = lightsAt(t), stats = state.stats = lighting.update(lights);
-    const pose = controls.pose(), vpGL = mul4(perspective(FOV, w / h, 0.05, 100), lookAt(pose.eye, pose.target)), vp = mul4(ZO, vpGL);
+    const pose = controls.pose(), projGL = perspective(FOV, w / h, 0.05, 100), viewM = lookAt(pose.eye, pose.target), vpGL = mul4(projGL, viewM), vp = mul4(ZO, vpGL), camera = state.camera = { view: Array.from(viewM), proj: Array.from(projGL), near: 0.05, far: 100 };
+    const t = T0 ?? (now - start) / 1000, lights = state.lights = lightsAt(t, OPTS), stats = state.stats = lighting.update(lights, camera, COOKIES);
+    if (lighting.cookieVersion !== litBGVersion) { litBG1 = lighting.bindGroupFor(lit, 1); litBGVersion = lighting.cookieVersion; }
     state.viewProj = Array.from(vpGL); state.eye = pose.eye;   // the GL-style matrix, as lights-demo.html reports it: the gate reads both pages one way
     device.queue.writeBuffer(camBuf, 0, new Float32Array([...vp, ...pose.eye, 0]));
     const enc = device.createCommandEncoder();
@@ -80,7 +83,7 @@ async function frame() {
     if (state._want) { const row = 256 * Math.ceil(cv.width * 4 / 256); rb = { buf: device.createBuffer({ size: row * cv.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), row, w: cv.width, h: cv.height, res: state._want }; state._want = null; enc.copyTextureToBuffer({ texture: tex }, { buffer: rb.buf, bytesPerRow: row }, [cv.width, cv.height]); }
     device.queue.submit([enc.finish()]);
     if (rb) { await rb.buf.mapAsync(GPUMapMode.READ); const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), px = new Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w * 4; x++) px[y * rb.w * 4 + x] = raw[y * rb.row + x]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, px, topDown: true }); }
-    if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights (${N} moving, 3 casting shadows) · ${stats.cells} cells · ${stats.faces} atlas tiles of 16${stats.unshadowed ? ` · ${stats.unshadowed} without a shadow` : ""}${stats.overflow ? ` · ${stats.overflow} over the cap` : ""}${Q.get("brute") === "1" ? " · every light, every pixel (brute)" : ""}`;
+    if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights (${N} moving, ${lights.filter((l) => l.shadow).length} casting shadows) · ${stats.cells} cells · ${stats.faces} atlas tiles of 16 (the moon's ${stats.cascades} cascades among them) · ${stats.space === "view" ? "clusters fitted to the view" : "clusters over the lights"}${stats.unshadowed ? ` · ${stats.unshadowed} without a shadow` : ""}${stats.overflow ? ` · ${stats.overflow} over the cap` : ""}${Q.get("brute") === "1" ? " · every light, every pixel (brute)" : ""}`;
     state.frames++; if (state.frames >= 2) state.ready = true;
     requestAnimationFrame(frame);
 }
