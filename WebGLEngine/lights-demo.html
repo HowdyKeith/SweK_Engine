@@ -34,7 +34,7 @@ const P = [], Nn = []; for (const [n, u, v] of [[[1, 0, 0], [0, 1, 0], [0, 0, 1]
     const c = (a, b) => n.map((x, i) => 0.5 * x + 0.5 * a * u[i] + 0.5 * b * v[i]); for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) { P.push(...c(a, b)); Nn.push(...n); } }
 const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
 const link = (vs, fs) => { const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, "aP"); gl.bindAttribLocation(p, 1, "aN"); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; };
-const DEF = (Q.get("brute") === "1" ? "#define CLUSTERED_BRUTE\n" : "") + (Q.get("shadows") === "0" ? "#define CLUSTERED_NO_SHADOWS\n" : "");
+const DEF = (Q.get("brute") === "1" ? "#define CLUSTERED_BRUTE\n" : "") + (Q.get("shadows") === "0" ? "#define CLUSTERED_NO_SHADOWS\n" : "") + (Q.get("soft") === "1" ? "#define CLUSTERED_SOFT\n" : "");   // ?soft=1: contact-hardening soft shadows
 const prog = link(`#version 300 es
 layout(location = 0) in vec3 aP; layout(location = 1) in vec3 aN; uniform mat4 uVP, uM; out vec3 vW; out vec3 vN;
 void main() { vec4 w = uM * vec4(aP, 1.0); vW = w.xyz; vN = aN; gl_Position = uVP * w; }`, `#version 300 es

@@ -23,6 +23,13 @@
 // listed (allocateAtlas(...).unshadowed). Sampled with the hardware's 2 x 2 comparison, inside the tile only. THE BIAS IS IN WORLD UNITS, along the surface normal and half as far
 // toward the light: bias * (1 + distance to the light) for a spot or point light (a depth bias would be metres far away, where depth is compressed; along the light alone it
 // left acne at grazing angles -- both found by the gate), and two of its cascade's texels for the sun.
+//   SOFT SHADOWS (2026-11-22, Keith's "shadow quality": softer edges): with CLUSTERED_SOFT defined before CLUSTERED_GLSL, or clusteredWGSL({ soft: true }), every shadow is
+//   PERCENTAGE-CLOSER SOFT (Fernando 2005), contact-hardening: 16 taps (POISSON16) within `maxPenumbra` texels find the blockers' mean depth; the penumbra is the light's size
+//   by similar triangles -- a light's `softness` is its emitter's radius in world units (spot, point) or its angular radius in radians (the sun) -- in texels at the receiver,
+//      spot, point   softness * (d_r - d_b) / (d_b * d_r) / texelAngle        d linear depths from the light, texelAngle = 2 tan(fov / 2) / tile pixels
+//      sun           (z_r - z_b) * depthRange * tan(softness) / worldTexel    z the tile's 0..1 depth (an orthographic map: linear)
+//   clamped to 1 .. maxPenumbra texels (penumbraTexels(face, zr, zb) on the CPU, from the face's `penumbra`, `depthNear`, `depthFar`); then 16 comparison taps within it. A
+//   shadow touching its caster is hard; it widens with the gap. Without softness a light's shadow is a 1-texel-radius filter of 16 taps.
 //   CASCADES (2026-11-22): the camera's view out to `shadowDistance` split by the practical scheme (Zhang 2006: lambda of the logarithmic split plus 1 - lambda of the even one);
 //   each cascade an orthographic map of the bounding sphere of its slice of the frustum, pushed `casterReach` back toward the sun for casters outside the view, its centre snapped
 //   to whole texels in the light's frame so it does not shimmer as the camera moves. A point takes the first cascade whose far split is beyond its view depth; past the last,
@@ -45,7 +52,7 @@
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], len = (a) => Math.hypot(a[0], a[1], a[2]);
 const norm = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-export const DEFAULTS = Object.freeze({ maxLights: 256, cells: [12, 4, 12], viewCells: [16, 9, 24], space: "world", maxPerCell: 24, atlasSize: 2048, slots: 4, bias: 0.006, cascades: 3, shadowDistance: 30, lambda: 0.6, casterReach: 20, cookieSize: 256 });
+export const DEFAULTS = Object.freeze({ maxPenumbra: 24, maxLights: 256, cells: [12, 4, 12], viewCells: [16, 9, 24], space: "world", maxPerCell: 24, atlasSize: 2048, slots: 4, bias: 0.006, cascades: 3, shadowDistance: 30, lambda: 0.6, casterReach: 20, cookieSize: 256 });
 export const window_ = (d, r) => { const x = Math.min(1, Math.max(0, 1 - Math.pow(d / r, 4))); return (x * x) / (d * d + 1); };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const T4 = (m, v) => [0, 1, 2, 3].map((r) => m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2] + m[12 + r] * v[3]);
@@ -145,8 +152,8 @@ export const CUBE_FACES = Object.freeze([[[1, 0, 0], [0, -1, 0]], [[-1, 0, 0], [
 export const NEAR = 0.05;
 /** The shadow matrices of a spot light (down its cone, a field of twice the outer angle, a hair wider) or a point light (six cube faces). */
 export function faceMatrices(l) {
-    if (l.type === "spot") { const d = norm(l.direction), up = Math.abs(d[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0], view = lookAt(l.position, add(l.position, d), up), proj = perspective(Math.min(Math.PI * 0.95, 2 * l.outerAngle * 1.05), 1, NEAR, l.range); return [{ view, proj, viewProj: mul4(proj, view) }]; }
-    return CUBE_FACES.map(([f, up]) => { const view = lookAt(l.position, add(l.position, f), up), proj = perspective(Math.PI / 2, 1, NEAR, l.range); return { view, proj, viewProj: mul4(proj, view) }; });
+    if (l.type === "spot") { const d = norm(l.direction), up = Math.abs(d[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0], view = lookAt(l.position, add(l.position, d), up), fov = Math.min(Math.PI * 0.95, 2 * l.outerAngle * 1.05), proj = perspective(fov, 1, NEAR, l.range); return [{ view, proj, viewProj: mul4(proj, view), fov }]; }
+    return CUBE_FACES.map(([f, up]) => { const view = lookAt(l.position, add(l.position, f), up), proj = perspective(Math.PI / 2, 1, NEAR, l.range); return { view, proj, viewProj: mul4(proj, view), fov: Math.PI / 2 }; });
 }
 /** The face of a point light's cube a direction from it falls in (the largest component; ties to the earlier face). */
 export function cubeFace(v) { const a = v.map(Math.abs); if (a[0] >= a[1] && a[0] >= a[2]) return v[0] >= 0 ? 0 : 1; if (a[1] >= a[2]) return v[1] >= 0 ? 2 : 3; return v[2] >= 0 ? 4 : 5; }
@@ -176,20 +183,29 @@ export function cascadeMatrices(sun, camera, { cascades = DEFAULTS.cascades, sha
 /** The atlas's tiles: the sun's cascades first, then by priority. Each face: { light, face, rect, viewProj, worldBias, splitFar }. */
 export function allocateAtlas(lights, { slots = DEFAULTS.slots, camera = null, atlasSize = DEFAULTS.atlasSize, cascades = DEFAULTS.cascades, shadowDistance = DEFAULTS.shadowDistance, lambda = DEFAULTS.lambda, casterReach = DEFAULTS.casterReach } = {}) {
     const faces = [], byLight = new Map(), unshadowed = []; let next = 0;
-    const place = (i, mats) => { byLight.set(i, [faces.length, mats.length]); mats.forEach((m, f) => { const s = next++, x = s % slots, y = Math.floor(s / slots); faces.push({ light: i, face: f, rect: [x / slots, y / slots, 1 / slots, 1 / slots], viewProj: m.viewProj, worldBias: m.worldBias || 0, splitFar: m.splitFar || 0, slot: s }); }); };
+    const place = (i, mats) => { byLight.set(i, [faces.length, mats.length]); mats.forEach((m, f) => { const s = next++, x = s % slots, y = Math.floor(s / slots); faces.push({ light: i, face: f, rect: [x / slots, y / slots, 1 / slots, 1 / slots], viewProj: m.viewProj, worldBias: m.worldBias || 0, splitFar: m.splitFar || 0, penumbra: m.penumbra || 0, depthNear: m.depthNear || 0, depthFar: m.depthFar || 0, slot: s }); }); };
     const sun = sunIndexOf(lights);
     if (sun >= 0 && lights[sun].shadow) {
         if (!camera) throw new Error("clusteredLights.allocateAtlas: the sun's cascades need the camera");
         if (cascades > slots * slots || cascades > 4) unshadowed.push(sun);
-        else place(sun, cascadeMatrices(lights[sun], camera, { cascades, shadowDistance, lambda, tileSize: atlasSize / slots, casterReach }).map((m) => ({ ...m, worldBias: 2 * m.worldTexel })));
+        else place(sun, cascadeMatrices(lights[sun], camera, { cascades, shadowDistance, lambda, tileSize: atlasSize / slots, casterReach }).map((m) => ({ ...m, worldBias: 2 * m.worldTexel, penumbra: (2 * m.radius + casterReach - 0.01) * Math.tan(lights[sun].softness || 0) / m.worldTexel, depthNear: 0, depthFar: 0 })));
     }
     const order = lights.map((l, i) => i).filter((i) => lights[i].shadow && !isSun(lights[i])).sort((a, b) => (lights[b].priority ?? 0) - (lights[a].priority ?? 0) || a - b);
     for (const i of order) {
         const need = lights[i].type === "spot" ? 1 : 6;
         if (next + need > slots * slots) { unshadowed.push(i); continue; }
-        place(i, faceMatrices(lights[i]));
+        const tile = atlasSize / slots; place(i, faceMatrices(lights[i]).map((m) => ({ ...m, penumbra: (lights[i].softness || 0) / (2 * Math.tan(m.fov / 2) / tile), depthNear: NEAR, depthFar: lights[i].range })));
     }
     return { faces, byLight, unshadowed };
+}
+
+/** The 16 taps of the soft shadows' blocker search and filter (a Poisson disc in the unit circle). */
+export const POISSON16 = Object.freeze([[-0.94201624, -0.39906216], [0.94558609, -0.76890725], [-0.09418410, -0.92938870], [0.34495938, 0.29387760], [-0.91588581, 0.45771432], [-0.81544232, -0.87912464], [-0.38277543, 0.27676845], [0.97484398, 0.75648379], [0.44323325, -0.97511554], [0.53742981, -0.47373420], [-0.26496911, -0.41893023], [0.79197514, 0.19090188], [-0.24188840, 0.99706507], [-0.81409955, 0.91437590], [0.19984126, 0.78641367], [0.14383161, -0.14100790]]);
+/** A soft shadow's penumbra, in atlas texels, for a receiver at tile depth zr behind blockers at mean tile depth zb (0..1 both): the shaders' formula before its clamp. */
+export function penumbraTexels(face, zr, zb) {
+    if (!(face.depthNear > 0)) return face.penumbra * (zr - zb);
+    const n = face.depthNear, f = face.depthFar, lin = (z) => (n * f) / (f - z * (f - n)), dr = lin(zr), db = lin(zb);
+    return (face.penumbra * (dr - db)) / (db * dr);
 }
 
 /** THE COOKIE ATLAS: 2 x 2 tiles of RGB, `size` square, row 0 at v = 0. Tile k = (k % 2, k >> 1). */
@@ -230,10 +246,10 @@ function packLights(lights, A, maxLights) {
     });
     return ld;
 }
-/** The face rows: 6 vec4s a face (the view-projection, the tile's rect, (world bias, split, 0, 0)). */
+/** The face rows: 6 vec4s a face (the view-projection, the tile's rect, (world bias, penumbra scale, near, far) -- near 0 for the sun's orthographic cascades). */
 function packFaces(A, maxFaces, transform = (m) => m) {
     const fd = new Float32Array(24 * maxFaces);
-    A.faces.forEach((f, k) => { fd.set(transform(f.viewProj), k * 24); fd.set(f.rect, k * 24 + 16); fd.set([f.worldBias, f.splitFar, 0, 0], k * 24 + 20); });
+    A.faces.forEach((f, k) => { fd.set(transform(f.viewProj), k * 24); fd.set(f.rect, k * 24 + 16); fd.set([f.worldBias, f.penumbra || 0, f.depthNear || 0, f.depthFar || 0], k * 24 + 20); });
     return fd;
 }
 const packCells = (C, N, maxPerCell, Typed) => { const cd = new Typed(N * (maxPerCell + 1)); for (let c = 0; c < N; c++) { cd[c * (maxPerCell + 1)] = C.counts[c]; for (let k = 0; k < C.counts[c]; k++) cd[c * (maxPerCell + 1) + 1 + k] = C.lists[c * maxPerCell + k]; } return cd; };
@@ -246,12 +262,30 @@ const build = (O, lights, camera) => {
 export const CLUSTERED_GLSL = `
 uniform highp sampler2D uClusterCells;   // R32F: row c = cell c; texel 0 its count, texels 1.. its light indices
 uniform highp sampler2D uClusterLights;  // RGBA32F: row i = light i, 9 texels (position and range; colour and type; direction and cos outer; cos inner, first face, faces, cookie; the cookie's matrix; its rect)
-uniform highp sampler2D uShadowFaces;    // RGBA32F: row f = atlas face f, 6 texels (the view-projection's columns; the tile's rect; world bias, cascade split)
+uniform highp sampler2D uShadowFaces;    // RGBA32F: row f = atlas face f, 6 texels (the view-projection's columns; the tile's rect; world bias, penumbra scale, near, far)
 uniform highp sampler2DShadow uShadowAtlas;
 uniform highp sampler2D uCookies;
 uniform vec3 uClusterMin, uClusterSize; uniform ivec3 uClusterDims; uniform int uClusterMaxPerCell, uLightCount, uClusterMode, uSunIndex, uSunCascades; uniform float uShadowBias, uAtlasTexel;
 uniform mat4 uClusterView; uniform vec4 uClusterProj;   // P00, P11, near, far
 uniform vec4 uCascadeSplits;
+#ifdef CLUSTERED_SOFT
+uniform highp sampler2D uShadowDepth;   // the atlas again, read raw (a sampler object without comparison) for the blocker search
+uniform float uMaxPenumbra;
+const vec2 CL_POISSON[16] = vec2[16](vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725), vec2(-0.09418410, -0.92938870), vec2(0.34495938, 0.29387760), vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464), vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379), vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420), vec2(-0.26496911, -0.41893023), vec2(0.79197514, 0.19090188), vec2(-0.24188840, 0.99706507), vec2(-0.81409955, 0.91437590), vec2(0.19984126, 0.78641367), vec2(0.14383161, -0.14100790));
+float clSoft(vec4 ex, vec4 r, vec2 uv, float z) {
+    vec2 lo = r.xy + vec2(uAtlasTexel * 0.5), hi = r.xy + r.zw - vec2(uAtlasTexel * 0.5), dim = vec2(textureSize(uShadowDepth, 0));
+    float nb = 0.0, sb = 0.0;
+    for (int k = 0; k < 16; k++) { vec2 q = clamp(uv + CL_POISSON[k] * uMaxPenumbra * uAtlasTexel, lo, hi); float d = texelFetch(uShadowDepth, ivec2(q * dim), 0).r; if (d < z) { nb += 1.0; sb += d; } }
+    if (nb == 0.0) return 1.0;
+    float zb = sb / nb, pen;
+    if (ex.z == 0.0) pen = ex.y * (z - zb);
+    else { float dr = ex.z * ex.w / (ex.w - z * (ex.w - ex.z)), db = ex.z * ex.w / (ex.w - zb * (ex.w - ex.z)); pen = ex.y * (dr - db) / (db * dr); }
+    pen = clamp(pen, 1.0, uMaxPenumbra);
+    float sum = 0.0;
+    for (int k = 0; k < 16; k++) sum += texture(uShadowAtlas, vec3(clamp(uv + CL_POISSON[k] * pen * uAtlasTexel, lo, hi), z));
+    return sum / 16.0;
+}
+#endif
 float clWindow(float d, float r) { float x = clamp(1.0 - pow(d / r, 4.0), 0.0, 1.0); return x * x / (d * d + 1.0); }
 int clCubeFace(vec3 v) { vec3 a = abs(v); if (a.x >= a.y && a.x >= a.z) return v.x >= 0.0 ? 0 : 1; if (a.y >= a.z) return v.y >= 0.0 ? 2 : 3; return v.z >= 0.0 ? 4 : 5; }
 float clShadow(vec3 p0, vec3 n, vec3 L, vec3 lp, bool sun, int first, int count) {
@@ -270,7 +304,11 @@ float clShadow(vec3 p0, vec3 n, vec3 L, vec3 lp, bool sun, int first, int count)
     vec3 s = q.xyz / q.w * 0.5 + 0.5;
     if (s.z >= 1.0) return 1.0;
     vec2 uv = r.xy + clamp(s.xy, vec2(0.0), vec2(1.0)) * r.zw; uv = clamp(uv, r.xy + vec2(uAtlasTexel * 0.5), r.xy + r.zw - vec2(uAtlasTexel * 0.5));
+#ifdef CLUSTERED_SOFT
+    return clSoft(ex, r, uv, s.z);
+#else
     return texture(uShadowAtlas, vec3(uv, s.z));
+#endif
 #endif
 }
 vec3 clCookie(int i, vec3 p) {
@@ -330,6 +368,7 @@ export function createClusteredLighting(gl, opts = {}) {
     let cookieTex = tex(1, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR, new Uint8Array([255, 255, 255, 255])), cookieSource = null;
     const atlas = tex(O.atlasSize, O.atlasSize, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+    const rawSampler = gl.createSampler(); gl.samplerParameteri(rawSampler, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.samplerParameteri(rawSampler, gl.TEXTURE_MAG_FILTER, gl.NEAREST); gl.samplerParameteri(rawSampler, gl.TEXTURE_COMPARE_MODE, gl.NONE);
     const fbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, atlas, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     const self = { options: O, clusters: null, atlas: null, lights: [], atlasTexture: atlas, camera: null };
     self.update = (lights, camera = null, cookies = null) => {
@@ -351,13 +390,14 @@ export function createClusteredLighting(gl, opts = {}) {
     self.bind = (program, firstUnit = 4) => {
         const u = (n) => gl.getUniformLocation(program, n), C = self.clusters || buildClusters([], O), view = C.mode === "view";
         [[cellsTex, "uClusterCells"], [lightsTex, "uClusterLights"], [facesTex, "uShadowFaces"], [atlas, "uShadowAtlas"], [cookieTex, "uCookies"]].forEach(([t, n], k) => { gl.activeTexture(gl.TEXTURE0 + firstUnit + k); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(u(n), firstUnit + k); });
+        if (u("uShadowDepth")) { gl.activeTexture(gl.TEXTURE0 + firstUnit + 5); gl.bindTexture(gl.TEXTURE_2D, atlas); gl.bindSampler(firstUnit + 5, rawSampler); gl.uniform1i(u("uShadowDepth"), firstUnit + 5); gl.uniform1f(u("uMaxPenumbra"), O.maxPenumbra); }   // CLUSTERED_SOFT: unit firstUnit + 5 keeps this sampler object
         gl.activeTexture(gl.TEXTURE0);
         gl.uniform3fv(u("uClusterMin"), Float32Array.from(C.min)); gl.uniform3fv(u("uClusterSize"), Float32Array.from(C.size)); gl.uniform3iv(u("uClusterDims"), Int32Array.from(C.dims));
         gl.uniform1i(u("uClusterMaxPerCell"), O.maxPerCell); gl.uniform1i(u("uLightCount"), self.lights.length); gl.uniform1f(u("uShadowBias"), O.bias); gl.uniform1f(u("uAtlasTexel"), 1 / O.atlasSize);
         gl.uniform1i(u("uClusterMode"), view ? 1 : 0); gl.uniform1i(u("uSunIndex"), self.sun ?? -1); gl.uniform1i(u("uSunCascades"), self.cascades || 0); gl.uniform4fv(u("uCascadeSplits"), Float32Array.from(self.splits || [0, 0, 0, 0]));
         gl.uniformMatrix4fv(u("uClusterView"), false, self.camera ? Float32Array.from(self.camera.view) : new Float32Array(16)); gl.uniform4f(u("uClusterProj"), view ? C.P00 : 1, view ? C.P11 : 1, view ? C.near : 0.1, view ? C.far : 100);
     };
-    self.destroy = () => { for (const t of [cellsTex, lightsTex, facesTex, atlas, cookieTex]) gl.deleteTexture(t); gl.deleteFramebuffer(fbo); };
+    self.destroy = () => { for (const t of [cellsTex, lightsTex, facesTex, atlas, cookieTex]) gl.deleteTexture(t); gl.deleteFramebuffer(fbo); gl.deleteSampler(rawSampler); };
     return self;
 }
 
@@ -366,11 +406,11 @@ export function createClusteredLighting(gl, opts = {}) {
 // the atlas's own pixel order, top row first, as setViewport takes it, so a point's place in its tile is (x * 0.5 + 0.5, 0.5 - y * 0.5). The cookie atlas is sampled at
 // (x * 0.5 + 0.5, y * 0.5 + 0.5) on both backends (its row 0 is v = 0 on both).
 export const ZO = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 1]);
-export function clusteredWGSL({ group = 1, brute = false, shadows = true } = {}) {
+export function clusteredWGSL({ group = 1, brute = false, shadows = true, soft = false } = {}) {
     return `
 struct CLLight { posRange: vec4f, colorType: vec4f, dirCosOuter: vec4f, cosInnerFaces: vec4f, cookie: mat4x4f, cookieRect: vec4f };
 struct CLFace { viewProj: mat4x4f, rect: vec4f, extra: vec4f };
-struct CLParams { minv: vec4f, size: vec4f, dims: vec4u, misc: vec4f, view: mat4x4f, proj: vec4f, sun: vec4f, splits: vec4f };   // misc = (bias, atlas texel, light count, max per cell); sun = (index or -1, cascades, view mode, 0)
+struct CLParams { minv: vec4f, size: vec4f, dims: vec4u, misc: vec4f, view: mat4x4f, proj: vec4f, sun: vec4f, splits: vec4f };   // misc = (bias, atlas texel, light count, max per cell); sun = (index or -1, cascades, view mode, max penumbra in texels)
 @group(${group}) @binding(0) var<uniform> clP: CLParams;
 @group(${group}) @binding(1) var<storage, read> clCells: array<u32>;
 @group(${group}) @binding(2) var<storage, read> clLights: array<CLLight>;
@@ -379,6 +419,20 @@ struct CLParams { minv: vec4f, size: vec4f, dims: vec4u, misc: vec4f, view: mat4
 @group(${group}) @binding(5) var clCmp: sampler_comparison;
 @group(${group}) @binding(6) var clCookies: texture_2d<f32>;
 @group(${group}) @binding(7) var clCookieSampler: sampler;
+${soft ? `var<private> CL_POISSON: array<vec2f, 16> = array<vec2f, 16>(vec2f(-0.94201624, -0.39906216), vec2f(0.94558609, -0.76890725), vec2f(-0.09418410, -0.92938870), vec2f(0.34495938, 0.29387760), vec2f(-0.91588581, 0.45771432), vec2f(-0.81544232, -0.87912464), vec2f(-0.38277543, 0.27676845), vec2f(0.97484398, 0.75648379), vec2f(0.44323325, -0.97511554), vec2f(0.53742981, -0.47373420), vec2f(-0.26496911, -0.41893023), vec2f(0.79197514, 0.19090188), vec2f(-0.24188840, 0.99706507), vec2f(-0.81409955, 0.91437590), vec2f(0.19984126, 0.78641367), vec2f(0.14383161, -0.14100790));
+fn clSoft(face: CLFace, uv: vec2f, z: f32) -> f32 {
+    let tx = clP.misc.y; let lo = face.rect.xy + vec2f(tx * 0.5); let hi = face.rect.xy + face.rect.zw - vec2f(tx * 0.5); let maxP = clP.sun.w; let dim = vec2f(textureDimensions(clAtlas));
+    var nb = 0.0; var sb = 0.0;
+    for (var k = 0; k < 16; k++) { let q = clamp(uv + CL_POISSON[k] * maxP * tx, lo, hi); let d = textureLoad(clAtlas, vec2i(q * dim), 0); if (d < z) { nb += 1.0; sb += d; } }
+    if (nb == 0.0) { return 1.0; }
+    let zb = sb / nb; let ex = face.extra; var pen = 0.0;
+    if (ex.z == 0.0) { pen = ex.y * (z - zb); }
+    else { let dr = ex.z * ex.w / (ex.w - z * (ex.w - ex.z)); let db = ex.z * ex.w / (ex.w - zb * (ex.w - ex.z)); pen = ex.y * (dr - db) / (db * dr); }
+    pen = clamp(pen, 1.0, maxP);
+    var sum = 0.0;
+    for (var k = 0; k < 16; k++) { sum += textureSampleCompareLevel(clAtlas, clCmp, clamp(uv + CL_POISSON[k] * pen * tx, lo, hi), z); }
+    return sum / 16.0;
+}` : ""}
 fn clWindow(d: f32, r: f32) -> f32 { let x = clamp(1.0 - pow(d / r, 4.0), 0.0, 1.0); return x * x / (d * d + 1.0); }
 fn clCubeFace(v: vec3f) -> u32 { let a = abs(v); if (a.x >= a.y && a.x >= a.z) { return select(1u, 0u, v.x >= 0.0); } if (a.y >= a.z) { return select(3u, 2u, v.y >= 0.0); } return select(5u, 4u, v.z >= 0.0); }
 fn clShadow(p0: vec3f, n: vec3f, L: vec3f, lp: vec3f, sun: bool, first: u32, count: u32) -> f32 {
@@ -395,7 +449,7 @@ fn clShadow(p0: vec3f, n: vec3f, L: vec3f, lp: vec3f, sun: bool, first: u32, cou
     if (s.z >= 1.0) { return 1.0; }
     let t = clamp(vec2f(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5), vec2f(0.0), vec2f(1.0));
     let h = vec2f(clP.misc.y * 0.5); let uv = clamp(face.rect.xy + t * face.rect.zw, face.rect.xy + h, face.rect.xy + face.rect.zw - h);
-    return textureSampleCompareLevel(clAtlas, clCmp, uv, s.z);
+    ${soft ? "return clSoft(face, uv, s.z);" : "return textureSampleCompareLevel(clAtlas, clCmp, uv, s.z);"}
 }
 fn clCookie(l: CLLight, p: vec3f) -> vec3f {
     let q = l.cookie * vec4f(p, 1.0);
@@ -459,7 +513,7 @@ export function createClusteredLightingGPU(device, opts = {}) {
         B.A.faces.forEach((f, k) => device.queue.writeBuffer(faceBuffers[k], 0, zo(f.viewProj)));
         const pf = new Float32Array(44), pu = new Uint32Array(pf.buffer);
         pf.set([...C.min, 0, ...C.size, 0], 0); pu.set([...C.dims, 0], 8); pf.set([O.bias, 1 / O.atlasSize, lights.length, O.maxPerCell], 12);
-        pf.set(camera ? Float32Array.from(camera.view) : new Float32Array(16), 16); pf.set([view ? C.P00 : 1, view ? C.P11 : 1, view ? C.near : 0.1, view ? C.far : 100], 32); pf.set([B.sun, B.cascades, view ? 1 : 0, 0], 36); pf.set(B.splits, 40);
+        pf.set(camera ? Float32Array.from(camera.view) : new Float32Array(16), 16); pf.set([view ? C.P00 : 1, view ? C.P11 : 1, view ? C.near : 0.1, view ? C.far : 100], 32); pf.set([B.sun, B.cascades, view ? 1 : 0, O.maxPenumbra], 36); pf.set(B.splits, 40);
         device.queue.writeBuffer(params, 0, pf);
         device.queue.writeBuffer(cells, 0, packCells(C, N, O.maxPerCell, Uint32Array)); device.queue.writeBuffer(lightsB, 0, packLights(lights, B.A, O.maxLights)); device.queue.writeBuffer(faces, 0, packFaces(B.A, maxFaces, zo));
         return { cells: N, overflow: C.overflow, faces: B.A.faces.length, unshadowed: B.A.unshadowed.length, cascades: B.cascades, space: O.space };
