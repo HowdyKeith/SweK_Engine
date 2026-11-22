@@ -48,6 +48,12 @@ The `render/denoise-layers-*.json` files (commit them on the branch, or paste th
 - the aimed set, its predicted gain, and the **measured** head to head;
 - its image against the f64 network (it must be within 1e-3; the run exits 1 otherwise).
 
+## What the rig found (2026-11-22)
+
+No mixed set: on the GTX 1080 r18t, and on the Intel r57p, already runs every layer within 5% of the fastest other kernel, and the head to head
+runs are level (0.99-1.07 x). The 1080's time is even across the layers; the Intel's is in the three hidden layers. `tools/ship/todo.mjs`'s
+`denoiser-slow-layers` has the numbers.
+
 ## What happens next
 
 If on a GPU the aimed set differs from the fastest whole set and wins its head to head, that mixed set is a candidate for the

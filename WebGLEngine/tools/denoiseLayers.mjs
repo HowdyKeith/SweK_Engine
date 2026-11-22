@@ -52,6 +52,10 @@ export function aim(stages, nLayers, kernels = null, margin = MARGIN) {
     return { best, bestMs: total(best), perLayer, mixed, predictedMs: predicted, predictedGain: total(best) / predicted, slowest, uniform: new Set(mixed).size === 1 };
 }
 
+/** How far a mixed set's image may sit from the f64 network: the loosest bound of the sets it uses -- the tree's own (render/denoiseDevice.mjs): r41h's half-precision
+ *  kernels F16_IMAGE_TOL, r57p's f16 storage F16S_IMAGE_TOL_RTZ (both rig GPUs truncate it, section 141), every f32 set 1e-3. Pure. */
+export const F32_IMAGE_TOL = 1e-3;
+export const imageTolFor = (sets) => Math.max(...[].concat(sets).map((s) => (DD.F16_SETS.includes(s) ? DD.F16_IMAGE_TOL : s === "r57p" ? DD.F16S_IMAGE_TOL_RTZ : F32_IMAGE_TOL)));
 /** The whole measurement on `gpu` (a node-webgpu GPU object). Returns the report. */
 export async function measure(gpu, net, { size = 512, rounds = 5, compiler = null, aimAt = null, trace = () => {} } = {}) {
     const first = await gpu.requestAdapter(); if (!first) throw new Error("denoiseLayers: node-webgpu gave no adapter");
@@ -72,7 +76,7 @@ export async function measure(gpu, net, { size = 512, rounds = 5, compiler = nul
         for (let r = 0; r < rounds; r++) for (const k of r % 2 ? ["best", "mixed"] : ["mixed", "best"]) { trace(`head to head, round ${r}: ${k}`); const t = await D[k].time(x, { warmup: r ? 1 : 2, minReps: 3, maxReps: 10, budgetMs: 2000 }); if (t.gpu) got[k].push(...t.gpu); }
         const ym = (await D.mixed.run(x)).y, yb = (await D.best.run(x)).y, y64 = denoise(net, x, H, W).y;
         let w64 = 0, wb = 0; for (let i = 0; i < y64.length; i++) { w64 = Math.max(w64, Math.abs(ym[i] - y64[i]) / (Math.abs(y64[i]) + 1e-6)); wb = Math.max(wb, Math.abs(ym[i] - yb[i]) / (Math.abs(yb[i]) + 1e-6)); }
-        image = { worstVsF64: w64, worstVsBest: wb, finite: ym.every(Number.isFinite), built: D.mixed.layers.map((l) => l.kernel), wanted: DD.deviceLayers(net, A.mixed).map((l) => l.kernel) };
+        image = { worstVsF64: w64, worstVsBest: wb, finite: ym.every(Number.isFinite), tol: imageTolFor(A.mixed), within: ym.every(Number.isFinite) && w64 <= imageTolFor(A.mixed), built: D.mixed.layers.map((l) => l.kernel), wanted: DD.deviceLayers(net, A.mixed).map((l) => l.kernel) };
         D.mixed.destroy(); D.best.destroy();
     } finally { dev.destroy(); }
     const m = DD.summarize(got.mixed), b = DD.summarize(got.best);
@@ -88,7 +92,8 @@ export function reportLines(r) {
     for (const l of r.aim.perLayer) L.push(`  L${l.layer}: aimed at ${l.set}'s ${l.kernel} (${l.ms.toFixed(3)} ms; fastest ${l.fastest}); ${Object.entries(l.bySet).sort((p, q) => p[1] - q[1]).map(([s, v]) => `${s} ${v.toFixed(3)}`).join(", ")}`);
     L.push(`  THE ${r.aim.forced ? "ASKED-FOR (--aim)" : "AIMED"} SET: [${r.aim.mixed.join(", ")}]${r.aim.uniform && !r.aim.forced ? ` -- ${r.aim.best} already runs every layer within ${100 * MARGIN}% of the fastest other kernel` : ""}; predicted ${r.aim.predictedMs ? r.aim.predictedMs.toFixed(3) + " ms, " + r.aim.predictedGain.toFixed(3) + " x the fastest whole set" : "(a set not timed whole)"}`);
     const h = r.headToHead; L.push(`  HEAD TO HEAD, ${h.rounds} rounds taking turns: aimed ${h.mixed ? h.mixed.median.toFixed(3) : "?"} ms, ${r.aim.best} ${h.best ? h.best.median.toFixed(3) : "?"} ms -- ${h.gain ? h.gain.toFixed(3) + " x" : "not measured"}`);
-    L.push(`  its image: worst relative difference ${r.image.worstVsF64.toExponential(2)} from the f64 network on the CPU, ${r.image.worstVsBest.toExponential(2)} from ${r.aim.best}'s${r.image.finite ? "" : "; NOT FINITE"}`);
+    const tol = r.image.tol ?? imageTolFor(r.aim.mixed);
+    L.push(`  its image: worst relative difference ${r.image.worstVsF64.toExponential(2)} from the f64 network on the CPU (bound ${tol.toExponential(1)}: ${r.image.finite && r.image.worstVsF64 <= tol ? "within" : "OUTSIDE"}), ${r.image.worstVsBest.toExponential(2)} from ${r.aim.best}'s${r.image.finite ? "" : "; NOT FINITE"}`);
     return L;
 }
 
@@ -114,5 +119,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     fs.writeFileSync(out, JSON.stringify(r, null, 1) + "\n");
     for (const l of reportLines(r)) console.log(l);
     console.log(`wrote ${out}`);
-    GPU.exitCleanly(r.image.finite && r.image.worstVsF64 < 1e-3 ? 0 : 1);
+    GPU.exitCleanly(r.image.within ? 0 : 1);
 }
