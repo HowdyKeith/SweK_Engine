@@ -149,12 +149,29 @@ console.log("\n3. *** THE SCANNER MUST NOT CARRY STATE BETWEEN CALLS ***");
 }
 
 // ---------------------------------------------------------------------------
+console.log("\n3b. *** A SPLICE IS READ, NOT SKIPPED (2026-11-22) ***");
+{
+    const tpl = "@group(0) @binding(0) var<storage, read> a: array<f32>;\n@group(0) @binding(1) var<storage, read> b: array<f32>;\n@compute @workgroup_size(1) fn main() { let x = a[0]; ${HELP} }";
+    const mk = (help, extra = "") => `${extra}const S = \`${tpl.replace("${HELP}", help)}\`;`;
+    const viaConst = extractShaders("const HELP = `let y = b[0];`;\n" + mk("${HELP}"))[0], viaImport = extractShaders(mk("${HELP}", 'import { HELP } from "./h.mjs";\n'), { imported: () => "export const HELP = `let y = b[0] + ${2.0};`;" })[0];
+    const unseen = extractShaders(mk("${makeIt()}"))[0], none = extractShaders(mk(""))[0];
+    ok("!! a splice naming a template constant of the same file is that constant's text: binding 1, used only there, is reached", viaConst && !viaConst.opaque && droppedBindings(viaConst.code).length === 0);
+    ok("!! ...and one imported by a relative path is read from that file (its own number splice a neutral token, so it is marked unseen, but the binding is still seen used)", viaImport && viaImport.opaque && droppedBindings(viaImport.code).length === 0);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wgslsplice-"));
+    const auto = 'device.createComputePipeline({ layout: "auto", compute: {} });\n';
+    fs.writeFileSync(path.join(tmp, "page.mjs"), auto + mk("${makeIt()}")); fs.writeFileSync(path.join(tmp, "plain.mjs"), auto + mk("").replace("const S", "const T"));
+    const th = scanTree(tmp); fs.rmSync(tmp, { recursive: true, force: true });
+    ok("!! IN THE TREE SCAN a drop in an opaque shader is UNVERIFIABLE (said, not a hit and not a pass) and a drop in a seen one is a hit", th.length === 1 && th[0].shader === "T" && th.unverifiable.length === 1 && th.unverifiable[0].shader === "S", JSON.stringify({ hits: th.map((h) => h.shader), unverifiable: (th.unverifiable || []).map((h) => h.shader) }));
+    ok("!! a splice the scan cannot read marks the shader OPAQUE, and with no splice the drop is still a drop", unseen && unseen.opaque && droppedBindings(unseen.code).map((d) => d.name).join() === "b" && none && !none.opaque && droppedBindings(none.code).map((d) => d.name).join() === "b");
+}
+
 console.log("\n4. *** THE TREE: NO PIPELINE MAY LOSE A BINDING TO ITS OWN AUTO LAYOUT ***");
 {
     const hits = scanTree(ENG);
     ok("no shader drops a declared binding under `layout: \"auto\"`", hits.length === 0,
        hits.length ? hits.map((h) => `${h.file}:${h.shader} (${h.kind}) drops ` + h.dropped.map((d) => d.binding + ":" + d.name).join("/")).join(" | ") : "0 hits");
     report("files carrying WGSL bindings were parsed; hits are reported per pipeline, not per entry point");
+    if (hits.unverifiable.length) report("UNVERIFIABLE (part of the shader is a splice the scan cannot read, so a binding it does not see used may be used there)", hits.unverifiable.map((h) => `${h.file}:${h.shader} ${h.dropped.map((d) => d.binding + ":" + d.name).join("/")}`).join(" | "));
 }
 
 // ---------------------------------------------------------------------------
@@ -230,3 +247,7 @@ console.log("\n6. *** SABOTAGE: PUT THE SHIPPED BUG BACK AND THE SCAN MUST FIND 
 
 console.log("\n" + (fails ? `${fails} FAILED` : "ALL PASS"));
 process.exit(fails ? 1 : 0);
+
+// SABOTAGE LOG (2026-11-22, the splice reading of section 3b): 4 mutants of tools/ship/wgslAutoLayout.mjs, each in a hard-linked copy of the tree: ALL 4 RED (a splice
+// skipped, an opaque shader's drop silently passed -- GREEN at first, as the tree has no such drop; the temp-tree row makes one --, a splice never marking the shader opaque,
+// relative imports ignored).
