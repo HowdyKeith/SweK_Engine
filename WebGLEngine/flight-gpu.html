@@ -51,6 +51,9 @@ import { tacticsPanel, drawPanel } from "/render/brainPanel.mjs";   // the selec
 import { mountTacticsPanel } from "/ui/tacticsPanel.mjs";   // v4839 -- Load Tactics: brain/tacticsRoster.mjs behind two selects (the sim below reads roster.weights("A"|"B"))
 import { createESBox3D } from "/physics/esBox3d.js";
 import { box3d } from "/physics/box3d/box3dLoader.js";
+import { createSmaaGPU } from "/render/smaaPassGPU.mjs";   // 2026-11-22: ?aa=smaa | t2x (T2x reprojected by this page's own depth buffer, with disocclusion)
+import { jitterProjection } from "/render/jitter.mjs";
+import { mat4Invert } from "/render/motionVectors.mjs";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
 import { installRecorder } from "/ui/canvasRecorder.js";
 installRecorder();
@@ -296,6 +299,8 @@ fn disk(r: f32, pos: vec3f, rs: f32) -> vec3f {
 }
 `;
 
+const AA_MODE = ["smaa", "t2x"].includes(new URLSearchParams(location.search).get("aa")) ? new URLSearchParams(location.search).get("aa") : null, AA_REPROJECT = new URLSearchParams(location.search).get("reproject") !== "0";
+let sceneFormat, aa = null, aaPrevVP = null; const aaState = window.__flightAA = { aa: AA_MODE || "off", frames: 0, carried: 0, reproject: null };
 let device, ctx, format, uBuf, bind, shipPipe, gridPipe, shotPipe, fxPipe, meshBuf, instBuf, shotInst, shotCol, fxInst, fxCol, depthTex;
 let bhPipe, bhUBO, bhBind, sceneTex, sceneView, depthView, sampler;
 const bhCam = new Float32Array(36);   // 5 vec4 camera + mat4 viewProj
@@ -347,6 +352,7 @@ async function initGPU() {
   ctx = canvas.getContext("webgpu"); if (!ctx) { fallback("getContext('webgpu') null."); return false; }
   format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: "opaque" });
+  sceneFormat = AA_MODE ? "rgba8unorm" : format;   // with SMAA the scene is drawn into its input
 
   uBuf = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   meshBuf = device.createBuffer({ size: shipMesh().byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
@@ -379,12 +385,12 @@ async function initGPU() {
         { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
         { arrayStride: 32, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }, { shaderLocation: 2, offset: 16, format: "float32x4" }] },
       ] },
-      fragment: { module: modS, entryPoint: "fs", targets: [{ format }] },
+      fragment: { module: modS, entryPoint: "fs", targets: [{ format: sceneFormat }] },
     });
     gridPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
       vertex: { module: modG, entryPoint: "vs" },
-      fragment: { module: modG, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modG, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     shotPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
@@ -392,7 +398,7 @@ async function initGPU() {
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
       ] },
-      fragment: { module: modH, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modH, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     fxPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
@@ -400,9 +406,10 @@ async function initGPU() {
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
       ] },
-      fragment: { module: modFX, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modFX, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
   } catch (e) { fallback("pipeline failed: " + e.message); return false; }
+  if (AA_MODE) aa = createSmaaGPU(device, { width: 1, height: 1, outputFormat: format, temporal: AA_MODE === "t2x" });
   bind = device.createBindGroup({ layout: sceneBGL, entries: [{ binding: 0, resource: { buffer: uBuf } }] });
   bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
@@ -419,7 +426,7 @@ function resizeTargets() {
   if (canvas.width !== w || canvas.height !== h || !depthTex) {
     canvas.width = w; canvas.height = h;
     if (depthTex) depthTex.destroy(); depthTex = device.createTexture({ size: [w, h], format: "depth32float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
-    if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [w, h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [w, h], format: sceneFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
     sceneView = sceneTex.createView(); depthView = depthTex.createView();
     bhBind = device.createBindGroup({ layout: bhPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bhUBO } }, { binding: 1, resource: sampler }, { binding: 2, resource: sceneView }, { binding: 3, resource: depthView }] });
   }
@@ -451,7 +458,9 @@ function render() {
     eye = [me.x - hv.x * 520 + 60, 260, me.y - hv.y * 520 + 60]; center = [me.x + hv.x * 300, 40, me.y + hv.y * 300];
   } else { theta += 0.0016; const R = 2900, hgt = 1500; eye = [ccx + Math.cos(theta) * R, hgt, ccy + Math.sin(theta) * R]; center = [ccx, 0, ccy]; }
   const view = lookAt(eye, center, [0, 1, 0]); const proj = perspZO(52 * Math.PI / 180, canvas.width / canvas.height, 12, 12000);
-  device.queue.writeBuffer(uBuf, 0, mul(proj, view));
+  const vp = mul(proj, view), useAA = aa && !bhOn;
+  if (useAA) { aa.resize(canvas.width, canvas.height); const [jx, jy] = aa.jitter(); device.queue.writeBuffer(uBuf, 0, aa.temporal ? mul(jitterProjection(proj, jx, jy, canvas.width, canvas.height), view) : vp); }
+  else device.queue.writeBuffer(uBuf, 0, vp);
   if (bhOn) {
     let fx0 = center[0] - eye[0], fy0 = center[1] - eye[1], fz0 = center[2] - eye[2]; const fl = Math.hypot(fx0, fy0, fz0) || 1; fx0 /= fl; fy0 /= fl; fz0 /= fl;   // forward
     let rx = -fz0, ry = 0, rz = fx0; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;                                                    // right = norm(cross(fwd,(0,1,0)))
@@ -479,7 +488,7 @@ function render() {
     pb.setPipeline(bhPipe); pb.setBindGroup(0, bhBind); pb.draw(3); pb.end();
   } else {
     const pass = enc.beginRenderPass({
-      colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
+      colorAttachments: [{ view: useAA ? aa.inputView : ctx.getCurrentTexture().createView(), clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
       depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" },
     });
     pass.setBindGroup(0, bind);
@@ -488,7 +497,13 @@ function render() {
     if (nShot) { pass.setPipeline(shotPipe); pass.setVertexBuffer(0, shotInst); pass.setVertexBuffer(1, shotCol); pass.draw(6, nShot); }
     if (nFx) { pass.setPipeline(fxPipe); pass.setVertexBuffer(0, fxInst); pass.setVertexBuffer(1, fxCol); pass.draw(6, nFx); }
     pass.end();
+    if (useAA) {   // the camera moves every frame here: the history is carried by this frame's depth buffer and last frame's matrix, or dropped (&reproject=0)
+      const reproject = aa.temporal && AA_REPROJECT && aaPrevVP ? { invViewProj: mat4Invert(vp), prevViewProj: aaPrevVP, depth: depthView } : null;
+      aa.encode(enc, ctx.getCurrentTexture().createView(), { moved: true, reproject });
+      aaState.frames++; if (aa.lastUsedHistory) aaState.carried++; aaState.reproject = aa.temporal ? (AA_REPROJECT ? "depth" : "off") : null;
+    }
   }
+  aaPrevVP = useAA ? vp : null;   // the black hole's lensing pass draws without SMAA: the history starts again after it
   device.queue.submit([enc.finish()]);
 }
 

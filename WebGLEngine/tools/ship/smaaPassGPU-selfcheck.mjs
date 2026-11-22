@@ -15,6 +15,10 @@
 //                      (14.19 against 14.68: a small win, as the bilinear re-read of a history a third of a pixel off softens it), without reprojection it is SMAA 1x
 //                      to the bit, and no flat pixel ghosts; a depth texture of the plane's depth is the plane's picture to the bit, a nearer one is not; after a
 //                      slide of 0.6 every pixel whose last place is off the screen takes no history
+//   7  DEPTH AND DISOCCLUSION (2026-11-22) a page's own depth32float depth buffer is read as the depth; a red card nearer the eye than one-pixel stripes, the camera
+//                      sliding: every stripe pixel the card has just uncovered takes no history (SMAA 1x to the bit), while with the test off the red leaks in;
+//                      wherever the same surface was there last frame the picture is the same with the test on or off; a last frame with no depth buffer judges
+//                      nothing. flight-gpu.html ?aa=t2x carries its history by its depth buffer every frame of a moving camera (&reproject=0: never)
 //   5  THE PAGE        splat-gpu.html ?aa=smaa|t2x draws the same cloud and says so; ?aa=t2x reprojects by the target plane; with ?spin the history is kept across
 //                      the moves, with &reproject=0 never
 //
@@ -146,6 +150,22 @@ window.__offscreen = async (A, B, inv, prev, depth) => {
     draw(one.inputView, new Float32Array(B)); enc = device.createCommandEncoder(); one.encode(enc, out.createView()); device.queue.submit([enc.finish()]); res.one = Array.from(await read(out, W, H));
     return res;
 };
+window.__disocc = async (A, B, inv, prev, wrongPlane) => {   // A and B: [jittered xyz-rgba triangles for phase 0, for phase 1]; B drawn reprojected from A, with a real depth buffer
+    const mod = device.createShaderModule({ code: "struct V { @builtin(position) p: vec4f, @location(0) c: vec4f }; struct In { @location(0) p: vec3f, @location(1) c: vec4f }; @vertex fn vs(i: In) -> V { var o: V; o.p = vec4f(i.p, 1.0); o.c = i.c; return o; } @fragment fn fs(v: V) -> @location(0) vec4f { return v.c; }" });
+    const tri3 = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs", buffers: [{ arrayStride: 28, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }, { shaderLocation: 1, offset: 12, format: "float32x4" }] }] }, fragment: { module: mod, entryPoint: "fs", targets: [{ format: "rgba8unorm" }] }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
+    const depth = device.createTexture({ size: [W, H], format: "depth32float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    const draw3 = (view, data) => { const buf = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }); device.queue.writeBuffer(buf, 0, data); const enc = device.createCommandEncoder(), rp = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: "clear", clearValue: [0.1, 0.12, 0.15, 1], storeOp: "store" }], depthStencilAttachment: { view: depth.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" } }); rp.setPipeline(tri3); rp.setVertexBuffer(0, buf); rp.draw(data.length / 7); rp.end(); device.queue.submit([enc.finish()]); };
+    const out = target(W, H), res = {}, errs = [];
+    device.pushErrorScope("validation");
+    for (const [k, opts] of [["on", { temporal: true }], ["off", { temporal: true, disocclusion: 0 }], ["one", {}], ["onPlane", { temporal: true }], ["offPlane", { temporal: true, disocclusion: 0 }]]) {
+        const pass = createSmaaGPU(device, { width: W, height: H, ...opts });
+        if (k === "one") { draw3(pass.inputView, new Float32Array(B[1])); const enc = device.createCommandEncoder(); pass.encode(enc, out.createView()); device.queue.submit([enc.finish()]); }
+        else for (const [f, F] of [[0, A], [1, B]]) { draw3(pass.inputView, new Float32Array(F[f])); const enc = device.createCommandEncoder(); pass.encode(enc, out.createView(), { moved: f === 1, reproject: { invViewProj: inv, prevViewProj: prev, depth: f === 0 && k.endsWith("Plane") ? wrongPlane : depth.createView() } }); /* frame A too: its depth is what B judges by */ device.queue.submit([enc.finish()]); }
+        res[k] = Array.from(await read(out, W, H));
+    }
+    const e = await device.popErrorScope(); if (e) errs.push(e.message);
+    return { ...res, errs };
+};
 window.__probe = async (depth, w, h, inv, prev) => {
     const code = SMAA_REPROJECT_WGSL + "\\n@group(0) @binding(0) var<storage, read> D: array<f32>; @group(0) @binding(1) var<storage, read_write> O: array<f32>; struct M { a: mat4x4f, b: mat4x4f }; @group(0) @binding(2) var<uniform> MM: M;\\n@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) { let i = g.x; if (i >= " + (w * h) + "u) { return; } let p = vec2i(i32(i % " + w + "u), i32(i / " + w + "u)); let r = reprojectUV(p, vec2i(" + w + ", " + h + "), D[i], MM.a, MM.b); O[i * 3u] = r.x; O[i * 3u + 1u] = r.y; O[i * 3u + 2u] = r.z; }";
     const pipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } });
@@ -183,11 +203,34 @@ await section(async () => {
     const mvB = motionVectorsCPU(new Float32Array(W * H).fill(planeB), W, H, mat4Invert(vB), vA); let outside = 0, outsideSame = true, insideChanged = 0;
     for (let i = 0; i < W * H; i++) { const u = (i % W + 0.5) / W + mvB.data[i * 4], same = [0, 1, 2].every((c) => off.t[i * 4 + c] === off.one[i * 4 + c]); if (u < 0 || u > 1) { outside++; if (!same) outsideSame = false; } else if (!same) insideChanged++; }
     const run = await p.evaluate(([fr, tt]) => window.__run(fr, tt), [frames, frames.at(-1).plain]);
+    // DISOCCLUSION: one-pixel black and white stripes on the plane z = 0, a red card at z = 1.2 nearer the eye; the camera slides 0.3, so the card moves twice as far on
+    // the screen as the stripes behind it and uncovers a band of them. A projection with depth 0 to 1 (the depth buffer holds NDC depth as it is)
+    const ZO = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 1]), vpZ = (cx) => mat4Multiply(ZO, vpAt(cx)), zA = vpZ(0), zB = vpZ(0.3), FG = [-0.25, 0.25, -0.3, 0.3, 1.2];
+    const quad = (vp, x0, x1, y0, y1, z, c, jx, jy) => [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]].flatMap(([x, y]) => { const q = transform4(vp, x, y, z, 1); return [q[0] / q[3] + 2 * jx / W, q[1] / q[3] - 2 * jy / H, q[2] / q[3], ...c]; });
+    const scene = (vp, [jx, jy]) => { const v = [], sw = 2.5 / 73.2; for (let k = 0, x = -3; x < 3; k++, x += sw) v.push(...quad(vp, x, x + sw, -2, 2, 0, k & 1 ? [1, 1, 1, 1] : [0, 0, 0, 1], jx, jy)); v.push(...quad(vp, FG[0], FG[1], FG[2], FG[3], FG[4], [1, 0, 0, 1], jx, jy)); return v; };
+    const J = [[0.25, -0.25], [-0.25, 0.25]], dz = await p.evaluate(([a, b, i2, pv]) => window.__disocc(a, b, i2, pv), [J.map((j) => scene(zA, j)), J.map((j) => scene(zB, j)), Array.from(mat4Invert(zB)), Array.from(zA), (() => { const q = transform4(zA, 0, 0, 1.6, 1); return q[2] / q[3]; })()]);
+    const rectPx = (vp) => { const c = [[FG[0], FG[2]], [FG[1], FG[3]]].map(([x, y]) => { const q = transform4(vp, x, y, FG[4], 1); return [(q[0] / q[3] + 1) / 2 * W, (1 - q[1] / q[3]) / 2 * H]; }); return { x0: Math.min(c[0][0], c[1][0]), x1: Math.max(c[0][0], c[1][0]), y0: Math.min(c[0][1], c[1][1]), y1: Math.max(c[0][1], c[1][1]) }; };
+    const inR = (r, x, y, m) => x > r.x0 + m && x < r.x1 - m && y > r.y0 + m && y < r.y1 - m, outR = (r, x, y, m) => x < r.x0 - m || x > r.x1 + m || y < r.y0 - m || y > r.y1 + m;
+    const rA = rectPx(zA), rB = rectPx(zB), dBg = (() => { const q = transform4(zB, 0.3, 0, 0, 1); return q[2] / q[3]; })(), dFg = (() => { const q = transform4(zB, 0.3, 0, FG[4], 1); return q[2] / q[3]; })();
+    const mvBg = motionVectorsCPU(new Float32Array(W * H).fill(dBg), W, H, mat4Invert(zB), zA), mvFg = motionVectorsCPU(new Float32Array(W * H).fill(dFg), W, H, mat4Invert(zB), zA);
+    let revealed = 0, revealedIsOne = true, leaked = 0, steady = 0, steadySame = true;
+    const same = (a, b, i) => [0, 1, 2].every((c) => a[i * 4 + c] === b[i * 4 + c]);
+    for (let i = 0; i < W * H; i++) {
+        const x = i % W + 0.5, y = Math.floor(i / W) + 0.5;
+        if (outR(rB, x, y, 2)) { const px = x + mvBg.data[i * 4] * W, py = y + mvBg.data[i * 4 + 1] * H;
+            if (inR(rA, px, py, 2)) { revealed++; if (!same(dz.on, dz.one, i)) revealedIsOne = false; if (!same(dz.off, dz.one, i)) leaked++; }
+            else if (outR(rA, px, py, 2)) { steady++; if (!same(dz.on, dz.off, i)) steadySame = false; } }
+        else if (inR(rB, x, y, 2)) { const px = x + mvFg.data[i * 4] * W, py = y + mvFg.data[i * 4 + 1] * H; if (inR(rA, px, py, 2)) { steady++; if (!same(dz.on, dz.off, i)) steadySame = false; } }
+    }
     await browser.close(); srv.close();
     let worst = 0, validSame = true; for (let i = 0; i < w * h; i++) { const u = (i % w + 0.5) / w, v = (Math.floor(i / w) + 0.5) / h; if ((g[i * 3 + 2] > 0.5) !== (cpu.valid[i] === 1)) validSame = false; if (cpu.valid[i]) worst = Math.max(worst, Math.abs(g[i * 3] - (u + cpu.data[i * 4])), Math.abs(g[i * 3 + 1] - (v + cpu.data[i * 4 + 1]))); }
     ok("!! THE REPROJECTION IS motionVectorsCPU's: at every pixel of a 32 x 20 frame with random depths and a real perspective pair, where it says a pixel was last frame agrees within 1e-5 of a frame, and so does whether it had one", validSame && worst < 1e-5 && pe.length === 0, `worst ${worst.toExponential(2)} of a frame; ${pe.slice(0, 1).join("")}`);
     ok("!! ...and where it was BEHIND the last eye it says there is no history, as motionVectorsCPU does", behind > 50 && behind < w * h && behindSame, `${behind} of ${w * h} pixels behind`);
     ok("!! WHAT WAS OFF THE LAST FRAME TAKES NO HISTORY: after a slide of 0.6, every pixel whose last place is off the screen is SMAA 1x of this frame to the bit, while the rest took the (red) history in", outside > 500 && outsideSame && insideChanged > 500, `${outside} off-screen, ${insideChanged} of the rest changed by the history`);
+    ok("!! THE PAGE'S OWN DEPTH BUFFER (depth32float) IS READ AS THE DEPTH, with no validation error", dz.errs.length === 0 && dz.on.length === W * H * 4, dz.errs.join("; "));
+    ok("!! DISOCCLUSION: where the card has just uncovered the stripes behind it, every pixel takes NO history -- SMAA 1x of this frame to the bit -- while with the test off the card's red leaks into some of them through the stripes' wide clamp", revealed > 100 && revealedIsOne && leaked > 20, `${revealed} uncovered pixels; with the test off ${leaked} of them differ from SMAA 1x`);
+    ok("!! ...and it is judged only when the LAST frame had a depth buffer too: a last frame given one plane of depth (here a wrong one, nearer than everything) judges nothing -- the picture is the test-off picture to the bit", dz.onPlane.every((v, i) => v === dz.offPlane[i]));
+    ok("!! ...and it rejects nothing it should not: wherever the same surface was there last frame (the stripes away from the card, the card's own middle) the picture is the same with the test on or off", steady > 3000 && steadySame, `${steady} pixels`);
     ok("!! A PANNING CAMERA (a third of a pixel a frame, 8 frames): T2x with reprojection keeps its history and lands nearer the truth than SMAA 1x; without it the history is dropped every frame and the picture is SMAA 1x of the same jittered frame, to the bit", run.re < run.one && run.dropIsOne && run.edgePixels > 200, `aliased ${run.alias.toFixed(2)}, SMAA 1x ${run.one.toFixed(2)}, T2x dropping ${run.drop.toFixed(2)}, T2x reprojected ${run.re.toFixed(2)}`);
     ok("!! a depth TEXTURE holding the plane's depth at every pixel gives the plane's picture to the bit (the per-pixel path reads what the uniform path is given), and one holding a nearer depth does not", run.texIsPlane && run.badDiffers);
     ok("!! ...and it ghosts nothing: no pixel whose 5 x 5 neighbourhood is one colour is more than 2 levels from it (the history is clamped to the current 3 x 3)", run.reFarChanged === 0 && run.flats > 5000, `${run.reFarChanged} of ${run.flats} pixels`);
@@ -203,7 +246,11 @@ await section(async () => {
         await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=20000&still=4${q}`); await p.waitForFunction(() => window.__splatGpu && (window.__splatGpu.stopped || window.__splatGpu.error), null, { timeout: 120000 });
         const r = await p.evaluate(async () => { const s = window.__splatGpu; return { jit: s.aaJitter || null, re: s.aaReproject ?? null, carried: s.aaCarried || 0, aa: s.aa, backend: s.backend, error: s.error, hud: document.getElementById("hud").textContent, cap: s.error ? null : await s.capture() }; }); await p.close(); return { ...r, errors }; };
     const off = await open(""), on = await open("&aa=smaa"), t2 = await open("&aa=t2x"), t2n = await open("&aa=t2x&reproject=0"), sp = await open("&aa=t2x&spin=0.004"), spn = await open("&aa=t2x&spin=0.004&reproject=0");
+    const flight = async (q) => { const p = await browser.newPage({ viewport: { width: 480, height: 300 } }), errors = []; p.on("pageerror", (e) => errors.push(e.message)); await p.goto(`http://127.0.0.1:${srv.address().port}/flight-gpu.html${q}`);
+        await p.waitForFunction(() => window.__flightAA && window.__flightAA.frames >= 12, null, { timeout: 90000 }).catch(() => {}); const r = await p.evaluate(() => ({ ...window.__flightAA })); await p.close(); return { ...r, errors }; };
+    const fS = await flight("?aa=smaa"), fT = await flight("?aa=t2x"), fN = await flight("?aa=t2x&reproject=0"), fO = await flight("");
     await browser.close(); srv.close();
+    ok("!! flight-gpu.html ?aa=t2x (2026-11-22): the camera moves every frame and the history is KEPT, carried by the page's own depth buffer; &reproject=0 never keeps it; ?aa=smaa has none to keep; without ?aa the page draws as before; no page error", [fS, fT, fN].every((x) => x.frames >= 12) && fT.reproject === "depth" && fT.carried >= fT.frames - 3 && fN.carried === 0 && fN.reproject === "off" && fS.carried === 0 && fO.aa === "off" && [fS, fT, fN, fO].every((x) => x.errors.length === 0), JSON.stringify([fS, fT, fN, fO].map((x) => [x.aa, x.frames, x.carried, x.reproject, x.errors[0] || ""])));
     const diff = (a, b) => { let d = 0; for (let k = 0; k < a.cap.grid.length; k++) d += Math.abs(a.cap.grid[k] - b.cap.grid[k]); return d / a.cap.grid.length; };
     const pics = [off, on, t2].every((x) => x.cap && x.backend === "webgpu" && !x.error && x.errors.length === 0);
     ok("!! ?aa=smaa and ?aa=t2x draw the splats through SMAA on WebGPU and say so, with no page error, and the picture is the same cloud (within 4 levels a sample of the plain one, lit alike)", pics && on.aa === "smaa" && t2.aa === "t2x" && /SMAA(?! T2x)/.test(on.hud) && /SMAA T2x/.test(t2.hud) && off.aa === "off" && on.jit && on.jit.join() === "0,0" && t2.jit && Math.abs(t2.jit[0]) === 0.25 && Math.abs(t2.jit[1]) === 0.25 && diff(off, on) < 4 && diff(off, t2) < 4 && Math.abs(on.cap.lit - off.cap.lit) < 0.05, pics ? `smaa ${diff(off, on).toFixed(2)}, t2x ${diff(off, t2).toFixed(2)} levels a sample from the plain picture` : JSON.stringify([off, on, t2].map((x) => ({ aa: x.aa, error: x.error, errors: x.errors.slice(0, 1) }))));
@@ -224,3 +271,8 @@ process.exit(fails === 0 ? 0 : 1);
 // the slide of 0.6 over stripes now catches it --, the two matrices swapped, a move dropping the history even when reprojecting, the reproject flag never set,
 // lastUsedHistory always true); 4 of splat-gpu.html (reproject never passed -- GREEN at first, the page check read only the label; ?spin and the carried count now
 // show it --, ?reproject=0 ignored, the last frame's matrix never kept, every frame counted as still).
+// 2026-11-22, DEPTH AND DISOCCLUSION: 10 more, 9 RED. 7 of render/smaaPassGPU.mjs: never rejecting, rejecting the farther instead of the nearer, the depth not
+// kept for the next frame, last frame's matrix not inverted, a tolerance of 0 still judging, judging with no depth last frame (GREEN at first; a last frame given a
+// wrong plane of depth must now judge nothing) -- all red; the reprojected texel's centre not taken (u = x / w for (x + 0.5) / w) STAYS GREEN: every surface here
+// faces the camera, so half a texel along one has the same view depth, and the test cannot tell -- recorded, not hidden. 3 of flight-gpu.html, all red (no
+// reprojection passed, &reproject=0 ignored, last frame's matrix never kept).
