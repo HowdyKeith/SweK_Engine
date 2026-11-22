@@ -418,7 +418,15 @@ export const RECORD_HANDOVERS = Object.freeze([
         decidedBy: "Keith",
         evidence: "Keith's answer \"Yes, hand it over\" to the record-owner question on 2026-11-20. boxId() reads linux-x64-4c-16gb-46f962 after the container restart of 2026-11-20 (the round's first verdict printed 'the record belongs to " +
                   "linux-x64-4c-16gb-142c0d and this box is linux-x64-4c-16gb-46f962'); the shared record named 142c0d, captured 2026-11-20T06:18:42Z. The untracked sweep-timings.local.json and its ledger are deleted at the handover, " +
-                  "as at v4818, v4838, v4850, v4877, v4880, v4897, v4912 and v4913; the tracked per-box record stays. 142c0d held the record from v4913 to v4932." }),
+                  "as at v4818, v4838, v4850, v4877, v4880, v4897, v4912 and v4913; the tracked per-box record stays. 142c0d held the record from v4913 to v4932." }),    // v4933 -- BACK TO 142c0d, BECAUSE THE SANDBOX RESTARTED ONTO THAT HOST AND THE ROUND'S 106 NEW GATES HAD NOWHERE TO BE RECORDED. The round since v4932 (the PlayCanvas line, the duel
+    // studies, the fly pathways) brought 106 gates no shared record had read; the first two verdicts' sweeps ran the slow ones (battleshipDuel, clusteredLights, smaaPassGPU, softShadows and others,
+    // 20 to 100 s alone) as unmeasured and killed them at the 20 s cap, and the boxTimings and rotation readings went to sweep-timings.linux-x64-4c-16gb-142c0d.json and sweep-timings.local.json,
+    // which a fresh clone on the rig does not read -- so the rig's verify would have run them unmeasured too. Keith chose the handover in the session.
+    Object.freeze({ at: "v4933", from: "linux-x64-4c-16gb-46f962", to: "linux-x64-4c-16gb-142c0d",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"Hand over to 142c0d\" to the record-owner question on 2026-11-22. boxId() reads linux-x64-4c-16gb-142c0d at v4933 (the round's first verdict printed 'the record belongs to " +
+                  "linux-x64-4c-16gb-46f962 and this box is linux-x64-4c-16gb-142c0d'); the shared record named 46f962, captured 2026-11-20T18:27:08Z. The untracked sweep-timings.local.json and its ledger are deleted at the handover, " +
+                  "as at v4818, v4838, v4850, v4877, v4880, v4897, v4912, v4913 and v4932; the tracked per-box record stays. 46f962 held the record from v4932 to v4933." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

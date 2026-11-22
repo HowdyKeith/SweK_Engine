@@ -73,5 +73,11 @@ await section(() => {
     ok("!! and the file: a seatFlyWired6 brain of the gains -3, seated with the holding library", PB.importBrain(PB.describePolicy(FT.POLICY_ID6, FT.mixedHold), blob).ok && Array.from(blob.weights).join() === "-3,-3" && blob.policy === "seatFlyWired6" && /with no target it HOLDS its gun/.test(blob.by));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerHold.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerHold.mjs");
+    const NAMED = ["ESCORTS", "FLEET_SHIPS"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

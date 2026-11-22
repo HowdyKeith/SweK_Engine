@@ -86,5 +86,11 @@ await section(() => {
     ok("!! AND THE PAGE CARRIES IT: the best-ship preset is the `bysize` hand under the cannon-aware helm", ["{\"hand\":\"bysize\",\"helm\":\"flywired\",\"cannon\":true}", "{\"hand\":\"bysize\",\"helm\":\"split\",\"cannon\":true}"].includes(JSON.stringify(C.presetOf("best").choice))   /* since 2026-11-21 the split helm: tools/ship/takeSplitHelm.mjs */ && ["car-big", "flywired-one"].includes(C.HANDS.find((h) => h.id === "bysize").bySize.one)   /* the car's gunner, or since 2026-11-20 the fly-wired one with no window (tools/ship/takeFlyWiredOneWindow.mjs) */ && C.HANDS.find((h) => h.id === "bysize").bySize.fleet === "flywired");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeBySizeLoadout.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeBySizeLoadout.mjs");
+    const NAMED = ["ARMS", "SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

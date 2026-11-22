@@ -97,8 +97,9 @@ const SELF = "observedGates-selfcheck.mjs";
         // v4929 -- RE-READ 403 -> 414: the verdict's sweep read 414 (this round's seven new gates rest their only runtime evidence on the timing file until a sweep writes them to the ledger, plus the round's other moves); 403 + 10 was the line.
         // v4927 -- RE-READ 379 -> 403: origin/main reads 381, and the difference is exactly the 23 gates the merge of claude/fish-vestibular-helper added (the submarine duel series: the 19 takeEvade gates, subEccm, subEnergy, takeSubLeague, takeSubTournament; computed set against set, no other gate entered), less this gate itself, which left.
         // v4932 -- RE-READ 414 -> 428: the verdict's sweep read 429 and, after observedGates --write took this round's nine new gates into the ledger, 428 (the merge of claude/inspiring-mayer-9mdcut and stations rounds 13-15 brought gates whose evidence the shared record held only after this round's handover to 46f962; 414 + 10 was the line).
-        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 428) <= 10,
-        `${sweepOnly.length} of them, against 428 read at v4932 (414 at v4929) (403 at v4927) (379 at v4926) (347 at v4913) (285 at v4912) (172 at v4902) (148 at v4898) (107 at v4896) (96 at v4895) (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
+        // v4933 -- RE-READ 428 -> 532 after observedGates --write (ledger lag 0): the round since v4932 brought 106 gates, and the handover of the shared record to this box (Keith, 2026-11-22) let the verdict's sweep read every one of them for the first time.
+        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 532) <= 10,
+        `${sweepOnly.length} of them, against 532 read at v4933 (428 at v4932) (414 at v4929) (403 at v4927) (379 at v4926) (347 at v4913) (285 at v4912) (172 at v4902) (148 at v4898) (107 at v4896) (96 at v4895) (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
         "at the cap on a busy box, erased the wall's green -- and the sweep file's own note says it is not a " +
         "claim about the tree");
 

@@ -89,5 +89,11 @@ await section(() => {
     ok("!! the forecast was WRONG with escorts (it said a lead of about 0.3) and right in direction against fighters (smaller than the pilot's +0.13, as forecast); AND THE PAGE CARRIES IT: the by-size hand takes the fly-wired gunner one ship a side with escorts", near(R("oneEscorts6").bySize, 1.872) && near(R("fighters").bySight, 0.052) && /with escorts/.test(C.HANDS.find((h) => h.id === "bysize").label) && /WITH ESCORTS/.test(C.HANDS.find((h) => h.id === "bysize").note) && C.presetOf("best").choice.hand === "bysize");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeBySightLoadout.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeBySightLoadout.mjs");
+    const NAMED = ["ARMS", "SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

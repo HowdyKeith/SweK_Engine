@@ -51,7 +51,7 @@ export function forwardCosts({ n = 50000, now = () => performance.now() } = {}) 
 if (typeof process !== "undefined" && Array.isArray(process.argv)) {
     const { pathToFileURL } = await import("node:url");
     if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-        const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; }, seconds = Number(arg("seconds", 10)), kind = arg("kind", "head-on"), seed = Number(arg("seed", 1));
+        const { parseOrExit } = await import("./cliArgs.mjs"), cli = parseOrExit("takeLiveBrains", { values: { "--seconds": "string", "--kind": "string", "--seed": "string" } }), arg = (k, d) => cli.values["--" + k] ?? d, seconds = Number(arg("seconds", 10)), kind = arg("kind", "head-on"), seed = Number(arg("seed", 1));
         console.log(`[takeLiveBrains] this box: ${os.cpus().length} x ${os.cpus()[0]?.model || "unknown cpu"}, node ${process.version}; the first ${seconds} s of a ${kind} fight, seed ${seed}; networks on one core`);
         console.log("  ships+escorts a side | crafts | seated | asked a tick: peak, mean | ms a tick: mean, p95, max | x real time | flying at the end");
         const rows = FLEETS.map(([s, e]) => { const r = measure(s, e, { seconds, kind, seed }); console.log(`  ${s}+${e} | ${r.crafts} | ${r.seated} | ${r.peak}, ${r.mean.toFixed(1)} | ${r.ms.mean.toFixed(2)}, ${r.ms.p95.toFixed(2)}, ${r.ms.max.toFixed(2)} | ${r.xReal.toFixed(1)} | ${r.flying}`); return r; });

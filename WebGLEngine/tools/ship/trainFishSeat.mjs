@@ -10,17 +10,19 @@
 // *** NO EXPORTS ON PURPOSE: a command-line entry point and not a module. The libraries it imports are what the gates hold. ***
 "use strict";
 import fs from "node:fs";
+import { parseOrExit } from "./cliArgs.mjs";   // an unknown or misspelt option is refused by name, never read as a default
 import * as TS from "./trainSeatGunner.mjs";
 import * as SF from "../../brain/seatGunnerFish.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
+import { fileURLToPath } from "node:url";   // a URL's .pathname keeps the drive letter's slash on Windows (/C:/...); this does not
 
-const argv = process.argv.slice(2), flag = (k) => argv.includes("--" + k), val = (k, d) => { const i = argv.indexOf("--" + k); return i >= 0 ? argv[i + 1] : d; };
-const known = ["net", "runs", "iters", "seed", "write", "out"], bad = argv.filter((a) => a.startsWith("--") && !known.includes(a.slice(2)));
+const cli = parseOrExit("trainFishSeat", { values: { "--net": "string", "--runs": "string", "--iters": "string", "--seed": "string", "--out": "string" }, flags: ["--write"] });
+const flag = (k) => cli.flags.has("--" + k), val = (k, d) => cli.values["--" + k] ?? d;
 const which = val("net", "fish");
-if (bad.length || !["fish", "control"].includes(which)) { console.error(`trainFishSeat: ${bad.length ? `unknown option ${bad.join(", ")} (known: ${known.map((k) => "--" + k).join(", ")})` : `--net is fish or control (got ${which})`}`); process.exit(2); }
+if (!["fish", "control"].includes(which)) { console.error(`trainFishSeat: --net is fish or control (got ${which})`); process.exit(2); }
 if (which === "control" && flag("write")) { console.error("trainFishSeat: the control is never written (it is a control, not a brain to seat)"); process.exit(2); }
-const net = which === "fish" ? SF : SF.control, opts = { ...TS.RECIPE, runs: Number(val("runs", TS.RECIPE.runs)), iters: Number(val("iters", TS.RECIPE.iters)), seed: Number(val("seed", TS.RECIPE.seed)) }, out = val("out", new URL("../../brain/seatGunnerFishWeightsDefault.json", import.meta.url).pathname);
+const net = which === "fish" ? SF : SF.control, opts = { ...TS.RECIPE, runs: Number(val("runs", TS.RECIPE.runs)), iters: Number(val("iters", TS.RECIPE.iters)), seed: Number(val("seed", TS.RECIPE.seed)) }, out = val("out", fileURLToPath(new URL("../../brain/seatGunnerFishWeightsDefault.json", import.meta.url)));
 console.log(`the ${which === "fish" ? "fish's circuit (the Fish1 TEN core)" : `control (a random circuit of the fish's size, seed ${SF.CONTROL_SEED})`} in the gun seats: ${opts.runs} searches of ${opts.iters} iterations from seed ${opts.seed}`);
 /** What the wiring did, said in the file: how many of the circuit's synapses carry a weight in the champion. With none, the champion is the same gunner over ANY wiring of this size. */
 const synapseLine = (w) => { const from = net.FEATURES * net.HIDDEN + net.HIDDEN; let n = 0; for (let k = 0; k < net.REC_EDGES; k++) if (w[from + k] !== 0) n++; return n ? `${n} of the circuit's ${net.REC_EDGES} synapses carry a weight` : `NOT ONE of the circuit's ${net.REC_EDGES} synapses carries a weight: every weight that moved is on the hand path, so this is the same gunner over any wiring of this size and the fish's wiring did nothing here`; };

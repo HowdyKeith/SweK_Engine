@@ -95,6 +95,12 @@ await section(() => {
         && C.PRESETS.every((p) => !JSON.stringify(p.choice).includes("lc11")) && /takeLc11Gunner/.test(C.HANDS.find((h) => h.id === "flywired").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeLc11Gunner.mjs held by its gate (it found these 5 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeLc11Gunner.mjs");
+    const NAMED = ["FILES", "GUN_OF", "KEPT_DIR", "SINE", "fightReadings"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 

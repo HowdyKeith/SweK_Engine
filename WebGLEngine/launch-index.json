@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 503,
+  "page": 507,
   "demo": 49,
   "builtin": 38
  },
@@ -1652,6 +1652,14 @@
   },
   {
    "kind": "page",
+   "id": "gizmo-demo.html",
+   "display": "Gizmo Demo",
+   "href": "/gizmo-demo.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "glb_viewer.html",
    "display": "Glb Viewer",
    "href": "/glb_viewer.html",
@@ -2127,6 +2135,22 @@
    "id": "librechat.html",
    "display": "Librechat",
    "href": "/librechat.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lights-demo.html",
+   "display": "Lights Demo",
+   "href": "/lights-demo.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lights-gpu.html",
+   "display": "Lights Gpu",
+   "href": "/lights-gpu.html",
    "section": null,
    "collision": false
   },
@@ -3408,6 +3432,14 @@
    "display": "Sphere Impostor",
    "href": "/sphere-impostor.html",
    "section": "Renders",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "splat-gpu.html",
+   "display": "Splat Gpu",
+   "href": "/splat-gpu.html",
+   "section": null,
    "collision": false
   },
   {

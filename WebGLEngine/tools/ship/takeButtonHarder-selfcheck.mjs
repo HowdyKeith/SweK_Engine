@@ -86,5 +86,11 @@ await section(() => {
     ok("!! WHAT IS DECIDED, as read: both picks hold; the by-the-fight hand's note says where they were flown", v.ok && v.holds.escorts && v.holds.fleet && rd.verdict.ok && /takeButtonHarder/.test(h.note) && /by 0\.638/.test(h.note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeButtonHarder.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeButtonHarder.mjs");
+    const NAMED = ["SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

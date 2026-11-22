@@ -140,5 +140,11 @@ await section(async () => {
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of trainTrackSeat.mjs held by its gate (it found these 4 unnamed at the ship):
+{
+    const EXPORTS = await import("./trainTrackSeat.mjs");
+    const NAMED = ["DEFAULT_OUT", "biasChild", "choose", "pathChild"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

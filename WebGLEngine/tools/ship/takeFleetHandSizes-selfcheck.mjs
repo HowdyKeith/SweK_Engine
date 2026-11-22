@@ -71,6 +71,12 @@ await section(() => {
     ok("!! ...and what it decided is what the page does: no change -- the fleet button carries the fly-wired hand and the by-size hand's fleet pick is the fly-wired gunner; the fleet note gives both sizes", r.verdict.change === false && r.verdict.fleetHand === "flywired" && C.presetOf("fleet").choice.hand === "flywired" && C.HANDS.find((h) => h.id === "bysize").bySize.fleet === "flywired" && /takeFleetHandSizes/.test(C.presetOf("fleet").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFleetHandSizes.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFleetHandSizes.mjs");
+    const NAMED = ["KEPT_DIR", "fightReadings", "gunnerOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 

@@ -72,5 +72,11 @@ await section(() => {
     ok("!! ...and what it decided is what the page does: the split is kept, trailing nowhere, and both the best-ship and fleet presets carry helm \"split\"", r.verdict.keep === true && r.verdict.trails.length === 0 && C.PRESETS.find((p) => p.id === "best").choice.helm === "split" && C.PRESETS.find((p) => p.id === "fleet").choice.helm === "split");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeSplitHelmSizes.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeSplitHelmSizes.mjs");
+    const NAMED = ["KEPT_DIR", "fightReadings"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

@@ -230,7 +230,7 @@ function draw() {
 // Two guards, both already laws in this tree: a HIDDEN-PAGE guard (v2771 -- a backgrounded page does zero work,
 // the lever that ended the render-QA server death) and a BACKOFF when the chain is broken. A page with nothing
 // to draw polls once a second; it does not render nothing at 60fps.
-const gpuTime = (label, fn) => (window.__gpuTimerAuto ? window.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 let _idleTimer = null;
 function schedule(ms) {
     if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }

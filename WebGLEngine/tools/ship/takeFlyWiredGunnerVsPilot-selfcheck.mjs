@@ -81,5 +81,11 @@ await section(() => {
     ok("!! the ships-sticky gunner: -0.319 (TRAILS) against the pilot's fighters, as the pilot study had it (-0.31); +0.109 and -0.140 (TRAILS) with pilot-flown escorts. The forecast was right against the fighters and UNDER with escorts (it said a smaller lead than against PD escorts; it is about the same)", near(R("fighters").ships, -0.319) && rd.fighters.words.ships === "TRAILS" && near(R("escorts").ships, 0.109) && near(R("escortsCannon").ships, -0.140) && rd.escortsCannon.words.ships === "TRAILS");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerVsPilot.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerVsPilot.mjs");
+    const NAMED = ["ARMS", "ESCORTS", "FLEET_SHIPS"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

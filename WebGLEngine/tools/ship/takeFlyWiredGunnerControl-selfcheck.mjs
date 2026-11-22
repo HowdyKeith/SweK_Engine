@@ -85,5 +85,11 @@ await section(() => {
     ok("!! AND THE PAGE SAYS IT: the flywired hand's note says the circuit's shape is not shown to matter in this gunner", /shape is not shown to matter/i.test(C.HANDS.find((h) => h.id === "flywired").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerControl.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerControl.mjs");
+    const NAMED = ["SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

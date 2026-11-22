@@ -258,7 +258,7 @@ function drawScene() {
   gl.disable(gl.BLEND);
 }
 
-const gpuTime = (label, fn) => (window.__gpuTimerAuto ? window.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 let frame = 0;
 function loop() {
   if (!paused) {

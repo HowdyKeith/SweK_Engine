@@ -139,5 +139,11 @@ await section(() => {
     ok("!! THE FILE is [-2, -2, -0.25, -0.25] and THE PAGE'S sine helm loads it; the fly-wired helm's note says a sine does as well without a cannon", blob.policy === FS.POLICY_ID3 && blob.weights.join() === "-2,-2,-0.25,-0.25" && C.FILES["helm-sine"].path === "brain/helmFlyWired3WeightsSineNoCannon.json" && /takeSineHelmNoCannon/.test(C.HELMS.find((h) => h.id === "sine").note) && /takeSineHelmNoCannon/.test(C.HELMS.find((h) => h.id === "flywired").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeSineHelmNoCannon.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeSineHelmNoCannon.mjs");
+    const NAMED = ["helmOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

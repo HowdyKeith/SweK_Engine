@@ -91,6 +91,12 @@ section(() => {
     ok("!! A REFLEX THAT NEVER FIRES (tau0 0) FLIES EXACTLY AS NO REFLEX; one that fires (the registered 2 s) changes the fight; the same fight twice is the same fight", off === base && on1 !== base && on1 === on2, `${base} / ${off} / ${on1}`);
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of evadeReflex.mjs held by its gate (it found these 4 unnamed at the ship):
+{
+    const EXPORTS = await import("./evadeReflex.mjs");
+    const NAMED = ["JINK_HALF", "TAU0", "TYPES", "toBody"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 

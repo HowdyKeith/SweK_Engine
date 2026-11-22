@@ -71,5 +71,11 @@ await section(() => {
     ok("!! WHAT IS DECIDED, as read: the split helm; the fleet button carries it, its note saying so", v.split && rd.verdict.split && fleet.choice.helm === "split" && fleet.choice.hand === "flywired" && /takeSplitHelmFleet/.test(fleet.note) && /\+0\.031/.test(fleet.note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeSplitHelmFleet.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeSplitHelmFleet.mjs");
+    const NAMED = ["splitArmOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

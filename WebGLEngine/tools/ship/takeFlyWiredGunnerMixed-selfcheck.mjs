@@ -69,5 +69,11 @@ await section(() => {
     ok("against the plain side: the ships-sticky +0.118 (LEADS) and the mixed +0.024 in escort fleets without the cannon; -0.101 and +0.053 with it; +0.012 and -0.257 (TRAILS) with no escorts. The forecast was wrong in two of three: it said a lead without the cannon too, and CANNOT BE TOLD with no escorts", near(R("escorts").ships, 0.118) && near(R("escorts").mixed, 0.024) && near(R("escortsCannon").ships, -0.101) && near(R("escortsCannon").mixed, 0.053) && near(R("fleet").ships, 0.012) && near(R("fleet").mixed, -0.257) && rd.fleet.words.mixed === "TRAILS");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerMixed.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerMixed.mjs");
+    const NAMED = ["FLEET_SHIPS"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

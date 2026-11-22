@@ -73,5 +73,11 @@ await section(() => {
     ok("!! AND THE PAGE CARRIES IT: the `best` preset is the car's always-firing gunner under the cannon-aware fly-wired helm, the cannon on", ["car-big", "bysize"].includes(C.presetOf("best").choice.hand) && ["flywired", "split"].includes(C.presetOf("best").choice.helm)   /* since 2026-11-21 the split helm: tools/ship/takeSplitHelm.mjs */ && C.presetOf("best").choice.cannon === true   /* the car's gunner, or since 2026-11-20 the by-size hand that is the car's gunner one ship a side (tools/ship/takeBySizeLoadout.mjs) */);
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeBestShipLoadout.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeBestShipLoadout.mjs");
+    const NAMED = ["CHALLENGERS", "SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

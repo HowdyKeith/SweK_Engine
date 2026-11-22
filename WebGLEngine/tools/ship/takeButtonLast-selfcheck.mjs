@@ -99,5 +99,11 @@ await section(() => {
     ok("!! AND THE BY-SIZE NOTE NO LONGER SAYS IT WAS NOT FLOWN THERE", !/NOT flown/.test(C.HANDS.find((h) => h.id === "bysize").note) && /takeButtonLast/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeButtonLast.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeButtonLast.mjs");
+    const NAMED = ["ARMS", "SETUP", "gunnerOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

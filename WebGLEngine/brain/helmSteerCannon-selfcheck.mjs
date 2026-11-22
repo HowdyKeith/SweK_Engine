@@ -25,5 +25,11 @@ const doubled = [...Array.from(six.slice(0, 3)).map((v) => 2 * v), ...six.slice(
 ok("!! THE SWITCH READS THE CANNON: another set with the cannon is another fight with it and the same fight without; another set without is the same fight with the cannon", fl(C(doubled), true) !== fl(S, true) && fl(C(doubled), false) === fl(S, false) && fl(C([...six.slice(0, 3), 0, 0, 0]), true) === fl(S, true) && fl(C([...six.slice(0, 3), 0, 0, 0]), false) !== fl(S, false));
 const bad = steer.slice(); bad[5] = 0.1;
 ok("!! a steer file with a weight outside the three is refused by name; battleshipDuel seats helmSteerCannon as a helm", (() => { try { HSC.fromSteer(bad); return false; } catch (e) { return /outside the three/.test(e.message); } })() && D.PEER_POLICIES.helmSteerCannon.role === "helm" && D.PEER_POLICIES.helmSteerCannon.mod === HSC);
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of helmSteerCannon.mjs held by its gate (it found these 9 unnamed at the ship):
+{
+    const EXPORTS = await import("./helmSteerCannon.mjs");
+    const NAMED = ["FEATURES", "HIDDEN", "OUTPUTS", "POLICY_ID", "TORQUE_FRACTION", "helmFactory", "helmFor", "reportLines", "zeroWeights"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

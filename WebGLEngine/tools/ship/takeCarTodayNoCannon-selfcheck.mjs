@@ -74,5 +74,11 @@ await section(() => {
     ok("!! WHAT IS DECIDED, as read: both picks stay; the page's button keeps car-today without a cannon one ship a side and with escorts, adds no escortsNoCannon pick, and its note carries the reading", v.ok && v.one && v.escorts && rd.verdict.ok && h.bySize.oneNoCannon === "car-today" && h.bySize.escorts === "car-today" && h.bySize.escortsNoCannon === undefined && /takeCarTodayNoCannon/.test(h.note) && /\+0\.031/.test(h.note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeCarTodayNoCannon.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeCarTodayNoCannon.mjs");
+    const NAMED = ["ESCORT_FIGHTS", "SETUP", "gunnerOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

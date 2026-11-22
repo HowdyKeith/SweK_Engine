@@ -86,7 +86,11 @@ const c = shaderCensus(ROOT);
     // 8 -> 9, read before raising again: physics/render/specularProbeLit.mjs (fae26dbf, "wire specular IBL into a real
     // material shader") shares fetchTexelM/mipSizeAt/mipYAt between its WGSL and GLSL halves -- a real duplicated
     // computation, not a detector artifact. Still nine files, not twenty.
-    const DUPLICATION_BASELINE = 9;   // v4414 -- MEASURED, in the units the claim is actually about
+    //
+    // v4933 -- 9 -> 10, read before raising: render/volumetricFog.mjs (the PlayCanvas line's fog) marches the same ray in its GLSL and its WGSL
+    // (sigmaAt and ign in both) BY DESIGN, so one CPU twin (fogCPU) holds both backends -- the litSphere/water2d shape, not a translation an IR
+    // would have saved. render/infiniteGrid.mjs, the round's other dual module, shares a convention and not a computation. Ten files, not twenty.
+    const DUPLICATION_BASELINE = 10;   // v4414 -- MEASURED, in the units the claim is actually about
     ok("!! *** only " + pairs.duplication.length + " files DUPLICATE a computation across the two languages ***",
         pairs.duplication.length <= DUPLICATION_BASELINE,
         pairs.duplication.map((r) => r.file).join(", ") + " -- against " + c.both.length +

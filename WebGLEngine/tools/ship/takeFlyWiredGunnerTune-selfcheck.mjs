@@ -88,5 +88,11 @@ await section(() => {
     ok("!! and the file: a seatFlyWired10 brain at [-3, -3, 0.1, 0.2, 45 degrees], the page's `flywired` hand", PB.importBrain(PB.describePolicy(FT.POLICY_ID10, FT.nearTunable), blob).ok && Math.abs(blob.weights[4] - Math.PI / 4) < 1e-6 && blob.policy === "seatFlyWired10");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerTune.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerTune.mjs");
+    const NAMED = ["ESCORTS", "FLEET_SHIPS", "weightsOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

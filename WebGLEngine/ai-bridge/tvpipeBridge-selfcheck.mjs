@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url), HERE = path.dirname(fileURLToPath(import.meta.url));
 const B = require("./tvpipeBridge.js");
@@ -102,7 +102,7 @@ await section(async () => {
 
 console.log("3. THE REAL TVPIPE");
 await section(async () => {
-    let real = null; try { real = await import(require.resolve("@tvpipe/sdk", { paths: [HERE] })); } catch { /* not installed */ }
+    let real = null; try { real = await import(pathToFileURL(require.resolve("@tvpipe/sdk", { paths: [HERE] })).href); } catch { /* not installed */ }
     if (!real) { console.log(`  ----  @tvpipe/sdk is not installed here: the real run is skipped (${B.INSTALL_HINT})`); return; }
     B._reset(); B._useSdk(real);
     const r = await B.start("pattern", { to: "browser" });

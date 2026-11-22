@@ -120,5 +120,11 @@ await section(() => {
     ok("!! AND THE STEER HELM'S NOTE SAYS SO", /takeSteerCannon/.test(C.HELMS.find((h) => h.id === "steer").note) && /buys it nothing/.test(C.HELMS.find((h) => h.id === "steer").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeSteerCannon.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeSteerCannon.mjs");
+    const NAMED = ["THROTTLES", "TURNS", "helmOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

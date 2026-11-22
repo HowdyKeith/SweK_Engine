@@ -1,12 +1,21 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-20T17:46:01.498Z",
+ "at": "2026-11-22T23:50:22.897Z",
  "poolAt": "2026-11-20T05:40:26.914Z",
  "poolHorizon": "2026-11-16T18:32:18.286Z",
  "budgetMs": 3000,
  "lastRun": 1,
- "heldOutliers": {},
+ "heldOutliers": {
+  "tools/ship/reportDoors-selfcheck.mjs": {
+   "ms": 2484,
+   "at": "2026-11-22T23:50:22.897Z",
+   "side": "fast",
+   "since": "2026-11-22T23:49:38.004Z",
+   "count": 2,
+   "median": 5624
+  }
+ },
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -118,6 +127,12 @@
    "at": "2026-11-20T02:31:47.592Z"
   },
   {
+   "gate": "brain/battleshipDuel-selfcheck.mjs",
+   "ms": 22780,
+   "code": 0,
+   "at": "2026-11-22T22:27:33.634Z"
+  },
+  {
    "gate": "brain/battleshipFight-selfcheck.mjs",
    "ms": 244213,
    "code": 0,
@@ -205,6 +220,12 @@
    "at": "2026-11-19T16:00:41.621Z"
   },
   {
+   "gate": "brain/evadeReflex-selfcheck.mjs",
+   "ms": 2762,
+   "code": 0,
+   "at": "2026-11-22T22:27:36.594Z"
+  },
+  {
    "gate": "brain/flightTask-selfcheck.mjs",
    "ms": 2441,
    "code": 0,
@@ -224,6 +245,18 @@
    "at": "2026-11-20T17:44:29.780Z"
   },
   {
+   "gate": "brain/flySteering-selfcheck.mjs",
+   "ms": 12245,
+   "code": 0,
+   "at": "2026-11-22T22:27:49.030Z"
+  },
+  {
+   "gate": "brain/flyTracking-selfcheck.mjs",
+   "ms": 152758,
+   "code": 0,
+   "at": "2026-11-22T22:30:21.976Z"
+  },
+  {
    "gate": "brain/gfGain-selfcheck.mjs",
    "ms": 30459,
    "code": 0,
@@ -235,6 +268,12 @@
    "code": 0,
    "priorMs": 4274,
    "at": "2026-11-20T05:40:26.914Z"
+  },
+  {
+   "gate": "brain/helmSteerCannon-selfcheck.mjs",
+   "ms": 4733,
+   "code": 0,
+   "at": "2026-11-22T22:30:26.896Z"
   },
   {
    "gate": "brain/jetFight-selfcheck.mjs",
@@ -288,6 +327,12 @@
    "ms": 5666,
    "code": 0,
    "at": "2026-11-20T17:45:06.180Z"
+  },
+  {
+   "gate": "brain/peerFleet-selfcheck.mjs",
+   "ms": 15827,
+   "code": 0,
+   "at": "2026-11-22T22:30:42.908Z"
   },
   {
    "gate": "brain/pilot6dofMlpPage-selfcheck.mjs",
@@ -541,6 +586,12 @@
    "at": "2026-11-16T18:32:18.286Z"
   },
   {
+   "gate": "brain/seatGunnerFish-selfcheck.mjs",
+   "ms": 22182,
+   "code": 0,
+   "at": "2026-11-22T22:31:05.275Z"
+  },
+  {
    "gate": "brain/seatGunnerGpu-selfcheck.mjs",
    "ms": 5362,
    "code": 0,
@@ -558,6 +609,24 @@
    "ms": 949,
    "code": 0,
    "at": "2026-10-18T04:27:05.643Z"
+  },
+  {
+   "gate": "brain/seatTrackGunner-selfcheck.mjs",
+   "ms": 2809,
+   "code": 0,
+   "at": "2026-11-22T22:31:08.271Z"
+  },
+  {
+   "gate": "brain/seatTurretCircuit-selfcheck.mjs",
+   "ms": 6228,
+   "code": 0,
+   "at": "2026-11-22T22:31:14.681Z"
+  },
+  {
+   "gate": "brain/seatTurretGunner-selfcheck.mjs",
+   "ms": 66450,
+   "code": 0,
+   "at": "2026-11-22T22:32:21.349Z"
   },
   {
    "gate": "brain/shipCollision6dof-selfcheck.mjs",
@@ -2220,6 +2289,12 @@
    "at": "2026-11-17T18:01:46.533Z"
   },
   {
+   "gate": "render/spaceDuelCore-selfcheck.mjs",
+   "ms": 21233,
+   "code": 0,
+   "at": "2026-11-22T22:32:42.798Z"
+  },
+  {
    "gate": "render/subAquarium3dDark-selfcheck.mjs",
    "ms": 88,
    "code": 0,
@@ -2493,6 +2568,12 @@
    "code": 0,
    "priorMs": 3382,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/denoiseLayers-selfcheck.mjs",
+   "ms": 107499,
+   "code": 0,
+   "at": "2026-11-22T22:34:30.497Z"
   },
   {
    "gate": "tools/fingerprint/attest-selfcheck.mjs",
@@ -3790,6 +3871,18 @@
    "at": "2026-11-15T19:21:22.624Z"
   },
   {
+   "gate": "tools/ship/cameraControls-selfcheck.mjs",
+   "ms": 6426,
+   "code": 0,
+   "at": "2026-11-22T22:34:37.116Z"
+  },
+  {
+   "gate": "tools/ship/cameraPages-selfcheck.mjs",
+   "ms": 32016,
+   "code": 0,
+   "at": "2026-11-22T22:35:09.328Z"
+  },
+  {
    "gate": "tools/ship/canvasFill-selfcheck.mjs",
    "ms": 4676,
    "code": 0,
@@ -3898,9 +3991,10 @@
   },
   {
    "gate": "tools/ship/cliArgs-selfcheck.mjs",
-   "ms": 545,
+   "ms": 2788,
    "code": 0,
-   "at": "2026-09-20T19:13:28.185Z"
+   "priorMs": 3330,
+   "at": "2026-11-22T23:49:40.989Z"
   },
   {
    "gate": "tools/ship/cloneProvision-selfcheck.mjs",
@@ -3922,6 +4016,12 @@
    "code": 0,
    "priorMs": 3310,
    "at": "2026-11-20T02:31:47.592Z"
+  },
+  {
+   "gate": "tools/ship/clusteredLights-selfcheck.mjs",
+   "ms": 83117,
+   "code": 0,
+   "at": "2026-11-22T22:36:32.633Z"
   },
   {
    "gate": "tools/ship/colliderFromGLB-selfcheck.mjs",
@@ -4328,6 +4428,13 @@
    "at": "2026-11-17T18:01:46.533Z"
   },
   {
+   "gate": "tools/ship/exactHash-selfcheck.mjs",
+   "ms": 2476,
+   "code": 0,
+   "priorMs": 3213,
+   "at": "2026-11-22T23:49:43.668Z"
+  },
+  {
    "gate": "tools/ship/exitBanner-selfcheck.mjs",
    "ms": 77,
    "code": 0,
@@ -4416,6 +4523,12 @@
    "ms": 1789,
    "code": 0,
    "at": "2026-10-25T14:04:14.425Z"
+  },
+  {
+   "gate": "tools/ship/flightLights-selfcheck.mjs",
+   "ms": 179592,
+   "code": 0,
+   "at": "2026-11-22T22:39:32.413Z"
   },
   {
    "gate": "tools/ship/flightMap-selfcheck.mjs",
@@ -4746,6 +4859,12 @@
    "at": "2026-11-15T19:21:22.624Z"
   },
   {
+   "gate": "tools/ship/gizmoOverlay-selfcheck.mjs",
+   "ms": 28721,
+   "code": 0,
+   "at": "2026-11-22T22:40:01.319Z"
+  },
+  {
    "gate": "tools/ship/glCapture-selfcheck.mjs",
    "ms": 613,
    "code": 0,
@@ -4799,6 +4918,24 @@
    "code": 0,
    "priorMs": 3954,
    "at": "2026-11-20T05:40:26.914Z"
+  },
+  {
+   "gate": "tools/ship/gpuTimerAuto-selfcheck.mjs",
+   "ms": 161677,
+   "code": 0,
+   "at": "2026-11-22T22:42:43.217Z"
+  },
+  {
+   "gate": "tools/ship/gpuTimerGL-selfcheck.mjs",
+   "ms": 9122,
+   "code": 0,
+   "at": "2026-11-22T22:42:52.537Z"
+  },
+  {
+   "gate": "tools/ship/gpuTimerOverlay-selfcheck.mjs",
+   "ms": 14456,
+   "code": 0,
+   "at": "2026-11-22T22:43:07.183Z"
   },
   {
    "gate": "tools/ship/gpuUniverse-selfcheck.mjs",
@@ -5006,6 +5143,12 @@
    "code": 0,
    "priorMs": 4091,
    "at": "2026-11-20T02:31:47.592Z"
+  },
+  {
+   "gate": "tools/ship/infiniteGrid-selfcheck.mjs",
+   "ms": 3319,
+   "code": 0,
+   "at": "2026-11-22T22:43:10.689Z"
   },
   {
    "gate": "tools/ship/inputChain-selfcheck.mjs",
@@ -6415,11 +6558,23 @@
    "at": "2026-11-20T05:40:26.914Z"
   },
   {
+   "gate": "tools/ship/smaaPassGPU-selfcheck.mjs",
+   "ms": 132723,
+   "code": 0,
+   "at": "2026-11-22T22:45:23.620Z"
+  },
+  {
    "gate": "tools/ship/snowDeformPage-selfcheck.mjs",
    "ms": 6104,
    "code": 0,
    "priorMs": 6983,
    "at": "2026-11-17T01:53:26.513Z"
+  },
+  {
+   "gate": "tools/ship/softShadows-selfcheck.mjs",
+   "ms": 58892,
+   "code": 0,
+   "at": "2026-11-22T22:46:22.766Z"
   },
   {
    "gate": "tools/ship/solidTexture-selfcheck.mjs",
@@ -6470,11 +6625,47 @@
    "at": "2026-11-20T02:25:03.248Z"
   },
   {
+   "gate": "tools/ship/spaceDuelPage-selfcheck.mjs",
+   "ms": 16130,
+   "code": 0,
+   "at": "2026-11-22T22:46:39.088Z"
+  },
+  {
+   "gate": "tools/ship/splatGizmo-selfcheck.mjs",
+   "ms": 24465,
+   "code": 0,
+   "at": "2026-11-22T22:47:03.740Z"
+  },
+  {
+   "gate": "tools/ship/splatGpuPage-selfcheck.mjs",
+   "ms": 19123,
+   "code": 0,
+   "at": "2026-11-22T22:47:23.050Z"
+  },
+  {
+   "gate": "tools/ship/splatLod-selfcheck.mjs",
+   "ms": 25749,
+   "code": 0,
+   "at": "2026-11-22T22:47:49.069Z"
+  },
+  {
+   "gate": "tools/ship/splatRendererGPU-selfcheck.mjs",
+   "ms": 34824,
+   "code": 0,
+   "at": "2026-11-22T22:48:24.079Z"
+  },
+  {
    "gate": "tools/ship/splatRoundTrip-selfcheck.mjs",
    "ms": 672,
    "code": 0,
    "priorMs": 3312,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/splatSortGPU-selfcheck.mjs",
+   "ms": 6971,
+   "code": 0,
+   "at": "2026-11-22T22:48:31.295Z"
   },
   {
    "gate": "tools/ship/splatVoxelWorld-selfcheck.mjs",
@@ -6648,6 +6839,96 @@
    "at": "2026-11-19T17:14:00.540Z"
   },
   {
+   "gate": "tools/ship/takeBestShipLoadout-selfcheck.mjs",
+   "ms": 2613,
+   "code": 0,
+   "at": "2026-11-22T22:48:34.094Z"
+  },
+  {
+   "gate": "tools/ship/takeBestShipLoadout2-selfcheck.mjs",
+   "ms": 2848,
+   "code": 0,
+   "at": "2026-11-22T22:48:37.124Z"
+  },
+  {
+   "gate": "tools/ship/takeBestShipLoadout3-selfcheck.mjs",
+   "ms": 3071,
+   "code": 0,
+   "at": "2026-11-22T22:48:40.404Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonHardToday-selfcheck.mjs",
+   "ms": 2855,
+   "code": 0,
+   "at": "2026-11-22T22:48:43.439Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonHarder-selfcheck.mjs",
+   "ms": 2758,
+   "code": 0,
+   "at": "2026-11-22T22:48:46.400Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonLast-selfcheck.mjs",
+   "ms": 2597,
+   "code": 0,
+   "at": "2026-11-22T22:48:49.184Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonNoCannon-selfcheck.mjs",
+   "ms": 2749,
+   "code": 0,
+   "at": "2026-11-22T22:48:52.116Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonOneHard-selfcheck.mjs",
+   "ms": 2703,
+   "code": 0,
+   "at": "2026-11-22T22:48:55.025Z"
+  },
+  {
+   "gate": "tools/ship/takeButtonUntried-selfcheck.mjs",
+   "ms": 2730,
+   "code": 0,
+   "at": "2026-11-22T22:48:57.952Z"
+  },
+  {
+   "gate": "tools/ship/takeBySightLoadout-selfcheck.mjs",
+   "ms": 2739,
+   "code": 0,
+   "at": "2026-11-22T22:49:00.875Z"
+  },
+  {
+   "gate": "tools/ship/takeBySizeLoadout-selfcheck.mjs",
+   "ms": 3046,
+   "code": 0,
+   "at": "2026-11-22T22:49:04.116Z"
+  },
+  {
+   "gate": "tools/ship/takeCarToday-selfcheck.mjs",
+   "ms": 2674,
+   "code": 0,
+   "at": "2026-11-22T22:49:06.987Z"
+  },
+  {
+   "gate": "tools/ship/takeCarTodayEscorts-selfcheck.mjs",
+   "ms": 2688,
+   "code": 0,
+   "at": "2026-11-22T22:49:09.861Z"
+  },
+  {
+   "gate": "tools/ship/takeCarTodayNoCannon-selfcheck.mjs",
+   "ms": 2879,
+   "code": 0,
+   "at": "2026-11-22T22:49:12.934Z"
+  },
+  {
+   "gate": "tools/ship/takeCarTodayRations-selfcheck.mjs",
+   "ms": 2947,
+   "code": 0,
+   "at": "2026-11-22T22:49:16.090Z"
+  },
+  {
    "gate": "tools/ship/takeCounterfactual-selfcheck.mjs",
    "ms": 18249,
    "code": 0,
@@ -6783,6 +7064,162 @@
    "at": "2026-11-19T15:37:14.598Z"
   },
   {
+   "gate": "tools/ship/takeFleetHandSizes-selfcheck.mjs",
+   "ms": 2935,
+   "code": 0,
+   "at": "2026-11-22T22:49:19.246Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyVsSine-selfcheck.mjs",
+   "ms": 6160,
+   "code": 0,
+   "at": "2026-11-22T22:49:25.632Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredFights-selfcheck.mjs",
+   "ms": 11950,
+   "code": 0,
+   "at": "2026-11-22T22:49:37.771Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunner-selfcheck.mjs",
+   "ms": 3138,
+   "code": 0,
+   "at": "2026-11-22T22:49:41.127Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs",
+   "ms": 2893,
+   "code": 0,
+   "at": "2026-11-22T22:49:44.208Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs",
+   "ms": 2752,
+   "code": 0,
+   "at": "2026-11-22T22:49:47.206Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs",
+   "ms": 2599,
+   "code": 0,
+   "at": "2026-11-22T22:49:50.001Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs",
+   "ms": 2703,
+   "code": 0,
+   "at": "2026-11-22T22:49:52.892Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs",
+   "ms": 2670,
+   "code": 0,
+   "at": "2026-11-22T22:49:55.753Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs",
+   "ms": 2658,
+   "code": 0,
+   "at": "2026-11-22T22:49:58.607Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs",
+   "ms": 2604,
+   "code": 0,
+   "at": "2026-11-22T22:50:01.402Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs",
+   "ms": 3003,
+   "code": 0,
+   "at": "2026-11-22T22:50:04.631Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs",
+   "ms": 2643,
+   "code": 0,
+   "at": "2026-11-22T22:50:07.508Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs",
+   "ms": 2686,
+   "code": 0,
+   "at": "2026-11-22T22:50:10.393Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs",
+   "ms": 4598,
+   "code": 0,
+   "at": "2026-11-22T22:50:15.218Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelm-selfcheck.mjs",
+   "ms": 4079,
+   "code": 0,
+   "at": "2026-11-22T22:50:19.480Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs",
+   "ms": 8568,
+   "code": 0,
+   "at": "2026-11-22T22:50:28.248Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs",
+   "ms": 3135,
+   "code": 0,
+   "at": "2026-11-22T22:50:31.596Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs",
+   "ms": 3957,
+   "code": 0,
+   "at": "2026-11-22T22:50:35.816Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs",
+   "ms": 7316,
+   "code": 0,
+   "at": "2026-11-22T22:50:43.314Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs",
+   "ms": 2742,
+   "code": 0,
+   "at": "2026-11-22T22:50:46.265Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs",
+   "ms": 2691,
+   "code": 0,
+   "at": "2026-11-22T22:50:49.150Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredNext-selfcheck.mjs",
+   "ms": 3878,
+   "code": 0,
+   "at": "2026-11-22T22:50:53.239Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs",
+   "ms": 2786,
+   "code": 0,
+   "at": "2026-11-22T22:50:56.270Z"
+  },
+  {
+   "gate": "tools/ship/takeFlyWiredPilot-selfcheck.mjs",
+   "ms": 8631,
+   "code": 0,
+   "at": "2026-11-22T22:51:05.087Z"
+  },
+  {
+   "gate": "tools/ship/takeHelmLadder-selfcheck.mjs",
+   "ms": 2815,
+   "code": 0,
+   "at": "2026-11-22T22:51:08.087Z"
+  },
+  {
    "gate": "tools/ship/takeKindMatched-selfcheck.mjs",
    "ms": 5899,
    "code": 0,
@@ -6797,11 +7234,35 @@
    "at": "2026-11-19T17:14:00.540Z"
   },
   {
+   "gate": "tools/ship/takeLadder-selfcheck.mjs",
+   "ms": 2632,
+   "code": 0,
+   "at": "2026-11-22T22:51:10.955Z"
+  },
+  {
+   "gate": "tools/ship/takeLc11Gunner-selfcheck.mjs",
+   "ms": 9242,
+   "code": 0,
+   "at": "2026-11-22T22:51:20.381Z"
+  },
+  {
+   "gate": "tools/ship/takePlacesControl-selfcheck.mjs",
+   "ms": 4094,
+   "code": 0,
+   "at": "2026-11-22T22:51:24.680Z"
+  },
+  {
    "gate": "tools/ship/takePlainFamily-selfcheck.mjs",
    "ms": 6403,
    "code": 0,
    "priorMs": 5780,
    "at": "2026-11-19T17:14:00.540Z"
+  },
+  {
+   "gate": "tools/ship/takePresetsHard-selfcheck.mjs",
+   "ms": 2796,
+   "code": 0,
+   "at": "2026-11-22T22:51:27.703Z"
   },
   {
    "gate": "tools/ship/takeRankingReplication-selfcheck.mjs",
@@ -6824,11 +7285,53 @@
    "at": "2026-11-19T17:14:00.540Z"
   },
   {
+   "gate": "tools/ship/takeSineHelmBest-selfcheck.mjs",
+   "ms": 3211,
+   "code": 0,
+   "at": "2026-11-22T22:51:31.155Z"
+  },
+  {
+   "gate": "tools/ship/takeSineHelmNoCannon-selfcheck.mjs",
+   "ms": 6379,
+   "code": 0,
+   "at": "2026-11-22T22:51:37.769Z"
+  },
+  {
+   "gate": "tools/ship/takeSineTwins-selfcheck.mjs",
+   "ms": 2739,
+   "code": 0,
+   "at": "2026-11-22T22:51:40.694Z"
+  },
+  {
+   "gate": "tools/ship/takeSplitHelm-selfcheck.mjs",
+   "ms": 2868,
+   "code": 0,
+   "at": "2026-11-22T22:51:43.772Z"
+  },
+  {
+   "gate": "tools/ship/takeSplitHelmFleet-selfcheck.mjs",
+   "ms": 3004,
+   "code": 0,
+   "at": "2026-11-22T22:51:46.965Z"
+  },
+  {
+   "gate": "tools/ship/takeSplitHelmSizes-selfcheck.mjs",
+   "ms": 2791,
+   "code": 0,
+   "at": "2026-11-22T22:51:49.981Z"
+  },
+  {
    "gate": "tools/ship/takeStationRound-selfcheck.mjs",
    "ms": 14467,
    "code": 0,
    "priorMs": 12764,
    "at": "2026-11-19T17:14:00.540Z"
+  },
+  {
+   "gate": "tools/ship/takeSteerCannon-selfcheck.mjs",
+   "ms": 9410,
+   "code": 0,
+   "at": "2026-11-22T22:51:59.571Z"
   },
   {
    "gate": "tools/ship/takeSubLeague-selfcheck.mjs",
@@ -7026,6 +7529,18 @@
    "at": "2026-10-16T17:16:46.111Z"
   },
   {
+   "gate": "tools/ship/trainHelm-selfcheck.mjs",
+   "ms": 26616,
+   "code": 0,
+   "at": "2026-11-22T22:52:26.379Z"
+  },
+  {
+   "gate": "tools/ship/trainHelmSteer-selfcheck.mjs",
+   "ms": 12418,
+   "code": 0,
+   "at": "2026-11-22T22:52:39.000Z"
+  },
+  {
    "gate": "tools/ship/trainNeedsCircuit-selfcheck.mjs",
    "ms": 6105,
    "code": 0,
@@ -7082,6 +7597,42 @@
    "code": 0,
    "priorMs": 11943,
    "at": "2026-11-18T14:23:41.881Z"
+  },
+  {
+   "gate": "tools/ship/trainTrackSeat-selfcheck.mjs",
+   "ms": 16553,
+   "code": 0,
+   "at": "2026-11-22T22:52:55.759Z"
+  },
+  {
+   "gate": "tools/ship/trainTurretSeat-selfcheck.mjs",
+   "ms": 44773,
+   "code": 0,
+   "at": "2026-11-22T22:53:40.764Z"
+  },
+  {
+   "gate": "tools/ship/trainTurretSeatBig-selfcheck.mjs",
+   "ms": 24055,
+   "code": 0,
+   "at": "2026-11-22T22:54:05.020Z"
+  },
+  {
+   "gate": "tools/ship/trainTurretSeatFleet-selfcheck.mjs",
+   "ms": 19102,
+   "code": 0,
+   "at": "2026-11-22T22:54:24.336Z"
+  },
+  {
+   "gate": "tools/ship/trainTurretSeatFleet2-selfcheck.mjs",
+   "ms": 17921,
+   "code": 0,
+   "at": "2026-11-22T22:54:42.455Z"
+  },
+  {
+   "gate": "tools/ship/trainTurretSeatToday-selfcheck.mjs",
+   "ms": 7818,
+   "code": 0,
+   "at": "2026-11-22T22:54:50.483Z"
   },
   {
    "gate": "tools/ship/transitionSpec-selfcheck.mjs",
@@ -7147,6 +7698,12 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/tvOut-selfcheck.mjs",
+   "ms": 5394,
+   "code": 0,
+   "at": "2026-11-22T22:54:56.126Z"
+  },
+  {
    "gate": "tools/ship/typecheck-selfcheck.mjs",
    "ms": 2022,
    "code": 0,
@@ -7194,6 +7751,12 @@
    "code": 0,
    "priorMs": 4330,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/volumetricFog-selfcheck.mjs",
+   "ms": 15870,
+   "code": 0,
+   "at": "2026-11-22T22:55:12.181Z"
   },
   {
    "gate": "tools/ship/voxelAvatar-selfcheck.mjs",

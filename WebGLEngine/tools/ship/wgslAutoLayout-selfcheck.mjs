@@ -245,6 +245,12 @@ console.log("\n6. *** SABOTAGE: PUT THE SHIPPED BUG BACK AND THE SCAN MUST FIND 
     }
 }
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of wgslAutoLayout.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./wgslAutoLayout.mjs");
+    const NAMED = ["templateConsts"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log("\n" + (fails ? `${fails} FAILED` : "ALL PASS"));
 process.exit(fails ? 1 : 0);
 

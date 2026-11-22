@@ -88,5 +88,11 @@ await section(() => {
     ok("!! AND WHAT IT MEANS FOR THE BY-SIZE HAND, SAID: ONE SHIP AGAINST FIGHTERS it picks the car's gunner (one ship), which trails the fly-wired one there by 0.131 -- the size is not the whole of the rule; the forecast was right that both lead and UNDER against the pilot's fighters (it said about level)", near(R("pilotFighters").fleetOverShip, 0.131) && /against fighters/i.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takePresetsHard.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takePresetsHard.mjs");
+    const NAMED = ["ARMS", "RATION"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

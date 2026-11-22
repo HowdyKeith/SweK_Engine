@@ -193,6 +193,10 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/tankPairedReplicate.mjs",
     "tools/ship/trainDecisionCircuit.mjs",
     "tools/ship/trainStation.mjs",
+    // v4933 -- two more that take a SUBJECT, from the round since v4932: brain/peerFleet.mjs's reportLines(A, B, R) (the two folders and the fight's result) and
+    // tools/denoiseLayers.mjs's reportLines(r) (a timing run). Found by tools/ship/reportDoors-selfcheck.mjs at the ship, 53 measured against 51 registered.
+    "brain/peerFleet.mjs",
+    "tools/denoiseLayers.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -287,6 +291,10 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/tankPairedReplicate.mjs",
     "tools/ship/trainDecisionCircuit.mjs",
     "tools/ship/trainStation.mjs",
+    // v4933 -- both measured by CALLING them bare: brain/peerFleet.mjs refuses with "Cannot read properties of undefined (reading 'id')", tools/denoiseLayers.mjs with
+    // "Cannot read properties of undefined (reading 'software')". Neither fabricates a report out of nothing.
+    "brain/peerFleet.mjs",
+    "tools/denoiseLayers.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -346,6 +354,11 @@ export const CALL_COST_V4459 = Object.freeze({
             cheap: "MEASURED", cheapFlag: "{ live: false }", cheapArg: Object.freeze({ live: false }),
             cheapSeconds: 0.0, linesBare: 19, linesCheap: 18 }),
         Object.freeze({ rel: "physics/thermal/stefan.mjs", bare: 70.0,
+            cheap: "IMPOSSIBLE" }),
+        // v4933 -- brain/battleshipDuel.mjs (the round since v4932) sorts into the bounded sample's first fourteen and its report FLIES FIGHTS: 3.99 s bare on
+        // this box, which took reportDoors-selfcheck from 1.7 s to 7.1 s and out of the quick sweep with every row green. reportLines() takes no parameter, so
+        // there is no cheap path to measure -- IMPOSSIBLE, as for stefan.
+        Object.freeze({ rel: "brain/battleshipDuel.mjs", bare: 4.0,
             cheap: "IMPOSSIBLE" }),
         // *** THE ENTRY THAT LOOKED BEST-SUPPORTED IN v4458's TABLE WAS THE MOST WRONG ONE. *** It read
         // `cheapFlag: "{ live: false } -- HAS NO EFFECT", cheap: 72.3` -- a flag, a verdict and a number,

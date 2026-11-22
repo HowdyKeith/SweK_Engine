@@ -12,16 +12,16 @@
 // *** NO EXPORTS ON PURPOSE: a command-line entry point. The library is what the gate holds (brain/peerFleet-selfcheck.mjs). ***
 "use strict";
 import fs from "node:fs";
+import { parseOrExit } from "./cliArgs.mjs";   // an unknown or misspelt option is refused by name, never read as a default
 import path from "node:path";
-import * as PF from "../../brain/peerFleet.mjs";
 
-const argv = process.argv.slice(2), known = ["a", "b", "seeds", "ships", "escorts", "helm-a", "helm-b", "gunners-a", "gunners-b", "no-cannon-a", "no-cannon-b"], flags = ["no-cannon-a", "no-cannon-b"];
-const bad = argv.filter((x) => x.startsWith("--") && !known.includes(x.slice(2))), val = (k, d = null) => { const i = argv.indexOf("--" + k); return i >= 0 ? argv[i + 1] : d; }, has = (k) => argv.includes("--" + k);
+const VALS = ["a", "b", "seeds", "ships", "escorts", "helm-a", "helm-b", "gunners-a", "gunners-b"], cli = parseOrExit("takePeerFleet", { values: Object.fromEntries(VALS.map((k) => ["--" + k, "string"])), flags: ["--no-cannon-a", "--no-cannon-b"] });
+const val = (k, d = null) => cli.values["--" + k] ?? d, has = (k) => cli.flags.has("--" + k);
 const die = (m) => { console.error("takePeerFleet: " + m); process.exit(2); };
-if (bad.length) die(`unknown option ${bad.join(", ")} (known: ${known.map((k) => "--" + k).join(", ")})`);
 if (!val("a") || !val("b")) die("it needs --a <folder> and --b <folder | rule>");
 const seedsArg = val("seeds", "1-5"), m = /^(\d+)-(\d+)$/.exec(seedsArg), seeds = m ? Array.from({ length: Number(m[2]) - Number(m[1]) + 1 }, (_, i) => Number(m[1]) + i) : seedsArg.split(",").map(Number);
 if (!seeds.length || seeds.some((s) => !Number.isInteger(s) || s < 1)) die(`--seeds is a range (1-5) or a list (1,2,3) of whole numbers from 1 (got ${seedsArg})`);
+const PF = await import("../../brain/peerFleet.mjs");   // loaded after the options are read: a refused option costs no fight engine (tools/ship/cliArgs-selfcheck.mjs spawns every converted tool)
 const read = (dir) => {
     if (dir === "rule") return [];
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) die(`${dir} is not a folder`);

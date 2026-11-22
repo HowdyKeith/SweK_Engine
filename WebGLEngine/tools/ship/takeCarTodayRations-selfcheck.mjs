@@ -76,5 +76,11 @@ await section(() => {
     ok("!! WHAT IS DECIDED, as read: car-today trails nowhere, so the escorts pick stays; the by-the-fight hand's note gives every ration", !v.changes && !rd.verdict.changes && h.bySize.escorts === "car-today" && /takeCarTodayRations/.test(h.note) && /\+0\.187/.test(h.note) && /-0\.080/.test(h.note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeCarTodayRations.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeCarTodayRations.mjs");
+    const NAMED = ["SINE"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

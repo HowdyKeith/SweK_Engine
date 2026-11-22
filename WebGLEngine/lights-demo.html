@@ -59,7 +59,7 @@ const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pit
 const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0, 0.5, 0], radius: 6 }) });
 state.capture = () => new Promise((res) => { state._want = res; });
 const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now();
-const gpuTime = (label, fn) => (window.__gpuTimerAuto ? window.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label
 let last = performance.now();
 function frame() {
     const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;

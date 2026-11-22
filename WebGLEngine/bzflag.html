@@ -366,7 +366,7 @@ gl.cullFace(gl.BACK);
 gl.clearColor(0.04, 0.05, 0.06, 1);
 
 let last = performance.now();
-const gpuTime = (label, fn) => (window.__gpuTimerAuto ? window.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
 

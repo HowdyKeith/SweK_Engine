@@ -115,5 +115,11 @@ await section(() => {
     ok("!! WHAT IS DECIDED, as read: one ship a side takes car-today, in fleets the pick holds; THE PAGE'S by-the-fight button carries it (bySize oneNoCannon car-today) and its note says so", v.ok && v.takes.one === "today" && v.takes.fleet === "button" && rd.verdict.takes.one === "today" && rd.verdict.takes.fleet === "button" && C.HANDS.find((h) => h.id === "bysize").bySize.oneNoCannon === "car-today" && /takeButtonNoCannon/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeButtonNoCannon.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeButtonNoCannon.mjs");
+    const NAMED = ["CARS", "SHIPS", "gunnerOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

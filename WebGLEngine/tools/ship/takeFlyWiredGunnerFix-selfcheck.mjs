@@ -61,5 +61,11 @@ await section(() => {
     ok("!! AND AGAINST FIGHTERS IT IS A LITTLE WORSE (sticky less shipped -0.029, z -2.9: TRAILS), so BY THE RULE REGISTERED BEFORE THE PAIRS IT DOES NOT SHIP -- no file, and the page keeps the shipped gunner. The forecast was right for the fleets' direction, under for the no-cannon fleet, and wrong for the fighters", near(R("fighters").gain, -0.029) && rd.fighters.words.gain === "TRAILS" && near(R("fighters").sticky, -0.182) && !rd.verdict.ok && /in fighters sticky less shipped TRAILS/.test(rd.verdict.reasons.join()) && !fs.existsSync(G.DEFAULT_OUT));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredGunnerFix.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredGunnerFix.mjs");
+    const NAMED = ["POLICY"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

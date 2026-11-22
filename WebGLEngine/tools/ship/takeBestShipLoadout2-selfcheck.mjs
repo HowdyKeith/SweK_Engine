@@ -76,5 +76,11 @@ await section(() => {
     ok("!! AND THE PAGE STILL CARRIES THE CAR'S GUNNER, its note no longer saying the rationed and escort fights were not tried", ["car-big", "bysize"].includes(C.presetOf("best").choice.hand) && ["flywired", "split"].includes(C.presetOf("best").choice.helm)   /* since 2026-11-21 the split helm: tools/ship/takeSplitHelm.mjs */ && C.presetOf("best").choice.cannon === true   /* the car's gunner, or since 2026-11-20 the by-size hand that is the car's gunner one ship a side (tools/ship/takeBySizeLoadout.mjs) */ && !/NOT tried with rationed magazines/.test(C.presetOf("best").note) && /a quarter of every magazine/.test(C.presetOf("best").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeBestShipLoadout2.mjs held by its gate (it found these 3 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeBestShipLoadout2.mjs");
+    const NAMED = ["ESCORTS", "RATION", "SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

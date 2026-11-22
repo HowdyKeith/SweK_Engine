@@ -1,8 +1,8 @@
 # The evade seat: DRAFT registration (2026-11-22; UNNUMBERED)
 
-**STATUS: REGISTERED 2026-11-22 as the header of `tools/ship/takeEvadeSeat.mjs` (which, where the two differ, is the registration: the threat is an enemy ROUND on a hitting course, tau0 2 s; stage 2's seeds are 1701001-/1711001-). NOTHING FLOWN.** The draft below is kept as written, with its corrections marked. It is registered when the reflex and the study tool are built and this text,
+**STATUS: REGISTERED 2026-11-22 as the header of `tools/ship/takeSpaceEvadeSeat.mjs` (which, where the two differ, is the registration: the threat is an enemy ROUND on a hitting course, tau0 2 s; stage 2's seeds are 1701001-/1711001-). NOTHING FLOWN.** The draft below is kept as written, with its corrections marked. It is registered when the reflex and the study tool are built and this text,
 as it then stands, is committed as the tool's header -- before any pair is flown. Once approved (with
-whatever he changes), this text becomes the header of `tools/ship/takeEvadeSeat.mjs`, committed before any pair is flown, as `tools/ship/takeLc11Gunner.mjs`'s was.
+whatever he changes), this text becomes the header of `tools/ship/takeSpaceEvadeSeat.mjs`, committed before any pair is flown, as `tools/ship/takeLc11Gunner.mjs`'s was.
 Backlog: `brain/BACKLOG_2026-11-04_BRAINS.md`, `evade-seat-loom-circuits`. Keith: "start with the LC4/LPLC2 data pull and a draft registration".
 
 ## The circuits (data: pulled, baked and pinned; see `vendor/male-cns/PROVENANCE.md` and `brain/maleCnsCircuits-selfcheck.mjs` sections 8-12)
@@ -118,10 +118,10 @@ reflex, so choosing from them biases nothing that will be flown.
 ## The second loom bench, read before any stage of the seat was flown (2026-11-22)
 
 `tools/ship/takeLoomBenchGF.mjs`: LC4 and LPLC2 also tell a loom's side from its own side (+0.43 to +0.45 and +0.32 to +0.42), as LC6 and LC16 do; PVLP151 decides none of them.
-It changes nothing in the registration (`tools/ship/takeEvadeSeat.mjs`, committed before this reading).
+It changes nothing in the registration (`tools/ship/takeSpaceEvadeSeat.mjs`, committed before this reading).
 
 ## What must be built before anything flies (none of it is built yet)
 
 * ~~The four pathways baked and their positions pinned~~ -- DONE 2026-11-22 (`brain/lc4*.mjs`, `brain/lplc2*.mjs`; gate sections 10-12).
 * ~~`brain/evadeReflex.mjs` and its gate; the duel's `evade` option; the pool passing it~~ -- DONE 2026-11-22 (the threat to be redefined, above).
-* `tools/ship/takeEvadeSeat.mjs` (this text as its header; the single read; the kept arms) and its gate.
+* `tools/ship/takeSpaceEvadeSeat.mjs` (this text as its header; the single read; the kept arms) and its gate.

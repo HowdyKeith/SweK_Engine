@@ -93,5 +93,11 @@ await section(() => {
     ok("!! AND THE PAGE HAS IT: the `sine twin` preset, the cannon-aware helm's sine twin and the by-the-fight hand's", JSON.stringify(C.presetOf("sine").choice) === '{"hand":"bysize-sine","helm":"sine","cannon":true}' && C.HELMS.some((h) => h.id === "sine") && C.HANDS.some((h) => h.id === "bysize-sine"));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeSineTwins.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeSineTwins.mjs");
+    const NAMED = ["SHIPS"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

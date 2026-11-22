@@ -106,5 +106,11 @@ await section(() => {
     ok("!! AND THE PAGE: the by-the-fight button's third pick, one ship a side with escorts, is car-today; its note says where it was flown and where not", h.bySize.escorts === "car-today" && h.bySize.one === "flywired-one" && h.bySize.fleet === "flywired" && /takeCarTodayEscorts/.test(h.note) && /\+0\.219/.test(h.note) && /not flown there without the cannon|without the cannon it leads the 45-degree gunner too/.test(h.note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeCarTodayEscorts.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeCarTodayEscorts.mjs");
+    const NAMED = ["ARMS", "SETUP"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

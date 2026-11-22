@@ -90,5 +90,11 @@ await section(() => {
     ok("!! the forecast was right in fleets (it said leads) and UNDER without the cannon (+0.5 against a forecast like one ship a side's +0.15), and wrong one ship a side with escorts (level); AND THE BY-SIZE NOTE NO LONGER SAYS IT WAS NOT FLOWN IN FLEETS OF FOUR", near(R("fleet4NoCannon").button, 1.035) && near(R("oneEscortsNoCannon").car, 1.622) && !/NOT flown in fleets of four or more/.test(C.HANDS.find((h) => h.id === "bysize").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeButtonUntried.mjs held by its gate (it found these 2 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeButtonUntried.mjs");
+    const NAMED = ["ARMS", "gunnerOf"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

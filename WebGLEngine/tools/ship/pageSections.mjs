@@ -918,6 +918,12 @@ export const UNPLACED = new Map([
     // as born invisible at the first verdict). WHICH DRAWER IS KEITH'S CALL, as it was for the rtx pages: the fruit-fly drawer already holds es-flight6dof.html, whose pilots
     // these pages fly, but a combat page is not obviously a brain page, and the choice is one he makes with the three side by side.
     // UNNUMBERED -- the sub aquarium (WIP, the submarine line). Linked from Arriving so it is reachable, and it is the FISH BRAIN chip's click-through; the drawer is Keith's call: it is a brain page (the GFC pilots) AND a fleet page (peers send subs).
+    // v4933 -- FOUR PAGES OF THE PLAYCANVAS LINE, linked from server.html (beside blackhole.html) at the ship so pageReach could see them. Which drawer is Keith's call:
+    // the WebGPU drawer they would join is full at 15 of 15, and gizmo-demo and lights-demo are WebGL2. Waiting here, said, until he files them.
+    ["splat-gpu.html", "Gaussian splats sorted and drawn on the card (render/splatSortGPU.mjs, render/splatRendererGPU.mjs) -- the WebGPU drawer is full at 15 of 15; a drawer decision, Keith's"],
+    ["gizmo-demo.html", "the gizmos, view cube and infinite grid on WebGL2 (render/gizmo.mjs, render/infiniteGrid.mjs) -- an editor tool with no editor drawer yet; a drawer decision, Keith's"],
+    ["lights-demo.html", "clustered lighting with a shadow atlas on WebGL2 (render/clusteredLights.mjs) -- the WebGL2 half of a pair whose WebGPU half has no slot either; a drawer decision, Keith's"],
+    ["lights-gpu.html", "the same many-lights scene on WebGPU, with soft shadows and fog shafts -- the WebGPU drawer is full at 15 of 15; a drawer decision, Keith's"],
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */

@@ -91,5 +91,11 @@ await section(() => {
     ok("!! against the plain ship: the car's +1.785 and +1.216, no window +1.802 and +1.361; the forecast was right with the cannon and UNDER without (it said about the same); AND THE FILE AND THE PAGE: a seatFlyWired11 brain with the window 0, which the by-size hand takes one ship a side", near(R("oneCannon").car, 1.785) && near(R("oneNoCannon").fly0, 1.361) && blob.policy === "seatFlyWired11" && blob.weights[4] === 0 && C.FILES["seat-flywired-one"].path.endsWith("seatFlyWired11WeightsOne.json") && C.HANDS.find((h) => h.id === "bysize").bySize.one === "flywired-one");
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeFlyWiredOneWindow.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeFlyWiredOneWindow.mjs");
+    const NAMED = ["WINDOW0"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

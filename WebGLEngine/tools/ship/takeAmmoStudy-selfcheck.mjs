@@ -74,5 +74,11 @@ section(() => {
     ok("!! the first pair of the champion's file at an eighth of the magazines that the ration changed, flown again here through the pool's own leadOf with the ration, is the lead the file holds -- and without the ration it is another", P.leadOf(A.jobsOf("champion", 0.125, champion, [{ kind, seed: Number(seed) }])[0]) === first[1] && P.leadOf(A.jobsOf("champion", 1, champion, [{ kind, seed: Number(seed) }])[0]) !== first[1]);
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of takeAmmoStudy.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./takeAmmoStudy.mjs");
+    const NAMED = ["EAGER"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

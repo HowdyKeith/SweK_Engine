@@ -25,7 +25,7 @@ import { mat4Invert } from "./render/motionVectors.mjs";
 
 const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsGpu = { ready: false, frames: 0, error: null };
 const fail = (m) => { state.error = m; document.getElementById("stats").textContent = "· " + m; throw new Error(m); };
-if (!navigator.gpu) fail("this browser has no WebGPU");
+if (!navigator.gpu) { const W = await import("./ui/webgpuProbe.mjs"), P = W.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location }); if (P.reason === "insecure-origin") W.showOriginBanner(P); fail(P.message); }   // the origin may be what withheld it (ui/webgpuProbe.mjs)
 const adapter = await navigator.gpu.requestAdapter(); if (!adapter) fail("no WebGPU adapter");
 const device = await adapter.requestDevice(), ctx = cv.getContext("webgpu"), FORMAT = "rgba8unorm";
 ctx.configure({ device, format: FORMAT, alphaMode: "opaque", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
@@ -95,4 +95,5 @@ async function frame() {
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-</script></body></html>
+</script><script type="module" src="/ui/originNotice.js"></script>   <!-- on a LAN address navigator.gpu is absent (not a secure context): say so, not "no WebGPU" -->
+</body></html>

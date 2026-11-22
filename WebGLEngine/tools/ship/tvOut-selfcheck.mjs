@@ -22,7 +22,7 @@ import http from "node:http";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as T from "../../ui/tvOut.js";
 
 const require = createRequire(import.meta.url), ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -118,7 +118,7 @@ await section(async () => {
 console.log("4. END TO END (a real browser, the real tvpipe)");
 await section(async () => {
     let sdk = null, chromium = null;
-    try { sdk = await import(require.resolve("@tvpipe/sdk", { paths: [path.join(ENG, "ai-bridge")] })); } catch { /* not installed */ }
+    try { sdk = await import(pathToFileURL(require.resolve("@tvpipe/sdk", { paths: [path.join(ENG, "ai-bridge")] })).href); } catch { /* not installed */ }
     try { chromium = require(require.resolve("playwright", { paths: [path.join(ENG, "tools", "render-qa"), ENG] })).chromium; } catch { try { chromium = (await import("playwright")).chromium; } catch { /* none */ } }
     if (!sdk || !chromium) { console.log(`  ----  skipped: ${!sdk ? "@tvpipe/sdk is not installed in ai-bridge" : "no playwright"} here`); return; }
     const { WebSocketServer } = require(require.resolve("ws", { paths: [path.join(ENG, "ai-bridge")] }));

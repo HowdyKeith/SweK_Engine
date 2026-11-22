@@ -108,7 +108,7 @@ function cloud() {
 
 let draw = null, drawCount = 0;
 async function useWebGPU(splat, capacity = splat.count) {
-    if (!navigator.gpu) throw new Error("this browser has no WebGPU");
+    if (!navigator.gpu) { const W = await import("./ui/webgpuProbe.mjs"), P = W.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location }); if (P.reason === "insecure-origin") W.showOriginBanner(P); throw new Error(P.message); }   // the origin may be what withheld it (ui/webgpuProbe.mjs)
     const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no WebGPU adapter");
     const wantTimer = Q.get("gputimer") !== "0" && adapter.features.has("timestamp-query");
     const device = await adapter.requestDevice(wantTimer ? { requiredFeatures: ["timestamp-query"] } : undefined), ctx = canvas.getContext("webgpu"), format = navigator.gpu.getPreferredCanvasFormat();
@@ -242,5 +242,6 @@ state.capture = async (cols = 32, rows = 20) => {
 resize();
 (Q.get("swlod") ? openLodStream(httpRange(Q.get("swlod"))).then(showLod) : Q.get("ply") ? fetch(Q.get("ply")).then((r) => { if (!r.ok) throw new Error(`${Q.get("ply")}: HTTP ${r.status}`); return r.arrayBuffer(); }).then((b) => show(parseSplatFile(b, Q.get("ply")))) : show(cloud())).then(() => requestAnimationFrame(frame), (e) => { state.error = String(e.message || e); hud.textContent = state.error; });
 </script>
+<script type="module" src="/ui/originNotice.js"></script>   <!-- on a LAN address navigator.gpu is absent (not a secure context): say so, not "no WebGPU" -->
 </body>
 </html>

@@ -131,14 +131,15 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // in that handler, and tools/roundhouse/angularImpulseCensus-selfcheck.mjs reads the file back to check the server hands it over byte for
     // byte (both in code). Found by the wide run of the box3d spin cap, two commits after the one that brought them (e1a56d0d), whose own batch
     // had not included this gate. Sabotaged: a third file naming a .wasm in code (W3), and one naming it in a comment only (W4) -- each turns both rows red.
-    ok("!! 130 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 130, `${mentions} mention it`);
+    // v4933 -- 130 -> 132 (103 -> 105 in code; comment-only stays at 27): tools/ship/flightLights-selfcheck.mjs and tools/ship/gpuTimerAuto-selfcheck.mjs, whose page servers map .wasm to application/wasm (the pages they open load box3d's and others' WASM).
+    ok("!! 132 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 132, `${mentions} mention it`);
     // *** AND THIS ROW'S TITLE CARRIED A NUMBER ITS ASSERTION DOES NOT CHECK. *** It said "24 of those are
     // comments" while asserting only `inCode === 94`, so when comment-only went to 25 the row kept passing and
     // kept saying 24 -- a title reporting a moving quantity as a fixed one, beside a detail line printing the
     // true value. Both halves are asserted now, so the title cannot drift away from the check underneath it.
-    ok("!! ...but 27 of those are comments and prose only; 103 mention it in live code",
-        inCode === 103 && mentions - inCode === 27, `${inCode} in code, ${mentions - inCode} comment-only`);
+    ok("!! ...but 27 of those are comments and prose only; 105 mention it in live code",
+        inCode === 105 && mentions - inCode === 27, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence

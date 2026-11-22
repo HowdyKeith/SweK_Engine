@@ -1,145 +1,135 @@
-// WebGLEngine/tools/ship/takeEvadeSeat.mjs -- UNNUMBERED (the version is chosen at ship time)
-//
-// THE EVADE SEAT: CAN A CAPITAL SHIP GET OUT OF THE WAY OF THE FIRE, AND DOES A FLY'S LOOMING CIRCUIT DO IT BETTER THAN A SINE? brain/evadeReflex.mjs is the reflex (its gate
-// brain/evadeReflex-selfcheck.mjs); brain/EVADE_SEAT_REGISTRATION_DRAFT.md is the draft this registration was made from, with Keith's answers (2026-11-22: "Screen first",
-// ten circuit arms, DNp04 for LC4, "Rounds on a hitting course"). The circuits: brain/maleCnsCircuits-selfcheck.mjs sections 8-12 and vendor/male-cns/PROVENANCE.md.
-//
-//   node tools/ship/takeEvadeSeat.mjs --stage 1 [--workers n]      the action screen; then --stage 2 (the circuits); then --stage 3 (the controls, if stage 2 asks for any)
-//
-// THE REFLEX (brain/evadeReflex.mjs; HAND-SET, NOT THE FLY'S): the THREAT is the enemy round whose straight path, relative to the hull, passes within the hull's radius (6 m) of its
-//   centre soonest, under 2 s; with none the ship flies as its helm says. While there is one, after today's best-ship helm (the split helm with the cannon, the sine twin), ONE
-//   action: `turn` (a yaw torque AWAY from where the round comes from, tanh(2 S) of half the torque limit), `burst` (the thrust up toward all the pods give), `climb` (a pitch
-//   torque away from the round's elevation: down from above, up from level or below), `jink` (full yaw swings, the first away, swapped every 0.5 s). S is the sine of the round's
-//   bearing, or a circuit's read-out: brain/flyTracking.mjs pathwayOf over LC6 (onto DNp103), LC16 (pIP1), LC4 (DNp04) or LPLC2 (DNp01, the Giant Fiber), the descending
-//   neurons' right less left, odd in the bearing, over its own peak, its sense set (pinned) so a round from a quarter turn left turns the hull right; for `burst` and `climb`
-//   the circuit's even read-out (the two together, less rest, over its peak) scales the action instead.
-// THE FIGHTS: side X flies today's best ship (the helm above and the fly-wired gunner, brain/seatFlyWired11Weights*.json, as tools/ship/takeLc11Gunner.mjs's `lc10` arm) with the
-//   arm's reflex; side Y is plain. The cannon on both sides. ONE SHIP A SIDE (the gunner with no hand window) and FLEETS OF THREE A SIDE (the 45-degree window). 300 pairs a
-//   fight, 75 of each of the duel's four kinds. NONE OF THESE SEEDS HAS BEEN FLOWN BY ANYTHING.
-//
-// STAGE 1, THE ACTION SCREEN (seeds 1681001- one ship a side, 1691001- fleets of three): arms `none` (no reflex), `turn`, `burst`, `climb`, `jink`, each with the sine read-out.
-//   THE ACTION IS CHOSEN BY THIS RULE: the action whose arm LEADS `none` (z >= 2, pair by pair) in at least one fight and TRAILS it (z <= -2) in none; if several, the larger
-//   mean lead over the two fights; IF NONE DOES, STAGE 2 FLIES `turn`, and says so.
-// STAGE 2, THE CIRCUITS (seeds 1701001- and 1711001-; NOT 1661001-/1671001-, which the draft named and tools/ship/takeFleetHandSizes.mjs had flown -- caught
-//   while registering), on stage 1's action: `none`, `sine`, and `lc6:medial`, `lc6:lateral`, `lc16:medial`, `lc16:lateral`, `lc4:medial`,
-//   `lc4:lateral`, `lplc2:medial`, `lplc2:lateral` (which end of each sheet is the front of the visual field is not in the data, so both).
-//   AN EVADE REFLEX SHIPS if some circuit-and-orientation LEADS `none` in at least one fight and TRAILS it in none; if several, the larger mean lead. The best-ship and fleet
-//   buttons then fly it. OTHERWISE NOTHING SHIPS, and the reading goes in the fly-wired helm's note. For the record, no page change: THE DARK-LOOMING CELLS AGAINST THE
-//   GIANT FIBER'S INPUTS -- the better of LC6 and LC16 (by mean lead over `none`) less the better of LC4 and LPLC2, pair by pair, in each fight -- and whether the shipped
-//   circuit (or, if none shipped, the best) can be told from `sine`.
-// STAGE 3, THE CONTROLS (stage 2's seeds), only for a circuit that shipped: `<type>:flat` (no places) and `<type>:shuffled:4242` (connections shuffled within each type). Its
-//   PLACES are credited if it leads `flat` somewhere and trails it nowhere; its WIRING, the same against the shuffle. If nothing shipped, stage 3 flies nothing and says so.
-//
-// REGISTERED 2026-11-22, BEFORE ANY PAIR OF ANY STAGE WAS FLOWN. What the reflex does in a fight was looked at only in fights with NO reflex (how often rounds and ships close),
-//   and that is what moved the threat from closing ships to rounds -- recorded in the draft.
-// FORECAST, for the record: no action can be told from `none` in fleets of three; one ship a side, `burst` or `jink` may lead (a 6 m hull moves out of a round's path faster
-//   than it turns); no circuit can be told from `sine`, and the dark-looming cells cannot be told from the Giant Fiber's inputs.
-// Every arm's leads are kept (brain/rig-results/evadeSeat/); each stage's reading file (brain/evadeSeat.stage<n>.reading.json) is the mark that it was read; a second read is
-// refused, and a stage is refused before the one it depends on was read.
-// WHAT IS NOT HERE: rounds from fighters (there are none in these fights), the cannon's charge as a threat, any learned weight, any other descending neuron for LC4.
+// WebGLEngine/tools/ship/takeEvadeSeat.mjs -- UNNUMBERED (the version is chosen at ship time; the registration is brain/SUB_EVADE_SEAT_WIP.md, the gate tools/ship/takeEvadeSeat-selfcheck.mjs)
+//   node tools/ship/takeEvadeSeat.mjs smoke                 the 17 sides against themselves on geometries 1 to 4; never recorded, free to read: the command runs
+//   node tools/ship/takeEvadeSeat.mjs dev  [--write]        the DEV read on geometries 106001 to 106024; --write records brain/subEvadeSeatDev.json once; DEV decides whether HELD is spent (rule R0)
+//   node tools/ship/takeEvadeSeat.mjs held --write          the HELD read on geometries 107001 to 107024, flown ONCE: refuses without a recorded DEV that holds R0, refuses without --write, refuses if brain/subEvadeSeatHeld.json exists
+// THE QUESTION (brain/SUB_EVADE_SEAT_WIP.md): does the evade doctrine reverse the seat in a MIRROR (a side flown against ITSELF does better from the seat that starts behind), and which of its numbers do it?
+// 17 SIDES, each flown against itself on every geometry (subTournament.seatBias's measure: seat A's score less seat B's, one duel a geometry): G; for league7001 and league7103 the unmodified finder U and the seven cells of G with some of its numbers (S, T, N, ST, SN, TN, STN, as in takeEvadeSplit.mjs).
+// A side is SEAT-A at a mean of at least +0.5 with z of at least +2, REVERSED at -0.5 and -2 or less, NEUTRAL otherwise. R0, R1 to R6 and the headline are rulesOf. The sunk boats of each seat are counted from the same duels (`fates`).
 "use strict";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import * as D from "../../brain/battleshipDuel.mjs";
-import * as EV from "../../brain/evadeReflex.mjs";
-import * as TA from "./takeTurretAudit.mjs";
-import { brainsOf } from "./takeLc11Gunner.mjs";
-import { createPool } from "./pairPool.mjs";
+import { fileURLToPath } from "node:url";
+import * as D from "../../brain/subDuel.mjs";
+import * as T from "../../brain/subTournament.mjs";
+import * as TA from "../../brain/subTactics.mjs";
+import { loadRuns, signed } from "./takeSubLeague.mjs";
+import { graft } from "./takeEvadeTurn.mjs";
+import { CELL_KEYS, CELLS } from "./takeEvadeSplit.mjs";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url)), BRAIN = path.resolve(HERE, "..", "..", "brain");
-export const READING_DIR = BRAIN, KEPT_DIR = path.join(BRAIN, "rig-results", "evadeSeat");
-export const readingFile = (stage, dir = READING_DIR) => path.join(dir, `evadeSeat.stage${stage}.reading.json`);
-export const FIGHTS = Object.freeze(["one", "fleet3"]), SHIPS = Object.freeze({ one: 1, fleet3: 3 }), GUN_OF = Object.freeze({ one: "gunOne", fleet3: "gun" });
-const pairs = (first, n) => Object.freeze(D.KINDS.flatMap((kind) => Array.from({ length: n }, (_, i) => Object.freeze({ kind, seed: first + i }))));
-export const SETS = Object.freeze({ 1: { one: pairs(1681001, 75), fleet3: pairs(1691001, 75) }, 2: { one: pairs(1701001, 75), fleet3: pairs(1711001, 75) } });
-export const STAGE1_ARMS = Object.freeze(["none", ...EV.ACTIONS]);
-export const CIRCUITS = Object.freeze(["lc6:medial", "lc6:lateral", "lc16:medial", "lc16:lateral", "lc4:medial", "lc4:lateral", "lplc2:medial", "lplc2:lateral"]);
-export const STAGE2_ARMS = Object.freeze(["none", "sine", ...CIRCUITS]);
-export const DARK = Object.freeze(["lc6", "lc16"]), GIANT = Object.freeze(["lc4", "lplc2"]);
-export const controlsOf = (circuit) => { const t = circuit.split(":")[0]; return [`${t}:flat`, `${t}:shuffled:4242`]; };
+const ENG = fileURLToPath(new URL("../../", import.meta.url));
+export const DEV_FILE = "brain/subEvadeSeatDev.json", HELD_FILE = "brain/subEvadeSeatHeld.json";
+export const SETS = Object.freeze({ smoke: Object.freeze({ first: 1, count: 4 }), dev: Object.freeze({ first: 106001, count: 24 }), held: Object.freeze({ first: 107001, count: 24 }) });
+export const FINDERS = Object.freeze(["league7001", "league7103"]), STRONG = "league7001", ODD = "league7103";
+export const BIAS = 0.5, MIN_Z = 2, G_BIAS = 3.35, G_TOLERANCE = 2.0;   // 1.0 until Amendment C of the seat note (dated after the DEV read, before any HELD geometry)
 
-/** The evade spec of an arm: null for `none`; the stage-1 action with the sine; or the chosen action with the arm's wiring. */
-export function evadeOf(stage, arm, action = null) {
-    if (arm === "none") return null;
-    if (stage === 1) { if (!EV.ACTIONS.includes(arm)) throw new Error(`takeEvadeSeat: no stage-1 arm ${arm}`); return { action: arm, wiring: "sine" }; }
-    if (!EV.ACTIONS.includes(action)) throw new Error(`takeEvadeSeat: stage ${stage} needs stage 1's action (got ${action})`);
-    const why = EV.checkWiring(arm); if (why) throw new Error(`takeEvadeSeat: ${why}`);
-    return { action, wiring: arm };
-}
-/** The jobs of one fight and arm: side X today's best ship with the arm's reflex, side Y plain; stage 3 flies stage 2's seeds. */
-export function jobsOf(stage, fight, arm, b, action = null) {
-    const list = SETS[stage === 3 ? 2 : stage][fight], g = b[GUN_OF[fight]], network = { ...g, weights: g.weights.slice() }, evade = evadeOf(stage, arm, action);
-    return list.map(({ kind, seed }) => ({ x: { id: "x", cannon: true, network, helmNet: b.helm, ...(evade ? { evade } : {}) }, y: { id: "plain", cannon: true }, kind, seed, opts: { ships: SHIPS[fight] } }));
-}
-const less = (a, b) => TA.stat(a.map((v, i) => v - b[i]));
-const credited = (zs) => zs.some((z) => z >= 2) && zs.every((z) => z > -2);
-/** Every arm against the plain side, and each arm less `base`, in one fight. Pure. */
-export function fightReadings(a, base = "none") {
-    const r = Object.fromEntries(Object.keys(a).map((arm) => [arm, TA.stat(a[arm])]));
-    for (const arm of Object.keys(a)) if (arm !== base && a[base]) r[`${arm} less ${base}`] = less(a[arm], a[base]);
-    return r;
-}
-/** STAGE 1's rule. Pure. */
-export function decideAction(out) {
-    const z = (x) => FIGHTS.map((f) => out[f][`${x} less none`].z), mean = (x) => FIGHTS.reduce((s, f) => s + out[f][`${x} less none`].mean, 0) / FIGHTS.length;
-    const beats = EV.ACTIONS.filter((x) => credited(z(x))), action = beats.length ? beats.slice().sort((p, q) => mean(q) - mean(p))[0] : "turn";
-    return { action, chosen: beats.length > 0, beats, reasons: [beats.length ? `THE ACTION IS ${action.toUpperCase()}: it leads no reflex in a fight and trails it in none${beats.length > 1 ? ` (of ${beats.join(", ")}, the larger mean lead)` : ""}` : "NO ACTION BEATS NO REFLEX: stage 2 flies TURN, as registered"] };
-}
-/** STAGE 2's rule and its record. Pure. */
-export function decideCircuits(out) {
-    const z = (x, k = "none") => FIGHTS.map((f) => out[f].reading[`${x} less ${k}`].z), mean = (x) => FIGHTS.reduce((s, f) => s + out[f].reading[`${x} less none`].mean, 0) / FIGHTS.length;
-    const bestOf = (list) => list.slice().sort((p, q) => mean(q) - mean(p))[0], beats = CIRCUITS.filter((c) => credited(z(c))), winner = beats.length ? bestOf(beats) : null, judged = winner || bestOf(CIRCUITS);
-    const dark = bestOf(CIRCUITS.filter((c) => DARK.includes(c.split(":")[0]))), giant = bestOf(CIRCUITS.filter((c) => GIANT.includes(c.split(":")[0])));
-    const darkLessGiant = Object.fromEntries(FIGHTS.map((f) => [f, less(out[f].arms[dark], out[f].arms[giant])])), lessSine = Object.fromEntries(FIGHTS.map((f) => [f, less(out[f].arms[judged], out[f].arms.sine)])), told = FIGHTS.some((f) => Math.abs(lessSine[f].z) >= 2);
-    return { ships: winner !== null, winner, judged, dark, giant, darkLessGiant, lessSine, toldFromSine: told,
-        reasons: [winner ? `AN EVADE REFLEX SHIPS: ${winner} leads no reflex in a fight and trails it in none -- the best-ship and fleet buttons fly it` : "NO CIRCUIT BEATS NO REFLEX: NOTHING SHIPS",
-            `the dark-looming cells (${dark}) less the Giant Fiber's inputs (${giant}): ${FIGHTS.map((f) => `${f} ${darkLessGiant[f].mean >= 0 ? "+" : ""}${darkLessGiant[f].mean.toFixed(3)} (z ${darkLessGiant[f].z.toFixed(2)})`).join(", ")}`,
-            `${judged} ${told ? "CAN" : "cannot"} be told from the sine`] };
-}
-/** STAGE 3's record. Pure. */
-export function decideControls(out, circuit) {
-    const [flat, shuf] = controlsOf(circuit), z = (k) => FIGHTS.map((f) => less(out[f].arms[circuit], out[f].arms[k]).z);
-    const places = credited(z(flat)), wiring = credited(z(shuf));
-    return { places, wiring, reasons: [`${circuit}'s PLACES ${places ? "ARE" : "are NOT"} credited (against ${flat}); its WIRING ${wiring ? "IS" : "is NOT"} credited (against ${shuf})`] };
-}
-const readJSON = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
-/** Which arms a stage flies, and on what action -- refusing a stage before the one it depends on was read. */
-export function planOf(stage, dir = READING_DIR) {
-    if (fs.existsSync(readingFile(stage, dir))) throw new Error(`takeEvadeSeat: ${readingFile(stage, dir)} is already there -- STAGE ${stage} HAS BEEN READ ONCE and is not read again`);
-    if (stage === 1) return { arms: STAGE1_ARMS, action: null };
-    if (!fs.existsSync(readingFile(stage - 1, dir))) throw new Error(`takeEvadeSeat: stage ${stage} waits for stage ${stage - 1}'s reading (${readingFile(stage - 1, dir)})`);
-    const one = readJSON(readingFile(1, dir)), action = one.verdict.action;
-    if (stage === 2) return { arms: STAGE2_ARMS, action };
-    const two = readJSON(readingFile(2, dir));
-    return { arms: two.verdict.ships ? [two.verdict.winner, ...controlsOf(two.verdict.winner)] : [], action, circuit: two.verdict.winner };
-}
-/** A stage. `fly(fight, arm)` -> Promise of leads. */
-export async function study(stage, plan, fly, log = () => {}) {
-    const out = {};
-    if (!plan.arms.length) { log("stage 3: nothing shipped in stage 2, so no control is flown"); return { stage, verdict: { flown: false, reasons: ["nothing shipped in stage 2: no control flown"] } }; }
-    for (const f of FIGHTS) {
-        const a = {}; for (const arm of plan.arms) a[arm] = await fly(f, arm);
-        out[f] = { arms: a, reading: fightReadings(a, stage === 3 ? plan.circuit : "none") };
-        log(`STAGE ${stage}, ${f === "one" ? "ONE SHIP A SIDE" : "FLEETS OF THREE"}${plan.action ? `, the ${plan.action}` : ""}, ${a[plan.arms[0]].length} pairs:`);
-        for (const [k, s] of Object.entries(out[f].reading)) log(`     ${k}: mean ${s.mean >= 0 ? "+" : ""}${s.mean.toFixed(3)}, z ${s.z.toFixed(2)} ${TA.word(s.z)}`);
+const f3 = (v) => signed(v, 3);
+
+/** The 17 sides from G (a theta) and the two finders ([{ id, final }]): { id, kind ("G", "U" or a cell), finder, theta }, G first, then for each finder U and the seven cells in the order of takeEvadeSplit's CELLS. */
+export function sidesOf(G, finders) {
+    const sides = [{ id: "G", kind: "G", finder: null, theta: { ...G } }];
+    for (const id of FINDERS) {
+        const f = finders.find((x) => x.id === id);
+        sides.push({ id: `U:${id}`, kind: "U", finder: id, theta: { ...f.final } });
+        for (const c of CELLS) sides.push({ id: `${c}:${id}`, kind: c, finder: id, theta: graft(G, f.final, CELL_KEYS[c]) });
     }
-    const flat = Object.fromEntries(FIGHTS.map((f) => [f, out[f].reading]));
-    const verdict = stage === 1 ? decideAction(flat) : stage === 2 ? decideCircuits(out) : decideControls(out, plan.circuit);
-    log(`WHAT IS DECIDED: ${verdict.reasons.join("; ")}`);
-    return { stage, action: plan.action, readings: Object.fromEntries(FIGHTS.map((f) => [f, out[f].reading])), verdict };
+    return sides;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const rest = process.argv.slice(2), arg = (k, d = null) => { const i = rest.indexOf("--" + k); return i >= 0 ? rest[i + 1] : d; }, bad = rest.filter((x) => x.startsWith("--") && !["stage", "workers", "dir", "kept"].includes(x.slice(2)));
-    if (bad.length) { console.error(`takeEvadeSeat: unknown option ${bad.join(", ")}`); process.exit(2); }
-    const stage = Number(arg("stage")); if (![1, 2, 3].includes(stage)) { console.error("takeEvadeSeat: --stage 1, 2 or 3"); process.exit(2); }
-    const dir = arg("dir", READING_DIR), kept = arg("kept", KEPT_DIR);
-    let plan; try { plan = planOf(stage, dir); } catch (e) { console.error(e.message); process.exit(1); }
-    const b = brainsOf(); fs.mkdirSync(kept, { recursive: true });
-    const pool = createPool(arg("workers") ? { workers: Number(arg("workers")) } : {});
-    const fly = async (fight, arm) => { const f = path.join(kept, `stage${stage}_${plan.action || "screen"}_${fight}_${arm.replace(/:/g, "-")}.json`); if (fs.existsSync(f)) return readJSON(f).leads; const leads = await pool.leads(jobsOf(stage, fight, arm, b, plan.action)); fs.writeFileSync(f, JSON.stringify({ stage, fight, arm, action: plan.action, leads }) + "\n"); return leads; };
-    const result = await study(stage, plan, fly, (m) => console.log(m));
-    fs.writeFileSync(readingFile(stage, dir), JSON.stringify(result) + "\n"); console.log(`wrote ${readingFile(stage, dir)}`);
-    await pool.close(); process.exit(0);
+/** A side's label from its mean seat bias and z: SEAT-A at +BIAS and +MIN_Z or more, REVERSED at -BIAS and -MIN_Z or less, NEUTRAL otherwise. */
+export const labelOf = (mean, z) => (mean >= BIAS && z >= MIN_Z ? "SEAT-A" : mean <= -BIAS && z <= -MIN_Z ? "REVERSED" : "NEUTRAL");
+
+/** z from a mean and its standard error: the mean over the se; infinite in the direction of the mean when the se is 0, and 0 for a mean of 0. */
+export const zOf = (mean, se) => (se > 0 ? mean / se : (mean > 0 ? Infinity : mean < 0 ? -Infinity : 0));
+/** From the `fates` of each duel ([seat A's, seat B's]): how many had seat A's boat sunk, seat B's boat sunk, both, and neither. */
+export function countSunk(fates) {
+    const sa = fates.filter((f) => f[0] === "sunk").length, sb = fates.filter((f) => f[1] === "sunk").length, both = fates.filter((f) => f[0] === "sunk" && f[1] === "sunk").length;
+    return { sunkA: sa, sunkB: sb, both, neither: fates.length - (sa + sb - both) };
+}
+/** Is a mean within `tol` of `ref` (at most)? */
+export const withinBias = (mean, ref, tol) => Math.abs(mean - ref) <= tol;
+
+/** One side against itself on a set of geometries: { mean, se, n, z, sunkA, sunkB, neither, both } (the mean of seat A's score less seat B's, as subTournament.seatBias; z is `zOf`; the sunk counts are `countSunk` of the duels' fates). */
+export function mirror(side, geos, opts = {}) {
+    const seconds = opts.seconds || D.SECONDS, v = [], fates = [];
+    for (const sc of geos) { const r = D.duel(side.side(), sc, { ...opts, opponent: side.side() }); v.push(r.score - D.scoreFor(r, "B", seconds)); fates.push(r.fates); }
+    const n = v.length, mean = v.reduce((a, b) => a + b, 0) / n, sd = n > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0, se = sd / Math.sqrt(n), c = countSunk(fates);
+    return { mean, se, n, z: zOf(mean, se), sunkA: c.sunkA, sunkB: c.sunkB, both: c.both, neither: c.neither };
+}
+
+/** Flies the 17 sides against themselves on a set ("smoke", "dev" or "held"), plus what the checks need: G flown a second time (`again`) and subTournament.seatBias's own figure for G (`reference`). Returns { rows, again: { mean }, reference: { mean } }. */
+export function fly(sides, setName, opts = {}) {
+    const geos = T.geometries(SETS[setName].count, SETS[setName].first), make = (s) => T.makeSide(s.id, { theta: s.theta });
+    const rows = sides.map((s) => { const m = mirror(make(s), geos, opts); return { id: s.id, kind: s.kind, finder: s.finder, ...m, label: labelOf(m.mean, m.z) }; });
+    const g = sides.find((s) => s.id === "G");
+    return { rows, again: { mean: mirror(make(g), geos, opts).mean }, reference: { mean: T.seatBias(make(g), geos, opts).mean } };
+}
+
+/** The checks that VOID the read, by name and not weighed. ctx { rows, sides, again, reference, G, runs }. */
+export function checksOf({ rows, sides, again, reference, G, runs }) {
+    const c = [], g = rows.find((r) => r.id === "G");
+    if (!g || again.mean !== g.mean) c.push("a second flight of G is not the same to the last digit");
+    if (!g || reference.mean !== g.mean) c.push("the command's seat bias for G is not subTournament.seatBias's");
+    if (rows.some((r) => !Number.isFinite(r.mean) || !Number.isFinite(r.se))) c.push("a mean seat bias is non-finite");
+    if (!sides.every((s) => TA.THETA_NAMES.every((k) => TA.clampTheta(s.theta)[k] === s.theta[k]))) c.push("a side has a theta that clampTheta changes");
+    if (runs.some((r) => JSON.stringify(r.gen0) !== JSON.stringify(G))) c.push("a run's generation 0 is not G");
+    if (g && !withinBias(g.mean, G_BIAS, G_TOLERANCE)) c.push(`G's mirror bias ${g.mean} is not within ${G_TOLERANCE} of +${G_BIAS}`);
+    return c;
+}
+
+/** R0 to R6, the headline and the forecast quantities from the rows. */
+export function rulesOf(rows) {
+    const by = (id) => rows.find((r) => r.id === id), lab = (id) => (by(id) ? by(id).label : null), rev = (id) => lab(id) === "REVERSED";
+    const r1 = rev(`U:${STRONG}`), r2 = rev(`STN:${STRONG}`), r3 = rev(`N:${STRONG}`), r4 = rev(`SN:${STRONG}`), r5 = rev(`S:${STRONG}`), r6 = !rev(`U:${ODD}`) && !rev(`STN:${ODD}`);
+    const headline = r4 && !r3 && r6 ? "THE SPEED IS WHAT REVERSES IT" : r3 ? "THE TURN ALONE REVERSES IT" : r2 && !r3 && !r4 && !r5 ? "THE TRIPLE, AND NO PART OF IT ALONE" : !r2 ? "NOTHING OF THE TRIPLE REVERSES IT" : null;
+    const reversed = rows.filter((r) => r.label === "REVERSED"), g = by("G");
+    return { replicates: lab("G") === "SEAT-A" && r1, R1: r1, R2: r2, R3: r3, R4: r4, R5: r5, R6: r6, headline, forecast: { reversedSunkMore: reversed.length > 0 && reversed.every((r) => r.sunkA > r.sunkB), gWithinHalf: !!g && withinBias(g.mean, G_BIAS, 0.5) } };
+}
+
+/** The report of a read, one string a line. */
+export function reportLines(rows, rules, name) {
+    const S = SETS[name], L = [], yn = (b) => (b ? "yes" : "no");
+    L.push(`[takeEvadeSeat] ${name} read: geometries ${S.first} to ${S.first + S.count - 1}, ${S.count} mirror duels a side (each side against itself, seat A's score less seat B's); SEAT-A at a mean of +${BIAS} or more with z of +${MIN_Z} or more, REVERSED at -${BIAS} and -${MIN_Z} or less`);
+    for (const r of rows) L.push(`  ${r.id.padEnd(15)} seat A is worth ${f3(r.mean)} (se ${r.se.toFixed(3)}, z ${r.z.toFixed(1)})  ${r.label.padEnd(8)}  sunk: seat A ${r.sunkA}, seat B ${r.sunkB}, neither ${r.neither}, both ${r.both}`);
+    L.push(`  R0 HOLDS: G is SEAT-A and U:${STRONG} is REVERSED: ${rules.replicates ? "yes" : "NO"}`);
+    L.push(`  R1 U:${STRONG} REVERSED ${yn(rules.R1)}; R2 STN:${STRONG} ${yn(rules.R2)}; R3 N:${STRONG} (the turn alone) ${yn(rules.R3)}; R4 SN:${STRONG} (speed with the turn) ${yn(rules.R4)}; R5 S:${STRONG} (the speed alone) ${yn(rules.R5)}; R6 ${ODD}: neither U nor STN reversed ${yn(rules.R6)}`);
+    L.push(`  HEADLINE: ${rules.headline === null ? "none" : rules.headline}`);
+    L.push("  PART A (8 geometries, 97001 to 97008): league7001 -1.873 (se 0.830), G (the search-ping side) +3.368");
+    L.push(`  FORECAST QUANTITIES: in every REVERSED side seat A's boat is sunk more often than seat B's ${yn(rules.forecast.reversedSunkMore)}; G's mirror bias within 0.5 of +${G_BIAS} ${yn(rules.forecast.gWithinHalf)}`);
+    return L;
+}
+
+const readJson = (f) => (fs.existsSync(ENG + f) ? JSON.parse(fs.readFileSync(ENG + f, "utf8")) : null);
+
+/** The command: argv (after the program), io { log, exists, write, read, fly, devSet, heldSet } (defaults: the console and the file system; `read(path)` gives parsed JSON or null; `fly` replaces the flying and `devSet` / `heldSet` name a smaller set to fly in the DEV / HELD mode, all for the gate, which never flies 106001 to 107024). Returns the exit code. */
+export function command(argv, io = {}) {
+    const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s)), read = io.read || readJson, flyIt = io.fly || fly;
+    const mode = argv[0];
+    if (mode !== "smoke" && mode !== "dev" && mode !== "held") { log("usage: takeEvadeSeat.mjs smoke | dev [--write] | held --write"); return 2; }
+    for (const a of argv.slice(1)) if (a !== "--write") { log(`takeEvadeSeat: unknown argument ${a}`); return 2; }
+    const wr = argv.includes("--write");
+    if (mode === "smoke" && wr) { log("takeEvadeSeat: smoke is never recorded"); return 2; }
+    if (mode === "dev" && wr && exists(DEV_FILE)) { log(`takeEvadeSeat: ${DEV_FILE} exists; DEV is recorded once and a second record is refused`); return 2; }
+    if (mode === "held" && !wr && !io.heldSet) { log("takeEvadeSeat: the HELD set is read once and the read is recorded; run held with --write"); return 2; }
+    if (mode === "held" && wr && exists(HELD_FILE)) { log(`takeEvadeSeat: ${HELD_FILE} exists; the HELD set is read once and a second read is refused`); return 2; }
+    if (mode === "held") {
+        const dev = read(DEV_FILE);
+        if (!dev) { log(`takeEvadeSeat: ${DEV_FILE} is missing; HELD is flown only after DEV is recorded`); return 2; }
+        if (dev.set !== "dev" || !dev.rules || dev.rules.replicates !== true) { log("takeEvadeSeat: DEV did not hold R0 or is not a DEV record; HELD is not flown by this registration"); return 2; }
+    }
+    const L = loadRuns(io.read); if (L.error) { log("takeEvadeSeat: " + L.error); return 2; }
+    const finders = FINDERS.map((id) => L.runs.find((r) => r.id === id));   // loadRuns refuses unless every one of the twelve runs exists
+    const G = L.runs[0].gen0, name = mode === "smoke" ? "smoke" : mode === "dev" ? (io.devSet || "dev") : (io.heldSet || "held"), sides = sidesOf(G, finders);
+    const flown = flyIt(sides, name), rules = rulesOf(flown.rows), checks = checksOf({ rows: flown.rows, sides, again: flown.again, reference: flown.reference, G, runs: L.runs });
+    for (const l of reportLines(flown.rows, rules, name)) log(l);
+    if (checks.length) log("  CHECKS FAILED, NOT WEIGHED: " + checks.join("; "));
+    if (mode === "dev") log(rules.replicates ? "  DEV: R0 holds; HELD may be flown (node tools/ship/takeEvadeSeat.mjs held --write)" : "  DEV: R0 FAILS; HELD is NOT flown by this registration");
+    if (wr) {
+        const file = mode === "dev" ? DEV_FILE : HELD_FILE;
+        write(file, JSON.stringify({ mode, set: name, first: SETS[name].first, count: SETS[name].count, rules, rows: flown.rows, checks }, null, 1) + "\n"); log(`  written ${file}`);
+    }
+    return checks.length ? 1 : 0;
+}
+
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(command(process.argv.slice(2)));
 }

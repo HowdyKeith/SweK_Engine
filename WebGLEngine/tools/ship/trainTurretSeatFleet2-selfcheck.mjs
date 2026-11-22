@@ -136,5 +136,11 @@ await section(() => {
     ok("!! NOTHING WAS WRITTEN, the page has no fleet-trained hand, and car-today's note says both searches found nothing", !fs.existsSync(G.DEFAULT_OUT) && !Object.values(C.FILES).some((f) => /WeightsFleet2?\.json/.test(f.path)) && /trainTurretSeatFleet2/.test(C.HANDS.find((h) => h.id === "car-today").note));
 });
 
+// v4933 -- THE EXPORT LIST, named here so tools/ship/definitionGates-selfcheck.mjs sees each export of trainTurretSeatFleet2.mjs held by its gate (it found these 1 unnamed at the ship):
+{
+    const EXPORTS = await import("./trainTurretSeatFleet2.mjs");
+    const NAMED = ["MAX_K"];
+    ok(`the export list: ${NAMED.join(", ")} -- each exported and defined`, NAMED.every((n) => n in EXPORTS && EXPORTS[n] !== undefined), NAMED.filter((n) => !(n in EXPORTS) || EXPORTS[n] === undefined).join(", ") || "");
+}
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
