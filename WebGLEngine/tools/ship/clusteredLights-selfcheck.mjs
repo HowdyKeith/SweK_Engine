@@ -79,19 +79,22 @@ await section(() => {
     ok("!! EVERY DIRECTION FROM A POINT LIGHT LANDS INSIDE THE FACE cubeFace NAMES (500 directions); a spot's axis lands at its tile's centre and its cone's edge inside", bad === 0 && Math.abs(axis[0] / axis[3]) < 1e-6 && Math.abs(axis[1] / axis[3]) < 1e-6 && Math.abs(edge[0] / edge[3]) < 1, `${bad} outside`);
 });
 
-console.log("4. THE PAGE (lights-demo.html)");
-await section(async () => {
+import { PRESENT_ARGS } from "./webgpuHarness.mjs";
+const pageChecks = (title, file, stateVar, args) => section(async () => {
     const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript" };
     const srv = http.createServer((q, r) => { const f = path.join(ENG, decodeURIComponent(q.url.split("?")[0])); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
     await new Promise((res) => srv.listen(0, "127.0.0.1", res));
-    const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [];
-    const grab = async (q) => { const p = await browser.newPage({ viewport: { width: 480, height: 320 } }); p.on("pageerror", (e) => errors.push(e.message)); await p.goto(`http://127.0.0.1:${srv.address().port}/lights-demo.html?ease=0&t=3.5&gputimer=0${q}`);
-        await p.waitForFunction(() => window.__lights && (window.__lights.ready || window.__lights.error), null, { timeout: 90000 });
-        const r = await p.evaluate(async () => { const s = window.__lights, c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, stats: s.stats, lights: s.lights, pillars: s.pillars }; }); await p.close(); return r; };
+    const browser = await chromium.launch({ args, ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [];
+    const grab = async (q) => { const p = await browser.newPage({ viewport: { width: 480, height: 320 } }); p.on("pageerror", (e) => errors.push(e.message)); await p.goto(`http://127.0.0.1:${srv.address().port}/${file}?ease=0&t=3.5&gputimer=0${q}`);
+        await p.waitForFunction((v) => window[v] && (window[v].ready || window[v].error), stateVar, { timeout: 90000 });
+        const r = await p.evaluate(async (v) => { const s = window[v]; if (s.error) return { error: s.error }; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, stats: s.stats, lights: s.lights, pillars: s.pillars, error: s.error }; }, stateVar); await p.close();
+        if (r.error) throw new Error(`${file}${q}: ${r.error}`);
+        if (r.topDown) { const flip = new Array(r.px.length); for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w * 4; x++) flip[(r.h - 1 - y) * r.w * 4 + x] = r.px[y * r.w * 4 + x]; r.px = flip; }   // WebGPU's rows top first: turned to WebGL2's
+        return r; };
     const cl = await grab(""), br = await grab("&brute=1"), off = await grab("&shadows=0");
     await browser.close(); srv.close();
     let worst = 0; for (let i = 0; i < cl.px.length; i++) if (i % 4 !== 3) worst = Math.max(worst, Math.abs(cl.px[i] - br.px[i]));
-    ok("!! CLUSTERED AND EVERY-LIGHT PICTURES ARE THE SAME, to a level, over every pixel (67 lights, 3 casting shadows, no cell over its cap)", errors.length === 0 && cl.stats.overflow === 0 && worst <= 1, `worst ${worst} levels; overflow ${cl.stats.overflow}; ${errors[0] || ""}`);
+    ok(`!! ${title}: CLUSTERED AND EVERY-LIGHT PICTURES ARE THE SAME, to a level, over every pixel (67 lights, 3 casting shadows, no cell over its cap)`, errors.length === 0 && cl.stats.overflow === 0 && worst <= 1, `worst ${worst} levels; overflow ${cl.stats.overflow}; ${errors[0] || ""}`);
     const inv = invert4(cl.vp), Lt = cl.lights, C = CL.buildClusters(Lt, { cells: [16, 6, 16], maxPerCell: 48 }), boxes = cl.pillars;
     const hitBox = (o, d, tMax) => boxes.some((b) => { let tn = 1e-4, tf = tMax; for (let k = 0; k < 3; k++) { const lo = b.position[k] - b.size[k] / 2, hi = b.position[k] + b.size[k] / 2; if (Math.abs(d[k]) < 1e-12) { if (o[k] < lo || o[k] > hi) return false; continue; } let a = (lo - o[k]) / d[k], c = (hi - o[k]) / d[k]; if (a > c) [a, c] = [c, a]; tn = Math.max(tn, a); tf = Math.min(tf, c); } return tn < tf; });
     const blocked = (g, l) => { const d = l.position.map((v, i) => v - g[i]), t = Math.hypot(...d); return hitBox(g, d.map((v) => v / t), t); };
@@ -112,11 +115,16 @@ await section(async () => {
         if (drop(spot) >= 8 && marginBlocked(g, Lt[spot])) { inSpot++; if (on.reduce((s, c) => s + c, 0) < nf.reduce((s, c) => s + c, 0) - 3) spotDark++; else if (process.env.DBG) console.log("SPOTMISS", x, yb, g.map((q) => q.toFixed(2)).join(","), drop(spot), on.join(), nf.join()); }
         if (drop(point) >= 8 && marginBlocked(g, Lt[point])) { inPoint++; if (on.reduce((s, c) => s + c, 0) < nf.reduce((s, c) => s + c, 0) - 3) pointDark++; }
     }
-    ok("!! WITH SHADOWS OFF THE GROUND IS THE CPU SUM, within 2 levels (the light and cell textures, the window, the cone and the tone map read as the CPU reads them)", gp > 1000 && cpuWorst <= 2, `${gp} ground pixels, worst ${cpuWorst}`);
-    ok("!! WITH SHADOWS ON, ground no shadowed light is blocked from (a margin round it clear too) is unchanged, to a level", clear > 300 && clearSame, `${clear} pixels`);
-    ok("!! ground a pillar hides from the first spot light is darker with shadows on, wherever that light should matter by 8 levels or more (nine in ten at least)", inSpot > 10 && spotDark >= 0.9 * inSpot, `${spotDark} of ${inSpot}`);
-    ok("!! ground a pillar hides from the shadowed POINT light is darker too -- its six cube faces in the atlas (nine in ten at least)", inPoint > 20 && pointDark >= 0.9 * inPoint, `${pointDark} of ${inPoint}`);
+    ok(`!! ${title}: WITH SHADOWS OFF THE GROUND IS THE CPU SUM, within 2 levels (the light and cell textures, the window, the cone and the tone map read as the CPU reads them)`, gp > 1000 && cpuWorst <= 2, `${gp} ground pixels, worst ${cpuWorst}`);
+    ok(`!! ${title}: WITH SHADOWS ON, ground no shadowed light is blocked from (a margin round it clear too) is unchanged, to a level`, clear > 300 && clearSame, `${clear} pixels`);
+    ok(`!! ${title}: ground a pillar hides from the first spot light is darker with shadows on, wherever that light should matter by 8 levels or more (nine in ten at least)`, inSpot > 10 && spotDark >= 0.9 * inSpot, `${spotDark} of ${inSpot}`);
+    ok(`!! ${title}: ground a pillar hides from the shadowed POINT light is darker too -- its six cube faces in the atlas (nine in ten at least)`, inPoint > 20 && pointDark >= 0.9 * inPoint, `${pointDark} of ${inPoint}`);
 });
+
+console.log("4. THE PAGE ON WEBGL2 (lights-demo.html)");
+await pageChecks("WEBGL2", "lights-demo.html", "__lights", ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]);
+console.log("5. THE PAGE ON WEBGPU (lights-gpu.html, 2026-11-22)");
+await pageChecks("WEBGPU", "lights-gpu.html", "__lightsGpu", [...PRESENT_ARGS]);
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

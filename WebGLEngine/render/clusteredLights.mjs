@@ -195,3 +195,95 @@ export function createClusteredLighting(gl, opts = {}) {
     self.destroy = () => { for (const t of [cellsTex, lightsTex, facesTex, atlas]) gl.deleteTexture(t); gl.deleteFramebuffer(fbo); };
     return self;
 }
+
+// ================================================================================================================================================================
+// WEBGPU (2026-11-22; Keith: "keep going with the WebGPU version of clustered lighting"). The same clusters, lights, atlas and sum, in WGSL, read from STORAGE buffers:
+//   const L = createClusteredLightingGPU(device, { maxLights, cells, maxPerCell, atlasSize, slots })
+//   L.update(lights)                         the clusters built, the atlas allocated, the four buffers written (the same packing as WebGL2's textures)
+//   L.renderShadows(encoder, drawDepth)      the atlas cleared, then for each face a render pass with the tile's viewport and scissor; drawDepth(pass, face) draws the casters'
+//                                            depth with face.viewProj (0..1 depth) -- face.buffer is a uniform buffer holding that matrix (16 floats), for the page's bind group
+//   clusteredWGSL({ group, brute, shadows }) the chunk: fn clusteredLight(p: vec3f, n: vec3f, v: vec3f, albedo: vec3f) -> vec3f, its six bindings at @group(group)
+//   L.bindGroupFor(pipeline, group)          the bind group for those six bindings, for a pipeline made with layout "auto"
+// DEPTH AND TILES, SAID ONCE: the shadow matrices are faceMatrices' with WebGPU's 0..1 depth (ZO * viewProj); a tile's rect is in the atlas's own pixel order, top row first, as
+// setViewport takes it, so a point's place in its tile is (x * 0.5 + 0.5, 0.5 - y * 0.5).
+export const ZO = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 1]);
+export function clusteredWGSL({ group = 1, brute = false, shadows = true } = {}) {
+    return `
+struct CLLight { posRange: vec4f, colorType: vec4f, dirCosOuter: vec4f, cosInnerFaces: vec4f };
+struct CLFace { viewProj: mat4x4f, rect: vec4f };
+struct CLParams { minv: vec4f, size: vec4f, dims: vec4u, misc: vec4f };   // misc = (bias, atlas texel, light count, max per cell)
+@group(${group}) @binding(0) var<uniform> clP: CLParams;
+@group(${group}) @binding(1) var<storage, read> clCells: array<u32>;
+@group(${group}) @binding(2) var<storage, read> clLights: array<CLLight>;
+@group(${group}) @binding(3) var<storage, read> clFaces: array<CLFace>;
+@group(${group}) @binding(4) var clAtlas: texture_depth_2d;
+@group(${group}) @binding(5) var clCmp: sampler_comparison;
+fn clWindow(d: f32, r: f32) -> f32 { let x = clamp(1.0 - pow(d / r, 4.0), 0.0, 1.0); return x * x / (d * d + 1.0); }
+fn clCubeFace(v: vec3f) -> u32 { let a = abs(v); if (a.x >= a.y && a.x >= a.z) { return select(1u, 0u, v.x >= 0.0); } if (a.y >= a.z) { return select(3u, 2u, v.y >= 0.0); } return select(5u, 4u, v.z >= 0.0); }
+fn clShadow(p0: vec3f, n: vec3f, lp: vec3f, first: u32, count: u32) -> f32 {
+    ${shadows ? "" : "return 1.0;"}
+    if (count == 0u) { return 1.0; }
+    let L = normalize(lp - p0); let p = p0 + (n + 0.5 * L) * clP.misc.x * (1.0 + length(lp - p0));
+    var f = first; if (count == 6u) { f = first + clCubeFace(p - lp); }
+    let face = clFaces[f]; let q = face.viewProj * vec4f(p, 1.0);
+    if (q.w <= 0.0) { return 1.0; }
+    let s = q.xyz / q.w;
+    if (s.z >= 1.0) { return 1.0; }
+    let t = clamp(vec2f(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5), vec2f(0.0), vec2f(1.0));
+    let h = vec2f(clP.misc.y * 0.5); let uv = clamp(face.rect.xy + t * face.rect.zw, face.rect.xy + h, face.rect.xy + face.rect.zw - h);
+    return textureSampleCompareLevel(clAtlas, clCmp, uv, s.z);
+}
+fn clOne(i: u32, p: vec3f, n: vec3f, v: vec3f, albedo: vec3f) -> vec3f {
+    let l = clLights[i]; let dl = l.posRange.xyz - p; let dist = length(dl); var L = vec3f(0.0, 1.0, 0.0); if (dist > 0.0) { L = dl / dist; }
+    var att = clWindow(dist, l.posRange.w);
+    if (l.colorType.w > 0.5) { let t = clamp((dot(-L, l.dirCosOuter.xyz) - l.dirCosOuter.w) / max(l.cosInnerFaces.x - l.dirCosOuter.w, 1e-6), 0.0, 1.0); att = att * t * t * (3.0 - 2.0 * t); }
+    if (att <= 0.0) { return vec3f(0.0); }
+    let rad = l.colorType.rgb * att; let nl = max(dot(n, L), 0.0); let hv = normalize(L + v); var sp = 0.0; if (nl > 0.0) { sp = pow(max(dot(n, hv), 0.0), 32.0) * 0.25; }
+    return (albedo * rad * nl + rad * sp) * clShadow(p, n, l.posRange.xyz, u32(l.cosInnerFaces.y), u32(l.cosInnerFaces.z));
+}
+fn clusteredLight(p: vec3f, n: vec3f, v: vec3f, albedo: vec3f) -> vec3f {
+    var sum = vec3f(0.0);
+${brute ? `    _ = arrayLength(&clCells);   // the cells unread here, but bound: an auto layout keeps the binding
+    for (var i = 0u; i < u32(clP.misc.z); i++) { sum += clOne(i, p, n, v, albedo); }
+    return sum;` : `    let cf = floor((p - clP.minv.xyz) / clP.size.xyz);
+    if (any(cf < vec3f(0.0)) || any(cf >= vec3f(clP.dims.xyz))) { return sum; }
+    let c = vec3u(cf); let cell = (c.z * clP.dims.y + c.y) * clP.dims.x + c.x; let stride = u32(clP.misc.w) + 1u; let count = min(clCells[cell * stride], u32(clP.misc.w));
+    for (var k = 0u; k < count; k++) { sum += clOne(clCells[cell * stride + 1u + k], p, n, v, albedo); }
+    return sum;`}
+}`;
+}
+
+export function createClusteredLightingGPU(device, opts = {}) {
+    const O = { ...DEFAULTS, ...opts }, N = O.cells[0] * O.cells[1] * O.cells[2], BU = globalThis.GPUBufferUsage, TU = globalThis.GPUTextureUsage, maxFaces = O.slots * O.slots;
+    const buf = (size, usage) => device.createBuffer({ size: Math.max(16, size), usage: usage | BU.COPY_DST });
+    const params = buf(64, BU.UNIFORM), cells = buf(4 * N * (O.maxPerCell + 1), BU.STORAGE), lightsB = buf(64 * O.maxLights, BU.STORAGE), faces = buf(80 * maxFaces, BU.STORAGE);
+    const atlas = device.createTexture({ size: [O.atlasSize, O.atlasSize], format: "depth32float", usage: TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING });
+    const cmp = device.createSampler({ compare: "less-equal", magFilter: "linear", minFilter: "linear" }), faceBuffers = Array.from({ length: maxFaces }, () => buf(64, BU.UNIFORM));
+    const self = { options: O, clusters: null, atlas: null, lights: [], atlasTexture: atlas, faceBuffers };
+    const zo = (m) => mul4(ZO, m);
+    self.update = (lights) => {
+        if (lights.length > O.maxLights) throw new Error(`clusteredLights: ${lights.length} lights, at most ${O.maxLights}`);
+        const C = buildClusters(lights, O), A = allocateAtlas(lights, O); self.clusters = C; self.atlas = A; self.lights = lights;
+        const cd = new Uint32Array(N * (O.maxPerCell + 1)); for (let c = 0; c < N; c++) { cd[c * (O.maxPerCell + 1)] = C.counts[c]; for (let k = 0; k < C.counts[c]; k++) cd[c * (O.maxPerCell + 1) + 1 + k] = C.lists[c * O.maxPerCell + k]; }
+        const ld = new Float32Array(16 * O.maxLights);
+        lights.forEach((l, i) => { const d = l.type === "spot" ? norm(l.direction) : [0, 0, 0], s = A.byLight.get(i) || [0, 0];
+            ld.set([...l.position, l.range, ...l.color.map((c) => c * l.intensity), l.type === "spot" ? 1 : 0, ...d, l.type === "spot" ? Math.cos(l.outerAngle) : -2, l.type === "spot" ? Math.cos(l.innerAngle) : -1, s[0], s[1], 0], i * 16); });
+        const fd = new Float32Array(20 * maxFaces); A.faces.forEach((f, k) => { const m = zo(f.viewProj); fd.set(m, k * 20); fd.set(f.rect, k * 20 + 16); device.queue.writeBuffer(faceBuffers[k], 0, m); });
+        device.queue.writeBuffer(params, 0, new Float32Array([...C.min, 0, ...C.size, 0]));
+        device.queue.writeBuffer(params, 32, new Uint32Array([...C.dims, 0]));
+        device.queue.writeBuffer(params, 48, new Float32Array([O.bias, 1 / O.atlasSize, lights.length, O.maxPerCell]));
+        device.queue.writeBuffer(cells, 0, cd); device.queue.writeBuffer(lightsB, 0, ld); device.queue.writeBuffer(faces, 0, fd);
+        return { cells: N, overflow: C.overflow, faces: A.faces.length, unshadowed: A.unshadowed.length };
+    };
+    self.renderShadows = (enc, drawDepth) => {
+        if (!self.atlas) return;
+        enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" } }).end();
+        self.atlas.faces.forEach((f, k) => {
+            const [x, y, w, h] = f.rect.map((v) => Math.round(v * O.atlasSize)), pass = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "load", depthStoreOp: "store" } });
+            pass.setViewport(x, y, w, h, 0, 1); pass.setScissorRect(x, y, w, h); drawDepth(pass, { ...f, index: k, viewProj: zo(f.viewProj), buffer: faceBuffers[k] }); pass.end();
+        });
+    };
+    self.bindGroupFor = (pipeline, group = 1) => device.createBindGroup({ layout: pipeline.getBindGroupLayout(group), entries: [{ binding: 0, resource: { buffer: params } }, { binding: 1, resource: { buffer: cells } }, { binding: 2, resource: { buffer: lightsB } }, { binding: 3, resource: { buffer: faces } }, { binding: 4, resource: atlas.createView() }, { binding: 5, resource: cmp }] });
+    self.destroy = () => { for (const b of [params, cells, lightsB, faces, ...faceBuffers]) b.destroy(); atlas.destroy(); };
+    return self;
+}
