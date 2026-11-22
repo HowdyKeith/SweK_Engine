@@ -1,6 +1,6 @@
 # The evade seat: DRAFT registration (2026-11-22; UNNUMBERED)
 
-**STATUS: KEITH'S ANSWERS TAKEN (2026-11-22, below); STILL NOTHING FLOWN AND NO SEED USED.** It is registered when the reflex and the study tool are built and this text,
+**STATUS: REGISTERED 2026-11-22 as the header of `tools/ship/takeEvadeSeat.mjs` (which, where the two differ, is the registration: the threat is an enemy ROUND on a hitting course, tau0 2 s; stage 2's seeds are 1701001-/1711001-). NOTHING FLOWN.** The draft below is kept as written, with its corrections marked. It is registered when the reflex and the study tool are built and this text,
 as it then stands, is committed as the tool's header -- before any pair is flown. Once approved (with
 whatever he changes), this text becomes the header of `tools/ship/takeEvadeSeat.mjs`, committed before any pair is flown, as `tools/ship/takeLc11Gunner.mjs`'s was.
 Backlog: `brain/BACKLOG_2026-11-04_BRAINS.md`, `evade-seat-loom-circuits`. Keith: "start with the LC4/LPLC2 data pull and a draft registration".
@@ -58,7 +58,7 @@ stage 2 flies `turn`** (the drafted reflex), and says so -- the circuit question
 
 ## The fights
 
-* (Stage 2.) **ONE SHIP A SIDE** (seeds 1661001-; the helm alone decides where the hull points) and **FLEETS OF THREE A SIDE** (seeds 1671001-). 300 pairs a fight, 75 of each of the duel's
+* (Stage 2.) **ONE SHIP A SIDE** (seeds ~~1661001-~~ **1701001-**; the helm alone decides where the hull points) and **FLEETS OF THREE A SIDE** (seeds ~~1671001-~~ **1711001-**; the struck seeds had been flown by `tools/ship/takeFleetHandSizes.mjs` -- this draft was wrong to call them unused, caught while registering). 300 pairs a fight, 75 of each of the duel's
   four kinds. **None of these seeds has been flown by anything.**
 * Side X flies today's best-ship helm with the arm's reflex; side Y is plain. The cannon is on on both sides.
 
