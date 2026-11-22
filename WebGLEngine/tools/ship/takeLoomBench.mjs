@@ -44,6 +44,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FT from "../../brain/flyTracking.mjs";
+import * as LC6T from "../../brain/lc6Topology.mjs";
+import * as LC6S from "../../brain/lc6Synapses.mjs";
+import * as LC6P from "../../brain/lc6Places.mjs";
+import * as LC16T from "../../brain/lc16Topology.mjs";
+import * as LC16S from "../../brain/lc16Synapses.mjs";
+import * as LC16P from "../../brain/lc16Places.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), BRAIN = path.resolve(HERE, "..", "..", "brain");
 export const READING = process.env.LOOM_BENCH_READING || path.join(BRAIN, "loomBench.reading.json");   // the variable is for the gate's refusal check only
@@ -76,8 +82,9 @@ export function armOf(p, types, arm, relay) {
     return { row, verdict: verdictOf(row), ...(cut !== null ? { cut } : {}) };
 }
 /** The pathway for lc6 or lc16, from its baked modules. */
+const BAKED = { lc6: [LC6T, LC6S, LC6P], lc16: [LC16T, LC16S, LC16P] };
 export async function pathwayFor(name) {
-    const P = PATHWAYS[name], T = await import(pathToFileURL(path.join(BRAIN, `${name}Topology.mjs`))), Y = await import(pathToFileURL(path.join(BRAIN, `${name}Synapses.mjs`))), L = await import(pathToFileURL(path.join(BRAIN, `${name}Places.mjs`)));
+    const P = PATHWAYS[name], [T, Y, L] = BAKED[name];
     return { p: FT.pathwayOf({ topo: T, syn: Y, places: L, eye: P.eye, dn: P.dn }), types: T.NEURON_TYPES, relay: P.relay };
 }
 /** The registered decisions over every arm's result. */

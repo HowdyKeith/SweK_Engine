@@ -14,6 +14,12 @@
 // NO SABOTAGE LOG: there is no module here to break -- the gate reads data. Its numbers were read off the files by a separate script (python, in the session that vendored them) and written here by hand; a file that is re-extracted and differs turns it red.
 "use strict";
 import fs from "node:fs";
+import * as T6 from "./lc6Topology.mjs";
+import * as Y6 from "./lc6Synapses.mjs";
+import * as L6 from "./lc6Places.mjs";
+import * as T16 from "./lc16Topology.mjs";
+import * as Y16 from "./lc16Synapses.mjs";
+import * as L16 from "./lc16Places.mjs";
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const section = (fn) => { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
@@ -128,8 +134,8 @@ section(() => {
 console.log("10. THE BAKED MODULES FOR LC6 AND LC16 ARE THE VENDORED FILES (brain/lc6Topology.mjs, lc6Synapses.mjs, lc6Places.mjs and lc16's, 2026-11-22)");
 await (async () => {
     const { placesOf } = await import("../tools/bakeDendritePlaces.mjs"), r6 = (v) => Math.round(v * 1e6) / 1e6;
-    for (const [n, X] of [["lc6", K6], ["lc16", K16]]) {
-        const T = await import(`./${n}Topology.mjs`), Y = await import(`./${n}Synapses.mjs`), L = await import(`./${n}Places.mjs`), P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${n}-positions.json`, import.meta.url), "utf8")), pl = placesOf(P);
+    for (const [n, X, T, Y, L] of [["lc6", K6, T6, Y6, L6], ["lc16", K16, T16, Y16, L16]]) {
+        const P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${n}-positions.json`, import.meta.url), "utf8")), pl = placesOf(P);
         const idx = new Map(T.NEURON_ORDER.map((b, k) => [b, k])), V = X.v;
         const topo = T.NEURON_ORDER.join() === V.neurons.map((x) => x.bodyId).join() && T.NEURON_TYPES.join() === V.neurons.map((x) => x.type).join() && T.EDGES.length === V.edges.length && T.EDGES.every(([to, from], k) => to === idx.get(V.edges[k][1]) && from === idx.get(V.edges[k][0]));
         const syn = Y.EDGE_COUNTS.join() === V.edges.map((e) => e[2]).join() && Y.NEURON_NT.join() === V.neurons.map((x) => x.nt).join() && Y.NEURON_SOMA.join() === V.neurons.map((x) => x.somaSide).join();
