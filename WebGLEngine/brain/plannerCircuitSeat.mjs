@@ -17,6 +17,29 @@ import { mulberry } from "./pilotSubPolicy.mjs";
 import { STATE_INIT } from "./pilotSubCircuitState.mjs";
 
 export const BASE_FEATURES = P.FEATURES, STATION_ONEHOT = 3, FEATURES = BASE_FEATURES + STATION_ONEHOT, OUTPUTS = P.OUTPUTS, STEP_TICKS = P.STEP_TICKS, HIDDEN = 84;
+/** Round 43: the look-ahead features, read off the planner's last plan (plannerPerturbed's read-only `plan` getter). */
+export const LOOKAHEAD = 11, FEATURES_LA = FEATURES + LOOKAHEAD, PLAN_AGE_S = 120;
+/**
+ * Round 43's eleven look-ahead features into out[offset..offset+10], all 0 with no plan:
+ * L1 best value of any scored order (nearest-first included); L2 the nearest-first value; L3 = L1 - L2; L4-L6 for k = 0..2 of obs.stations the best value of
+ * a permutation STARTING at k (0 if none); L7-L9 the masks; L10 best minus second best (0 with one order); L11 min(1, (t - plan.t) / 120).
+ */
+export function lookaheadFeatures(plan, obs, out, offset = 0) {
+    for (let i = 0; i < LOOKAHEAD; i++) out[offset + i] = 0;
+    if (!plan || !plan.values) return out;
+    const entries = Object.entries(plan.values), vals = entries.map(([, v]) => v).sort((a, b) => b - a);
+    if (!vals.length) return out;
+    const best = vals[0], near = plan.values.nearest ?? 0;
+    out[offset] = best; out[offset + 1] = near; out[offset + 2] = best - near;
+    for (let k = 0; k < STATION_ONEHOT; k++) {
+        let m = -Infinity;
+        for (const [key, v] of entries) if (key !== "nearest" && Number(key.split(">")[0]) === k) m = Math.max(m, v);
+        if (m > -Infinity) { out[offset + 3 + k] = m; out[offset + 6 + k] = 1; }
+    }
+    out[offset + 9] = vals.length > 1 ? best - vals[1] : 0;
+    out[offset + 10] = Math.min(1, Math.max(0, (obs.t - plan.t) / PLAN_AGE_S));
+    return out;
+}
 /** The base constants, BY VALUE: the Round 8 constants with low -0.04 (equal to SURVEY_CONSTANTS today; pinned so a later seat change does not move this base silently). */
 export const BASE_04 = Object.freeze({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.04 });
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -29,11 +52,11 @@ const feasible = (s, r) => !s.visited && s.depth - T.CAPTURE.depth + 0.5 <= T.HU
  * dive's ctx (its rollouts read ctx.model) and called on EVERY tick. The returned seat carries `outputs`, `steps`, `overrides` (ticks whose station
  * differs from the planner's) and `planner` (the base seat, for its stats).
  */
-export function makePlannerSeat(sp, { params = BASE_04, plan = SS.planOf("standard"), base = null } = {}) {
+export function makePlannerSeat(sp, { params = BASE_04, plan = SS.planOf("standard"), base = null, lookahead = false } = {}) {
     // `base` (a seat factory) replaces the planner for the gate, which drives the override and the one-hot with a planner whose station it chooses
     base = base || Q.perturbedSeat(params, {}, plan); const q = U.normalise(params, U.WIDE_BOUNDS);
     return (ctx) => {
-        const planner = base(ctx), x = new Float64Array(FEATURES), xb = x.subarray(0, BASE_FEATURES);
+        const planner = base(ctx), x = new Float64Array(lookahead ? FEATURES_LA : FEATURES), xb = x.subarray(0, BASE_FEATURES);
         let y = new Float64Array(OUTPUTS), n = 0, steps = 0, overrides = 0, ema = null;
         const seat = (st, obs) => {
             const d = planner(st, obs), r = obs.r;
@@ -42,6 +65,7 @@ export function makePlannerSeat(sp, { params = BASE_04, plan = SS.planOf("standa
             if (n % STEP_TICKS === 0) {
                 P.featuresOf(st, obs, xb);
                 for (let k = 0; k < STATION_ONEHOT; k++) x[BASE_FEATURES + k] = pk === k ? 1 : 0;
+                if (lookahead) lookaheadFeatures(planner.plan || null, obs, x, FEATURES);   // Round 43: read AFTER the planner decided this tick
                 y = sp.step(x); steps++;
             }
             n++;
@@ -74,7 +98,7 @@ export function makePlannerSeat(sp, { params = BASE_04, plan = SS.planOf("standa
  */
 export function createPlannerPolicy(hidden = HIDDEN, name = "planner-circuit", init = STATE_INIT, seatOpts = {}) {
     if (!Number.isInteger(hidden) || hidden < 1) throw new Error(`plannerCircuitSeat.createPlannerPolicy: hidden must be a whole number of at least 1, got ${JSON.stringify(hidden)}`);
-    const H = hidden, F = FEATURES, OFF_B1 = H * F, OFF_W2 = OFF_B1 + H, OFF_B2 = OFF_W2 + OUTPUTS * H, WEIGHT_COUNT = OFF_B2 + OUTPUTS;
+    const H = hidden, F = seatOpts.lookahead ? FEATURES_LA : FEATURES, OFF_B1 = H * F, OFF_W2 = OFF_B1 + H, OFF_B2 = OFF_W2 + OUTPUTS * H, WEIGHT_COUNT = OFF_B2 + OUTPUTS;
     function handWeights() {
         const w = new Float32Array(WEIGHT_COUNT), rng = mulberry(init.seed);
         for (let i = 0; i < OFF_B1; i++) w[i] = gauss(rng) * init.inScale * init.inputGain;
@@ -97,3 +121,6 @@ export function createPlannerPolicy(hidden = HIDDEN, name = "planner-circuit", i
     }
     return { name, kind: "planner-plain", hidden: H, features: F, WEIGHT_COUNT, offsets: Object.freeze({ B1: OFF_B1, W2: OFF_W2, B2: OFF_B2 }), handWeights, seatFor, pilotFor: (w) => T.flyDecision(seatFor(w)), mutate, stepper };
 }
+
+/** Round 43: the look-ahead policy, 35 -> 84 -> 7 (3,619 weights), the readout starting at zero, on the look-ahead seat. */
+export const createLookaheadPolicy = (hidden = HIDDEN, name = "lookahead-circuit", init = STATE_INIT) => createPlannerPolicy(hidden, name, init, { lookahead: true });
