@@ -10,7 +10,8 @@
 //                 takes its seat out of the fight, an engine pod a third of the thrust), and its wave-motion cannon -- an INVENTED weapon -- charges, and fires one hit-scan beam along the bow when an enemy is in it.
 //
 //   A HELM PILOT (a capital ship's `helmPilot`, off by default): (rule, ctx) -> { torque, thrust }, called once a tick for a ship with a helm, AFTER the rule has decided: `rule` is { torque (body frame, already limited to the hull's own), thrust (a force along the nose) } -- whatever the behaviour made of them, a station's included -- and `ctx`
-//               is { body, ship, foe (the nearest enemy, or null), thrustMax (what the pods left give) }. What it returns REPLACES them, the torque limited to the hull's own again and the thrust clamped to 0..thrustMax. brain/helmPolicy.mjs is the network that fills it. A ship with no helm (the `crew` option) is not asked.
+//               is { body, ship, foe (the nearest enemy, or null), thrustMax (what the pods left give), enemies (2026-11-22: every enemy capital ship still flying, { id, body },
+//               for brain/evadeReflex.mjs's threat; read-only, and nothing older reads it) }. What it returns REPLACES them, the torque limited to the hull's own again and the thrust clamped to 0..thrustMax. brain/helmPolicy.mjs is the network that fills it. A ship with no helm (the `crew` option) is not asked.
 //   A TWO-PHASE TICK (the seats' networks asked in a batch): a gunner that is a network (brain/seatGunnerPolicy.mjs's `decide`) has two halves, `prepare` (its sight and the twelve features) and `finish` (the controls into a command), and carries `net` (the weights, the layers, the `post`). The tick runs every working seat's `prepare`,
 //               hands the networks of the seats that have a target out as ONE batch ([{ net, x }]) and goes on with the controls it is sent back. stepSpaceArena() runs each network on the CPU as its gunner would have (the same arithmetic: the tick is the tick it always was, bit for bit); stepSpaceArenaAsync(arena, forwardBatch) lets a function of its own run the batch
 //               (brain/seatGunnerGpu.mjs: the GPU Brain's BatchedMLP on a GPUDevice, one forward() per distinct network per tick). A gunner with no halves is called whole, as it always was; a seat that cannot work is not asked.
@@ -246,7 +247,7 @@ function* tickGen(arena) {
             if (!c.helm) torque = [0, 0, 0];   // the bridge crew is gone: nobody turns the hull or sets the engines (`crew` option)
             let thrust = c.helm ? (station ? station.thrust : CS.thrustWith(c.ship, c.enginesRunning) * c.cruise) : 0;
             if (c.helmPilot && c.helm) {   // a helm pilot answers the rule's answer
-                const pods = CS.thrustWith(c.ship, c.enginesRunning), out = c.helmPilot({ torque, thrust }, { body: c.body, ship: c.ship, foe, thrustMax: pods });
+                const pods = CS.thrustWith(c.ship, c.enginesRunning), out = c.helmPilot({ torque, thrust }, { body: c.body, ship: c.ship, foe, thrustMax: pods, enemies: alive.filter((o) => o.team !== c.team && o.kind === "capital").map((o) => ({ id: o.id, body: o.body })) });
                 torque = CS.limitTorque(c.ship, out.torque); thrust = Math.max(0, Math.min(pods, out.thrust));
             }
             plan.set(c, { torque, thrust, fire: false, foe });

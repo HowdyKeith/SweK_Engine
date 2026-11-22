@@ -103,8 +103,20 @@ so far has tied the sine; LC11 trailed LC10a one ship a side.
 4. **LC4's descending neuron:** keep the rule's answer (DNp04), or read the Giant Fiber (DNp01) for both LC4 and LPLC2, since it is the escape neuron? The rule says DNp04;
    changing it is a choice made after seeing the numbers, and would be recorded as one.
 
+## FOUND WHILE BUILDING THE REFLEX (2026-11-22) -- THE TRIGGER AS DRAFTED NEVER FIRES. NOTHING IS REGISTERED UNTIL KEITH CHOOSES.
+
+`brain/evadeReflex.mjs` is built and gated (the threat picker, the four actions, the sixteen read-outs pinned). Run in the duels as they are, seed 4242, every kind, one and three
+ships a side, with no reflex:
+* **Capital ships never close fast.** The shortest time to contact between enemy capital ships in any fight is **21.7 to 84 s**; the closest approach is 300 to 566 m. With
+  tau0 4 s the reflex **never fires, in any fight**. A closing enemy ship comes under 30 s on 0 to 4% of a ship's ticks, under 60 s on 0 to 23%, under 120 s on 15 to 46%.
+* **The duels have no fighters** (no escorts unless a side is given them).
+* **Shots are the opposite:** an enemy round is under 4 s from contact on **52 to 97%** of a ship's ticks -- a reflex on rounds would be on almost all the time.
+
+So the threat has to be redefined before anything is registered. The choices are Keith's (see the reply of 2026-11-22). Every number above was measured on fights with NO
+reflex, so choosing from them biases nothing that will be flown.
+
 ## What must be built before anything flies (none of it is built yet)
 
 * ~~The four pathways baked and their positions pinned~~ -- DONE 2026-11-22 (`brain/lc4*.mjs`, `brain/lplc2*.mjs`; gate sections 10-12).
-* `brain/evadeReflex.mjs`: the threat picker, the turn, the helm hook; `wiringOf`-style names for the arms; its gate (the sense, the read-outs pinned, the threat picker's rules).
+* ~~`brain/evadeReflex.mjs` and its gate; the duel's `evade` option; the pool passing it~~ -- DONE 2026-11-22 (the threat to be redefined, above).
 * `tools/ship/takeEvadeSeat.mjs` (this text as its header; the single read; the kept arms) and its gate.

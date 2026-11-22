@@ -41,6 +41,7 @@ import * as PB from "./peerBrain.mjs";
 import * as SG from "./seatGunnerPolicy.mjs";
 import * as SM from "./seatGunnerMlp.mjs";
 import * as SF from "./seatGunnerFish.mjs";
+import * as EV from "./evadeReflex.mjs";
 import * as ST from "./seatTurretGunner.mjs";
 import * as HP from "./helmPolicy.mjs";
 import * as HS from "./helmSteerPolicy.mjs";
@@ -115,7 +116,7 @@ const SEAT_IDS = Object.freeze(CS.createCapitalShip().seats.map((q) => q.id));
 /**
  * A side, checked: { id, label, gunners, network, seatNetworks, helmRule, helmNet, cannon, pilot } (see the header). Everything but `id` has a default: regular gunners behind the hand rule, the arena's own helm, the cannon, PD-autopilot escorts.
  */
-export function makeSide(id, { label = "", gunners = BF.DEFAULT_GUNNERS, network = null, seatNetworks = null, helmRule = "face", helmNet = null, cannon = true, pilot = null } = {}) {
+export function makeSide(id, { label = "", gunners = BF.DEFAULT_GUNNERS, network = null, seatNetworks = null, helmRule = "face", helmNet = null, cannon = true, pilot = null, evade = null } = {}) {
     if (typeof id !== "string" || !id) throw new Error(`battleshipDuel.makeSide: a side needs an id (got ${id})`);
     const opts = typeof gunners === "string" ? BF.GUNNERS[gunners] : gunners;
     if (!opts || typeof opts !== "object") throw new Error(`battleshipDuel.makeSide: side "${id}": gunners must be one of ${Object.keys(BF.GUNNERS).join(", ")} or a handGunner options object (got ${gunners})`);
@@ -131,7 +132,9 @@ export function makeSide(id, { label = "", gunners = BF.DEFAULT_GUNNERS, network
     if (helmNet !== null && !(helmNet && typeof helmNet.module?.helmFactory === "function" && helmNet.weights?.length === helmNet.module.WEIGHT_COUNT)) throw new Error(`battleshipDuel.makeSide: side "${id}": helmNet must be { module (a helm library: helmFactory and WEIGHT_COUNT), weights (WEIGHT_COUNT of them) }`);
     if (pilot !== null && !(pilot && typeof pilot.module?.pilotFor === "function" && pilot.weights?.length === pilot.module.WEIGHT_COUNT)) throw new Error(`battleshipDuel.makeSide: side "${id}": pilot must be { module (a 6DOF pilot library: pilotFor and WEIGHT_COUNT), weights (WEIGHT_COUNT of them) }`);
     if (typeof cannon !== "boolean") throw new Error(`battleshipDuel.makeSide: side "${id}": cannon is true or false (got ${cannon})`);
-    return Object.freeze({ id, label: label || id, gunners, gunnerOptions: Object.freeze({ ...BF.SHARED, ...opts }), network, seatNetworks, helmRule, helmNet, cannon, pilot, pilots: null });
+    // `evade` (2026-11-22): { action, wiring, tau0?, reach? } -- brain/evadeReflex.mjs's reflex, after the helm (rule, hand rule, helm network), while a ship closes on this one
+    if (evade !== null) { if (!evade || !EV.ACTIONS.includes(evade.action)) throw new Error(`battleshipDuel.makeSide: side "${id}": evade is { action (${EV.ACTIONS.join(", ")}), wiring } (got ${JSON.stringify(evade)})`); const why = EV.checkWiring(evade.wiring ?? "sine"); if (why) throw new Error(`battleshipDuel.makeSide: side "${id}": evade: ${why}`); }
+    return Object.freeze({ id, label: label || id, gunners, gunnerOptions: Object.freeze({ ...BF.SHARED, ...opts }), network, seatNetworks, helmRule, helmNet, cannon, pilot, pilots: null, evade: evade ? Object.freeze({ wiring: "sine", ...evade }) : null });
 }
 /** The network in a seat of a side, or null for the hand rule: battleshipFight's rule (the seat's own id, else its group, else `network`). */
 export function seatNetOf(side, seatId) {
@@ -162,7 +165,8 @@ export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, second
             return g;
         };
         const hand = side.helmRule === "broadside" ? broadsideHelm() : null, net = side.helmNet ? side.helmNet.module.helmFactory(side.helmNet.weights)() : null;
-        const helmPilot = hand || net ? (rule, ctx) => { const r = hand ? hand(rule, ctx) : rule; if (!net) return r; if (countBrains) asked(); return net(r, ctx); } : null;
+        const ev = side.evade ? EV.createReflex(side.evade) : null;
+        const helmPilot = hand || net || ev ? (rule, ctx) => { let r = hand ? hand(rule, ctx) : rule; if (net) { if (countBrains) asked(); r = net(r, ctx); } return ev ? ev(r, ctx) : r; } : null;
         const whole = CS.createCapitalShip(), hull = ammo === 1 ? whole : { ...whole, seats: Object.freeze(whole.seats.map((q) => Object.freeze({ ...q, gun: Object.freeze({ ...q.gun, magazine: magazineOf(q.gun, ammo) }) }))) };   // SCARCE ROUNDS: see the header; with ammo 1 the ship is the ship it was
         const ship = side.cannon ? hull : { ...hull, waveGun: { ...hull.waveGun, charge: Infinity } };   // a cannon that never finishes charging is no cannon; the arena is not edited
         shipIds[t].push(id);

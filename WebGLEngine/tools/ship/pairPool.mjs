@@ -37,7 +37,7 @@ export function sideOf(spec) {
         if (other && !family) throw new Error(`pairPool.sideOf: only ${Object.keys(WIRED).join(", ")} have another wiring to fly (got ${n.policy} with wiring ${n.wiring})`);
         return { module: other ? family.wiringOf(n.wiring) : kind.mod, weights: n.weights instanceof Float32Array ? n.weights : Float32Array.from(n.weights) };   // `wiring`: "control:<seed>" flies the same weights over a random circuit (brain/seatTurretCircuit.mjs)
     };
-    return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm"), pilot: net(spec.pilotNet, "pilot") });   // `pilotNet` (2026-11-20): the brain that flies the side's ESCORTS (null: the PD autopilot)
+    return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm"), pilot: net(spec.pilotNet, "pilot"), evade: spec.evade ?? null });   // `evade` (2026-11-22): plain data, { action, wiring }: brain/evadeReflex.mjs   // `pilotNet` (2026-11-20): the brain that flies the side's ESCORTS (null: the PD autopilot)
 }
 /** A fight against fighters in numbers: the share of the raiders destroyed, less the share of the ship side's hit points lost. In [-1, 1]; a ship that downs all eight and takes nothing scores 1. */
 export const fighterScore = (t, fighters = BF.FIGHTERS) => t.killed / fighters - t.damageOnShips / (1500 * t.ships.length);
