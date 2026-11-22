@@ -7111,6 +7111,7 @@ import { SpriteAtlas } from "./render/spriteAtlas.js";
 import { BloomPass } from "./render/bloomPass.js";
 import { PhosphorPass } from "./render/phosphorPass.js";
 import { FxaaPass } from "./render/fxaaPass.js";
+import { SmaaPass } from "./render/smaaPass.js";   // 2026-11-22: SMAA 1x, the anti-aliasing slot's other occupant
 import { makeSwiftShaderPass, swiftShaderNames, KNOBS as SWIFT_KNOBS, DEFAULT_KNOBS as SWIFT_DEFAULTS } from "./render/swiftShaderPass.js";   // v4169
 import { RunnerPanel } from "./ui/runnerPanel.js";   // v4169
 import * as SWIFT_CPU from "./render/swiftShaderModel.mjs";   // v4169 -- the CPU reference, as the no-GPU fallback
@@ -7399,6 +7400,7 @@ let tvOverlay = null;
 let bloomPass = null;
 let phosphorPass = null;   // v1074 — GL CRT/phosphor post pass (opt-in)
 let fxaaPass = null;       // screen-space anti-aliasing pass (opt-in, ui/graphicsSettings.js "fxaa")
+let smaaPass = null;       // SMAA 1x (opt-in, ui/graphicsSettings.js "smaa"); takes the slot instead of FXAA when on
 
 // Round 30 wow-pass — transient bloom flash for kaiju attack impacts. Bumps
 // bloomPass.intensity above its current baseline and eases it back over ~380ms.
@@ -7443,6 +7445,7 @@ function resize() {
     if (bloomPass) bloomPass.resize(canvas.width, canvas.height);
     if (phosphorPass) phosphorPass.resize(canvas.width, canvas.height);
     if (fxaaPass) fxaaPass.resize(canvas.width, canvas.height);
+    if (smaaPass) smaaPass.resize(canvas.width, canvas.height);
 }
 resize();
 window.addEventListener("resize", resize);
@@ -9941,6 +9944,8 @@ const spriteAtlas = new SpriteAtlas(gl);
 bloomPass   = new BloomPass(gl, canvas.width, canvas.height);
 phosphorPass = new PhosphorPass(gl, canvas.width, canvas.height);   // v1074
 fxaaPass = new FxaaPass(gl, canvas.width, canvas.height);
+smaaPass = new SmaaPass(gl, canvas.width, canvas.height);
+console.log("[smaa] " + (smaaPass && smaaPass.ok ? "ready -- GFX panel's SMAA toggle (off by default; used instead of FXAA when on)" : "unavailable (shader compile failed)"));
 console.log("[fxaa] " + (fxaaPass && fxaaPass.ok ? "ready -- GFX panel's Anti-aliasing toggle (off by default)" : "unavailable (shader compile failed)"));
 // v1074 — true GL CRT/phosphor pass. Bloom composites into the phosphor FBO,
 // then a fullscreen shader applies barrel/scanlines/phosphor-tint/glow/vignette.
@@ -31916,6 +31921,7 @@ function loop(t, xrFrame) {
         rootArchLandmark.enabled = gfxSettings.get("rootarch");
         // screen-space anti-aliasing, same source of truth -- off by default (GFX panel "Anti-aliasing").
         if (fxaaPass) fxaaPass.enabled = fxaaPass.ok && gfxSettings.get("fxaa");
+        if (smaaPass) smaaPass.enabled = smaaPass.ok && gfxSettings.get("smaa");
         if (renderer.slopesEnabled !== undefined) {
             renderer.slopesEnabled = gfxSettings.get("slopes");
         }
@@ -31926,7 +31932,9 @@ function loop(t, xrFrame) {
         const _phOn = !!(phosphorPass && phosphorPass.ok && phosphorPass.enabled);
         // screen-space anti-aliasing -- opt-in (ui/graphicsSettings.js "fxaa", default off; the retro/CRT
         // look this tree leans on often reads aliasing as in-theme rather than a defect).
-        const _fxOn = !!(fxaaPass && fxaaPass.ok && fxaaPass.enabled);
+        // 2026-11-22: the slot holds SMAA when its toggle is on, else FXAA (render/smaaPass.js has fxaaPass.js's shape: inputFBO, outputFBO, render)
+        const aaPass = smaaPass && smaaPass.ok && smaaPass.enabled ? smaaPass : fxaaPass;
+        const _fxOn = !!(aaPass && aaPass.ok && aaPass.enabled);
         if (_phOn) {
             // v1074 — tint follows the live in-game effect color (--game-color),
             // throttled to ~4Hz to avoid per-frame style reflow.
@@ -31943,12 +31951,12 @@ function loop(t, xrFrame) {
                 // FXAA sits between bloom's composite and phosphor's CRT shader -- it smooths the clean
                 // rendered image before phosphor's barrel/scanline/aberration distortion reshapes it,
                 // rather than anti-aliasing an already-stylised picture.
-                bloomPass.outputFBO = fxaaPass.inputFBO;
+                bloomPass.outputFBO = aaPass.inputFBO;
                 bloomPass.apply();                       // composite the frame into the fxaa FBO
                 bloomPass.outputFBO = null;
-                fxaaPass.outputFBO = phosphorPass.inputFBO;
-                fxaaPass.render();                       // FXAA -> the phosphor FBO
-                fxaaPass.outputFBO = null;
+                aaPass.outputFBO = phosphorPass.inputFBO;
+                aaPass.render();                         // FXAA or SMAA -> the phosphor FBO
+                aaPass.outputFBO = null;
             } else {
                 bloomPass.outputFBO = phosphorPass.inputFBO;
                 bloomPass.apply();                       // composite the frame into the phosphor FBO
@@ -31956,10 +31964,10 @@ function loop(t, xrFrame) {
             }
             phosphorPass.render(performance.now());  // CRT shader -> screen
         } else if (_fxOn && bloomPass._enabled !== false) {
-            bloomPass.outputFBO = fxaaPass.inputFBO;
+            bloomPass.outputFBO = aaPass.inputFBO;
             bloomPass.apply();                           // composite the frame into the fxaa FBO
             bloomPass.outputFBO = null;
-            fxaaPass.render();                           // FXAA -> screen (outputFBO left null)
+            aaPass.render();                             // FXAA or SMAA -> screen (outputFBO left null)
         } else {
             bloomPass.outputFBO = null;
             if (bloomPass._enabled !== false) bloomPass.apply();
