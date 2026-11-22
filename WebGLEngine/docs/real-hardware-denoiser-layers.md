@@ -60,3 +60,30 @@ If on a GPU the aimed set differs from the fastest whole set and wins its head t
 page's table for that adapter (`PAGE_KERNELS_BY_ADAPTER` in `render/denoiseDevice.mjs`), to be registered and confirmed on
 fresh timings before it replaces anything. `--aim r18t,r15,r15,r15,r15` times any mixed set you name against the fastest whole
 set, the same way.
+
+## Round 2026-11-22: is r57p the Intel's page set? (registered: `tools/denoiseKernelRound.mjs`)
+
+Only on the **Intel** (it is the table's entry being asked about). In the same clone, after `git pull`:
+
+```
+cd /d %USERPROFILE%\SweK_Layers\WebGLEngine
+git pull --ff-only origin claude/epic-cori-2hm1my
+set SWEK_WEBGPU=
+node tools/denoiseKernelRound-selfcheck.mjs
+node tools/denoiseKernelRound.mjs --challenger r57p --repeats 5
+```
+
+- The self-check must end `ALL PASS` (it needs no GPU).
+- The round opens `denoise.html` in Chrome on the GPU five times and presses its own **Time the network** with only r18u (the table's set) and r57p, then times the
+  same two natively five times. It can take a while: five page ladders and five native ones.
+- Its first line names the adapter and the page's key; it must say `Windows/intel/gen-9`. **If it says SOFTWARE ADAPTER it refuses**, and that is the thing to send.
+- It writes `render/denoise-round-windows-intel-gen-9-r57p.json` and prints the decision. Commit and push that file (or paste it):
+
+```
+git add render\denoise-round-*.json
+git commit -m "Denoiser kernel round from the Intel rig"
+git push origin claude/epic-cori-2hm1my
+```
+
+The rule was written before any run (the tool's header): r57p takes the Intel's entry only if, IN THE PAGE, it is at least 1.02 x faster in median and faster in at least
+4 of 5 repeats at every size of 512 or more (at least two sizes). The native figures are reported beside it and decide nothing.
