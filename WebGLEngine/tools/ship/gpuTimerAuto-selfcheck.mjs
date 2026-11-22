@@ -10,9 +10,10 @@
 //                   frame, is timed, and then the page is idle and the overlay says so; the page's requestAnimationFrame is the browser's own; when the drawn
 //                   canvas leaves the page the timer moves to the one left; ?gputimer=0 installs nothing (getContext the browser's own, no overlay); a page
 //                   with no context shows no overlay
+//   2b NAMED PASSES time("heavy", fn) on the test page is timed under its name, apart from the rest; the overlay lists it; time() returns fn's value, timer or not
 //   3  THE PAGES    every page that carries it loads with no page error that it does not also have with ?gputimer=0; a page that makes its context only when
 //                   asked (a button) says "no WebGL2 context" and shows nothing; every other page is timed on a canvas, shows the overlay, and -- for those
-//                   listed as drawing at load or every frame -- has timed a frame that drew (0.01 ms or more)
+//                   listed as drawing at load or every frame -- has timed a frame that drew (0.01 ms or more); water, raymarch-live and bzflag list the passes they name
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -55,6 +56,7 @@ const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/ja
 const TEST = `<!doctype html><html><head><meta charset="utf-8">${TAG}</head><body><script>
 const Q = new URLSearchParams(location.search);
 window.__nativeRaf = /\\[native code\\]/.test(Function.prototype.toString.call(window.requestAnimationFrame));
+window.__timeReturns = window.__gpuTimerAuto.time("x", () => 7);
 window.__nativeGet = /\\[native code\\]/.test(Function.prototype.toString.call(HTMLCanvasElement.prototype.getContext));
 if (Q.get("none") !== "1") {
     const probe = document.createElement("canvas"); probe.width = probe.height = 2; probe.getContext("webgl2");   // a capability probe, never on the page
@@ -67,6 +69,7 @@ if (Q.get("none") !== "1") {
     const pb = prog(gl);
     window.__drawOnce = () => { gl.useProgram(pb); for (let k = 0; k < 6; k++) gl.drawArrays(gl.TRIANGLES, 0, 3); };
     setTimeout(() => { window.__drawOnce(); window.__drewAt = performance.now(); }, 400);   // ONCE, on a timer -- not in an animation frame
+    window.__labelled = () => { window.__labelling = true; const f = () => { window.__gpuTimerAuto.time("heavy", () => window.__drawOnce()); gl.useProgram(pb); for (let k = 0; k < 3; k++) gl.drawArrays(gl.TRIANGLES, 0, 3); if (window.__labelling) requestAnimationFrame(f); }; requestAnimationFrame(f); };
     window.__dropBig = () => big.remove(); window.__grow = () => { big.width = 400; };
 }
 <\/script></body></html>`;
@@ -90,13 +93,18 @@ await section(async () => {
     ok("!! THE CANVAS DRAWN ON IS TIMED, not the 2 x 2 probe made first, nor the smaller canvas", a.canvas === "320 x 200", a.canvas);
     ok("!! A DRAW DONE ONCE, ON A TIMER (not in any animation frame), IS TIMED; then the page is idle and the overlay says how long the frame that drew took", a.busy > 0.05 && a.last < 0.01 && /idle; the last frame that drew took/.test(a.box) && pe.length === 0, JSON.stringify({ busy: a.busy, last: a.last, box: a.box, pe: pe.slice(0, 1) }));
     ok("!! the page's requestAnimationFrame is the browser's own, untouched (getContext is the one function wrapped)", a.raf === true && a.get === false);
+    await p.evaluate(() => window.__labelled()); await p.waitForTimeout(3000);
+    const L = await p.evaluate(() => ({ last: window.__gpuTimerAuto.lastLabels, ret: window.__timeReturns, box: (document.getElementById("gpuTimerAuto") || {}).textContent }));
+    await p.evaluate(() => { window.__labelling = false; }); await p.waitForTimeout(800);
+    const ratio = L.last && L.last["the rest"] > 0 ? L.last.heavy / L.last["the rest"] : Infinity;
+    ok("!! A PAGE'S NAMED PASS IS TIMED UNDER ITS NAME, AND THE REST APART: six draws inside time(\"heavy\") and three after it, every frame -- the latest frame's heavy about twice its rest (1.3 to 3.5); the overlay lists heavy, the rest, then the total; time() returns what its function returns", ratio > 1.3 && ratio < 3.5 && /^heavy .*\nthe rest .*\nGPU total/.test(L.box || "") && L.ret === 7, `heavy / rest ${ratio.toFixed(2)}; ${JSON.stringify(L)}`);
     await p.evaluate(() => window.__grow()); await p.waitForTimeout(500);
     ok("!! the size it reports is the canvas's as it is now (a page sizes its canvas after making the context)", await p.evaluate(() => window.__gpuTimerAuto.canvas) === "400 x 200");
     await p.evaluate(() => window.__dropBig()); await p.waitForFunction(() => window.__gpuTimerAuto.canvas === "64 x 40", null, { timeout: 20000 }).catch(() => {});
     ok("!! when the drawn canvas leaves the page, the timer moves to the one left", await p.evaluate(() => window.__gpuTimerAuto.canvas) === "64 x 40" && pe.length === 0);
     const off = await browser.newPage(); await off.goto(base + "?gputimer=0"); await off.waitForTimeout(1500);
-    const o = await off.evaluate(() => ({ s: window.__gpuTimerAuto.state, get: window.__nativeGet, raf: window.__nativeRaf, box: !!document.getElementById("gpuTimerAuto") }));
-    ok("!! ?gputimer=0 installs nothing: getContext is the browser's own, no overlay, and it says off", o.s === "off" && o.get === true && o.raf === true && !o.box, JSON.stringify(o));
+    const o = await off.evaluate(() => ({ t: window.__gpuTimerAuto.time("y", () => 9), s: window.__gpuTimerAuto.state, get: window.__nativeGet, raf: window.__nativeRaf, box: !!document.getElementById("gpuTimerAuto") }));
+    ok("!! ?gputimer=0 installs nothing: getContext is the browser's own, no overlay, and it says off (time() still just runs its function)", o.s === "off" && o.t === 9 && o.get === true && o.raf === true && !o.box, JSON.stringify(o));
     const none = await browser.newPage(); await none.goto(base + "?none=1"); await none.waitForTimeout(1500);
     const n = await none.evaluate(() => ({ s: window.__gpuTimerAuto.state, box: !!document.getElementById("gpuTimerAuto") }));
     ok("!! a page that makes no WebGL2 context shows no overlay and says so", n.s === "no WebGL2 context" && !n.box, JSON.stringify(n));
@@ -113,7 +121,7 @@ await section(async () => {
             await p.waitForFunction(() => window.__gpuTimerAuto && window.__gpuTimerAuto.frames >= 3, null, { timeout: 15000 }).catch(() => {});
             await p.setViewportSize({ width: 600, height: 380 }); await p.waitForTimeout(2500);   // a resize: many pages draw again on one
         } else await p.waitForTimeout(3000);
-        const r = await p.evaluate(() => ({ ...window.__gpuTimerAuto, box: (document.getElementById("gpuTimerAuto") || {}).textContent || null })).catch((e) => ({ state: "page gone: " + e.message.slice(0, 40) }));
+        const r = await p.evaluate(() => ({ ...window.__gpuTimerAuto, time: undefined, box: (document.getElementById("gpuTimerAuto") || {}).textContent || null })).catch((e) => ({ state: "page gone: " + e.message.slice(0, 40) }));
         await p.close(); return { ...r, errs };
     };
     const rows = [];
@@ -126,6 +134,8 @@ await section(async () => {
     ok(`!! the other ${rest.length} are timed on a canvas and show the overlay (and with ?gputimer=0 say off)`, notOn.length === 0, notOn.map((r) => `${r.pg}: ${r.on.state} / ${r.off.state}`).join("; "));
     const drew = rest.filter((r) => DRAWS.includes(r.pg)), idle = drew.filter((r) => !(r.on.busy >= 0.01));
     ok(`!! the ${DRAWS.length} that draw at load or every frame have each timed a frame that drew`, drew.length === DRAWS.length && idle.length === 0, idle.map((r) => r.pg).join(", "));
+    const LABELS = { "water.html": ["sim", "caustics", "scene"], "raymarch-live.html": ["march"], "bzflag.html": ["world"] }, unnamed = Object.entries(LABELS).filter(([pg, ls]) => { const r = rows.find((x) => x.pg === pg); return !r || !ls.every((l) => r.on.labels && r.on.labels[l] > 0) || !ls.every((l) => new RegExp("^" + l + " ", "m").test(r.on.box || "")); });
+    ok("!! THE PAGES THAT NAME THEIR PASSES HAVE THEM TIMED AND LISTED: water's sim, caustics and scene; raymarch-live's march; bzflag's world", unnamed.length === 0, unnamed.map(([pg]) => `${pg}: ${JSON.stringify((rows.find((x) => x.pg === pg) || { on: {} }).on.labels)}`).join("; "));
     for (const r of rest) console.log(`  ....  ${r.pg.padEnd(22)} ${r.on.canvas || ""}  ${r.on.box || ""}`);
     await browser.close(); srv.close();
 });
@@ -138,3 +148,6 @@ process.exit(fails === 0 ? 0 : 1);
 // kept; the overlay shown with no context; idle judged by the smoothed time; the size not refreshed -- the last GREEN until the test page grew its canvas after the
 // context was made). 2 of the pages, against section 1 (the line taken out of cube.html; the line moved after sky.html's module script -- moved only to BEFORE it
 // at first, which left it first and was no mutant at all).
+// 2026-11-22, NAMED PASSES: 6 more, ALL 6 RED (the rest never resuming after a named pass -- GREEN at first, the smoothed labels still held earlier frames; the
+// check now holds the LATEST frame's own heavy-to-rest ratio --, the label ignored, time() dropping its value, no time() with ?gputimer=0, the overlay listing no labels;
+// and water.html's caustics left unnamed).
