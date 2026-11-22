@@ -1,6 +1,7 @@
 # The evade seat: DRAFT registration (2026-11-22; UNNUMBERED)
 
-**STATUS: A DRAFT FOR KEITH TO READ. NOTHING HERE HAS BEEN FLOWN, NO SEED BELOW HAS BEEN USED, AND NOTHING IS REGISTERED UNTIL KEITH SAYS SO.** Once approved (with
+**STATUS: KEITH'S ANSWERS TAKEN (2026-11-22, below); STILL NOTHING FLOWN AND NO SEED USED.** It is registered when the reflex and the study tool are built and this text,
+as it then stands, is committed as the tool's header -- before any pair is flown. Once approved (with
 whatever he changes), this text becomes the header of `tools/ship/takeEvadeSeat.mjs`, committed before any pair is flown, as `tools/ship/takeLc11Gunner.mjs`'s was.
 Backlog: `brain/BACKLOG_2026-11-04_BRAINS.md`, `evade-seat-loom-circuits`. Keith: "start with the LC4/LPLC2 data pull and a draft registration".
 
@@ -36,9 +37,28 @@ only on which eye sees it -- so `lc4:medial`, `lc4:lateral` and `lc4:flat` may f
   correction of up to the hull's torque fraction, scaled by the read-out (`tanh(2 S)`). Pitch, thrust, the gun and everything else are as they are.
 * **ORIENTATION.** Which end of each sheet is the front of the visual field is not in the data, so each circuit is flown both ways: `medial` and `lateral`, as for LC10a and LC11.
 
+## TWO STAGES (Keith, 2026-11-22: "Screen first")
+
+**STAGE 1, THE ACTION SCREEN.** Which evasive action helps at all, with no circuit in it. Five arms, each against the plain side:
+* `none` -- today's helm, no reflex.
+* `turn` -- turn AWAY: a yaw correction of `tanh(2 S)` of the torque fraction, S the sine of the threat's bearing (left threat, right turn).
+* `burst` -- a SPEED BURST: the pods' thrust to full while there is a threat.
+* `climb` -- CLIMB OR DIVE: a pitch correction of the full torque fraction, away from the threat's elevation (down if it is above the hull's plane, up if it is level or below).
+* `jink` -- a JINK: a yaw correction of the full torque fraction, its sign alternating every 0.5 s while the threat lasts, the first swing away from the threat.
+
+Seeds: one ship a side 1681001-, fleets of three 1691001-; 300 pairs a fight, 75 of each kind; none flown by anything. **The action is chosen by this rule, written now:**
+the action whose arm LEADS `none` (z >= 2) in at least one fight and TRAILS it (z <= -2) in none; if several, the larger mean lead over the two fights; **if none does,
+stage 2 flies `turn`** (the drafted reflex), and says so -- the circuit question stands whatever the screen finds.
+
+**STAGE 2, THE CIRCUITS,** on the action stage 1 chose: the ten arms below. How a circuit drives each action, fixed now:
+* `turn` -- the circuit's read-out S (odd, over its own peak) in place of the sine.
+* `jink` -- the sign of S sets the first swing (away); the swings are full, as in stage 1.
+* `burst`, `climb` -- the side does not matter to these, so the circuit's EVEN read-out (its two descending neurons' activity together, over its own peak) scales the
+  action: full at the circuit's strongest response, nothing where the circuit does not respond.
+
 ## The fights
 
-* **ONE SHIP A SIDE** (seeds 1661001-; the helm alone decides where the hull points) and **FLEETS OF THREE A SIDE** (seeds 1671001-). 300 pairs a fight, 75 of each of the duel's
+* (Stage 2.) **ONE SHIP A SIDE** (seeds 1661001-; the helm alone decides where the hull points) and **FLEETS OF THREE A SIDE** (seeds 1671001-). 300 pairs a fight, 75 of each of the duel's
   four kinds. **None of these seeds has been flown by anything.**
 * Side X flies today's best-ship helm with the arm's reflex; side Y is plain. The cannon is on on both sides.
 
@@ -67,7 +87,14 @@ No circuit can be told from `none` in fleets of three. One ship a side, where th
 in this model the reflex reads the bearing and nothing else. The forecast is that the dark-looming cells cannot be told from the Giant Fiber inputs. Every fly-wired seat
 so far has tied the sine; LC11 trailed LC10a one ship a side.
 
-## Open questions for Keith, before registering
+## Keith's answers (2026-11-22)
+
+1. Separate runs for turning away, a speed burst, a climb and a jink: **yes, as the stage-1 screen** above, the circuits flown on the action it picks.
+2. tau0 4 s and 1,500 m: **as drafted.**
+3. **Ten arms** in the circuit stage.
+4. LC4's descending neuron: **DNp04, the rule's**, chosen now -- before any fight is flown, so no result can bend it.
+
+## The questions as asked (kept for the record)
 
 1. **Is "turn away" the reflex you want?** The alternatives are a speed burst, a climb or dive, or a jink: a short turn either way. Only the turn has a model here so far.
 2. **tau0 (4 s) and the 1,500 m reach**: hand-set. A shorter tau0 makes the reflex rarer and later.
