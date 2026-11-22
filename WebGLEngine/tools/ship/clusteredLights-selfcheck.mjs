@@ -10,7 +10,7 @@
 //                      0 outside the outer
 //   3  THE ATLAS       shadowed lights by priority, a spot one tile and a point light six, no two tiles overlapping, all inside the atlas; a light with no room listed as
 //                      unshadowed; every direction from a point light lands inside the face cubeFace names (500 directions), a spot's axis at its tile's centre
-//   4  THE PAGE        lights-demo.html (67 lights, three casting shadows): clustered and every-light (?brute=1) pictures the same to a level; with shadows off, ground
+//   4, 5  THE PAGES    lights-demo.html (WebGL2) and lights-gpu.html (WebGPU, 2026-11-22), the same scene (67 lights, three casting shadows), each: clustered and every-light (?brute=1) pictures the same to a level; with shadows off, ground
 //                      pixels are the CPU sum to 2 levels; with shadows on, ground no shadowed light is blocked from is unchanged, ground a pillar hides from a spot light
 //                      is darker, and ground a pillar hides from the point light is darker (its cube's faces)
 //
@@ -137,3 +137,7 @@ process.exit(fails === 0 ? 0 : 1);
 // BEFORE THE SABOTAGE the gate found two real faults in the shadows: a bias in DEPTH (0.002) was about two world units at seven from the spot lights, so pillars near the
 // ground cast no shadow there (9 of 17 darker); a bias toward the light alone left acne at grazing angles (43 clear ground pixels a level or two darker). The bias is now in
 // world units, along the surface normal and half as far toward the light.
+// 2026-11-22, WEBGPU (section 5, lights-gpu.html): 11 mutants of the WGSL half, 10 RED -- the cell index transposed, the list read from the count's slot, the window not the CPU's,
+// the tile's v not flipped (WebGL2's order), the cube face from the wrong direction, no shadow bias, the spot cone dropped, the cell counts written as zero, the light count
+// wrong (the brute loop runs none), the atlas never cleared. ONE STAYS GREEN: the shadow matrices left in -1..1 depth -- the shadow pass and the lookup then agree on the same
+// -1..1 values, and only casters within about 0.1 of a light (where that depth is below WebGPU's 0) are lost; nothing in this scene is that close. Recorded, not hidden.
