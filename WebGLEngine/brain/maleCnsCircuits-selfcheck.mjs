@@ -125,5 +125,18 @@ section(() => {
     ok("!! LC16 FEEDS pIP1 FROM THE LATERAL END, as LC11 feeds DNp35 (-0.55 left, -0.46 right). WHICH PART OF THE VISUAL FIELD EITHER END IS, IS NOT IN THE DATA USED HERE AND IS NOT CLAIMED", B.side.L.c.pIP1 < -0.4 && B.side.R.c.pIP1 < -0.4, `pIP1 ${f(B, "pIP1")}`);
 });
 
+console.log("10. THE BAKED MODULES FOR LC6 AND LC16 ARE THE VENDORED FILES (brain/lc6Topology.mjs, lc6Synapses.mjs, lc6Places.mjs and lc16's, 2026-11-22)");
+await (async () => {
+    const { placesOf } = await import("../tools/bakeDendritePlaces.mjs"), r6 = (v) => Math.round(v * 1e6) / 1e6;
+    for (const [n, X] of [["lc6", K6], ["lc16", K16]]) {
+        const T = await import(`./${n}Topology.mjs`), Y = await import(`./${n}Synapses.mjs`), L = await import(`./${n}Places.mjs`), P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${n}-positions.json`, import.meta.url), "utf8")), pl = placesOf(P);
+        const idx = new Map(T.NEURON_ORDER.map((b, k) => [b, k])), V = X.v;
+        const topo = T.NEURON_ORDER.join() === V.neurons.map((x) => x.bodyId).join() && T.NEURON_TYPES.join() === V.neurons.map((x) => x.type).join() && T.EDGES.length === V.edges.length && T.EDGES.every(([to, from], k) => to === idx.get(V.edges[k][1]) && from === idx.get(V.edges[k][0]));
+        const syn = Y.EDGE_COUNTS.join() === V.edges.map((e) => e[2]).join() && Y.NEURON_NT.join() === V.neurons.map((x) => x.nt).join() && Y.NEURON_SOMA.join() === V.neurons.map((x) => x.somaSide).join();
+        const places = T.NEURON_ORDER.every((b, k) => (pl.has(b) ? L.ACROSS[k] === r6(pl.get(b).across) && L.ALONG[k] === r6(pl.get(b).along) : L.ACROSS[k] === -1 && L.ALONG[k] === -1)) && pl.size === P.cells.length;
+        ok(`!! ${n.toUpperCase()}'S BAKED MODULES ARE ITS VENDORED FILES: the neurons in the file's order, every edge [to, from] the file's (${T.EDGES.length.toLocaleString()}), its synapse counts, transmitters and soma sides, and each cell's rank across and along its side's sheet (-1 for the ${T.NEURON_ORDER.length - P.cells.length} that are not ${n.toUpperCase()})`, topo && syn && places, JSON.stringify({ topo, syn, places }));
+    }
+})().catch((e) => ok(`!! the section THREW instead of answering: ${e.message}`, false));
+
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
