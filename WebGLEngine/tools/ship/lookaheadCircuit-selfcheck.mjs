@@ -10,7 +10,18 @@
 // which replaces the profile ONLY on V4. No search seed, audit seed or training set is flown here.
 //
 // ---- SABOTAGE LOG ----------------------------------------------------------------------------------------------
-// (filled in by the mutation pass below this round's build)
+// 19 mutants (each in a backed-up copy, restored byte-identical and checked), all red by name in the end; FIVE were not, first, and each is fixed:
+//   red at once: the getter handing back the planner's live values (the copy row); L3 summed (2); the margin to the third value; the age uncapped; the
+//   look-ahead flag ignored (the live row); replacing without V4 (2); V4 at REF only; Round 42's seeds (3); the weight count unchecked; getterPassive
+//   blinded (red only once its tampered-record control was added, before the pass); startIsSeat blinded; the command's job refusal and ledger check.
+//   *** NOT AT FIRST: (1) a getter returning an object before the first plan CRASHED the gate inside the probe dive -- no verdict; the probe now catches
+//   and fails its row (3 red). (2) Round 42's CUR arm put back went red on one row and then CRASHED section 6; the section now catches (2 red).
+//   (3) the planner replanning half as often went 0 RED, and that is MEASURED, not a gate defect: a 240 s replan changes none of 16 recorded dives (the
+//   planner moves a decision on 0-4% of ticks). It was replaced by a decision-moving mutant, the planner's pump threshold: 2 red (passive, start).
+//   (4) "features read before the planner" was MY no-op (an unused variable); the real one -- features a step stale -- went red only once a row asked
+//   that the FIRST net step already carries the plan made that tick (1 red). (5) a getter with a side effect (resetting the planner's filter when read)
+//   went 0 RED: the look-ahead seat flies the planner's station only, so no decision on the gate's dives moved. A row now flies one dive twice, the
+//   getter read every tick in one flight, and requires the same plans value for value and the same dive (1 red). ***
 
 import fs from "node:fs";
 import os from "node:os";
@@ -49,10 +60,24 @@ sec("2. THE GETTER IS PASSIVE, AND IT CARRIES THE PLAN");
     ok("!! the shipped seat still flies the SEAT-04 dives Round 42's committed audit recorded BEFORE plannerPerturbed gained its plan getter (56001, 56002) -- and a tampered record fails it",
         X.getterPassive(rec, 2) && !X.getterPassive(tampered, 2));
     const sc = T.scenario(X.GATE_SEEDS[0], X.KIND), seatOf = SS.surveySeat();
-    let seen = null, before = undefined, copyOk = false;
-    T.fly(T.flyDecision((ctx) => { const s = seatOf(ctx); const wrap = (st, obs) => { if (before === undefined) before = s.plan; const d = s(st, obs); if (!seen && s.plan) { seen = s.plan; const again = s.plan; again.values.nearest = -1; copyOk = s.plan.values.nearest !== -1; } return d; }; return wrap; }), sc, { gauge: X.SOUND, seconds: 30 });
+    let seen = null, before = undefined, copyOk = false, crashed = null;
+    try { T.fly(T.flyDecision((ctx) => { const s = seatOf(ctx); const wrap = (st, obs) => { if (before === undefined) before = s.plan; const d = s(st, obs); if (!seen && s.plan) { seen = s.plan; const again = s.plan; again.values.nearest = -1; copyOk = s.plan.values.nearest !== -1; } return d; }; return wrap; }), sc, { gauge: X.SOUND, seconds: 30 }); } catch (e) { crashed = e.message; }
     ok("!! the getter is null before the first plan, then carries the plan's values (nearest-first included), its order and its time -- as a COPY (writing to it does not reach the planner)",
-        before === null && seen && typeof seen.values.nearest === "number" && Object.keys(seen.values).length >= 1 && typeof seen.t === "number" && copyOk);
+        crashed === null && before === null && seen && typeof seen.values.nearest === "number" && Object.keys(seen.values).length >= 1 && typeof seen.t === "number" && copyOk, crashed ? "the probe dive THREW: " + crashed : "");
+}
+
+{
+    // READING THE GETTER CHANGES NOTHING: one dive flown twice, the getter read on every tick of one flight and never in the other. The plans the planner
+    // made, and the dive, must be identical. (A getter that touched the planner's filter changed no decision on the gate's dives -- the look-ahead seat flies
+    // the planner's station only -- so the start check could not see it; the plans can.)
+    const sc = T.scenario(X.GATE_SEEDS[1], X.KIND), plansOf = (read) => {
+        const seatOf = SS.surveySeat(), plans = []; let last = null;
+        const fp = T.fly(T.flyDecision((ctx) => { const s = seatOf(ctx); return (st, obs) => { if (read) void s.plan; const d = s(st, obs); const p = s.stats.plans; if (p !== last) { last = p; plans.push(JSON.stringify(s.plan)); } return d; }; }), sc, { gauge: X.BIASED, seconds: 300 }).fingerprint;
+        return { fp, plans };
+    };
+    const quiet = plansOf(false), loud = plansOf(true);
+    ok("!! READING THE GETTER CHANGES NOTHING: a dive whose planner is read on every tick makes the same plans, value for value, and flies the same dive as one never read",
+        quiet.plans.length > 1 && JSON.stringify(quiet.plans) === JSON.stringify(loud.plans) && quiet.fp === loud.fp, `${quiet.plans.length} plans compared`);
 }
 
 sec("3. THE ELEVEN FEATURES, ON PLANS WHOSE ANSWER IS KNOWN");
@@ -68,6 +93,8 @@ sec("3. THE ELEVEN FEATURES, ON PLANS WHOSE ANSWER IS KNOWN");
     T.fly(T.flyDecision(PC.makePlannerSeat(sp, { lookahead: true })), T.scenario(X.GATE_SEEDS[1], X.KIND), { gauge: X.SOUND, seconds: 120 });
     ok("!! live: the look-ahead seat steps the net on 35 features, the last 11 read off the planner's plan (L1 is a rollout value in [0, 1] and is not all zero)",
         xs.length > 1 && xs.every((x) => x.length === 35) && xs.some((x) => x[24] > 0) && xs.every((x) => x[24] >= 0 && x[24] <= 1 && x[34] >= 0 && x[34] <= 1));
+    ok("!! the features are read AFTER the planner decides that tick: the very first net step (t = 0, the planner's first plan) already carries a plan value, with age 0",
+        xs.length > 0 && xs[0][24] > 0 && xs[0][34] === 0, `first step L1 ${xs.length ? xs[0][24].toFixed(4) : "-"}, L11 ${xs.length ? xs[0][34] : "-"}`);
 }
 
 sec("4. NEW'S START IS THE SHIPPED SEAT (57901-57902, both gauges, full length)");
@@ -99,7 +126,7 @@ sec("5. THE SEARCH, THE RECORD AND THE LEDGER (a stub fitness)");
 }
 
 sec("6. THE TWO-ARM CHECKS AND THE BOTTOM LINE (V4 OR NOTHING)");
-{
+try {
     const runs = (scores, fp) => scores.map((score, i) => ({ score, kind: X.KIND, damage0: i, fingerprint: fp + i }));
     const n = 300, base = Array.from({ length: n }, (_, i) => 0.8 + 0.1 * Math.sin(i)), shift = (d) => base.map((x, i) => x + d + 0.002 * Math.cos(3 * i));
     const arm = (r, b, fp, cb = 0) => ({ REF: { score: 0, runs: runs(r, fp + "r"), crashed: 0, stranded: 0 }, BIAS: { score: 0, runs: runs(b, fp + "b"), crashed: cb, stranded: 0 } });
@@ -113,7 +140,7 @@ sec("6. THE TWO-ARM CHECKS AND THE BOTTOM LINE (V4 OR NOTHING)");
     ok("!! THE ARMS DIFFER in its isStart form: NEW must EQUAL SEAT-04 when the champion is the start", row(eq).ok && !row(same).ok);
     const rep = X.report({ NEW: arm([], [], "x"), "SEAT-04": arm([], [], "y") }, [], { dives: 300 });
     ok("!! a failed check prints NOT WEIGHED and no verdict; the checks include THE GETTER IS PASSIVE", rep.at(-1) === "BOTTOM LINE: NOT WEIGHED (a check failed)" && rep.some((l) => /THE GETTER IS PASSIVE/.test(l)) && !rep.some((l) => /^  V1/.test(l)));
-}
+} catch (e) { ok("!! section 6 ran to its end (the verdict code did not throw on two arms)", false, e.message); }
 
 sec("7. THE AUDIT AND THE COMMAND");
 {
