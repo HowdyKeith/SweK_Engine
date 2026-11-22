@@ -54,9 +54,12 @@ section(() => {
     ok("!! BURST: the thrust up to everything the pods give (1,500), the torques untouched", burst.thrust === 1500 && burst.torque.join() === "10,20,30");
     const climb = EV.createReflex({ action: "climb" }), above = climb(RULE(), ctxOf([round([300, 0, 200], [-300, 0, -200])])), level = climb(RULE(), ctxOf(L)), half = EV.FRACTION * lim * I[1];
     ok("!! CLIMB: NOSE DOWN (+ about y) for a round from above the hull's plane, UP (-) for one level or from below, half the torque limit", Math.abs(above.torque[1] - (20 + half)) < 1e-9 && Math.abs(level.torque[1] - (20 - half)) < 1e-9);
+    // the restart: 10 ticks of a threat from the left (still the first swing), a tick without, then one from the right -- only a restart makes that swing point left
     const jink = EV.createReflex({ action: "jink" }), swings = []; for (let k = 0; k < 40; k++) swings.push(Math.sign(jink(RULE(), ctxOf(L)).torque[2] - 30));
-    const swapAt = swings.findIndex((s2) => s2 !== swings[0]), again = EV.createReflex({ action: "jink" }); for (let k = 0; k < 20; k++) again(RULE(), ctxOf(L)); again(RULE(), ctxOf([])); const fresh = Math.sign(again(RULE(), ctxOf(Rt)).torque[2] - 30);
+    const swapAt = swings.findIndex((s2) => s2 !== swings[0]), again = EV.createReflex({ action: "jink" }); for (let k = 0; k < 10; k++) again(RULE(), ctxOf(L)); again(RULE(), ctxOf([])); const fresh = Math.sign(again(RULE(), ctxOf(Rt)).torque[2] - 30);
     ok("!! JINK: full swings, the FIRST AWAY (from the left: right), swapped every 0.5 s (15 ticks); a tick with no threat ends it, and the next threat (from the right) starts it again away (left)", swings[0] === -1 && swapAt === Math.round(0.5 / DT) && swings[swapAt * 2] === -1 && fresh === 1, `swap after ${swapAt} ticks`);
+    const cb = EV.createReflex({ action: "burst", wiring: "lc6:medial" })(RULE(), ctxOf([round([300, 0, 0], [-400, 0, 0])])), E0 = EV.readoutOf("lc6:medial").E(0);
+    ok("!! A CIRCUIT SCALES THE BURST: LC6 (medial) at a round dead ahead raises the thrust by its strength there (E 0.584) of the way to the pods' all, not all of it", Math.abs(cb.thrust - (450 + 1050 * E0)) < 1e-9 && E0 > 0.5 && E0 < 0.7, `thrust ${cb.thrust.toFixed(1)}`);
     const out = RULE(), none = EV.createReflex({ action: "turn" });
     ok("!! WITH NO THREAT THE HELM'S ANSWER IS RETURNED UNTOUCHED (the very same object)", none(out, ctxOf([])) === out && none.last === null);
 });
@@ -73,6 +76,8 @@ section(() => {
     const peaks = ["lc6:medial", "lc6:lateral", "lc16:medial", "lc16:lateral", "lc4:medial", "lc4:lateral", "lplc2:medial", "lplc2:lateral"].map(peakOf).join();
     ok("!! THE SENSES, as measured: every original circuit reads its own side (-1, as the loom bench found for LC6 and LC16), the LC6 and LPLC2 shuffles the other (+1)", senses === "-1,-1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1", senses);
     ok("!! WHERE EACH READ-OUT PEAKS, as measured (degrees off the nose; medial and lateral mirror each other): LC6 46/134, LC16 135/45, LC4 59/121, LPLC2 124/56", peaks === "46,134,135,45,59,121,124,56", peaks);
+    const Es = [0, 90, 180].map((a) => EV.readoutOf("lc6:medial").E(deg(a)).toFixed(3)).join(), Es16 = [0, 90, 180].map((a) => EV.readoutOf("lc16:medial").E(deg(a)).toFixed(3)).join();
+    ok("!! THE STRENGTH E IS MEASURED FROM THE CIRCUIT AT REST, as pinned: LC6 medial 0.584 / 0.986 / 0.470 and LC16 medial 0.359 / 0.852 / 0.608 dead ahead, abeam and astern", Es === "0.584,0.986,0.470" && Es16 === "0.359,0.852,0.608", `${Es}; ${Es16}`);
     let threw = 0; for (const bad of ["lc5:medial", "lc6:front", "lc6:shuffled:x", "", "sine2"]) { try { EV.readoutOf(bad); } catch { threw++; } }
     ok("a wiring is refused unless it is sine or <lc6|lc16|lc4|lplc2>:<medial|lateral|flat|shuffled:<seed>>", threw === 5 && EV.checkWiring("lplc2:shuffled:7") === null);
 });
@@ -89,4 +94,7 @@ section(() => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 12 mutants of brain/evadeReflex.mjs, each in a hard-linked copy of the tree: ALL 12 RED -- the threat not relative to the hull, the miss distance ignored, the
+// latest round picked instead of the first, the bearing in the world's frame, turning toward the round, climbing toward it, the jink never swapped, the jink not restarted after
+// a tick without a threat (GREEN at first: the test's 20 ticks landed on a swing pointing the same way either way; 10 now), the burst not scaled by a circuit (GREEN at first: only
+// the sine, whose E is 1, was tried; LC6's is now), the sense not set, lateral flown as medial, and E not measured from the circuit at rest (GREEN at first: E was never pinned).

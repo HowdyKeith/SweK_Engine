@@ -84,4 +84,6 @@ section(() => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 9 mutants of tools/ship/takeEvadeSeat.mjs, each in a hard-linked copy of the tree: ALL 9 RED -- stage 1's rule ignoring a trailing fight, no default action,
+// the first of several actions instead of the larger mean, a second read allowed, stage 2 not waiting for stage 1, the reflex given to the plain side too, stage 2 on stage 1's
+// seeds, the draft's flown stage-2 seeds back, the gunner from the wrong fight.
