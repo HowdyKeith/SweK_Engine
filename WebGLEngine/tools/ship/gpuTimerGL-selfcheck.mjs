@@ -73,6 +73,10 @@ await section(() => {
     const D = fakeGL(), d = createGpuTimerGL(D.gl); d.time("a", () => {}); d.time("b", () => {}); d.finish(); D.answerAll(1e6); d.collect(); d.time("c", () => {}); d.finish(); d.destroy();
     const D2 = fakeGL(), d2 = createGpuTimerGL(D2.gl); d2.time("a", () => {}); d2.finish(); d2.begin("b"); d2.destroy();
     ok("!! destroy() ends an open query and deletes EVERY query it made -- waiting, open, and back in the reuse pool (a and b read and pooled, c reusing one and waiting: 2 made, 2 deleted; a waiting and b open: 2 and 2)", D.log.errors === 0 && D.made.length === 2 && D.log.deleted === 2 && D2.log.errors === 0 && D2.log.deleted === 2);
+    const C = fakeGL(), seen = [], c = createGpuTimerGL(C.gl, { smoothing: 0.5, onFrame: (d) => seen.push(d) });
+    for (const ns of [3e6, 0, 5e6]) { c.time("frame", () => {}); c.time("frame", () => {}); c.finish(); C.answerAll(ns / 2); }
+    C.made.forEach((q) => { q.ns = q.ns ?? 0; }); c.collect();
+    ok("!! onFrame is called with EACH frame's own times, oldest first, even when collect() reads several at once (3, 0, 5 ms here -- the idle one between included)", seen.length === 3 && seen.map((d) => d.frame).join() === "3,0,5", JSON.stringify(seen));
     ok("!! the overlay's lines are render/gpuTimer.mjs's, unchanged: largest first, then the total on the card", lines1.join("|") === "draw        5.00 ms|upload      0.50 ms|total       5.50 ms on the card");
 });
 

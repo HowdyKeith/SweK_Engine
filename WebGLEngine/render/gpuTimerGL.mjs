@@ -11,6 +11,7 @@
 //                                          dropped rather than kept growing -- a card that is slow to answer costs readings, never memory)
 //   t.collect()                            each frame, without waiting: every waiting frame whose queries have ALL answered is read, oldest first. If the driver says
 //                                          the clock was DISJOINT (a power-state change, a context switch: GPU_DISJOINT_EXT), every waiting frame is thrown away, unread
+//   onFrame(d)                             an option: called with each frame's own { label: ms } as it is read, oldest first
 //   t.stats()                              { supported, frames, labels: { label: { ms (smoothed), last } }, totalMs, dropped }
 //
 // THE CLOCK. Browsers coarsen this query (Chrome to about 0.1 ms or worse) and some disable it entirely; a stretch shorter than the coarsening can read 0.
@@ -18,7 +19,7 @@
 // queued before it ran -- it is the card's time on that stretch, not a pass in the WebGPU sense.
 "use strict";
 
-export function createGpuTimerGL(gl, { ring = 3, smoothing = 0.1, maxPerFrame = 32 } = {}) {
+export function createGpuTimerGL(gl, { ring = 3, smoothing = 0.1, maxPerFrame = 32, onFrame = null } = {}) {
     const ext = gl && typeof gl.getExtension === "function" ? gl.getExtension("EXT_disjoint_timer_query_webgl2") : null;
     const st = { supported: !!ext, frames: 0, labels: {}, totalMs: 0, dropped: 0 };
     if (!ext) return { supported: false, begin() {}, end() {}, time: (_l, fn) => fn(), finish() {}, collect: () => st, stats: () => st, destroy() {} };
@@ -45,6 +46,7 @@ export function createGpuTimerGL(gl, { ring = 3, smoothing = 0.1, maxPerFrame = 
             let total = 0;
             for (const [k, ms] of Object.entries(d)) { const p = st.labels[k]; st.labels[k] = { ms: p ? p.ms + (ms - p.ms) * smoothing : ms, last: ms }; total += ms; }
             st.totalMs = st.frames ? st.totalMs + (total - st.totalMs) * smoothing : total; st.frames++;
+            if (onFrame) onFrame(d);   // each frame read, its own { label: ms }, oldest first (collect() may read several at once)
         }
         return st;
     };
