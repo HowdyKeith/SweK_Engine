@@ -168,6 +168,14 @@ whose largest descending targets are DNp04 and DNp01 (the Giant Fiber) and DNp10
 other Giant Fiber partners appear among their top descending targets. PVLP151's synapses onto DNp103 mostly cross the midline (389 of 406), the first crossing relay in these files.
 What DNp103 and pIP1 do in behaviour is not read here and not claimed. Pinned by `brain/maleCnsCircuits-selfcheck.mjs` section 8.
 
+**The loom-response bench (registered, read once, 2026-11-22; `tools/ship/takeLoomBench.mjs`, `brain/loomBench.reading.json`):** over the LC10a/LC11 pathway model (a loom
+at a bearing drives one eye's cells at their places; the connectome's signed weights, three steps), BOTH pathways tell the side of a loom IPSILATERALLY in both orientations
+of the sheet (LC6 onto DNp103 +0.15 to +0.24, LC16 onto pIP1 +0.37 to +0.49 on the registered index), which the Giant Fiber input model (one bilateral potential) cannot.
+PVLP151 does not decide LC6's side: cutting it makes LC6 more ipsilateral (+0.26 to +0.32) -- its crossing synapses pull the other way and lose. The side comes from which
+eye a cell is in, not its place (flat arms tell it too); shuffling connections within type flips LC6 contralateral and leaves LC16 no side. A model, hand-set where the
+fly's numbers are missing (the drive, sigma, three steps); not a behaviour. The baked modules: `brain/lc6Topology.mjs`, `lc6Synapses.mjs`, `lc6Places.mjs` and LC16's,
+re-derived by `brain/maleCnsCircuits-selfcheck.mjs` section 10.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,

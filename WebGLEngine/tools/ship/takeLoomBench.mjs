@@ -30,6 +30,13 @@
 //   the shuffled arm does not.
 // FORECAST, for the record: LC16 tells the side, ipsilaterally, in both orientations and in the flat and shuffled arms too (its only descending neuron's input from it
 //   is on its own side). LC6: no forecast of the sign -- the direct route is ipsilateral, the relay's mostly crosses; whichever is the larger after three steps decides.
+// READ 2026-11-22 (brain/loomBench.reading.json): BOTH PATHWAYS TELL THE SIDE, IPSILATERALLY, in both orientations -- a loom drives the descending neuron on its own side
+//   more: LC6 onto DNp103 +0.22 to +0.24 (medial), +0.15 to +0.22 (lateral); LC16 onto pIP1 +0.37 to +0.45 and +0.45 to +0.49. THE RELAY DOES NOT DECIDE LC6'S SIDE: with
+//   PVLP151 cut LC6 is MORE ipsilateral (+0.31 to +0.32 medial, +0.26 to +0.31 lateral) -- the mostly-crossing relay pulls against the direct route, by about a third of
+//   its index, and loses. On the record: the PLACES DO NOT MATTER to the side (flat: +0.35 and +0.70, the same side -- the side comes from which eye a cell is in);
+//   the WIRING'S PARTICULARS DO (shuffled within type, LC6 turns CONTRALATERAL, -0.11 to -0.13, and LC16 tells no side, +0.05 at 30 degrees). The forecast was right
+//   about LC16's side and wrong about its shuffle (it said the shuffle would keep the side); it made no call on LC6. What the Giant Fiber input cannot say -- the side --
+//   these two pathways do say, in this model, both the same way round.
 // WHAT CHANGES: nothing in the game (no seat reads these pathways). The reading goes into vendor/male-cns/PROVENANCE.md beside the circuits.
 // WHAT IS NOT HERE: a loom's size or time course in these pathways, dark against bright, LC4's or LPLC2's own connectome (not vendored), what DNp103 or pIP1 do.
 "use strict";
