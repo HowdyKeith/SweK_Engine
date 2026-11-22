@@ -59,6 +59,12 @@ Build order: (1) a headless library and gate that runs a flying-layer arm and a 
 | `survey-3d-markers` | The aquarium's 3D view has no station markers (the plan and side views do). | OPEN; touches `render/subAquarium3d.mjs` (the other branch lists `tank-nav-3d` for the same file) |
 | `ship-v4912` | Version bump, changelog, derived files, verdict for the needs rounds 17-33, the survey seat and the survey event. | rig timings first (waiting on the denoise study to finish) |
 
+## Added 2026-11-22: the evade seat (Keith: "add to Backlog")
+
+| id | what | status |
+|---|---|---|
+| `evade-seat-loom-circuits` | AN EVADE SEAT IN THE GAME. Pull the LC4 and LPLC2 circuits from neuPrint too (male-cns, the same route as `vendor/male-cns/lc6-loom-circuit.json`), build a helm evade reflex -- turn away from a closing ship -- read off each circuit, and fly paired fights: LC6, LC16 and LC4/LPLC2 arms plus flat, shuffled and sine controls, registered before any pair, as `tools/ship/takeLc11Gunner.mjs` was. Starts from what is already there: LC6 and LC16 baked and gated (`brain/lc6*.mjs`, `brain/lc16*.mjs`, `brain/maleCnsCircuits-selfcheck.mjs` sections 8-10), and the loom bench's reading that both tell a loom's side ipsilaterally (`tools/ship/takeLoomBench.mjs`, `brain/loomBench.reading.json`). The biggest item here: days of rig-style runs. | OPEN; queued behind the PlayCanvas items (gizmos, fog, clustered lights) |
+
 ## What another chat can do at the same time, in one list
 
 Take now, no shared files: `leaky-unit-baseline` (new module and gate), a draft registration for `decision-circuit-vs-twin` (a document), the `demo-fish-escape` pre-read (read the pilot's outputs and say whether an escape output exists), and `plain-net-tank-kind` if it keeps to the files it already owns.
