@@ -86,15 +86,16 @@ await section(async () => {
 console.log("4. THE GRID");
 await section(async () => {
     await p.evaluate(() => { Object.assign(window.__gizmoDemo.boxes[0], { position: [-1.6, 0.5, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }); window.__gizmoDemo.select(-1);   // back on the ground: the scale above sank half of it below
-    window.__gizmoDemo.controls.goal.yaw = 0.7; window.__gizmoDemo.controls.goal.pitch = 0.45; }); await frame();
+    window.__gizmoDemo.controls.goal.yaw = 0.7; window.__gizmoDemo.controls.goal.pitch = 0.12; }); await frame();   // low enough that the horizon is on the screen
     const on = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = true; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye }; });
     const off = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = false; const c = await s.capture(); s.gridOn = true; return c; });
     const picks = await p.evaluate(() => { const s = window.__gizmoDemo, out = []; for (let y = 3; y < 600; y += 7) for (let x = 3; x < 900; x += 7) { const k = s.pick(x + 0.5, y + 0.5), inner = k >= 0 && [[4, 0], [-4, 0], [0, 4], [0, -4]].every(([dx, dy]) => s.pick(x + 0.5 + dx, y + 0.5 + dy) === k); out.push(k < 0 ? -1 : inner ? k : -2); } return out; });   // -2: a box's edge (where it meets the ground the two depths are one: not judged)
     const inv = invert4(on.vp), P = { invViewProj: inv, eye: on.eye, up: "y", cell: 0.5, major: 10, fade: 25, zRange: "gl" }, at = (img, x, y) => { const o = ((on.h - 1 - y) * on.w + x) * 4; return [img[o], img[o + 1], img[o + 2]]; };
-    const dbg = []; let strong = 0, strongShown = 0, empty = 0, emptyExact = true, onBox = 0, boxExact = true, k = 0;
+    const dbg = []; let strong = 0, strongShown = 0, empty = 0, emptyExact = true, onBox = 0, boxExact = true, k = 0, sky = 0, skyExact = true;
     for (let y = 3; y < 600; y += 7) for (let x = 3; x < 900; x += 7, k++) {
         const a = at(on.px, x, y), b = at(off.px, x, y), same = a.every((v, i) => v === b[i]);
         if (picks[k] === -2) continue;
+        { const nx = ((x + 0.5) / on.w) * 2 - 1, ny = 1 - ((y + 0.5) / on.h) * 2, T = (z) => [1, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[8 + r] * z + inv[12 + r]), a0 = T(-1), a1 = T(1); if (a1[0] / a1[1] > a0[0] / a0[1]) { if (picks[k] < 0) { sky++; if (!same) skyExact = false; } continue; } }
         if (picks[k] >= 0) { if (!same) dbg.push([x, y, a.join(), b.join()]); onBox++; if (!same) boxExact = false; continue; }
         const al = gridAlphaCPU(P, x, y, on.w, on.h), around = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => gridAlphaCPU(P, x + dx, y + dy, on.w, on.h) === 0);
         if (al > 0.6) { strong++; if (a.some((v, i) => Math.abs(v - b[i]) > 25)) strongShown++; }
@@ -102,6 +103,7 @@ await section(async () => {
     }
     ok("!! WHERE THE GRID'S CPU SUM SAYS A LINE IS STRONG, THE PIXEL IS THE GRID'S (more than 25 levels from the grid-less frame) -- nine in ten at least", strong >= 10 && strongShown >= 0.9 * strong, `${strongShown} of ${strong}`);
     ok("!! where it says nothing (and nothing beside it), the pixel is the grid-less frame's exactly", empty > 1000 && emptyExact, `${empty} pixels`);
+    ok("!! ABOVE THE HORIZON NOTHING: the sky is the grid-less frame's exactly (the plane behind the eye is not drawn)", sky > 200 && skyExact, `${sky} pixels`);
     ok("!! ON A BOX THE PIXEL IS THE BOX'S EXACTLY (its edges, where it meets the ground, not judged): the grid writes the plane's depth and hides behind what stands on it", onBox > 100 && boxExact, `${onBox} pixels; ${JSON.stringify(dbg.slice(0, 6))}`);
 });
 
@@ -109,4 +111,8 @@ await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 5 mutants of render/gizmoOverlay.mjs: 4 RED -- listening without the capture phase (GREEN at first: the page made the overlay before binding the camera, so
+// order alone let it win; gizmo-demo.html now binds the camera first, as a page adding a gizmo would), no stopImmediatePropagation on a handle, the cube click setting no goal,
+// keys switching nothing. ONE STAYS GREEN: the drag reading the view it began with instead of the current one -- equivalent while the camera holds still, which the gizmo itself
+// ensures during a drag; recorded, not hidden. 3 of render/infiniteGrid.mjs's GLSL: ALL RED -- no depth written, the sky not discarded (GREEN at first: the camera saw no sky;
+// the grid section now looks low enough to), lines not a pixel wide.

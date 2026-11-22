@@ -55,21 +55,26 @@ try {
     await pg.goto(`http://127.0.0.1:${srv.address().port}/__grid.html`); await pg.waitForFunction(() => window.__ready, null, { timeout: 60000 });
     const a = await pg.evaluate(([v, i, e]) => window.__run(v, i, e, false), [Array.from(vp), Array.from(inv), eye]), b = await pg.evaluate(([v, i, e]) => window.__run(v, i, e, true), [Array.from(vp), Array.from(inv), eye]);
     const at = (img, x, y) => img.slice((y * W + x) * 4, (y * W + x) * 4 + 3), BG = [13, 15, 23];
-    let strong = 0, shown = 0, empty = 0, exact = true, sky = 0, skyExact = true, leftGrid = 0, rightSame = true;
+    const ratios = []; let strong = 0, shown = 0, empty = 0, exact = true, sky = 0, skyExact = true, leftGrid = 0, rightSame = true;
     for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
         const c = at(a.px, x, y), al = gridAlphaCPU(P, x, y, W, H), around = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => gridAlphaCPU(P, x + dx, y + dy, W, H) === 0), isBg = c.every((v, i) => Math.abs(v - BG[i]) <= 1);
         const nx = ((x + 0.5) / W) * 2 - 1, ny = 1 - ((y + 0.5) / H) * 2, q0 = [0, 1, 2, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[12 + r]), q1 = [0, 1, 2, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[8 + r] + inv[12 + r]), up = q1[1] / q1[3] - q0[1] / q0[3] > 0;
         if (up) { sky++; if (!isBg) skyExact = false; }
         else if (al > 0.6) { strong++; if (!isBg) shown++; }
+        if (!up && al > 0.15 && al < 0.6) { const g0 = [0, 1, 2, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[12 + r]), g1 = [0, 1, 2, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[8 + r] + inv[12 + r]), o = g0.map((v) => v / g0[3]), dd = g1.map((v, i) => v / g1[3] - o[i]), t = -o[1] / dd[1], gx = o[0] + dd[0] * t, gz = o[2] + dd[2] * t;
+            if (Math.abs(gx) > 1 && Math.abs(gz) > 1) ratios.push(((c[1] - BG[1]) / (153 - BG[1])) / al); }
         else if (al === 0 && around) { empty++; if (!isBg) exact = false; }
         const d = at(b.px, x, y); if (x < W / 2 - 1) { if (!d.every((v, i) => Math.abs(v - BG[i]) <= 1)) leftGrid++; } else if (x > W / 2 + 1 && !d.every((v, i) => v === c[i])) rightSame = false;
     }
     ok("!! THE WGSL GRID BUILDS AND DRAWS with no validation error", a.errs.length === 0 && b.errs.length === 0 && pe.length === 0, [...a.errs, ...b.errs, ...pe].join("; "));
     ok("!! where the CPU sum says a line is strong the pixel is the grid's (nine in ten at least); where it says nothing the pixel is the clear colour; above the horizon, nothing", strong > 20 && shown >= 0.9 * strong && empty > 500 && exact && sky > 500 && skyExact, `${shown} of ${strong} strong; ${empty} empty; ${sky} sky`);
+    ratios.sort((p2, q2) => p2 - q2); const med = ratios.length ? ratios[ratios.length >> 1] : 0;
+    ok("!! THE BLEND IS THE SUM'S: on fainter line pixels away from the axes, the amount of grid colour in the pixel over the CPU sum's alpha is about 1 (median within 0.75 to 1.33)", ratios.length > 30 && med > 0.75 && med < 1.33, `median ${med.toFixed(3)} over ${ratios.length} pixels`);
     ok("!! IT WRITES AND TESTS THE PLANE'S DEPTH: behind a nearer wall over the left half no grid shows; the right half is the grid as before", leftGrid === 0 && rightSame, `${leftGrid} grid pixels behind the wall`);
 } catch (e) { ok(`!! the check THREW instead of answering: ${e.message}`, false); }
 await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 3 mutants of render/infiniteGrid.mjs: ALL 3 RED -- the WGSL writing no depth, the WGSL not discarding the sky, and gridAlphaCPU's fade off by a factor of
+// three (GREEN at first: the checks only asked strong or nothing; the measured blend over the sum's alpha is now held near 1).

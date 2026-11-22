@@ -66,6 +66,9 @@ section(() => {
     const ro = G.createGizmo({ mode: "rotate" }), s = G.worldPerPixel(v, [0, 0, 0]) * ro.size, a = px([0, s, 0]), b = px([0, 0, s]), d4 = G.begin(ro, T, v, "x", a.x, a.y), r4 = d4.update(b.x, b.y);
     const yTo = G.quat.rotate(r4.rotation, [0, 1, 0]);
     ok("!! ROTATE: the x ring taken from its y end to its z end turns the transform 90 degrees about x (y goes to z)", Math.abs(d4.delta - Math.PI / 2) < 1e-6 && close(yTo, [0, 0, 1], 1e-6), `${(d4.delta * 180 / Math.PI).toFixed(4)} degrees`);
+    const d4b = G.begin(ro, T, v, "x", b.x, b.y); d4b.update(a.x, a.y);
+    const Tq = { ...T0(), rotation: G.quat.axisAngle([0, 1, 0], 0.5) }, r4c = G.begin(ro, Tq, v, "x", a.x, a.y).update(b.x, b.y), want = G.quat.rotate(G.quat.axisAngle([1, 0, 0], Math.PI / 2), G.quat.rotate(Tq.rotation, [1, 0.3, -0.2]));
+    ok("!! ...back the other way is -90 degrees; and an object already turned is turned ABOUT THE WORLD'S x (world space): the new rotation is the turn after the old", Math.abs(d4b.delta + Math.PI / 2) < 1e-6 && close(G.quat.rotate(r4c.rotation, [1, 0.3, -0.2]), want, 1e-6), `${(d4b.delta * 180 / Math.PI).toFixed(4)} degrees`);
     const g5 = G.createGizmo({ mode: "rotate", snap: { rotate: Math.PI / 12 } }), c5 = px([0, s * Math.cos(1.3), s * Math.sin(1.3)]), d5 = G.begin(g5, T, v, "x", a.x, a.y); d5.update(c5.x, c5.y);
     ok("!! ...and a snap of 15 degrees rounds 74.5 degrees to 75", Math.abs(d5.delta - 5 * Math.PI / 12) < 1e-9, `${(d5.delta * 180 / Math.PI).toFixed(2)}`);
     const scg = G.createGizmo({ mode: "scale" }), m = start(scg, "x"), wr = G.rayAt(v, m.x, m.y), ta = G.lineNearRay([0, 0, 0], [1, 0, 0], wr), e6 = px([2 * ta, 0, 0]), r6 = G.begin(scg, T, v, "x", m.x, m.y).update(e6.x, e6.y);
@@ -75,15 +78,17 @@ section(() => {
     ok("!! SCALE IS ALONG THE OBJECT'S OWN AXES: turned a quarter about y, its x axis is world -z; dragged to three times, its x scale is 3", close(r7.scale, [3, 1, 1], 1e-6) && Math.abs(hl.axis[2] + 1) < 1e-9, JSON.stringify(r7.scale));
     const o = px([0, 0, 0]), u0 = { x: o.x + 20, y: o.y }, r8 = G.begin(scg, T, v, "uniform", u0.x, u0.y).update(o.x + 50, o.y);
     ok("!! UNIFORM SCALE: the pointer 20 then 50 pixels from the centre scales by 2.5 on every axis", close(r8.scale, [2.5, 2.5, 2.5], 1e-9));
-    const side = camera([5, 0.0, 0.0]), sv = G.project(side, [0, 0, 0]), d9 = G.begin(tr, T, side, "zx", sv.x, sv.y + 1);
-    const r9 = d9.update(sv.x + 40, sv.y + 10);
-    ok("!! A RAY PARALLEL TO ITS PLANE HOLDS THE DRAG (seen edge-on the zx plane gives no move, not a jump to infinity)", r9.position.every(Number.isFinite) && close(r9.position, [0, 0, 0]), JSON.stringify(r9.position));
+    const side = camera([5, 1e-6, 0.0], [0, 1e-6, 0]), d9 = G.begin(tr, T, side, "zx", W / 2, H / 2);
+    const r9 = d9.update(W / 2 + 40, H / 2);   // the eye a hair above the plane, the pointer on the middle row: every ray runs parallel to the zx plane
+    const grazing = G.rayPlane({ origin: [0, 1, 0], dir: G.vec.norm([1, -1e-12, 0]) }, [0, 0, 0], [0, 1, 0]);
+    ok("!! A RAY PARALLEL TO ITS PLANE HOLDS THE DRAG (seen edge-on the zx plane gives no move, not a jump to infinity; a ray tilted 1e-12 toward a plane meets it nowhere, not 1e12 away)", r9.position.every(Number.isFinite) && close(r9.position, [0, 0, 0]) && grazing === null, JSON.stringify(r9.position));
 });
 
 console.log("4. THE VIEW CUBE");
 section(() => {
     const regions = new Set(); for (let a = 0; a < 3; a++) for (const s of [-1, 1]) for (let u = -1; u <= 1; u += 0.1) for (let w = -1; w <= 1; w += 0.1) { const p = [0, 0, 0]; p[a] = s; p[(a + 1) % 3] = u; p[(a + 2) % 3] = w; regions.add(G.viewCubeRegion(p).join()); }
     ok("!! THE CUBE'S SURFACE HAS 26 REGIONS: 6 faces, 12 edges, 8 corners", regions.size === 26 && !regions.has("0,0,0") && [...regions].filter((r) => r.split(",").filter((v) => v !== "0").length === 1).length === 6 && [...regions].filter((r) => r.split(",").filter((v) => v !== "0").length === 3).length === 8);
+    ok("!! a face's border band is 0.3 wide: (1, 0.6, 0) is on the +x face, (1, 0.75, 0) on its edge with +y", G.viewCubeRegion([1, 0.6, 0]).join() === "1,0,0" && G.viewCubeRegion([1, 0.75, 0]).join() === "1,1,0");
     const front = G.viewRotationOf([0, 0, 1]), iso = G.viewRotationOf([1, 1, 1]);
     ok("!! seen square-on from +z, the middle of the drawing is the +z face, its upper right the (+x, +y, +z) corner, its right edge the (+x, +z) edge, and past the cube nothing", G.viewCubePick(front, 0, 0).join() === "0,0,1" && G.viewCubePick(front, 0.55, 0.55).join() === "1,1,1" && G.viewCubePick(front, 0.55, 0).join() === "1,0,1" && G.viewCubePick(front, 0.99, 0.99) === null);
     ok("!! seen from the (1, 1, 1) corner, the middle of the drawing is that corner", G.viewCubePick(iso, 0, 0).join() === "1,1,1");
@@ -95,4 +100,9 @@ section(() => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 12 mutants of render/gizmo.mjs, each in a hard-linked copy of the tree: ALL 12 RED -- the gizmo not kept to its screen size, the axis drag's and the plane
+// drag's start not subtracted, the rotation's sign lost (GREEN at first: only +90 was dragged; -90 is now), the turn applied in the object's frame instead of the world's (GREEN
+// at first: the object started unturned; one starts turned now), scale along world axes, a parallel ray not held (GREEN twice: the edge-on drag's rays happened to point away
+// from the plane, where both versions meet nothing; a ray tilted 1e-12 toward a plane is now checked directly), the snap ignored, view-cube edges twice as wide (GREEN at first;
+// a point between the two widths now), poseFor's yaw off a quarter, the cube picked without its rotation, centres not winning the hit. A 13th, a near plane forced to -1,
+// turned out to change nothing as written and is not counted.

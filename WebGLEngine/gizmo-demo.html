@@ -58,9 +58,10 @@ const boxes = state.boxes = [
     { position: [0, 0.75, -0.4], rotation: G.quat.axisAngle([0, 1, 0], 0.5), scale: [1, 1.5, 1], color: [0.4, 0.72, 0.45] },
     { position: [1.7, 0.4, 0.6], rotation: G.quat.identity(), scale: [0.8, 0.8, 0.8], color: [0.42, 0.55, 0.9] }];
 const controls = state.controls = createCameraControls({ up: "y", yaw: 0.7, pitch: 0.45, distance: 8, target: [0, 0.5, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
+// the camera's listeners FIRST, as a page that adds a gizmo to its camera would: the overlay still wins, by listening in the capture phase
+const camInput = bindCameraControls(cv, controls, { focusOn: () => (state.selected >= 0 ? { center: boxes[state.selected].position, radius: 1.2 } : { center: [0, 0.5, 0], radius: 3 }) });
 const ov = state.overlay = createGizmoOverlay(cv, { controls, up: "y", onChange: (t) => { if (state.selected >= 0) Object.assign(boxes[state.selected], { position: t.position, rotation: t.rotation, scale: t.scale }); showSel(); } });
 ov.visible = false;
-const camInput = bindCameraControls(cv, controls, { focusOn: () => (state.selected >= 0 ? { center: boxes[state.selected].position, radius: 1.2 } : { center: [0, 0.5, 0], radius: 3 }) });
 
 // picking: the box whose own (local) cube the pointer's ray enters first
 function pick(x, y) {
