@@ -176,6 +176,19 @@ eye a cell is in, not its place (flat arms tell it too); shuffling connections w
 fly's numbers are missing (the drive, sigma, three steps); not a behaviour. The baked modules: `brain/lc6Topology.mjs`, `lc6Synapses.mjs`, `lc6Places.mjs` and LC16's,
 re-derived by `brain/maleCnsCircuits-selfcheck.mjs` section 10.
 
+### The Giant Fiber's looming inputs, LC4 and LPLC2 (2026-11-22, same route; for the evade seat's draft registration)
+
+`lc4-loom-circuit.json` -- `LC4` 126 (71 left, 55 right), `DNp04` 2: 128 neurons, 5,485 edges. `lplc2-loom-circuit.json` -- `LPLC2` 185 (94 left, 91 right), `PVLP151` 4,
+`DNp01` (the Giant Fiber) 2: 191 neurons, 14,390 edges. Every cell predicted acetylcholine. Made by `tools/maleCnsFlatExtract.py` from the same three flat files.
+
+**Chosen by LC11's rule**, as LC6's and LC16's were: the descending neuron taking the most of the type's output directly and through one relay; relays the central-brain types
+taking at least 2,000 synapses from the type and giving at least 400 to it. **LC4: DNp04** (11,597 direct; the Giant Fiber second, 6,362 direct and 4,816 through relays); no
+relay passes (PVLP024 takes 6,850 from LC4 but gives DNp04 152). **LPLC2: the Giant Fiber, DNp01, by 65 synapses** (4,862 direct and 2,393 through relays, 7,255, against
+DNp103's 5,065 and 2,125, 7,190); relay PVLP151 (6,771 in, 603 out). Said plainly: the rule does NOT give LC4 the Giant Fiber, and gives it LPLC2 only narrowly. LC4 and LPLC2
+are visual projection types, so neither is the other's relay, though each feeds the other's descending neuron heavily (LC4 gives DNp01 6,362; LPLC2 gives DNp04 2,552).
+PVLP151's synapses onto the Giant Fiber mostly cross the midline (582 of 603), as its synapses onto DNp103 do. Pinned by `brain/maleCnsCircuits-selfcheck.mjs` section 11.
+What the evade seat would do with them is a draft: `brain/EVADE_SEAT_REGISTRATION_DRAFT.md`.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,

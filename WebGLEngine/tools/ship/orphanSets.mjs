@@ -692,6 +692,11 @@ export const RECORDED = Object.freeze({
         "tools/ship/subSensedPool.mjs",
         "tools/ship/takeTankDropout.mjs",
         "tools/ship/tankNavRun.mjs",
+        // 2026-11-22 -- DATA AHEAD OF ITS CONSUMER, ADMITTED WITH THEIR REASON: the LC4 and LPLC2 topologies, baked for the evade seat (brain/EVADE_SEAT_REGISTRATION_DRAFT.md),
+        // gated by brain/maleCnsCircuits-selfcheck.mjs sections 10-12, and named by their own synapse and place modules. Their consumer, brain/evadeReflex.mjs, waits on Keith's
+        // reading of the draft. When it is built they are wired and leave this set; if the draft is dropped, they are deleted.
+        "brain/lc4Topology.mjs",
+        "brain/lplc2Topology.mjs",
         // 2026-11-22 -- COMMANDS, ADMITTED WITH THEIR REASON: the fly-wired line's registered studies and trainers (tools/ship/take*.mjs, train*.mjs) and three tools
         // (splatPack, denoiseLayers, bakeDendritePlaces). Each is a COMMAND a person runs by path (its header gives the line), imported only by its own gate, and
         // named in prose by the page's notes and the rig sheets -- the four-command class the v4673 reckoning below already names, fifty-eight more of it.

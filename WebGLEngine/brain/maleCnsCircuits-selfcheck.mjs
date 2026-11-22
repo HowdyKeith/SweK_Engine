@@ -20,11 +20,17 @@ import * as L6 from "./lc6Places.mjs";
 import * as T16 from "./lc16Topology.mjs";
 import * as Y16 from "./lc16Synapses.mjs";
 import * as L16 from "./lc16Places.mjs";
+import * as T4m from "./lc4Topology.mjs";
+import * as Y4 from "./lc4Synapses.mjs";
+import * as L4 from "./lc4Places.mjs";
+import * as TPm from "./lplc2Topology.mjs";
+import * as YP from "./lplc2Synapses.mjs";
+import * as LP from "./lplc2Places.mjs";
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const section = (fn) => { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
 const load = (f) => { const v = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${f}`, import.meta.url), "utf8")), by = new Map(v.neurons.map((n) => [n.bodyId, n])), E = v.edges.map(([a, b, w]) => ({ a: by.get(a), b: by.get(b), w })); return { v, by, E, syn: (ta, tb, pred = () => true) => E.filter((e) => e.a.type === ta && e.b.type === tb && pred(e)).reduce((s, e) => s + e.w, 0), count: (t) => v.neurons.filter((n) => n.type === t).length, nt: (t) => [...new Set(v.neurons.filter((n) => n.type === t).map((n) => n.nt))].join() }; };
-const S = load("cx-steering-circuit.json"), I = load("cx-steering-inputs-circuit.json"), T = load("lc10-tracking-circuit.json"), O = load("lc11-object-circuit.json"), K6 = load("lc6-loom-circuit.json"), K16 = load("lc16-loom-circuit.json"), same = (e) => e.a.somaSide === e.b.somaSide, other = (e) => e.a.somaSide !== e.b.somaSide;
+const S = load("cx-steering-circuit.json"), I = load("cx-steering-inputs-circuit.json"), T = load("lc10-tracking-circuit.json"), O = load("lc11-object-circuit.json"), K6 = load("lc6-loom-circuit.json"), K16 = load("lc16-loom-circuit.json"), K4 = load("lc4-loom-circuit.json"), KP = load("lplc2-loom-circuit.json"), same = (e) => e.a.somaSide === e.b.somaSide, other = (e) => e.a.somaSide !== e.b.somaSide;
 
 console.log("maleCnsCircuits-selfcheck -- three fly circuits off the release's flat files\n");
 
@@ -131,10 +137,10 @@ section(() => {
     ok("!! LC16 FEEDS pIP1 FROM THE LATERAL END, as LC11 feeds DNp35 (-0.55 left, -0.46 right). WHICH PART OF THE VISUAL FIELD EITHER END IS, IS NOT IN THE DATA USED HERE AND IS NOT CLAIMED", B.side.L.c.pIP1 < -0.4 && B.side.R.c.pIP1 < -0.4, `pIP1 ${f(B, "pIP1")}`);
 });
 
-console.log("10. THE BAKED MODULES FOR LC6 AND LC16 ARE THE VENDORED FILES (brain/lc6Topology.mjs, lc6Synapses.mjs, lc6Places.mjs and lc16's, 2026-11-22)");
+console.log("10. THE BAKED MODULES FOR LC6, LC16, LC4 AND LPLC2 ARE THE VENDORED FILES (brain/lc6Topology.mjs, lc6Synapses.mjs, lc6Places.mjs and lc16's, 2026-11-22)");
 await (async () => {
     const { placesOf } = await import("../tools/bakeDendritePlaces.mjs"), r6 = (v) => Math.round(v * 1e6) / 1e6;
-    for (const [n, X, T, Y, L] of [["lc6", K6, T6, Y6, L6], ["lc16", K16, T16, Y16, L16]]) {
+    for (const [n, X, T, Y, L] of [["lc6", K6, T6, Y6, L6], ["lc16", K16, T16, Y16, L16], ["lc4", K4, T4m, Y4, L4], ["lplc2", KP, TPm, YP, LP]]) {
         const P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${n}-positions.json`, import.meta.url), "utf8")), pl = placesOf(P);
         const idx = new Map(T.NEURON_ORDER.map((b, k) => [b, k])), V = X.v;
         const topo = T.NEURON_ORDER.join() === V.neurons.map((x) => x.bodyId).join() && T.NEURON_TYPES.join() === V.neurons.map((x) => x.type).join() && T.EDGES.length === V.edges.length && T.EDGES.every(([to, from], k) => to === idx.get(V.edges[k][1]) && from === idx.get(V.edges[k][0]));
@@ -143,6 +149,32 @@ await (async () => {
         ok(`!! ${n.toUpperCase()}'S BAKED MODULES ARE ITS VENDORED FILES: the neurons in the file's order, every edge [to, from] the file's (${T.EDGES.length.toLocaleString()}), its synapse counts, transmitters and soma sides, and each cell's rank across and along its side's sheet (-1 for the ${T.NEURON_ORDER.length - P.cells.length} that are not ${n.toUpperCase()})`, topo && syn && places, JSON.stringify({ topo, syn, places }));
     }
 })().catch((e) => ok(`!! the section THREW instead of answering: ${e.message}`, false));
+
+console.log("11. THE GIANT FIBER'S LOOMING INPUTS, LC4 AND LPLC2 (vendor/male-cns/lc4-loom-circuit.json, lplc2-loom-circuit.json, 2026-11-22; for the evade seat's draft)");
+section(() => {
+    const whole = (X) => X.v.neuronCount === X.v.neurons.length && X.v.edgeCount === X.v.edges.length && X.v.edges.every(([a, b, w]) => X.by.has(a) && X.by.has(b) && Number.isInteger(w) && w >= 1) && JSON.stringify(X.v.sources) === JSON.stringify(T.v.sources);
+    ok("!! both files are whole and read off the same three source files as the others", whole(K4) && whole(KP), `${K4.v.neuronCount}/${K4.v.edgeCount}, ${KP.v.neuronCount}/${KP.v.edgeCount}`);
+    ok("126 LC4 (71 left, 55 right) with DNp04 (1 a side); 185 LPLC2 (94 left, 91 right) with PVLP151 (2 a side) and DNp01, the Giant Fiber (1 a side); every cell predicted acetylcholine", ["LC4", "DNp04"].map(K4.count).join() === "126,2" && ["LPLC2", "PVLP151", "DNp01"].map(KP.count).join() === "185,4,2" && [[K4, "DNp04", "L,R"], [KP, "DNp01", "L,R"], [KP, "PVLP151", "L,L,R,R"]].every(([X, t, sides]) => X.v.neurons.filter((n) => n.type === t).map((n) => n.somaSide).sort().join() === sides) && K4.v.neurons.filter((n) => n.type === "LC4" && n.somaSide === "L").length === 71 && KP.v.neurons.filter((n) => n.type === "LPLC2" && n.somaSide === "L").length === 94 && [K4, KP].every((X) => X.v.neurons.every((n) => n.nt === "acetylcholine")));
+    ok("!! LC4 reaches DNp04 directly, 11,597 synapses, every one on its own side; LC4 onto LC4 is 18,392 (the rule admits no relay: PVLP024 takes 6,850 from LC4 and gives DNp04 152)", K4.syn("LC4", "DNp04") === 11597 && K4.syn("LC4", "DNp04", other) === 0 && K4.syn("LC4", "LC4") === 18392 && K4.v.neurons.length === 128);
+    ok("!! LPLC2 reaches the Giant Fiber directly (4,862, on its own side) and through PVLP151 (6,771 in, 342 of them crossing; 603 out) -- and PVLP151's synapses onto the Giant Fiber MOSTLY CROSS THE MIDLINE (582 of the 603), as its synapses onto DNp103 do", KP.syn("LPLC2", "DNp01") === 4862 && KP.syn("LPLC2", "DNp01", other) === 0 && KP.syn("LPLC2", "PVLP151") === 6771 && KP.syn("LPLC2", "PVLP151", other) === 342 && KP.syn("PVLP151", "DNp01") === 603 && KP.syn("PVLP151", "DNp01", other) === 582 && KP.syn("LPLC2", "LPLC2") === 46178);
+});
+
+console.log("12. WHERE LC4'S AND LPLC2'S DENDRITES ARE (vendor/male-cns/lc4-positions.json, lplc2-positions.json, by tools/maleCnsDendritePositions.py, 2026-11-22)");
+section(() => {
+    const sheet = (X, file, type, targets) => {
+        const P = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${file}`, import.meta.url), "utf8")), lc = X.v.neurons.filter((n) => n.type === type), midX = (P.outputCentres.L[0] + P.outputCentres.R[0]) / 2, R = { P, side: {} };
+        for (const side of ["L", "R"]) { const cells = P.cells.filter((c) => c.somaSide === side), ax = axes(cells.map((c) => c.centroid)), v2 = ax.vec[1], s2 = Math.sign(v2[0]) === Math.sign(midX - ax.mean[0]) ? 1 : -1, along = cells.map((c) => s2 * [0, 1, 2].reduce((a, i) => a + (c.centroid[i] - ax.mean[i]) * v2[i], 0));
+            R.side[side] = { ax, c: Object.fromEntries(targets.map((t) => { const w = new Map(); for (const e of X.E) if (e.a.type === type && e.b.type === t) w.set(e.a.bodyId, (w.get(e.a.bodyId) || 0) + e.w); return [t, corr(cells.map((c) => w.get(c.bodyId) || 0), along)]; })) }; }
+        R.flat = ["L", "R"].every((sd) => R.side[sd].ax.sd[2] < R.side[sd].ax.sd[1] / 3 && R.side[sd].ax.sd[1] < R.side[sd].ax.sd[0]) && [0, 1].every((k) => Math.abs(R.side.L.ax.sd[k] / R.side.R.ax.sd[k] - 1) < 0.05);
+        R.whole = P.type === type && P.cells.map((c) => c.bodyId).join() === lc.map((n) => n.bodyId).join() && P.cells.every((c, i) => c.somaSide === lc[i].somaSide && c.dendrite <= c.sites && c.centroid.every(Number.isFinite)) && P.sources.partners.sha256 === "43748c76db13e339e9eeb6f4d56e98aab704a4f7fa8bf3cb916b323000070d04";
+        return R;
+    };
+    const A = sheet(K4, "lc4-positions.json", "LC4", ["DNp04"]), B = sheet(KP, "lplc2-positions.json", "LPLC2", ["DNp01", "PVLP151"]), sum = (R, k) => R.P.cells.reduce((a, c) => a + c[k], 0), f = (R, t) => ["L", "R"].map((sd) => R.side[sd].c[t].toFixed(2)).join(" / ");
+    ok("!! a place for every LC4 (126) and LPLC2 (185) cell, in the circuits' order, off the same per-synapse file: 305,573 input sites for LC4 (270,102 dendrite, each cell at least 1,256), 351,434 for LPLC2 (254,555, at least 801)", A.whole && B.whole && sum(A, "sites") === 305573 && sum(A, "dendrite") === 270102 && sum(B, "sites") === 351434 && sum(B, "dendrite") === 254555 && A.P.cells.every((c) => c.dendrite >= 1256) && B.P.cells.every((c) => c.dendrite >= 801));
+    ok("!! BOTH LIE ON A SHEET A SIDE, the two sides the same size to a twentieth (as LC6, LC10a, LC11 and LC16 do)", A.flat && B.flat, ["L", "R"].map((sd) => `LC4 ${sd} ${A.side[sd].ax.sd.map((x) => x.toFixed(0)).join("/")}, LPLC2 ${sd} ${B.side[sd].ax.sd.map((x) => x.toFixed(0)).join("/")}`).join("; "));
+    ok("!! LC4 FEEDS DNp04 WITH NO GRADIENT ACROSS ITS SHEET (correlation within 0.2 of none on both sides: every cell feeds it -- as a whole-field loom-speed cell would)", Math.abs(A.side.L.c.DNp04) < 0.2 && Math.abs(A.side.R.c.DNp04) < 0.2, `DNp04 ${f(A, "DNp04")}`);
+    ok("!! LPLC2 FEEDS THE GIANT FIBER A LITTLE MORE FROM THE LATERAL END (-0.33 left, -0.30 right) and PVLP151 more so (-0.41, -0.40). Which part of the visual field an end is, is not claimed", B.side.L.c.DNp01 < -0.2 && B.side.R.c.DNp01 < -0.2 && B.side.L.c.DNp01 > -0.45 && B.side.R.c.DNp01 > -0.45 && B.side.L.c.PVLP151 < -0.35 && B.side.R.c.PVLP151 < -0.35, `DNp01 ${f(B, "DNp01")}; PVLP151 ${f(B, "PVLP151")}`);
+});
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
