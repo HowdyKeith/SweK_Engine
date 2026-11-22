@@ -11,9 +11,16 @@
 //   aa.jitter(frame) -> [jx, jy] in pixels: with temporal on, the scene is drawn with this subpixel offset (render/jitter.mjs jitterProjection), alternating
 //                       (+1/4, -1/4) and (-1/4, +1/4) as SMAA T2x does; without it, [0, 0]
 //
+// REPROJECTION (2026-11-22; Keith: "SMAA T2x with real reprojection"). encode(enc, target, { reproject: { invViewProj, prevViewProj, depth } }) keeps the history across a
+// MOVING camera: each pixel is unprojected through the current frame's inverse view-projection at its depth and taken through the previous frame's view-projection,
+// exactly render/motionVectors.mjs's motionVectorsCPU (SMAA_REPROJECT_WGSL below; the gate holds the two to each other), and the history is sampled there; a pixel
+// whose history falls off the screen or behind the previous eye has none. `depth` is a number (one plane of NDC depth for every pixel: the splat page's, which has no
+// depth buffer -- what lies off that plane is reprojected wrong by its parallax, and the neighbourhood clamp is what keeps that from ghosting) or the view of an
+// r32float texture of NDC depth per pixel. Without `reproject`, as before: the history is dropped when the camera moves.
+//
 // THE TEMPORAL RESOLVE (T2x), SAID AS IT IS. Each frame is SMAA 1x of a jittered picture; the resolve averages it with the last resolved frame, the history first CLAMPED to
-// the current frame's 3 x 3 neighbourhood (so a change that is not jitter cannot ghost far). THE HISTORY IS DROPPED WHEN THE CAMERA MOVES (encode's `moved`): a splat page
-// has no motion vectors to reproject by, so a moving camera gets SMAA 1x, a still one the two-frame average. SMAA's own T2x also looks up subsample-specific areas in its full
+// the current frame's 3 x 3 neighbourhood (so a change that is not jitter cannot ghost far). WITHOUT `reproject` THE HISTORY IS DROPPED WHEN THE CAMERA MOVES (encode's
+// `moved`): a moving camera gets SMAA 1x, a still one the two-frame average; with it (above) the history follows the camera. SMAA's own T2x also looks up subsample-specific areas in its full
 // table; the vendored table is the compact 1x one, which has none -- so this is 1x per frame plus the two-sample resolve, not the reference T2x to the bit.
 // Held by tools/ship/smaaPassGPU-selfcheck.mjs.
 "use strict";
@@ -319,16 +326,40 @@ export const SMAA_BLEND_WGSL = PRE + `
 }`;
 /** The T2x resolve: the current SMAA frame averaged with the history clamped to the current 3 x 3 neighbourhood (the current frame alone when U.smaaParams.x is 0: no
  *  history); written twice, to the target and to the next frame's history. */
-export const SMAA_RESOLVE_WGSL = PRE + `
+/** THE REPROJECTION, render/motionVectors.mjs's motionVectorsCPU in WGSL: pixel p of a w x h frame at NDC depth d -> (u, v) it had last frame and whether it had one. */
+export const SMAA_REPROJECT_WGSL = `
+fn reprojectUV(p: vec2i, size: vec2i, d: f32, invCur: mat4x4f, vpPrev: mat4x4f) -> vec3f {
+    let u = (f32(p.x) + 0.5) / f32(size.x); let v = (f32(p.y) + 0.5) / f32(size.y);
+    let w4 = invCur * vec4f(2.0 * u - 1.0, 1.0 - 2.0 * v, d, 1.0);
+    if (w4.w == 0.0) { return vec3f(0.0, 0.0, 0.0); }
+    let q = vpPrev * vec4f(w4.xyz / w4.w, 1.0);
+    if (q.w <= 0.0) { return vec3f(0.0, 0.0, 0.0); }
+    return vec3f((q.x / q.w + 1.0) * 0.5, (1.0 - q.y / q.w) * 0.5, 1.0);
+}`;
+export const SMAA_RESOLVE_WGSL = `
+struct R { invCur: mat4x4f, vpPrev: mat4x4f, p: vec4f };   // p = (use history, reproject, plane depth, depth from the texture)
+@group(0) @binding(0) var<uniform> RU: R;
 @group(0) @binding(1) var curTex: texture_2d<f32>;
 @group(0) @binding(2) var histTex: texture_2d<f32>;
+@group(0) @binding(3) var depthTex: texture_2d<f32>;
+@group(0) @binding(4) var histSampler: sampler;
+${SMAA_REPROJECT_WGSL}
 struct Out2 { @location(0) color: vec4f, @location(1) history: vec4f };
 @fragment fn fragmentMain(@builtin(position) pos: vec4f) -> Out2 {
     let p = vec2i(pos.xy); let size = vec2i(textureDimensions(curTex)); let cur = textureLoad(curTex, p, 0);
     var lo = cur; var hi = cur;
     for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) { let c = textureLoad(curTex, clamp(p + vec2i(dx, dy), vec2i(0), size - 1), 0); lo = min(lo, c); hi = max(hi, c); } }
-    let hist = clamp(textureLoad(histTex, p, 0), lo, hi);
-    let c = select(cur, 0.5 * (cur + hist), U.smaaParams.x > 0.5);
+    var useHist = RU.p.x > 0.5;
+    var raw = textureLoad(histTex, p, 0);
+    if (useHist && RU.p.y > 0.5) {
+        let d = select(RU.p.z, textureLoad(depthTex, p, 0).r, RU.p.w > 0.5);
+        let r = reprojectUV(p, size, d, RU.invCur, RU.vpPrev);
+        let inside = r.z > 0.5 && r.x >= 0.0 && r.x <= 1.0 && r.y >= 0.0 && r.y <= 1.0;
+        useHist = inside;
+        raw = textureSampleLevel(histTex, histSampler, r.xy, 0.0);
+    }
+    let hist = clamp(raw, lo, hi);
+    let c = select(cur, 0.5 * (cur + hist), useHist);
     var o: Out2; o.color = c; o.history = c; return o;
 }`;
 /** SMAA T2x's two subpixel offsets, in pixels (y down), alternating by frame. */
@@ -341,7 +372,8 @@ export function createSmaaGPU(device, { width, height, outputFormat = "rgba8unor
     device.queue.writeTexture({ texture: area }, L.area, { bytesPerRow: AREA_WIDTH * 2 }, [AREA_WIDTH, AREA_HEIGHT]);
     device.queue.writeTexture({ texture: search }, L.search, { bytesPerRow: SEARCH_WIDTH }, [SEARCH_WIDTH, SEARCH_HEIGHT]);
     const lin = device.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" });
-    const uni = device.createBuffer({ size: 48, usage: BU.UNIFORM | BU.COPY_DST }), uniT = device.createBuffer({ size: 48, usage: BU.UNIFORM | BU.COPY_DST });
+    const uni = device.createBuffer({ size: 48, usage: BU.UNIFORM | BU.COPY_DST }), uniT = device.createBuffer({ size: 144, usage: BU.UNIFORM | BU.COPY_DST });
+    const noDepth = tex(1, 1, "r32float", TU.TEXTURE_BINDING);   // bound when a page gives no depth texture
     const vs = device.createShaderModule({ code: SMAA_VS_WGSL });
     const pipe = (code, targets) => device.createRenderPipeline({ layout: "auto", vertex: { module: vs, entryPoint: "vertexMain" }, fragment: { module: device.createShaderModule({ code }), entryPoint: "fragmentMain", targets: targets.map((format) => ({ format })) }, primitive: { topology: "triangle-list" } });
     const pEdge = pipe(SMAA_EDGE_WGSL, ["rg8unorm"]), pWeights = pipe(SMAA_WEIGHTS_WGSL, ["rgba8unorm"]), pBlendOut = pipe(SMAA_BLEND_WGSL, [outputFormat]);
@@ -359,7 +391,7 @@ export function createSmaaGPU(device, { width, height, outputFormat = "rgba8unor
             weights: bg(pWeights, [{ buffer: uni }, T.edges.createView(), lin, area.createView(), lin, search.createView(), lin]),
             blendOut: bg(pBlendOut, [{ buffer: uni }, T.color.createView(), lin, T.weights.createView(), lin]),
             ...(temporal ? { blendCur: bg(pBlendCur, [{ buffer: uni }, T.color.createView(), lin, T.weights.createView(), lin]),
-                resolveA: bg(pResolve, [{ buffer: uniT }, T.cur.createView(), T.hA.createView()]), resolveB: bg(pResolve, [{ buffer: uniT }, T.cur.createView(), T.hB.createView()]) } : {}),
+                resolveA: (dv) => bg(pResolve, [{ buffer: uniT }, T.cur.createView(), T.hA.createView(), dv || noDepth.createView(), lin]), resolveB: (dv) => bg(pResolve, [{ buffer: uniT }, T.cur.createView(), T.hB.createView(), dv || noDepth.createView(), lin]) } : {}),
         };
     };
     build(Math.max(1, width | 0), Math.max(1, height | 0));
@@ -369,19 +401,24 @@ export function createSmaaGPU(device, { width, height, outputFormat = "rgba8unor
     };
     self.resize = (w, h) => { w = Math.max(1, w | 0); h = Math.max(1, h | 0); if (w !== self.width || h !== self.height) build(w, h); };
     self.jitter = (frame = self.frame) => (temporal ? T2X_JITTER[frame & 1].slice() : [0, 0]);
-    /** The three passes (and with temporal on, the resolve) into `target`. `moved`: the camera moved since the last frame, so the history is dropped. */
-    self.encode = (enc, target, { moved = false } = {}) => {
+    /** The three passes (and with temporal on, the resolve) into `target`. `moved`: the camera moved since the last frame, so the history is dropped -- unless
+     *  `reproject` ({ invViewProj, prevViewProj, depth: number | r32float view }) says where each pixel was last frame. */
+    self.encode = (enc, target, { moved = false, reproject = null } = {}) => {
         const m = new Float32Array([1 / self.width, 1 / self.height, self.width, self.height, P.threshold, P.maxSearchSteps, P.maxSearchStepsDiag, P.cornerRounding / 100, 1, 0, 0, 0]);
         device.queue.writeBuffer(uni, 0, m);
         pass(enc, T.edges.createView(), pEdge, self._bg.edge);   // cleared first: the edge pass discards where there is no edge
         pass(enc, T.weights.createView(), pWeights, self._bg.weights);
         if (!temporal) { pass(enc, target, pBlendOut, self._bg.blendOut); self.frame++; return; }
         pass(enc, T.cur.createView(), pBlendCur, self._bg.blendCur);
-        const useHist = self.historyValid && !moved, readA = (self.frame & 1) === 0;   // even frames read A and write B, odd ones the other way
-        device.queue.writeBuffer(uniT, 0, new Float32Array([m[0], m[1], m[2], m[3], useHist ? 1 : 0, 0, 0, 0, 1, 0, 0, 0]));
-        pass(enc, target, pResolve, readA ? self._bg.resolveA : self._bg.resolveB, (readA ? T.hB : T.hA).createView());
+        const useHist = self.historyValid && (!moved || !!reproject), readA = (self.frame & 1) === 0;   // even frames read A and write B, odd ones the other way
+        const R = new Float32Array(36), dTex = reproject && typeof reproject.depth === "object" ? reproject.depth : null;
+        if (reproject) { R.set(reproject.invViewProj, 0); R.set(reproject.prevViewProj, 16); }
+        R.set([useHist ? 1 : 0, reproject ? 1 : 0, reproject && typeof reproject.depth === "number" ? reproject.depth : 0, dTex ? 1 : 0], 32);
+        device.queue.writeBuffer(uniT, 0, R);
+        pass(enc, target, pResolve, (readA ? self._bg.resolveA : self._bg.resolveB)(dTex), (readA ? T.hB : T.hA).createView());
+        self.lastUsedHistory = useHist;   // whether this frame took any history in (a move without `reproject` drops it)
         self.historyValid = true; self.frame++;
     };
-    self.destroy = () => { for (const t of Object.values(T)) t.destroy(); area.destroy(); search.destroy(); uni.destroy(); uniT.destroy(); };
+    self.destroy = () => { for (const t of Object.values(T)) t.destroy(); noDepth.destroy(); area.destroy(); search.destroy(); uni.destroy(); uniT.destroy(); };
     return self;
 }

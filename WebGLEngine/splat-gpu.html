@@ -17,7 +17,8 @@
   adapter offers them; on the WebGL2 renderer, the re-upload and the draw by EXT_disjoint_timer_query_webgl2 (render/gpuTimerGL.mjs) where the browser offers
   it; ?gputimer=0 turns either off.
   ?aa=smaa       SMAA 1x on the WebGPU renderer (render/smaaPassGPU.mjs); ?aa=t2x adds the two-frame temporal resolve (jittered frames averaged while the camera
-                 is still, the history dropped when it moves)
+                 is still; when it moves, the history reprojected by the plane through the orbit target, or dropped with &reproject=0)
+  ?spin=0.003    turn the orbit by this many radians each frame (to see the temporal resolve on a moving camera; the gate drives it)
   ?still=5       draw five frames and stop (for a screenshot: a software renderer cannot present 60 a second, and a screenshot waits behind the queue)
   ?ply=/path/scene.ply   open a .ply or .splat by URL. A .ply with f_rest_* draws its colour from where the camera stands (spherical harmonics,
                  render/splatSH.mjs, on either renderer; the status line says to what degree); ?sh=0 draws band 0 only
@@ -58,10 +59,11 @@ import { createGpuTimerGL } from "./render/gpuTimerGL.mjs";
 import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
 import { createSmaaGPU } from "./render/smaaPassGPU.mjs";
 import { jitterProjection } from "./render/jitter.mjs";
+import { mat4Multiply, mat4Invert, transform4 } from "./render/motionVectors.mjs";
 
 const Q = new URLSearchParams(location.search), canvas = document.getElementById("c"), hud = document.getElementById("hud");
 const state = window.__splatGpu = { ready: false, backend: null, count: 0, frames: 0, frameMs: null, error: null };
-const STILL = Number(Q.get("still")) || 0;
+const STILL = Number(Q.get("still")) || 0, SPIN = Number(Q.get("spin")) || 0;
 const controls = createCameraControls({ up: "y", yaw: 0.6, pitch: 0.25, distance: 3.2, target: [0, 0, 0], fovY: 0.9, damping: Q.get("ease") === "0" ? 0 : 0.98, minDistance: 0.05 });
 let focusSphere = null;   // the cloud's bounding sphere, for F
 /** Aim the camera at a sphere at once (a newly opened cloud), keeping the view's direction. */
@@ -104,11 +106,17 @@ async function useWebGPU(splat, capacity = splat.count) {
         const enc = device.createCommandEncoder(), tex = ctx.getCurrentTexture();
         if (aa) {
             aa.resize(canvas.width, canvas.height);
-            const key = eye.join() + "|" + Array.from(proj).join(), moved = key !== d.lastKey; d.lastKey = key;   // the history is dropped whenever the camera moves (no motion vectors)
+            const key = eye.join() + "|" + Array.from(proj).join(), moved = key !== d.lastKey; d.lastKey = key;
+            // 2026-11-22 REPROJECTION (T2x): splats write no depth, so the history is carried across a camera move as if the scene were the plane through the orbit
+            // target, facing the camera (its NDC depth); the resolve's 3 x 3 clamp holds what that gets wrong off the plane. ?reproject=0 drops the history on a move instead.
+            const vp = mat4Multiply(proj, view), tq = transform4(vp, ...camTarget(), 1);
+            const reproject = aa.temporal && Q.get("reproject") !== "0" && d.prevVP && tq[3] > 0 ? { invViewProj: mat4Invert(vp), prevViewProj: d.prevVP, depth: tq[2] / tq[3] } : null;
+            d.prevVP = vp; state.aaReproject = reproject ? "plane" : (aa.temporal ? "off" : null);
             const [jx, jy] = aa.jitter(), jp = aa.temporal ? jitterProjection(proj, jx, jy, canvas.width, canvas.height) : proj;
             state.aaJitter = [jx, jy];   // the subpixel offset this frame was drawn at (T2x), for the gate
             r.draw(enc, { view, proj: jp, camera: eye, target: aa.inputView, width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1], timer });
-            aa.encode(enc, tex.createView(), { moved });
+            aa.encode(enc, tex.createView(), { moved, reproject });
+            if (moved && aa.lastUsedHistory) state.aaCarried = (state.aaCarried || 0) + 1;   // frames whose camera moved and that kept their history
         } else
         r.draw(enc, { view, proj, camera: eye, target: tex.createView(), width: canvas.width, height: canvas.height, clear: [0.027, 0.039, 0.063, 1], timer });
         timer.finish(enc); device.queue.submit([enc.finish()]);
@@ -150,6 +158,7 @@ function paintHud() {
 }
 let lastTick = performance.now();
 function frame() {
+    if (SPIN) { controls.orbit(SPIN, 0); controls.snap(); }
     const tnow = performance.now(); camInput.tick(Math.min(0.1, (tnow - lastTick) / 1000)); lastTick = tnow;   // the held keys, then the easing
     if (canvas.width !== Math.round(canvas.clientWidth * Math.min(2, window.devicePixelRatio || 1))) resize();
     const eye = eyeOf(), view = lookAt(eye, camTarget()), proj = perspective(0.9, canvas.width / canvas.height, 0.01, 200);
