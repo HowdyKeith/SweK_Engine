@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · many lights</title>
+<!--
+  MANY LIGHTS: CLUSTERED LIGHTING AND A SHADOW ATLAS (render/clusteredLights.mjs; render/BACKLOG_2026-11-21_PLAYCANVAS.md, `clustered-lights`).
+  A field of pillars lit by ?n=64 moving coloured point lights (no shadows), two spot lights and one point light that cast shadows from one atlas (the spots a tile each, the
+  point light six, one for each face of its cube). Each pixel loops over the lights of its world-space cell only; ?brute=1 loops over every light instead (the same picture --
+  the gate holds the two together); ?shadows=0 draws no shadows; ?t=3.5 holds the lights still at that time; ?atlas=1 shows the atlas in a corner.
+  The camera is render/cameraControls.mjs. window.__lights reports { ready, frames, stats, lights, pillars, viewProj, eye, capture() } for tools/ship/clusteredLights-selfcheck.mjs.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #07090e; color: #cfd8e6; font: 13px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: absolute; left: 10px; top: 10px; z-index: 6; background: rgba(10,14,22,.78); border: 1px solid #22304a; border-radius: 8px; padding: 8px 10px; max-width: 560px; }
+  .dim { color: #8494ad; }
+</style></head>
+<body><canvas id="cv"></canvas><div id="hud"><b>Many lights</b> <span id="stats" class="dim">starting...</span></div>
+<script type="module">
+import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
+import { perspective, lookAt } from "./render/gpuDriven.mjs";
+import { createClusteredLighting, CLUSTERED_GLSL } from "./render/clusteredLights.mjs";
+
+const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), gl = cv.getContext("webgl2", { antialias: false, preserveDrawingBuffer: false }), FOV = 0.9;
+const state = window.__lights = { ready: false, frames: 0, error: null };
+if (!gl) { state.error = "no WebGL2"; throw new Error(state.error); }
+const mul4 = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+const model = (p, s) => new Float32Array([s[0], 0, 0, 0, 0, s[1], 0, 0, 0, 0, s[2], 0, p[0], p[1], p[2], 1]);
+let seed = 7; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+// the scene: a ground slab and a 5 x 5 field of pillars (boxes: centre, size)
+const GROUND = { position: [0, -0.05, 0], size: [30, 0.1, 30] }, pillars = state.pillars = [];
+for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) { const h = 0.6 + 1.2 * rnd(); pillars.push({ position: [(i - 2) * 2.2, h / 2, (j - 2) * 2.2], size: [0.45, h, 0.45] }); }
+const N = Number(Q.get("n")) || 64, moving = Array.from({ length: N }, (_, k) => ({ r: 1 + 5.5 * rnd(), w: (0.15 + 0.35 * rnd()) * (rnd() < 0.5 ? -1 : 1), a0: 2 * Math.PI * rnd(), y: 0.25 + 1.2 * rnd(), range: 2 + 2 * rnd(), color: (() => { const h = rnd() * 6, c = [Math.abs(h - 3) - 1, 2 - Math.abs(h - 2), 2 - Math.abs(h - 4)].map((v) => Math.min(1, Math.max(0, v))); return c; })(), intensity: 2.2 }));
+function lightsAt(t) {
+    const L = moving.map((m) => ({ type: "point", position: [m.r * Math.cos(m.a0 + m.w * t), m.y, m.r * Math.sin(m.a0 + m.w * t)], range: m.range, color: m.color, intensity: m.intensity, shadow: false }));
+    L.push({ type: "spot", position: [-4.5, 4.2, -4.5], direction: [0.55 + 0.25 * Math.cos(0.3 * t), -1, 0.6 + 0.25 * Math.sin(0.3 * t)], range: 12, innerAngle: 0.32, outerAngle: 0.45, color: [1, 0.92, 0.8], intensity: 9, shadow: true, priority: 2 });
+    L.push({ type: "spot", position: [5, 3.6, 3.5], direction: [-0.8, -1, -0.5], range: 11, innerAngle: 0.28, outerAngle: 0.4, color: [0.7, 0.85, 1], intensity: 8, shadow: true, priority: 2 });
+    L.push({ type: "point", position: [1.1 * Math.cos(0.4 * t), 1.35, 1.1 + 1.1 * Math.sin(0.4 * t)], range: 6.5, color: [1, 0.55, 0.3], intensity: 5, shadow: true, priority: 1 });
+    return L;
+}
+
+const P = [], Nn = []; for (const [n, u, v] of [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]]]) {
+    const c = (a, b) => n.map((x, i) => 0.5 * x + 0.5 * a * u[i] + 0.5 * b * v[i]); for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) { P.push(...c(a, b)); Nn.push(...n); } }
+const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+const link = (vs, fs) => { const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, "aP"); gl.bindAttribLocation(p, 1, "aN"); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; };
+const DEF = (Q.get("brute") === "1" ? "#define CLUSTERED_BRUTE\n" : "") + (Q.get("shadows") === "0" ? "#define CLUSTERED_NO_SHADOWS\n" : "");
+const prog = link(`#version 300 es
+layout(location = 0) in vec3 aP; layout(location = 1) in vec3 aN; uniform mat4 uVP, uM; out vec3 vW; out vec3 vN;
+void main() { vec4 w = uM * vec4(aP, 1.0); vW = w.xyz; vN = aN; gl_Position = uVP * w; }`, `#version 300 es
+precision highp float; precision highp int;
+${DEF}${CLUSTERED_GLSL}
+in vec3 vW; in vec3 vN; uniform vec3 uEye, uAlbedo; out vec4 o;
+void main() { vec3 n = normalize(vN), v = normalize(uEye - vW); vec3 c = uAlbedo * 0.04 + clusteredLight(vW, n, v, uAlbedo); o = vec4(c / (1.0 + c), 1.0); }`);
+const depthProg = link(`#version 300 es
+layout(location = 0) in vec3 aP; uniform mat4 uVP, uM; void main() { gl_Position = uVP * uM * vec4(aP, 1.0); }`, `#version 300 es
+precision highp float; void main() {}`);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+[[0, P], [1, Nn]].forEach(([loc, data]) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); });
+gl.bindVertexArray(null);
+const lighting = state.lighting = createClusteredLighting(gl, { maxLights: Math.max(80, N + 8), cells: [16, 6, 16], maxPerCell: 48, atlasSize: 2048, slots: 4 });
+const U = (p, n) => gl.getUniformLocation(p, n);
+const drawAll = (p, vp, withColor) => { gl.useProgram(p); gl.bindVertexArray(vao); gl.uniformMatrix4fv(U(p, "uVP"), false, vp);
+    for (const [b, alb] of [[GROUND, [0.55, 0.55, 0.58]], ...pillars.map((q) => [q, [0.7, 0.68, 0.64]])]) { gl.uniformMatrix4fv(U(p, "uM"), false, model(b.position, b.size)); if (withColor) gl.uniform3fv(U(p, "uAlbedo"), alb); gl.drawArrays(gl.TRIANGLES, 0, 36); }
+    gl.bindVertexArray(null); };
+
+const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pitch: 0.55, distance: 13, target: [0, 0.4, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
+const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0, 0.5, 0], radius: 6 }) });
+state.capture = () => new Promise((res) => { state._want = res; });
+const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now();
+const gpuTime = (label, fn) => (window.__gpuTimerAuto ? window.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label
+let last = performance.now();
+function frame() {
+    const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
+    const t = T0 ?? (now - start) / 1000, lights = state.lights = lightsAt(t), stats = state.stats = lighting.update(lights);
+    gpuTime("shadows", () => lighting.renderShadows((vp) => drawAll(depthProg, vp, false)));
+    const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+    const pose = controls.pose(), vp = mul4(perspective(FOV, w / h, 0.05, 100), lookAt(pose.eye, pose.target)); state.viewProj = Array.from(vp); state.eye = pose.eye;
+    gl.viewport(0, 0, cv.width, cv.height); gl.clearColor(0.027, 0.035, 0.055, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+    gl.useProgram(prog); lighting.bind(prog, 4); gl.uniform3fv(U(prog, "uEye"), Float32Array.from(pose.eye));
+    gpuTime("lit", () => drawAll(prog, vp, true));
+    if (state._want) { const px = new Uint8Array(cv.width * cv.height * 4); gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = state._want; state._want = null; r({ w: cv.width, h: cv.height, px: Array.from(px) }); }
+    if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights (${N} moving, 3 casting shadows) · ${stats.cells} cells · ${stats.faces} atlas tiles of 16${stats.unshadowed ? ` · ${stats.unshadowed} without a shadow (no room)` : ""}${stats.overflow ? ` · ${stats.overflow} light-cell pairs over the cap` : ""}${Q.get("brute") === "1" ? " · every light, every pixel (brute)" : ""}`;
+    state.frames++; if (state.frames >= 2) state.ready = true;
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>
