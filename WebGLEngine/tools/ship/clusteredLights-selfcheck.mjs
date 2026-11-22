@@ -121,4 +121,11 @@ await section(async () => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in below)
+// SABOTAGE LOG: 15 mutants of render/clusteredLights.mjs, each in a hard-linked copy of the tree: 14 RED -- the sphere-box test skipped, the cell range one short at the top,
+// overflow not counted, the window not reaching 0 at the range, the GLSL window not the CPU's, the GLSL cell index transposed, the GLSL list read from the count's texel, the
+// cube face picked from the wrong direction, no shadow at all, the tile's rect ignored, no bias, the atlas handed out in order instead of by priority, a point light given one
+// tile, the spot cone not applied in GLSL. ONE STAYS GREEN: cubeFace breaking an exact tie toward the later face -- a direction exactly on a face boundary lies inside both
+// faces' frusta, so either answer is right; recorded, not hidden.
+// BEFORE THE SABOTAGE the gate found two real faults in the shadows: a bias in DEPTH (0.002) was about two world units at seven from the spot lights, so pillars near the
+// ground cast no shadow there (9 of 17 darker); a bias toward the light alone left acne at grazing angles (43 clear ground pixels a level or two darker). The bias is now in
+// world units, along the surface normal and half as far toward the light.
