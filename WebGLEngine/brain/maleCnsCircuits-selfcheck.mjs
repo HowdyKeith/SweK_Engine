@@ -15,7 +15,7 @@ let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const section = (fn) => { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
 const load = (f) => { const v = JSON.parse(fs.readFileSync(new URL(`../vendor/male-cns/${f}`, import.meta.url), "utf8")), by = new Map(v.neurons.map((n) => [n.bodyId, n])), E = v.edges.map(([a, b, w]) => ({ a: by.get(a), b: by.get(b), w })); return { v, by, E, syn: (ta, tb, pred = () => true) => E.filter((e) => e.a.type === ta && e.b.type === tb && pred(e)).reduce((s, e) => s + e.w, 0), count: (t) => v.neurons.filter((n) => n.type === t).length, nt: (t) => [...new Set(v.neurons.filter((n) => n.type === t).map((n) => n.nt))].join() }; };
-const S = load("cx-steering-circuit.json"), I = load("cx-steering-inputs-circuit.json"), T = load("lc10-tracking-circuit.json"), O = load("lc11-object-circuit.json"), same = (e) => e.a.somaSide === e.b.somaSide, other = (e) => e.a.somaSide !== e.b.somaSide;
+const S = load("cx-steering-circuit.json"), I = load("cx-steering-inputs-circuit.json"), T = load("lc10-tracking-circuit.json"), O = load("lc11-object-circuit.json"), K6 = load("lc6-loom-circuit.json"), K16 = load("lc16-loom-circuit.json"), same = (e) => e.a.somaSide === e.b.somaSide, other = (e) => e.a.somaSide !== e.b.somaSide;
 
 console.log("maleCnsCircuits-selfcheck -- three fly circuits off the release's flat files\n");
 
@@ -79,6 +79,17 @@ section(() => {
     ok("!! EVERY ONE OF THE 143 LC11 CELLS REACHES DNp35 DIRECTLY, 2,027 synapses, each on its own side only (right 1,271, left 756)", new Set(O.E.filter((e) => e.a.type === "LC11" && e.b.type === "DNp35").map((e) => e.a.bodyId)).size === 143 && O.syn("LC11", "DNp35") === 2027 && O.syn("LC11", "DNp35", other) === 0 && O.syn("LC11", "DNp35", (e) => e.a.somaSide === "R") === 1271);
     ok("!! THE RULE THAT CHOSE THE RELAYS HOLDS IN THE FILE: AVLP079, AVLP080 and AVLP086 each take at least 2,000 synapses from LC11 (3,219, 2,097, 2,122) and give at least 400 to DNp35 (576, 815, 444), all on their own side", O.syn("LC11", "AVLP079") === 3219 && O.syn("LC11", "AVLP080") === 2097 && O.syn("LC11", "AVLP086") === 2122 && O.syn("AVLP079", "DNp35") === 576 && O.syn("AVLP080", "DNp35") === 815 && O.syn("AVLP086", "DNp35") === 444 && ["AVLP079", "AVLP080", "AVLP086"].every((t) => O.syn("LC11", t, other) === 0));
     ok("!! AND THE INHIBITION COMES BACK: AVLP079 returns 1,792 synapses to LC11 and AVLP086 595 -- a feedback loop the tracking circuit does not have; LC11 onto LC11 is the file's bulk (6,967 connections, 15,491 synapses)", O.syn("AVLP079", "LC11") === 1792 && O.syn("AVLP086", "LC11") === 595 && O.E.filter((e) => e.a.type === "LC11" && e.b.type === "LC11").length === 6967 && O.syn("LC11", "LC11") === 15491);
+});
+
+console.log("8. THE DARK-LOOMING CELLS, LC6 AND LC16 (vendor/male-cns/lc6-loom-circuit.json, lc16-loom-circuit.json, 2026-11-22)");
+section(() => {
+    // the choice, by LC11's rule: the descending neuron taking the most of the type's output directly and through one relay; relays the central-brain types taking at least
+    // 2,000 synapses from it and giving at least 400 to that neuron (read off the whole release by a separate script; the numbers below are the files')
+    const whole = (X) => X.v.neuronCount === X.v.neurons.length && X.v.edgeCount === X.v.edges.length && X.v.edges.every(([a, b, w]) => X.by.has(a) && X.by.has(b) && Number.isInteger(w) && w >= 1) && JSON.stringify(X.v.sources) === JSON.stringify(T.v.sources);
+    ok("!! both files are whole and read off the same three source files as the others", whole(K6) && whole(K16), `${K6.v.neuronCount}/${K6.v.edgeCount}, ${K16.v.neuronCount}/${K16.v.edgeCount}`);
+    ok("124 LC6 (59 left, 65 right) with PVLP151 (2 a side) and DNp103 (1 a side); 182 LC16 (88 left, 94 right) with pIP1 (1 a side); every cell predicted acetylcholine", ["LC6", "PVLP151", "DNp103"].map(K6.count).join() === "124,4,2" && ["LC16", "pIP1"].map(K16.count).join() === "182,2" && K6.v.neurons.filter((n) => n.type === "LC6" && n.somaSide === "L").length === 59 && K16.v.neurons.filter((n) => n.type === "LC16" && n.somaSide === "L").length === 88 && [K6, K16].every((X) => X.v.neurons.every((n) => n.nt === "acetylcholine")));
+    ok("!! LC6 reaches DNp103 directly (848 synapses) and through PVLP151 (2,679 in, 406 out), every LC6 synapse on its own side -- and PVLP151's onto DNp103 MOSTLY CROSS THE MIDLINE (389 of the 406)", K6.syn("LC6", "DNp103") === 848 && K6.syn("LC6", "PVLP151") === 2679 && K6.syn("PVLP151", "DNp103") === 406 && K6.syn("PVLP151", "DNp103", other) === 389 && K6.syn("LC6", "DNp103", other) === 0 && K6.syn("LC6", "PVLP151", other) === 0);
+    ok("!! LC16 reaches pIP1 directly (1,296 synapses, on its own side) and through no relay the rule admits; LC16 onto LC16 is its file's bulk (14,596)", K16.syn("LC16", "pIP1") === 1296 && K16.syn("LC16", "pIP1", other) === 0 && K16.syn("LC16", "LC16") === 14596 && K16.v.neurons.length === 184);
 });
 
 console.log("7. WHERE THE SMALL-OBJECT CELLS' DENDRITES ARE (vendor/male-cns/lc11-positions.json, by tools/maleCnsDendritePositions.py, 2026-11-21)");

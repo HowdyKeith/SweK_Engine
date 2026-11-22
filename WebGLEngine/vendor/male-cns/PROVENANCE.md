@@ -154,6 +154,20 @@ right). Which part of the visual field that end is, is not in this data. Pinned 
 **Not here:** what DNp35 does in behaviour (not read; this file says nothing about it), the eye's input to LC11,
 and the other descending neurons LC11 reaches more weakly (DNp103, DNp09, DNp06 through relays).
 
+### The dark-looming cells LC6 and LC16 (2026-11-22, same route; the routes found through Neuprint first)
+
+`lc6-loom-circuit.json` -- `LC6` 124 (59 left, 65 right), `PVLP151` 4, `DNp103` 2: 130 neurons, 3,407 edges. `lc16-loom-circuit.json` -- `LC16` 182 (88 left,
+94 right), `pIP1` 2: 184 neurons, 8,324 edges. Every cell predicted acetylcholine. Made by `tools/maleCnsFlatExtract.py` from the same three flat files.
+
+**Chosen by LC11's rule**, stated before anything flies on them: the descending neuron taking the most of the type's output directly and through one relay -- DNp103
+for LC6, pIP1 for LC16 -- and the central-brain relays taking at least 2,000 synapses from the type and giving at least 400 to that neuron: PVLP151 for LC6, none for LC16.
+
+**What the data says, plainly (Keith asked about these as an escape or evade input):** in this release LC6 and LC16 are NOT a second route to the Giant Fiber. Their
+direct output onto descending neurons is small -- LC6 2,215 synapses of 77,898, LC16 1,542 of 116,249 -- beside LC4's 33,190 of 144,613 and LPLC2's 24,519 of 186,652,
+whose largest descending targets are DNp04 and DNp01 (the Giant Fiber) and DNp103 and DNp01. LC6 is 1.6% of DNp103's input, LC16 3.2% of pIP1's. Neither DNp01 nor the
+other Giant Fiber partners appear among their top descending targets. PVLP151's synapses onto DNp103 mostly cross the midline (389 of 406), the first crossing relay in these files.
+What DNp103 and pIP1 do in behaviour is not read here and not claimed. Pinned by `brain/maleCnsCircuits-selfcheck.mjs` section 8.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,
