@@ -25,6 +25,13 @@
    "note": "H68: flight only: the stored networks at 80, 160 and 320 s horizons; cheap"
   },
   {
+   "round": "86",
+   "priority": 7,
+   "hours": 2,
+   "why": "redraws H36's population search: cheap (about 1.6 h), runs early",
+   "note": "H86: redraws H36's population search on four new seeds: cheap (about 1.6 h), runs early"
+  },
+  {
    "round": "74",
    "priority": 6,
    "hours": 6,
