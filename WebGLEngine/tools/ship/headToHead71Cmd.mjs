@@ -1,7 +1,7 @@
 // WebGLEngine/tools/ship/headToHead71Cmd.mjs -- the command for tools/ship/headToHead71.mjs (export-free on purpose). Round H71 of brain/HEAD_TO_HEAD.md.
-//   node tools/ship/headToHead71Cmd.mjs search [--workers 4] [--out brain/rig-results/head-to-head66-search.jsonl] [--smoke]     the 4 searches (H32's (1+1)-ES with ONLY the price changed: 0.03 instead of 0.02, group P03, 1800 iterations on the 72 train ids, seeds 26011-26014, checkpoints 900/1200/1500/1800), one process each, each RESUMING from brain/rig-results/head-to-head66-state-<seed>.json when it exists (a state of another price is refused); a search already in the file is not run again
-//   node tools/ship/headToHead71Cmd.mjs fly [--in brain/rig-results/head-to-head66-search.jsonl] [--parts 4] [--from 91200 --to 91399] [--seconds 160] [--out brain/rig-results]     the thirteen arms flown dark and lit, the report, head-to-head66.json
-//   node tools/ship/headToHead71Cmd.mjs fly --from-json brain/rig-results/head-to-head66.json     report the runs of an earlier flight again (no audit flight)
+//   node tools/ship/headToHead71Cmd.mjs search [--workers 4] [--out brain/rig-results/head-to-head71-search.jsonl] [--smoke]     the 4 searches (H32's (1+1)-ES with ONLY the price changed: 0.03 instead of 0.02, group P03, 1800 iterations on the 72 train ids, seeds 26011-26014, checkpoints 900/1200/1500/1800), one process each, each RESUMING from brain/rig-results/head-to-head71-state-<seed>.json when it exists (a state of another price is refused); a search already in the file is not run again
+//   node tools/ship/headToHead71Cmd.mjs fly [--in brain/rig-results/head-to-head71-search.jsonl] [--parts 4] [--from 91200 --to 91399] [--seconds 160] [--out brain/rig-results]     the thirteen arms flown dark and lit, the report, head-to-head71.json
+//   node tools/ship/headToHead71Cmd.mjs fly --from-json brain/rig-results/head-to-head71.json     report the runs of an earlier flight again (no audit flight)
 //   node tools/ship/headToHead71Cmd.mjs --one SEED [--smoke]     the child's mode: one resumable search, printed as one JSON line
 //   node tools/ship/headToHead71Cmd.mjs --part 2/4 --sets-file <path> [--from ... --to ... --seconds ...] --to-file <path>     the child's mode of fly
 // `--smoke` searches for 6 iterations (checkpoints at 2, 4 and 6, state every 2) on 4 train ids at 40 s into a temporary state directory (the plumbing, not the recipe); its records are marked and `fly` refuses them.
@@ -29,11 +29,11 @@ const originals = () => ({ original: { search: readRows(RR + "head-to-head27-sea
 const armsOfPart = (p, P) => X.ARM_IDS.filter((a, i) => a === "autopilot" || i % P === p);
 const range = { from: Number(val("--from", X.IDS.from)), to: Number(val("--to", X.IDS.to)) }, seconds = Number(val("--seconds", X.SECONDS));
 const freshOf = (rows) => ({ nets: X.SEEDS.P03.map((s) => rows.find((r) => r.seed === s && r.group === "P03").checkpoints.find((k) => k.iter === 1800).weights) });
-const stateDir = () => (smoke ? (process.env.H71_SMOKE_STATE || path.join(os.tmpdir(), "h71-smoke-state")) : RR), stateFile = (seed) => path.join(stateDir(), `head-to-head66-state-${seed}.json`);
+const stateDir = () => (smoke ? (process.env.H71_SMOKE_STATE || path.join(os.tmpdir(), "h71-smoke-state")) : RR), stateFile = (seed) => path.join(stateDir(), `head-to-head71-state-${seed}.json`);
 const finish = (au, out) => {
     const lines = X.report(au); for (const l of lines) console.log(l);
     fs.mkdirSync(out, { recursive: true });
-    fs.writeFileSync(path.join(out, "head-to-head66.json"), JSON.stringify({ range: au.range, seconds: au.seconds, fresh: au.fresh, search: au.search, fixture: au.fixture, startVal: au.startVal, report: lines, dark: au.dark, lit: au.lit }));
+    fs.writeFileSync(path.join(out, "head-to-head71.json"), JSON.stringify({ range: au.range, seconds: au.seconds, fresh: au.fresh, search: au.search, fixture: au.fixture, startVal: au.startVal, report: lines, dark: au.dark, lit: au.lit }));
 };
 if (has("--one")) {
     const seed = val("--one", ""), group = "P03"; const file = stateFile(Number(seed)), opts = smoke ? SMOKE : {};
@@ -41,7 +41,7 @@ if (has("--one")) {
     const state = X.loadState(fs, file, { seed: Number(seed), group, ...(smoke ? { iters: SMOKE.iters, checkpoints: SMOKE.checkpoints } : {}) });
     console.log(JSON.stringify({ ...X.longSearch(Number(seed), group, loadWip(), { ...opts, state, save: (s) => X.saveStateAtomic(fs, file, s) }), smoke }));
 } else if (args[0] === "search") {
-    const outFile = path.resolve(val("--out", smoke ? path.join(os.tmpdir(), "h71-smoke-search.jsonl") : RR + "head-to-head66-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
+    const outFile = path.resolve(val("--out", smoke ? path.join(os.tmpdir(), "h71-smoke-search.jsonl") : RR + "head-to-head71-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
     const todo = X.SEEDS.P03.map((s) => [s, "P03"]).filter(([s, g]) => !done.has(`${s}:${g}`));
     console.log(`[h71 search] ${todo.length} searches to run, ${done.size} already in ${outFile}, ${workers} workers${smoke ? " (SMOKE)" : ""}`);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -74,7 +74,7 @@ if (has("--one")) {
     const j = JSON.parse(fs.readFileSync(path.resolve(val("--from-json", "")), "utf8")), wip = loadWip();
     finish({ dark: j.dark, lit: j.lit, range: j.range, seconds: j.seconds, wip, h27: h27Sets(), s32: s32Sets(), fresh: j.fresh, search: j.search, ...originals(), startVal: j.startVal, fixture: j.fixture,  c02: X.LAW_C02.slice() }, path.resolve(val("--out", RR)));
 } else if (args[0] === "fly") {
-    const inFile = path.resolve(val("--in", RR + "head-to-head66-search.jsonl")), rows = readRows(inFile);
+    const inFile = path.resolve(val("--in", RR + "head-to-head71-search.jsonl")), rows = readRows(inFile);
     if (!rows.length) { console.error(`no search file at ${inFile} (run search first)`); process.exit(2); }
     if (rows.some((r) => r.smoke)) { console.error("the search file holds SMOKE records: fly refuses them (search again without --smoke)"); process.exit(2); }
     let fresh; try { fresh = freshOf(rows); X.champion(rows, 1800); } catch (e) { console.error(String(e.message)); process.exit(2); }
