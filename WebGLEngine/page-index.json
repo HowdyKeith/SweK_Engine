@@ -1428,7 +1428,7 @@
    "f": "gizmo-demo.html",
    "t": "gizmos",
    "d": "",
-   "g": "",
+   "g": "recentnew",
    "p": 0
   },
   {
@@ -1855,14 +1855,14 @@
    "f": "lights-demo.html",
    "t": "many lights",
    "d": "",
-   "g": "",
+   "g": "recentnew",
    "p": 0
   },
   {
    "f": "lights-gpu.html",
    "t": "many lights (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "recentnew",
    "p": 0
   },
   {
@@ -2989,7 +2989,7 @@
    "f": "splat-gpu.html",
    "t": "Splats on the GPU",
    "d": "",
-   "g": "",
+   "g": "recentnew",
    "p": 0
   },
   {
