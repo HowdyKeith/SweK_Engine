@@ -25,7 +25,59 @@
 // Composite Simpson with a step small enough for the oscillation at the upper limit. The integrand oscillates
 // faster as t grows (phase ~ t^2), so the step count scales with x^2, not x -- a fixed step silently loses
 // accuracy exactly where the physics gets interesting.
+/**
+ * THE FRESNEL INTEGRALS WITHOUT A STEP COUNT: the power series below |x| = 1.5 and the continued fraction above it
+ * (the construction of Numerical Recipes' `frenel`, written out here), accurate to about 1e-15 at every argument at a COST THAT DOES NOT GROW WITH x.
+ * The composite Simpson in fresnelCS needs n = 400 x^2 steps; this needs at most a few hundred operations, which is what makes it the bounded path for a caller whose argument is set by a sweep.
+ */
+export function fresnelCSFast(x) {
+    const EPS = 1e-16, FPMIN = 1e-300, MAXIT = 200, PIBY2 = Math.PI / 2, XMIN = 1.5;
+    const sign = x < 0 ? -1 : 1, ax = Math.abs(x);
+    if (ax === 0) return { C: 0, S: 0 };
+    let c, s;
+    if (ax < Math.sqrt(FPMIN)) { c = ax; s = 0; }
+    else if (ax <= XMIN) {
+        let sum = 0, sums = 0, sumc = ax, sgn = 1, odd = true, term = ax, n = 3;
+        const fact = PIBY2 * ax * ax;
+        for (let k = 1; k <= MAXIT; k++) {
+            term *= fact / k; sum += sgn * term / n;
+            const test = Math.abs(sum) * EPS;
+            if (odd) { sgn = -sgn; sums = sum; sum = sumc; } else { sumc = sum; sum = sums; }
+            if (term < test) break;
+            odd = !odd; n += 2;
+        }
+        s = sums; c = sumc;
+    } else {
+        // continued fraction for the complex quantity h, b = 1 - i pi x^2
+        let br = 1, bi = -Math.PI * ax * ax, cr = 1 / FPMIN, ci = 0;
+        const inv = (re, im) => { const d = re * re + im * im; return [re / d, -im / d]; };
+        let [dr, di] = inv(br, bi), hr = dr, hi = di;
+        let n = -1;
+        for (let k = 2; k <= MAXIT; k++) {
+            n += 2; const a = -n * (n + 1);
+            br += 4;
+            // d = 1 / (a d + b)
+            [dr, di] = inv(a * dr + br, a * di + bi);
+            // c = b + a / c
+            const [qr, qi] = inv(cr, ci); cr = br + a * qr; ci = bi + a * qi;
+            // del = c d ; h *= del
+            const er = cr * dr - ci * di, ei = cr * di + ci * dr;
+            const nhr = hr * er - hi * ei, nhi = hr * ei + hi * er; hr = nhr; hi = nhi;
+            if (Math.abs(er - 1) + Math.abs(ei) < EPS * 10) break;
+        }
+        // h *= (ax - i ax)
+        const gr = hr * ax + hi * ax, gi = hi * ax - hr * ax; hr = gr; hi = gi;
+        const t = PIBY2 * ax * ax, cs = Math.cos(t), sn = Math.sin(t);
+        // cs = (0.5 + 0.5i) * (1 - (cos t + i sin t) * h)
+        const pr = cs * hr - sn * hi, pi = cs * hi + sn * hr;
+        const ur = 1 - pr, ui = -pi;
+        c = 0.5 * (ur - ui); s = 0.5 * (ur + ui);
+    }
+    return { C: sign * c, S: sign * s };
+}
+
 export function fresnelCS(x, opts = {}) {
+    if (opts.method === "fast") return fresnelCSFast(x);
     const sign = x < 0 ? -1 : 1;          // C and S are odd functions
     const a = Math.abs(x);
     if (a === 0) return { C: 0, S: 0 };
@@ -63,11 +115,11 @@ export function knifeEdgeProfile(vs) { return vs.map(knifeEdgeIntensity); }
 // --- single slit in the NEAR field --------------------------------------------------------------------
 // Closed form in Fresnel integrals for a slit of width `a` centred on the axis:
 //   I(x)/I0 = 1/2 [ (C(v2) - C(v1))^2 + (S(v2) - S(v1))^2 ],  v = sqrt(2/(lambda z)) (x -+ a/2)
-export function slitFresnel(a, lambda, z, xs) {
+export function slitFresnel(a, lambda, z, xs, opts = {}) {
     const k = Math.sqrt(2 / (lambda * z));
     return xs.map((x) => {
         const v1 = k * (x - a / 2), v2 = k * (x + a / 2);
-        const A = fresnelCS(v1), B = fresnelCS(v2);
+        const A = fresnelCS(v1, opts), B = fresnelCS(v2, opts);
         const dC = B.C - A.C, dS = B.S - A.S;
         return 0.5 * (dC * dC + dS * dS);
     });
@@ -107,8 +159,8 @@ export function regime(a, lambda, z) {
 // --- far-field limit of the SAME near-field formula ----------------------------------------------------
 // At large z the near-field profile approaches the Fraunhofer sinc^2. This returns the near-field profile
 // sampled at the angles the far-field module uses, so the two can be compared directly.
-export function slitFresnelAtAngles(a, lambda, z, sinThetas) {
-    return slitFresnel(a, lambda, z, sinThetas.map((s) => s * z));
+export function slitFresnelAtAngles(a, lambda, z, sinThetas, opts = {}) {
+    return slitFresnel(a, lambda, z, sinThetas.map((s) => s * z), opts);
 }
 
 // Normalised RMS difference between two profiles, each scaled to its own peak. Shape comparison, not amplitude.
