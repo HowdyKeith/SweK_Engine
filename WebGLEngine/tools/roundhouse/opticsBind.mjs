@@ -23,6 +23,8 @@ import { knifeEdgeIntensity, slitFresnelAtAngles, fresnelNumber, profileRms } fr
 
 /** The nominal Simpson evaluations above which the converge mode takes the bounded path (v4488 measured the sweep waiting 12 minutes on a configuration of 1.85e9; the shipped default is 2.33e8, 3.5 s). */
 export const CONVERGE_EVAL_BUDGET = 5e7;
+/** Which Fresnel-integral path the converge mode takes for a nominal Simpson cost: Simpson up to and AT the budget, the bounded fast path above it. */
+export const convergeMethod = (quadratureEvals) => (quadratureEvals > CONVERGE_EVAL_BUDGET ? "fast" : "simpson");
 export const OPTICS_OBSERVABLES = [
     "rayleighFactor", "rayleighFactorExact", "airyRingErrFrac",
     "slitRms", "slitFirstMinFactor", "slitFirstMinErrFrac",
@@ -241,7 +243,7 @@ export async function buildOptics(hyp, base = {}) {
     // *** THE MODE IS NOW BOUNDED. *** The nominal Simpson cost above is REPORTED unchanged (quadratureEvals stays 2 x angles x max(64, 7200/F), derived, not fitted), but a configuration whose nominal cost is
     // over CONVERGE_EVAL_BUDGET is computed with physics/optics/fresnel.js's fresnelCSFast -- the same integrals from a series and a continued fraction, accurate to about 1e-14 at a cost that does not grow with
     // the argument -- so the worst case no longer waits on 1e9 Simpson steps. Below the budget the Simpson path runs exactly as before. The two paths agree to about 1e-12 on nearFarRms (graded in opticsBind-selfcheck).
-    const method = out.quadratureEvals > CONVERGE_EVAL_BUDGET ? "fast" : "simpson";
+    const method = convergeMethod(out.quadratureEvals);
     const far = slitAnalytic(c.a, c.lambda, st);
     const near = slitFresnelAtAngles(c.a, c.lambda, c.z, st, { method });
     out.nearFarRms = profileRms(near, far);
