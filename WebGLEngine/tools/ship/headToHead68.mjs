@@ -67,7 +67,6 @@ const bestOf = (au, s) => NET_IDS[bestIdx(NET_IDS.map((a) => penMean(au, s, a)))
 const meansAt = (au, s) => NET_IDS.map((a) => penMean(au, s, a));
 const marginAt = (au, s) => avg(NET_IDS.map((a) => pen(au, s, a, "c02").mean));
 const lostNames = (au, s) => { const v = view(au, s), l = NET_IDS.filter((a) => lostBoth(v, a) > 0).map((a) => `${a} ${lostBoth(v, a)}`); return l.length ? l.join(", ") : "NONE"; };
-const lostTotal = (au, s) => NET_IDS.reduce((p, a) => p + lostBoth(view(au, s), a), 0);
 const powerAt = (au, s) => avg(NET_IDS.map((a) => meanPower(au, s, a)));
 const rho = (au, s) => spearman(meansAt(au, s), meansAt(au, CONTROL));
 /** The networks whose reading against c02 at an other horizon differs from their reading at 160 s: [{ id, s, control, other }]. */
