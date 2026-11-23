@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h79",
+ "kind": "rounds",
+ "rounds": [
+  "79"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": 1,
+ "created": "2026-11-23T16:23:25Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H79: 0.06, where the regime between 3 kW and 1.6 kW is chosen",
+ "sig": "23fc5170e8b1c1bc5188f0ddacae5022b4e6d14cad0a61d1ac14e8208c417fc7"
+}
