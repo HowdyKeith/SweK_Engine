@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h65",
+ "kind": "rounds",
+ "rounds": [
+  "65"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": -4,
+ "created": "2026-11-23T16:23:30Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H65: new seeds at 144 ids: does H41's tie replicate (about a day)",
+ "sig": "53c52697dfc1d2bf949b96a5ada6c1c8e28c35c5b2edc08f82eec62b819850b3"
+}
