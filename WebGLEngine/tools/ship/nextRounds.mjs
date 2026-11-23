@@ -3078,7 +3078,14 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         what: "The field does not know the current. The harder test's strong-current kind (mean up to 1.2 m/s) is flown on a plan that ignores it, and reached 93 percent with 4 collisions.",
         how: "A crab angle in the aim point; the current in the cost (a cell costs more against the set); a margin that grows with the current; the turn radius (about 35 m) in the margin.",
-        why: "The documented failures in a current are collisions on the way, not arrival failures (follow-up 1).",
+        why: "The documented failures in a current are collisions on the way, not arrival failures (follow-up 1). PARTLY DONE 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 7 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD7 (seeds 701 to 760, two current strengths, four arms, 480 flights in brain/subCurrentHeld7.jsonl). The CRAB ANGLE works: at the HELD4 strength 56 of 60 became 60 of 60 and at 1.5 times it 38 became 48 (10 gained, 0 lost, p 0.002; collisions 12 to 1). The MARGIN raised by the quarter-turn drift did not help alone and made the crab worse (0 gained, 7 lost at x1.5), so the registered designated arm (crab + margin) was PARTLY SUPPORTED and the worse of the two. STILL OPEN here: the current IN THE COST (a cell costs more against the set, which needs the field solver's cost model changed) and the turn radius in the margin as its own term.",
+    },
+    {
+        id: "nav-current-estimated",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 7's crab arm is TOLD the mean current exactly. A real vessel knows its water velocity and its ground velocity and has to infer the current from the difference, while the unsteady part moves under it.",
+        how: "The crab arm with the mean current estimated as a running average of (ground velocity minus water velocity) over a window, started at zero, on fresh seeds at the same two strengths; the told-current arm is the ceiling and `any` the floor. A registered window, no tuning on the held set.",
+        why: "The crab gain (63 to 80 percent at x1.5) is a ceiling until the current is something the vessel can estimate; whether it survives the estimate is the question.",
     },
     {
         id: "nav-margin-sweep-any",

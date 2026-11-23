@@ -461,3 +461,32 @@ The module, the study command and their gates were sabotaged first (the module 1
 ### DEV NOTE TO FOLLOW-UP 7 (2026-11-23; made BEFORE HELD7 was read or flown; DEV is not a result and nothing registered above is changed)
 
 The DEV sanity run (`node tools/ship/subCurrentStudy.mjs --set dev`, seeds 1 to 30, 2 strengths x 4 arms, 240 flights, 7 s) found NEITHER rule degenerate, the only thing the registration allowed an amendment for: no first plan was a no-route scenario at the raised or the ordinary ladder, and the crab arm never turned away from its goal. Read for sanity, not tuned on: `any` reached 26 of 30 at x1.0 and 16 at x1.5; `any+crab` 28 and 20; `any+margin` 23 and 14; the designated `any+crab+margin` 28 and 17. At x1.5 the crab arms time out more (6 and 7 of 30 against `any`'s 3): a current of up to 2.5 m/s against a cruise of 3 m/s leaves a ground speed near 0.5 m/s on a head-on leg, and the 260 s limit is the cost of staying on the course. That is the vessel's physics and not a defect of the rule, and C7 (at most 3 designated timeouts in all) is expected to be MISSED; it is not amended. The raised margin alone did NOT help on DEV (`any+margin` below `any` at both strengths), a finding I will read against C5 and not tune. HELD7 is flown next, once.
+
+## RESULT OF THE CURRENT IN THE FIELD (2026-11-23; `node tools/ship/subCurrentStudy.mjs --set held7 --write`, HELD7 = seeds 701 to 760 of hard-current at two strengths, read once; every flight is in `brain/subCurrentHeld7.jsonl`, 480 records): **PARTLY SUPPORTED by the registered rule, and the designated arm was the wrong one** -- `any+crab+margin` (designated) held the x1.0 gain (2 collisions against `any`'s 4, 58 reached against 56) and missed the x1.5 gain (41 against 38, +3, the bar 5). The arm that did the work was the CRAB ALONE.
+
+The module, the study command and their gates were sabotaged first (the module 64 mutants, 50 red and 14 declared equivalent or not reached; the study command 84 mutants, 82 red and 2 equivalent; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| strength | arm | reached | collided | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|---|
+| x1.0 | any (reference) | 56 / 60 (93%) | 4 | 0 | 0 | 155.6 | 1.09 | 10.0 |
+| x1.0 | any+crab | **60 / 60 (100%)** | 0 | 0 | 0 | 145.6 | 1.03 | 14.1 |
+| x1.0 | any+margin | 56 / 60 (93%) | 3 | 0 | 1 | 172.2 | 1.20 | 22.3 |
+| x1.0 | **any+crab+margin** | 58 / 60 (97%) | 2 | 0 | 0 | 159.1 | 1.12 | 24.9 |
+| x1.5 | any (reference) | 38 / 60 (63%) | 12 | 0 | 10 | 159.0 | 1.12 | 7.1 |
+| x1.5 | any+crab | **48 / 60 (80%)** | 1 | 0 | 11 | 135.5 | 1.03 | 12.8 |
+| x1.5 | any+margin | 34 / 60 (57%) | 15 | 3 | 8 | 182.4 | 1.20 | 8.9 |
+| x1.5 | **any+crab+margin** | 41 / 60 (68%) | 9 | 0 | 10 | 154.2 | 1.10 | 13.6 |
+
+**Predictions scored (held or missed, moving nothing).** **C1 held** (`any` reached 38 at x1.5, the bar 47). **C2 MISSED** (+3). **C3 held**. **C4 held** (`any+crab` 48 against `any+margin` 34). **C5 held** (`any+margin` 56 against `any`'s 56). **C6 held** (time ratios 1.02 and 0.97). **C7 MISSED** (the designated arm timed out in 10 flights at x1.5, the bar 3; the DEV note said to expect it). **C8 held** (no scenario had no route).
+
+**Post hoc, from the 480 recorded flights (labelled: none of it was registered and none of it moves the verdict).** Paired on the same 60 seeds, flights gained / lost, exact two-sided sign test:
+* **`any+crab` against `any`:** x1.0 4 gained, 0 lost (p 0.125); **x1.5 10 gained, 0 lost (p 0.002)**. It reached every one of the 60 at x1.0, with no collision, and cut collisions at x1.5 from 12 to 1.
+* **`any+margin` against `any`:** x1.0 3 and 3; x1.5 1 gained, 5 lost (p 0.22). The raised margin alone does not help and costs time (path over chord 1.20 against 1.09).
+* **`any+crab+margin` against `any+crab`:** x1.5 **0 gained, 7 lost (p 0.016)**; x1.0 0 and 2. Adding the margin to the crab makes it WORSE.
+* **What is left of the crab arm at x1.5:** 11 timeouts and 1 collision. The 11 are flights that stay on the course against a current averaging 2.04 m/s (the whole x1.5 set averages 1.48) with a cruise of 3 m/s; `any` timed out in 10 of its own, and the crab turns 12 of its collisions into 9 more reached and 2 more timeouts. A real vessel would burn more thrust or take the lee, and neither is in this round.
+
+**What this says.** The field does not know the current, and the cheapest correction is the aim point: pointing the nose so the ground track lies on the course the field asked for turned 93 percent into 100 at the HELD4 strength and 63 into 80 at 1.5 times it, with one collision where `any` had twelve. The margin raised by the quarter-turn drift did not do what it was written for: it rounds corridors off the plan's shortest line (path over chord 1.20) and the vessel spends longer exposed to the unsteady part of the current. Within this model the registered designated arm was the worse of the two combinations, which the registration could not know and which is entered above, not hidden.
+
+**What this would not say.** The registration's list stands: the planner is told the MEAN current exactly (a vessel that has to estimate it from its own drift is not here), nothing of the unsteady part or the weight error, the current is one generator's, and x1.5 is a condition of my own making. The crab is a ground-course correction, not a trajectory plan, and the clamp 0.9 was not tuned. The 11 remaining timeouts are a speed limit of the model (a head-on leg in a current close to the cruise speed), not a navigation fault. HELD7's 60 scenarios per cell move by about nine flights between two sets for one arm (FOLLOW-UP 5), so the x1.0 differences (4 flights) are inside that and the x1.5 crab gain (10, p 0.002, 0 lost) is not.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-current-in-field` PARTLY done: the crab angle is in and works, the raised margin is out as written; the current IN THE COST (a cell costs more against the set) and the turn radius in the margin are untouched. New: **`nav-current-estimated`**, the crab arm with the mean current ESTIMATED from the vessel's own drift (ground velocity against water velocity) instead of told.
