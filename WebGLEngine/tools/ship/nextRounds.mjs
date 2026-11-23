@@ -3053,10 +3053,25 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-reacting-traffic",
-        blocker: "OPEN",
+        blocker: "CLOSED",
+        closed: "CLOSED 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 6 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD6 (seeds 601 to 660, three ship behaviours, three arms, 540 flights in brain/subReactHeld6.jsonl). PARTLY SUPPORTED: estimating a ship's velocity from the last 3 s of its positions reached 18 more than keeping the ship to its original schedule when ships stop for the vessel (56 against 38 of 60, 19 gained and 1 lost) and 3 more when they turn away (47 against 44, inside the noise); the plan with NO prediction reached 59 of 60 when ships stop and beat the schedule-keeping arm there by 22 to 1, while with ships that hold course prediction beat it by 44 to 32. brain/subReactNav.mjs (the reacting ships, the estimator, the flight loop; its react-none flight IS subHardNav.flyHard, every field) and tools/ship/subReactStudy.mjs are gated (subReactNav-selfcheck: 7 sections, 120 mutants, 16 equivalent declared; subReactStudy-selfcheck: 88 mutants, none left). NOT DONE from this entry's HOW, said plainly: a ship that stops AND turns by other rules, noisy observations, the vessel's own stopping, reversing and an edge COST in the field; those are the two new entries below and nav-traffic-avoid-not-slow.",
         what: "The harder navigation test's ships hold course and speed, do not see the vessel, and their velocity is known to the planner exactly (HELD4: any+predict reached 72 percent against an 80 percent bar, 8 flights left the region).",
         how: "Ships that turn away (a simple right-of-way rule), ships whose velocity the planner has to ESTIMATE from successive positions (a constant-velocity filter), a ship that stops; and the vessel's own options the test did not give it: slowing, stopping, reversing; an edge COST in the field (the plan has only a wall).",
         why: "any+predict is only as good as its prediction, and the test measures it at its best; the 8 exits through the edge are a failure of the plan, not of prediction.",
+    },
+    {
+        id: "nav-belief-by-behaviour",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 6 found that the best way to plan around a ship depends on whether the ship keeps its schedule: prediction wins by 12 flights when ships hold course (44 against 32 of 60) and loses by 21 when they wait (38 against 59). The planner does not know which world it is in.",
+        how: "An arm that watches the ships it has been told about (each ship's observed position against the position its schedule gives, over the last EST_S seconds) and plans from where the ship IS when the two disagree by more than a margin and from where it will be when they agree; a registration with its own fresh seeds, the three behaviours of subReactNav and a mixed one (some ships keep the schedule, some do not), designated arm against the best fixed arm in each.",
+        why: "No fixed arm of FOLLOW-UP 6 is best in every behaviour, so an arm that picks is the obvious next thing; whether it can pick from the evidence a vessel has is the question.",
+    },
+    {
+        id: "nav-estimate-with-noise",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
+        how: "Add noise to the observed positions (a standard deviation of a few metres) and replace the difference by a filter (an alpha-beta or a constant-velocity Kalman filter); read the same three behaviours on fresh seeds. The gate's identity (react-none is flyHard, and the estimating arm equals the nominal one with no reaction and no noise) is the control.",
+        why: "A noiseless difference is the best case; the result is a ceiling for estimation, and a noisy one could be worse than the schedule.",
     },
     {
         id: "nav-current-in-field",
