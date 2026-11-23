@@ -8,7 +8,9 @@
 //   3  THE VERDICT     SHORTER (paired median 0.97), SAFE, the verdict over their combinations, T1 to T7 each at its boundary, a missing cell is a miss
 //   4  THE TEXT AND THE COMMAND   the table, the verdict block, bad arguments (exit 2, named), a short run end to end, run as a process, --write goes with held11 only
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of tools/ship/subTerrainStudy.mjs, one mutant per code line and operator, at most four of each operator on a line): 72 mutants; 67 red on the first pass and 5 survivors read one by one: the dived count at exactly one dive, SAFE with the reference's collisions, the T1 line's text, and the two equivalents below.
+//   Rows were added (a flight with exactly 1 dive counted, a reference with collisions in SAFE, the exact T1 line) and the three survivors that rows could reach were run again: 3 mutants, 3 red. The 2 left are EQUIVALENT: `process.argv[1] && ...` -> `||` (argv[1] is always set when a script runs) and `process.argv[1]` -> `argv[2]` in the same test (the process row passes arguments, so argv[2] is set; a run with NO arguments would differ and is the one thing not run here).
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the DEV and HELD11 flights themselves are the module's gate's.
 "use strict";
 import path from "node:path";
 import { spawnSync } from "node:child_process";

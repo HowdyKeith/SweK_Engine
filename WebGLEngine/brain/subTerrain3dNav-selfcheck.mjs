@@ -8,7 +8,11 @@
 //   3  THE DIVE        nearOrAhead by hand; depthTarget for each arm, the floor clamp winning
 //   4  THE FLIGHT      `any` is flyHard's flight when the floor never binds (the identity), the grounding branch, the record, the dives, the plan with passable bergs removed, a golden of thirty DEV seeds
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of brain/subTerrain3dNav.mjs, one mutant per code line and operator, at most four of each operator on a line, one worktree): 105 mutants; 61 red on the first pass and 44 survivors read one by one. Rows were added (a golden of the terrain generator, the east and west points of the footprint, the dive held only above the wanted depth, the floor ahead read along the heading,
+//   the grounding line at gap 0 and the hull's lowest point) and the survivors were run again: 44 mutants, 19 red, 25 survivors, all EQUIVALENT or NOT REACHED: seabed 1000 -> 1001 (the floor never touches a flight at depth); the footprint's `k <= 8` and `k < 9` (the ninth point repeats the first), the sign of the cosine or sine of the footprint (the eight points are symmetric under it), the quarter-turn
+//   step changed in the x term only (a floor that varies in x only has the same minimum among the shifted points on every test floor); `along >= 1` for `>= 0` (a berg within 1 m ahead is inside the grown footprint, which is caught first); the first plan built at t = 1 and the first clearance read at t = 1 (static scenario); `dist < BIG` -> `<=` and `&&` -> `||` in noRoute (no DEV seed has no route);
+//   `<` -> `<=` on a float tie (the floor minimum, the clearance minimum, collision, the region's edges); the struck obstacle (`||` -> `&&`, `|| null` -> `&& null`, `< 1`) and the region's four `&&`/`||` edge tests: NOT REACHED (no arm collides with a berg or leaves the region on any DEV seed, so the branch is not entered).
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the golden freezes what the three arms do on DEV today and does not say it is right.
 "use strict";
 import * as T from "./subTerrain3dNav.mjs";
 import * as H from "./subHardNav.mjs";
