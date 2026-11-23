@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h73",
+ "kind": "rounds",
+ "rounds": [
+  "73"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": 8,
+ "created": "2026-11-23T16:23:18Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H73: flight only: weight noise on the stored networks; cheap, the same question from the other side",
+ "sig": "0b35bde5bf1b046ea3858e926731b79614c963ed6f802cf36f6b17a888a53673"
+}
