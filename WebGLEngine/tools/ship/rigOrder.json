@@ -95,6 +95,13 @@
    "note": "H84: redraws H38's two smaller networks on new seeds: does the pruned-versus-random reading replicate"
   },
   {
+   "round": "85",
+   "priority": -2,
+   "hours": 9,
+   "why": "a search at price 0.005, between the 17 kW pilot of price 0 and the tie of price 0.01",
+   "note": "H85: a search at price 0.005, between the 17 kW pilot of price 0 and the tie of price 0.01"
+  },
+  {
    "round": "75",
    "priority": -3,
    "hours": 6,
