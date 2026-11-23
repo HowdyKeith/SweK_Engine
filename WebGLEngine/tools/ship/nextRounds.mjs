@@ -3102,7 +3102,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "tank-nav-3d",
-        blocker: "OPEN",
+        blocker: "CLOSED",
+        closed: "CLOSED 2026-11-23 (unnumbered, working branch, nothing shipped): render/subAquarium3d.mjs draws the navigation sea. navPose and goalPose are pure (an island is a column from the surface to the floor, an iceberg a disc at the surface tapering to its keel, a ship a hull to its keel, each navigating sub's goal a 3.5 m buoy in the sub's colour; the colours are the plan and side views' own), createView3d's render takes tank.sceneNow() as a fourth argument and keeps one mesh per obstacle (a moving ship is moved, not rebuilt; a shorter sea, a null sea and a sub with no goal drop meshes), navCount() reports what is held, and sub-aquarium.html passes the sea from its frame loop. render/subAquarium3d-selfcheck.mjs section 2d: nine rows, the live ones in headless Chromium (not skipped), nine sabotages each red by name or by a crash that the gate now reports as a red row. NOT DONE, said plainly: nobody has LOOKED at the picture (no screenshot was read; the rows grade poses, counts and colours, not whether it looks like a tank), and the entry's note that the top and depth views draw the same objects was not re-checked.",
         what: "The tank's 3D view (render/subAquarium3d.mjs) does not draw the navigation sea or the goals; the top and depth views do.",
         how: "Islands as columns, icebergs as discs with a keel, ships as hulls, goals as buoys, from tank.sceneNow() and each sub's nav.goal.",
         why: "The 3D view is the one people look at.",

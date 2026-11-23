@@ -63,6 +63,25 @@ export function poseFins(group, cmd) {
 /** The scene pose of a snapshot row ({x, y, depth, heading, pitch}). */
 export function subPose(s) { return { x: s.x, y: -s.depth, z: s.y, rotY: s.heading, rotZ: s.pitch }; }
 
+/** The colours of the navigation sea, the same three the plan and side views of sub-aquarium.html draw (islands green, icebergs pale blue, ships amber). */
+export const NAV_COLOURS = Object.freeze({ island: 0x3d6b3a, berg: 0xbfe3ff, ship: 0xf6a623 });
+/** The goal buoy's radius, metres on screen. */
+export const GOAL_RADIUS = 3.5;
+/**
+ * The scene pose of one object of the navigation sea (a row of tank.sceneNow(): { type: "island" | "berg" | "ship", x, y, r, keel }): a vertical solid of radius `r` hanging from the surface (scene Y = 0) down to its keel,
+ * or to the floor (`depthMax`) when the keel is Infinity (an island is land to the floor) or deeper than the floor. `pos` is the CENTRE of that solid in scene coordinates (X = x, Y = -height / 2, Z = y), the same mapping as subPose.
+ * A keel that is not a number, or is negative, reads as 0 (nothing hangs) rather than NaN in the scene.
+ */
+export function navPose(o, depthMax = 50) {
+    const k = o.keel === Infinity ? depthMax : Number.isFinite(o.keel) ? Math.max(0, Math.min(depthMax, o.keel)) : 0;
+    return { type: o.type, pos: [o.x, -k / 2, o.y], radius: o.r, height: k };
+}
+/** The goal of a snapshot row ({ nav: { goal: { x, y, depth } }, hue }) as a scene point (X = x, Y = -depth, Z = y) and the sub's hue, or null when the sub has no navigator or no goal. */
+export function goalPose(s) {
+    const g = s && s.nav && s.nav.goal;
+    return g && Number.isFinite(g.x) && Number.isFinite(g.y) && Number.isFinite(g.depth) ? { pos: [g.x, -g.depth, g.y], hue: s.hue } : null;
+}
+
 /** How close the camera sits to a sub it is following (metres): the hull is drawn 32 m long, so the tower and the tail fill the panel. */
 export const FOLLOW_DIST = 70;
 /** The camera for an orbit `view` ({ yaw, pitch, dist }) around `centre` ({ x, y, z }): a point on a sphere about the centre, looking at it. At the tank's centre this is the pose the page has always had. */
@@ -77,7 +96,7 @@ export function followStep(centre, target, k = 0.18) {
 }
 
 /**
- * @returns { render(snapshot, t, pov), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
+ * @returns { render(snapshot, t, pov, navSea), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
  */
 export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1, models = null } = {}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
@@ -95,6 +114,27 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
+    // the navigation sea (tank.sceneNow()): islands as columns to the floor, icebergs as discs at the surface tapering to a keel, ships as hulls to their keel, and each navigating sub's goal as a buoy in the sub's colour
+    const navMeshes = new Map(), goalMeshes = new Map(), navMat = {};
+    for (const [k, c] of Object.entries(NAV_COLOURS)) navMat[k] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, transparent: true, opacity: 0.5 });
+    const navGeoOf = (type) => geo["nav-" + type] || (geo["nav-" + type] = type === "berg" ? new THREE.CylinderGeometry(1, 0.4, 1, 24) : new THREE.CylinderGeometry(1, 1, 1, type === "ship" ? 16 : 28));
+    const syncNav = (sea, snapshot) => {
+        const list = Array.isArray(sea) ? sea.filter((o) => o && NAV_COLOURS[o.type] !== undefined) : [];
+        list.forEach((o, i) => {
+            const p = navPose(o, depthMax); let m = navMeshes.get(i);
+            if (!m || m.userData.type !== o.type) { if (m) scene.remove(m); m = new THREE.Mesh(navGeoOf(o.type), navMat[o.type]); m.userData.type = o.type; scene.add(m); navMeshes.set(i, m); }
+            m.position.set(p.pos[0], p.pos[1], p.pos[2]); m.scale.set(p.radius, Math.max(1e-3, p.height), p.radius);
+        });
+        for (const [i, m] of navMeshes) if (i >= list.length) { scene.remove(m); navMeshes.delete(i); }
+        const live = new Set();
+        for (const s of snapshot) {
+            const gp = goalPose(s); if (!gp) continue; live.add(s.id);
+            let m = goalMeshes.get(s.id);
+            if (!m) { m = new THREE.Mesh(geo.goal || (geo.goal = new THREE.SphereGeometry(GOAL_RADIUS, 12, 8)), new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((s.hue % 360) / 360, 0.8, 0.65), roughness: 0.4 })); scene.add(m); goalMeshes.set(s.id, m); }
+            m.position.set(gp.pos[0], gp.pos[1], gp.pos[2]);
+        }
+        for (const [id, m] of goalMeshes) if (!live.has(id)) { scene.remove(m); m.material.dispose(); goalMeshes.delete(id); }
+    };
     let modelHost = models;   // v4909: a render/subModels3d.mjs host (or null): when a hull has a model assigned it is put on the boat, the procedural hull staying as the fallback
     // v4901 -- the ballast: bubbles while a tank is blown, a drop weight that falls (render/subBallastCues.mjs holds the arithmetic)
     let bubbles = { list: [], counter: 0 }, weights = [], lastT = null; const wasReleased = new Map();
@@ -139,8 +179,9 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
         getView: () => ({ ...view }),
         resize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); },
         /** One frame. `pov` (optional) is { pos: [x, y, z], look: [x, y, z] } in scene coordinates and REPLACES the orbit camera for this frame (a first-person view; the follow centre keeps easing as before). */
-        render(snapshot, t = 0, pov = null) {
+        render(snapshot, t = 0, pov = null, navSea = null) {
             sea.update(t);
+            syncNav(navSea, snapshot);
             const live = new Set();
             for (const s of snapshot) {
                 live.add(s.id);
@@ -173,9 +214,11 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             if (backdrop) { const a = backdropApi(); if (a && a.ready) { const d = new THREE.Vector3(); camera.getWorldDirection(d); a.camera = seaCameraFromView([camera.position.x, camera.position.y, camera.position.z], [d.x, d.y, d.z], camera.fov); } }
             renderer.render(scene, camera);
         },
+        /** For a gate: how many navigation obstacles and goal buoys the view holds right now. */
+        navCount() { return { obstacles: navMeshes.size, goals: goalMeshes.size }; },
         /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
         cues() { return { bubbles: bubbles.list.length, drawn: bubbleGeo.drawRange.count, weights: weights.length, resting: weights.filter((w) => w.rest >= 0).length }; },
-        dispose() { bubbleGeo.dispose(); weightMat.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
+        dispose() { bubbleGeo.dispose(); weightMat.dispose(); for (const m of Object.values(navMat)) m.dispose(); for (const m of goalMeshes.values()) m.material.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
     };
 }
 

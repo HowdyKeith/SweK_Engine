@@ -380,7 +380,7 @@ function render() {
     sg.strokeStyle = c; sg.lineWidth = 2; sg.beginPath(); sg.arc(q.x * dx, q.depth * dz, 4, 0, 6.2832); sg.stroke();
   }
   drawCompass(snap); drawBrain();
-  if (view3d) view3d.render(snap, performance.now() / 1000);
+  if (view3d) view3d.render(snap, performance.now() / 1000, null, tank.sceneNow());
   updateStats(snap);
 }
 function frame(now) {
