@@ -70,7 +70,6 @@ export function champion(rows, iter) {
     let b = null; for (const s of seeds) { const r = mine.find((q) => q.seed === s), k = cpOf(r, iter); if (b === null || k.heldScore > b.heldScore) b = { seed: s, ...k }; } return b;
 }
 const LAST = CHECKPOINTS[CHECKPOINTS.length - 1];
-const lawOk = (w) => Array.isArray(w) && w.length === 4 && w.every(Number.isFinite);
 const lawOkW = (w) => Array.isArray(w) && w.length === 4 && w.every(Number.isFinite);
 /** The 13 arms as { id: arm }: `h27` = { laws: [q04] }; `old` = { s02: H32's champion network (the 1800 weights of s02_26011), p16: [H61's four 1800-iteration networks in seed order] }; `fresh` = { nets: [the four new networks in seed order] }. */
 export function armsOf(wip, h27, old, fresh) {
