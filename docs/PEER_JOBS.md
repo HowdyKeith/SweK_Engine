@@ -11,7 +11,10 @@ Keith: push a job file to a git folder; whichever SweK peer is free picks it up,
 | `jobs/<id>.json` | a signed job |
 | `claims/<id>.json` | who is running it, with a heartbeat |
 | `cancel/<id>.json` | a request to stop wanting it |
-| `results/<id>/` | `done.json` and the result files (`rig-out/*.zip`, `peerjob.log`) |
+| `results/<id>/` | `done.json` and the result files (`rig-out/*.zip`, `peerjob.log`); a file above 90 MB is left out and named under `skipped` |
+| `state/<id>/` | the job's data files (`head-to-head<round>-state-<seed>.json`, `-search.jsonl`, results), shared at every beat so ANY peer can resume it; removed when the job finishes |
+| `attempts/<id>.json` | how many times a run failed, by whom, and when |
+| `peers/<name>.json` | what each peer is doing now (idle, or the job, round and phase) and when it was last seen |
 
 ## A job is not a command
 Anyone who can push to the branch could otherwise run anything on every peer. So:
@@ -32,11 +35,18 @@ node tools/ship/peerJobsCmd.mjs init   --url <repo>                    # once pe
 node tools/ship/peerJobsCmd.mjs submit --id h69-search --rounds 69 --gpu any
 node tools/ship/peerJobsCmd.mjs submit --id h70-gpu --rounds 70 --gpu required
 node tools/ship/peerJobsCmd.mjs submit --id h71-intel --rounds 71 --gpu forbidden --cpu-match Intel
-node tools/ship/peerJobsCmd.mjs status
+node tools/ship/peerJobsCmd.mjs plan --file tools/ship/rigOrder.json --dry-run   # the whole ordered plan; without --dry-run it submits it
+node tools/ship/peerJobsCmd.mjs status                                  # jobs, WHAT RUNS ON WHICH PEER, every peer's state, attempts, results
 node tools/ship/peerJobsCmd.mjs watch                                  # on each peer; --once, --dry-run, --interval 120
 node tools/ship/peerJobsCmd.mjs cancel --id h69-search
 ```
 `submit` pins the job to the current `HEAD` (or `--commit`); push that commit first.
+
+## Interruptions, retries and order (2026-11-23)
+- **Resume.** A run starts from the furthest copy of each data file of its rounds (a state by its `iter`, a search file by its lines), taken from the queue branch and from this peer's own mirror (`~/.swek/peerjobs/state/<id>/`); it shares them again at every beat (10 min) and when the runner exits. A peer that stops and restarts, or a different peer taking over a claim that missed three beats, therefore loses at most the iterations since the last beat (the searches also save their own state every 50 iterations).
+- **Retries.** A failed run counts an attempt and releases its claim; the job is tried again after 10 minutes, from the saved state, up to 3 times; the third failure is the result (`status: failed`).
+- **What is running, and where.** `status` (and the Queue button in the SweK server's panel) lists every claimed job with its peer and host and last beat, and every peer: idle, running which job at which round and phase, or not seen for N minutes.
+- **Order.** The highest priority is taken first, then the oldest, then the smaller id. `plan` turns a plan file into one job per round with the plan's priorities, so free peers take different rounds at once and a single peer takes them in the plan's order. The order in the repository is `tools/ship/rigOrder.json`; its gate row fails if the order a lone peer takes differs from the one written.
 
 ## Known limits
 - One job at a time per peer; a cancel does not kill a run that has begun.
