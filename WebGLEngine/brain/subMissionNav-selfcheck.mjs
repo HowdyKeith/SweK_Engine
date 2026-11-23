@@ -7,7 +7,10 @@
 //   2  THE MISSION     the waypoint rule checked on every DEV seed (clearance, legs, chord sum, ranges, minDepth), determinism, the dropped branch
 //   3  THE FLIGHT      one waypoint is flyHard's flight (the identity), energy accounting, the energy-out branch, errors, the record, the speed cap, a golden of ten DEV missions
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of brain/subMissionNav.mjs, one mutant per code line and operator, at most four of each operator on a line, three worktrees in parallel): 104 mutants; 76 red on the first pass and 28 survivors read one by one. One row was added (a collided mission names the obstacle it struck, every other mission has hit null) and the two survivors it could reach, the `||` -> `&&` and `.type || null` -> `&& null` of the struck-obstacle lookup, were run again: both red.
+//   The 26 left are EQUIVALENT or NOT REACHED by any DEV mission: seabed 1000 -> 1001 (the floor never touches a flight at depth); `<` -> `<=` on a float tie (the leg length, the chord window's two ends, the clearance minimum, collision, the edges of the region test, the speed cap's `>=`); `max(1, ..)` -> `max(2, ..)` on a replan interval of 150 ticks; the first clearance read at t = 1 and the replan test `i >= 0` or `i > 1` for `i > 0` (a rebuild at i = 0 and the one at tick 150 are the same plan on the golden ten); the first plan and the plan at a leg switch built with the vessel's surroundings freed or not (no ship is near the vessel at those moments on the golden ten: NOT REACHED);
+//   the struck obstacle read at the 4th state component or at clearance < 1 (the first struck is the same obstacle in all collided DEV flights); `&&` for `||` on the region's four edges (no DEV mission leaves the region: NOT REACHED); the energy-out test at 1 J rather than 0 (a tick's draw is 150 J or more, so a charge between 0 and 1 is not reached); `path > 0` -> `>= 0` and `> 1` in the J/m (the path is never 0 or under 1 m after a tick).
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the golden freezes what the arms do on ten DEV missions today and does not say it is right.
 "use strict";
 import * as M from "./subMissionNav.mjs";
 import * as H from "./subHardNav.mjs";
@@ -73,6 +76,8 @@ console.log("\n3. THE FLIGHT");
     ok("!! a flight is deterministic", same(safe(() => M.flyMission(pilot, m0, M.DESIGNATED)), safe(() => M.flyMission(pilot, m0, M.DESIGNATED))));
     const jr = [2, 3, 4, 6, 9, 10].map((sd) => { const a = M.flyMission(pilot, M.missionFor(sd), M.REFERENCE), b = M.flyMission(pilot, M.missionFor(sd), M.DESIGNATED); return a.complete && b.complete ? b.jPerM / a.jPerM : null; }).filter((x) => x !== null);
     ok("!! the speed cap bites: the 2.5 m/s arm spends 0.60 to 0.85 of the reference's joules a metre (the tables' 1,891 / 2,675 = 0.71)", jr.length >= 3 && jr.every((x) => x > 0.6 && x < 0.85), jr.map((x) => x.toFixed(2)).join());
+    const hits = M.SETS.dev.slice(0, 10).map((sd) => M.flyMission(pilot, M.missionFor(sd), M.REFERENCE));
+    ok("!! a collided mission names the obstacle it struck (a ship, berg, island or wall) and every other mission has hit null", hits.some((x) => x.status === "collided") && hits.every((x) => (x.status === "collided" ? ["ship", "berg", "island", "wall"].includes(x.hit) : x.hit === null)), hits.map((x) => x.hit).join());
     const gold = M.MISSION_ARMS.map((arm) => M.SETS.dev.slice(0, 10).map((sd) => code(M.flyMission(pilot, M.missionFor(sd), arm))).join(" "));
     ok("!! GOLDEN (a regression snapshot of this module's own missions on ten DEV seeds, not a hand derivation; a change detector): the status and legs of each arm (C complete, x collided, E energy-out, L left, T timeout)",
         same(gold, ["x0 C3 C3 C3 x0 C3 x0 x0 C3 C3", "x0 C3 C3 C3 C3 C3 x0 x0 C3 C3", "x0 C3 C3 C3 x0 C3 x0 x0 C3 C3", "x0 C3 x0 C3 x0 C3 x0 x0 C3 C3"]), gold.join(" | "));

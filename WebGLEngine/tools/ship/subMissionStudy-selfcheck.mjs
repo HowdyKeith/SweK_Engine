@@ -8,7 +8,9 @@
 //   3  THE VERDICT     GAIN (5 more complete), COST MATTERS (5 energy-outs), the verdict over their combinations, E3 to E6 each at its boundary, a missing cell is a miss
 //   4  THE TEXT AND THE COMMAND   the table, the verdict block, bad arguments (exit 2, named), a short run end to end, run as a process, --write goes with held10 only
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of tools/ship/subMissionStudy.mjs, one mutant per code line and operator, at most four of each operator on a line): 64 mutants; 62 red, 2 survivors, both EQUIVALENT: `process.argv[1] && ...` -> `||` (argv[1] is always set when a script runs) and `process.argv[1]` -> `argv[2]` in the same test (the process row passes arguments, so argv[2] is set; a run with NO arguments would differ and is the one thing not run here).
+//   The table's widths, the title line, the E6 line, the missing-cell paths and every threshold's boundary were written exact from the start, from the earlier study gates' survivors.
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the DEV and HELD10 flights themselves are the module's gate's.
 "use strict";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
