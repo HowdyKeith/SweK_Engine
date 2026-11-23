@@ -3435,7 +3435,14 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         what: "The traffic fix (brain/SUB_FIELD_NAV_WIP.md, RESULT OF THE TRAFFIC FIX, HELD5) reached 40 of 60 (PARTLY SUPPORTED: +6 over any+predict, bar 80% and no-exit missed): the failures that remain are collisions with ships (14 of the designated arm's 16) and four exits through the edge band; slowing to 2 m/s did not change the collision count.",
         how: "A vessel that turns away from a ship (a velocity-obstacle or a give-way heading chosen against the ship's relative velocity), a stop, or a plan whose capsule is the ship's reach rather than its track; and a look at why the vessel crosses a 36 m wall (is the plan routeless there?). New registration, fresh seeds (HELD5 is spent).",
-        why: "The incumbent's rate moved nine flights between two 60-scenario sets, so a fix is only worth reading on a new set with the paired test beside it.",
+        why: "The incumbent's rate moved nine flights between two 60-scenario sets, so a fix is only worth reading on a new set with the paired test beside it. PARTLY DONE 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 8 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD8 (seeds 801 to 860, three arms, 180 flights in brain/subAvoidHeld8.jsonl). NOT SUPPORTED: a vessel that turns away from a ship reached 40 of 60 against 36 (+4, p 0.48), ship collisions 18 to 11, exits 2 to 5, path 1.32 against 1.18; turning and slowing together reached 34. STILL OPEN here: a stop, a reverse, a capsule that is the ship's reach, and the exits through the edge band.",
+    },
+    {
+        id: "nav-avoid-turn-radius",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 8 tested each candidate heading as a straight line after an instant turn; the real vessel turns on about a 35 m radius, and 28 percent of the rule's fires found no safe heading at all.",
+        how: "The same rule with each candidate tested along the vessel's own turning arc (a circle of radius R_TURN to the new heading, then straight) over the same 25 s, on fresh seeds, the straight-line rule as the reference and the paired test beside it.",
+        why: "The flown result is worse than the rule's own test by construction; whether an honest test changes the choice, or only shows the rule was optimistic, is the question.",
     },
     {
         id: "fly-pair-replication",
