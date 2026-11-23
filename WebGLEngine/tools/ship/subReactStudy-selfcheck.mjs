@@ -9,9 +9,12 @@
 //   4  THE TEXT        the table and the verdict block
 //   5  THE COMMAND     bad arguments (exit 2, named), a short DEV run end to end, --write goes with held6 only and puts one JSON line a flight in brain/subReactHeld6.jsonl
 //
-// SABOTAGE LOG: PENDING (to be written when the mutation pass is final).
+// SABOTAGE LOG (serial mutation pass of tools/ship/subReactStudy.mjs, one mutant per code line and operator, at most four of each operator on a line, run in two worktrees): 88 mutants; 80 red on the first pass; 8 survived: the table line's column widths (L61-o120 to o123, which the regexes of the first draft read through `\\s+`) and the command-line entry guard (L91-o10, o40, o120, o122). THE GATE WAS THEN EXTENDED (the table line laid out EXACTLY; the file run as a command: an unknown flag, --seeds 0 and --write with DEV exit 2, importing it runs nothing and running it with no arguments starts the DEV set) AND THE 8 RE-RUN: all red. NO SURVIVOR.
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line, so the long lines are SAMPLED and not exhausted; the DEV and HELD6 flights themselves (the study's flights are graded in brain/subReactNav-selfcheck.mjs).
 "use strict";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as St from "./subReactStudy.mjs";
 import * as R from "../../brain/subReactNav.mjs";
 import * as H from "../../brain/subHardNav.mjs";
@@ -74,6 +77,11 @@ console.log("\n4. THE TEXT");
     ok("!! the table has the title first, a header and a line for each cell flown (react-turn designated: 1/2 50%, 1 collided; react-stop nominal 1/1 100%) and no line for a cell not flown", tbl.split("\n")[0] === "A TITLE" && /^behaviour /.test(tbl.split("\n")[1]) && /react-turn\s+est\+predict\+edge\+yield\s+\| 1\/2 50%\s+\|\s+1 \( 0\)\s+0\s+0\s+0 \|/.test(tbl) && /^react-stop\s+any\+predict\+edge\+yield\s+\| 1\/1 100%/m.test(tbl) && !/react-none/.test(tbl) && tbl.split("\n").length === 4);
     const hand = { cells: { "react-turn": { [D]: { n: 60, reached: 50, rate: 50 / 60, collided: 4, shipHits: 3, left: 2, timeout: 3, other: 1, medianTime: 123.45, medianChord: 1.234, medianClearance: 7.89 } } } }, htbl = safe(() => St.table(hand, "T"), "");
     ok("!! each column of the table is its own number: reached 50/60 83%, collided 4 with (3) ship hits, left 2, timeout 3, other 1, then the median time 123.45, the median path over the chord 1.23, the median minimum clearance 7.89 (in that order, last)", /react-turn\s+est\+predict\+edge\+yield\s+\| 50\/60 83%\s+\|\s+4 \( 3\)\s+2\s+3\s+1 \|\s+123\.45 \|\s+1\.23 \|\s+7\.89$/m.test(htbl));
+    {
+        const hand2 = { cells: { "react-turn": { [D]: { n: 60, reached: 50, rate: 50 / 60, collided: 4, shipHits: 3, left: 2, timeout: 3, other: 1, medianTime: 123.45, medianChord: 1.234, medianClearance: 7.89 } } } };
+        const line = St.table(hand2, "T").split("\n")[2], want = "react-turn".padEnd(11) + " " + D.padEnd(22) + " | " + "50/60 83%".padEnd(12) + " | " + "       4" + " (" + " 3" + ") " + "   2" + " " + "      3" + " " + "    1" + " | " + "123.45".padStart(15) + " | " + "1.23".padStart(17) + " | " + "7.89".padStart(24);
+        ok("!! the table line is laid out exactly: the behaviour padded to 11, the arm to 22, the reached cell to 12, collided right-aligned in 8 with the ship hits in 2, then left in 4, timeout in 7, other in 5, and the three medians right-aligned in 15, 17 and 24 (a column that moves is a table nobody can read across)", line === want, JSON.stringify(line));
+    }
     const jx = { gainTurn: true, gainStop: false, verdict: "PARTLY SUPPORTED", r1: false, r2: true, r3: false, r4: true, r5: false, r6: true, r7: false, r8: true, r9: false, r10: true, timeRatios: [1.1, 1.2, NaN] }, vx = safe(() => St.verdictText(jx), "").split("\n");
     ok("!! each line of the verdict block reads ITS OWN judgement: the first the gain in react-turn HELD, in react-stop MISSED and the verdict; R1 MISSED, R2 HELD, R3 MISSED, R4 HELD, R5 MISSED, R6 HELD, R7 MISSED, R8 HELD, R9 MISSED, R10 HELD with the ratios 1.10, 1.20 and n/a",
         vx.length === 11 && /in react-turn HELD, in react-stop MISSED => PARTLY SUPPORTED$/.test(vx[0]) && vx.slice(1).map((l, i) => l.startsWith("R" + (i + 1) + " ")).every(Boolean) && [1, 3, 5, 7, 9].every((i) => /MISSED$/.test(vx[i])) && [2, 4, 6, 8, 10].every((i) => /HELD$/.test(vx[i])) && /\(1\.10, 1\.20, n\/a\)/.test(vx[10]));
@@ -92,5 +100,10 @@ console.log("\n5. THE COMMAND");
     const direct = safe(() => R.flyReact(St.pilot, H.hardScenario(601, "hard-traffic"), D, "react-turn")), rec = lines.find((r) => r.arm === D && r.behaviour === "react-turn");
     ok("!! the flights in the file are the module's own flights of the HELD6 scenarios on the PD autopilot (seed 601, the designated arm in react-turn: the same status, ticks and path as a direct flyReact)", !!rec && !!direct && rec.status === direct.status && rec.ticks === direct.ticks && near(rec.path, direct.path, 1e-9));
 }
+    const here = path.dirname(fileURLToPath(import.meta.url)), cli = (args) => spawnSync(process.execPath, [path.join(here, "subReactStudy.mjs"), ...args], { encoding: "utf8", timeout: 60000 });
+    const c1 = cli(["--bogus"]), c2 = cli(["--seeds", "0"]), c3 = cli(["--set", "dev", "--write"]);
+    ok("!! run as a command (node subReactStudy.mjs ...) the file takes its arguments from the command line: an unknown flag exits 2 and says so on stderr, --seeds 0 exits 2, --write with DEV exits 2, and importing the file runs nothing (this gate imported it and printed nothing before its own first line)", c1.status === 2 && /unknown argument "--bogus"/.test(c1.stderr) && c2.status === 2 && /--seeds needs a positive whole number/.test(c2.stderr) && c3.status === 2 && /--write goes with --set held6 only/.test(c3.stderr) && c1.stdout === "");
+    const imp = spawnSync(process.execPath, ["-e", `import(${JSON.stringify(path.join(here, "subReactStudy.mjs"))}.replace(/^/, "file://")).then(() => console.log("imported"))`], { encoding: "utf8", timeout: 20000 }), bare = spawnSync(process.execPath, [path.join(here, "subReactStudy.mjs")], { encoding: "utf8", timeout: 4000, killSignal: "SIGKILL" });
+    ok("!! importing the file from another program runs nothing (it prints `imported` and ends inside 20 s: a command run on import would fly the whole DEV set), and run with no arguments it starts the DEV set (its first line, `DEV set: 30 scenarios ...`, is written before the first flight; the run is stopped after 4 s)", imp.status === 0 && imp.stdout === "imported\n" && /^DEV set: 30 scenarios of hard-traffic x 3 ship behaviours, 3 arms/.test(bare.stdout || ""), JSON.stringify([imp.status, imp.stdout.slice(0, 40), (bare.stdout || "").slice(0, 60)]));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);
