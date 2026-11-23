@@ -5,7 +5,10 @@
 // THE GATE OF tools/ship/headToHead76.mjs (Round H76 of brain/HEAD_TO_HEAD.md, registered first: a different seed set, H55's search at 0.08 with seeds 33001-33004, against c02, q04, H32's champion and H55's own four networks).
 //   1 SETS   2 SEARCH (identity with H32's longSearch when the price handed in is 0.02; a reference loop written out in this gate at 0.08, 0.04 and 0.02; defaults and flight counts at 72 ids; refusals; states carry the price and the train size; a resumed search equals an uninterrupted one at every saved state)
 //   3 CHAMPION / ARMS / AUDIT   4 STATS (the eight-part verdict in every branch, part F recomputed here inside and outside 2 se)   5 CHECKS (sixteen rows, each broken once)   6 REPORT   7 SOURCE (and that the command names no other round's files)   8 GOLDEN LINES AND ROWS FROM THE MUTATION PASS.
-// SABOTAGE LOG: PENDING (to be written when the mutation pass is final).
+// SABOTAGE LOG (serial mutation pass of tools/ship/headToHead76.mjs, one mutant per code line and operator, run one at a time in worktrees): 406 mutants; 395 red on the first and only pass; 11 survived and are all EQUIVALENT, declared: L32-o121 (the length of the JSON error message quoted in a refusal), L77-o60 (every -> some over a list of exactly one law, forced by the clause before it),
+//   L160-o30, L160-o31, L160-o32, L173-o30 and L175-o30 (< -> <= at a float tie of exactly 1e-9, 1e-6 or 1e-12, or at a shared end id masked by `au.range.from > 95399`, that no input reaches), L184-o40, L184-o60 and L184-o90 (the champion check's best-held-out conjunct, a tautology while champion() is correct: champion() is itself mutated in section 3),
+//   L194-o60 (every -> some over the disjointness of the audit range from the train and held-out ids, masked by the clause `au.range.from > 95399`). The gate carries the golden report and the rows of H74's and H75's passes from the start, which is why none other survived.
+// NOT CHECKED, said plainly: that new seeds do anything but redraw H55's search (the round's run); the real searches and audit; the command file beyond its file names (section 7) and a smoke run by hand (4 searches in 2 s, the audit's part mode on 2 ids).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
