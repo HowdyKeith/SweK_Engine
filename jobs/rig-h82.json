@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h82",
+ "kind": "rounds",
+ "rounds": [
+  "82"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": -2,
+ "created": "2026-11-23T16:23:28Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H82: redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate",
+ "sig": "8431896ce1ab570fe579d25a2c5bf0719ae71c9b2b2d754da6b54885c2846ca2"
+}
