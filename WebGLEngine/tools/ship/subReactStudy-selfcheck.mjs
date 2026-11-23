@@ -1,0 +1,96 @@
+// WebGLEngine/tools/ship/subReactStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node tools/ship/subReactStudy-selfcheck.mjs      (about 20 s: arithmetic on hand-built summaries and a short DEV and HELD6 run end to end)
+//
+// THE STUDY OF REACTING TRAFFIC (tools/ship/subReactStudy.mjs), held to its word before HELD6 is flown ("FOLLOW-UP 6" in brain/SUB_FIELD_NAV_WIP.md):
+//   1  THE CONSTANTS   the file, the sets, the thresholds
+//   2  THE SUMMARY     counts by behaviour and arm, the ship hits, medians over arrivals or over every flight, only the cells flown, in BEHAVIOURS then REACT_ARMS order
+//   3  THE VERDICT     the gain in each reacting behaviour (5 more than the nominal arm), the verdict over their combinations, R1 to R10 each at its boundary, a missing cell is a miss
+//   4  THE TEXT        the table and the verdict block
+//   5  THE COMMAND     bad arguments (exit 2, named), a short DEV run end to end, --write goes with held6 only and puts one JSON line a flight in brain/subReactHeld6.jsonl
+//
+// SABOTAGE LOG: PENDING (to be written when the mutation pass is final).
+"use strict";
+import path from "node:path";
+import * as St from "./subReactStudy.mjs";
+import * as R from "../../brain/subReactNav.mjs";
+import * as H from "../../brain/subHardNav.mjs";
+
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const near = (a, b, e = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= e;
+const safe = (f, d = null) => { try { return f(); } catch { return d; } };
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const run = (seed, behaviour, arm, o = {}) => ({ kind: "hard-traffic", seed, behaviour, arm, status: "reached", hit: null, reached: true, t: 100, path: 400, chord: 380, minClearance: 10, ...o });
+const lose = (status, o = {}) => ({ status, reached: false, t: null, ...o });
+const N = R.NOMINAL_ARM, D = R.DESIGNATED;
+console.log("subReactStudy-selfcheck -- the study of reacting traffic\n");
+
+console.log("1. THE CONSTANTS");
+{
+    ok("!! the output is brain/subReactHeld6.jsonl; the sets are the module's (DEV seeds 1 to 30, HELD6 601 to 660)", St.OUT === "brain/subReactHeld6.jsonl" && St.SETS === R.SETS && St.SETS.held6.length === 60 && St.SETS.dev.length === 30);
+    ok("!! the thresholds: the gain 5, within 3 (R1), the stop loss 2 (R3), 3 timeouts (R7), the time factor 1.25 (R10)", same(St.THRESH, { gain: 5, within: 3, stopLoss: 2, timeouts: 3, timeFactor: 1.25 }) && Object.isFrozen(St.THRESH));
+    const xs = [5, 1, 3];
+    ok("!! median: the middle of an odd count (5, 1, 3 -> 3), the mean of the middle two of an even one (1, 2, 3, 10 -> 2.5), NaN for none; the input is not sorted in place", St.median(xs) === 3 && same(xs, [5, 1, 3]) && St.median([10, 3, 1, 2]) === 2.5 && Number.isNaN(St.median([])));
+}
+console.log("\n2. THE SUMMARY");
+{
+    const b = "react-turn", runs = [run(1, b, D, { t: 100, path: 380 * 1.1, minClearance: 10 }), run(2, b, D, { t: 120, path: 380 * 1.3, minClearance: 20 }), run(3, b, D, { ...lose("collided"), hit: "ship", minClearance: -0.1 }), run(4, b, D, { ...lose("collided"), hit: "berg", minClearance: -0.2 }), run(5, b, D, { ...lose("collided"), hit: "ship", minClearance: -0.3 }),
+        run(6, b, D, { ...lose("timeout"), minClearance: 2 }), run(7, b, D, { ...lose("timeout"), minClearance: 3 }), run(8, b, D, { ...lose("left"), minClearance: 4 }), run(9, b, D, { ...lose("broached"), minClearance: 6 }), run(1, "react-none", D, { t: 200 }), run(1, b, "any+replan", { t: 50 })];
+    const sum = safe(() => St.summarize(runs)), x = sum && sum.cells[b] && sum.cells[b][D];
+    ok("!! a cell counts flights by status: of nine react-turn designated flights 2 reached, 3 collided (2 of them with a ship), 2 timed out, 1 left, 1 other (broached), the rate is reached/n (2 of 9)", !!x && x.n === 9 && x.reached === 2 && x.collided === 3 && x.shipHits === 2 && x.timeout === 2 && x.left === 1 && x.other === 1 && near(x.rate, 2 / 9));
+    ok("!! the ship hits count COLLIDED flights that struck a ship (a reached flight with hit 'ship' is not one; a timed-out one is not)", (() => { const s = St.summarize([run(1, b, D, { ...lose("collided"), hit: "ship" }), run(2, b, D, { hit: "ship" }), run(3, b, D, { ...lose("timeout"), hit: "ship" }), run(4, b, D, { ...lose("collided"), hit: "berg" })]); return s.cells[b][D].shipHits === 1 && s.cells[b][D].collided === 2; })());
+    ok("!! the median clearance is over ALL the flights (-0.3, -0.2, -0.1, 2, 3, 4, 6, 10, 20: 3), the median time and path/chord over the ARRIVALS only (100 and 120 s: 110; 1.1 and 1.3: 1.2)", !!x && near(x.medianClearance, 3) && near(x.medianTime, 110) && near(x.medianChord, 1.2, 1e-9));
+    ok("!! only the cells flown exist, keyed by behaviour then arm in BEHAVIOURS and REACT_ARMS order, and a cell's runs are its own (react-none designated: 1 flight, 200 s; react-turn any+replan: 1 flight, 50 s; no react-stop)",
+        !!sum && Object.keys(sum.cells).join() === "react-none,react-turn" && Object.keys(sum.cells["react-turn"]).join() === "any+replan," + D && sum.cells["react-none"][D].n === 1 && sum.cells["react-none"][D].medianTime === 200 && sum.cells["react-turn"]["any+replan"].medianTime === 50 && sum.cells["react-none"][N] === undefined);
+}
+console.log("\n3. THE VERDICT");
+{
+    const cell = (n, reached, o = {}) => ({ n, reached, rate: reached / n, collided: 0, shipHits: 0, left: 0, timeout: 0, other: 0, medianTime: 150, medianChord: 1.1, medianClearance: 5, ...o });
+    const base = () => ({ cells: {
+        "react-none": { "any+replan": cell(60, 30), [N]: cell(60, 40, { left: 4 }), [D]: cell(60, 40, { left: 4 }) },
+        "react-turn": { "any+replan": cell(60, 38), [N]: cell(60, 42, { shipHits: 10 }), [D]: cell(60, 49, { shipHits: 6, left: 3 }) },
+        "react-stop": { "any+replan": cell(60, 35), [N]: cell(60, 40), [D]: cell(60, 47, { left: 2 }) } } });
+    const jb = safe(() => St.judge(base())), mod = (f) => { const b = base(); f(b.cells); return safe(() => St.judge(b)); };
+    ok("!! the base case has the gain in both reacting behaviours (49 against 42 and 47 against 40): SUPPORTED, and R1 to R10 all held", !!jb && jb.gainTurn && jb.gainStop && jb.verdict === "SUPPORTED" && [jb.r1, jb.r2, jb.r3, jb.r4, jb.r5, jb.r6, jb.r7, jb.r8, jb.r9, jb.r10].every((v) => v === true));
+    ok("!! the GAIN is 5 more than the nominal arm in the behaviour (47 against 42 holds, 46 fails; 45 against 40 holds, 44 fails), each behaviour its own",
+        mod((c) => { c["react-turn"][D] = cell(60, 47); }).gainTurn === true && mod((c) => { c["react-turn"][D] = cell(60, 46); }).gainTurn === false && mod((c) => { c["react-stop"][D] = cell(60, 45); }).gainStop === true && mod((c) => { c["react-stop"][D] = cell(60, 44); }).gainStop === false && mod((c) => { c["react-turn"][D] = cell(60, 46); }).gainStop === true && mod((c) => { c["react-stop"][D] = cell(60, 44); }).gainTurn === true);
+    ok("!! the verdict rule: both gains SUPPORTED; only the turn gain PARTLY; only the stop gain PARTLY; neither NOT; a gain in react-none alone moves nothing (NOT)",
+        mod(() => {}).verdict === "SUPPORTED" && mod((c) => { c["react-stop"][D] = cell(60, 44); }).verdict === "PARTLY SUPPORTED" && mod((c) => { c["react-turn"][D] = cell(60, 46); }).verdict === "PARTLY SUPPORTED" && mod((c) => { c["react-turn"][D] = cell(60, 46); c["react-stop"][D] = cell(60, 44); }).verdict === "NOT SUPPORTED" && mod((c) => { c["react-turn"][D] = cell(60, 46); c["react-stop"][D] = cell(60, 44); c["react-none"][D] = cell(60, 58); }).verdict === "NOT SUPPORTED");
+    ok("!! R1: in react-none the two arms reach within 3 (40 and 43 hold, 40 and 44 fails, 44 and 40 fails; the OTHER behaviours do not enter)", mod((c) => { c["react-none"][D] = cell(60, 43); }).r1 === true && mod((c) => { c["react-none"][D] = cell(60, 44); }).r1 === false && mod((c) => { c["react-none"][D] = cell(60, 37); }).r1 === true && mod((c) => { c["react-none"][D] = cell(60, 36); }).r1 === false && mod((c) => { c["react-turn"][D] = cell(60, 10); }).r1 === true);
+    ok("!! R2: the nominal arm reaches at least as many in react-turn as in react-none (equal holds, one fewer fails); R3: at most 2 fewer in react-stop than in react-none (38 of 40 holds, 37 fails, more holds)", mod((c) => { c["react-turn"][N] = cell(60, 40); }).r2 === true && mod((c) => { c["react-turn"][N] = cell(60, 39); }).r2 === false && mod((c) => { c["react-stop"][N] = cell(60, 38); }).r3 === true && mod((c) => { c["react-stop"][N] = cell(60, 37); }).r3 === false && mod((c) => { c["react-stop"][N] = cell(60, 55); }).r3 === true);
+    ok("!! R4 and R5 are the two gains (the same judgements, named)", mod((c) => { c["react-turn"][D] = cell(60, 46); }).r4 === false && mod((c) => { c["react-stop"][D] = cell(60, 44); }).r5 === false && jb.r4 === true && jb.r5 === true);
+    ok("!! R6: any+replan reaches FEWER than the nominal arm in EACH behaviour (equal in one fails; fewer in all holds)", mod((c) => { c["react-stop"]["any+replan"] = cell(60, 40); }).r6 === false && mod((c) => { c["react-none"]["any+replan"] = cell(60, 40); }).r6 === false && mod((c) => { c["react-turn"]["any+replan"] = cell(60, 41); }).r6 === true && mod((c) => { c["react-turn"]["any+replan"] = cell(60, 42); }).r6 === false);
+    ok("!! R7: the designated arm times out in at most 3 flights IN ALL the behaviours together (1 + 1 + 1 holds, 2 + 1 + 1 fails)", mod((c) => { for (const b of R.BEHAVIOURS) c[b][D] = { ...c[b][D], timeout: 1 }; }).r7 === true && mod((c) => { for (const b of R.BEHAVIOURS) c[b][D] = { ...c[b][D], timeout: 1 }; c["react-none"][D].timeout = 2; }).r7 === false);
+    ok("!! R8: the designated arm's exits in react-turn and in react-stop are EACH at most its exits in react-none (4: 4 and 4 hold; a 5 in either fails; one fewer than react-none holds)", mod((c) => { c["react-turn"][D] = { ...c["react-turn"][D], left: 4 }; c["react-stop"][D] = { ...c["react-stop"][D], left: 4 }; }).r8 === true && mod((c) => { c["react-turn"][D] = { ...c["react-turn"][D], left: 5 }; }).r8 === false && mod((c) => { c["react-stop"][D] = { ...c["react-stop"][D], left: 5 }; }).r8 === false && mod((c) => { c["react-none"][D] = { ...c["react-none"][D], left: 2 }; }).r8 === false);
+    ok("!! R9: the designated arm's collisions with SHIPS in react-turn are fewer than the nominal arm's (6 against 10 holds; equal fails; the stop behaviour does not enter)", mod((c) => { c["react-turn"][D] = cell(60, 49, { shipHits: 10 }); }).r9 === false && mod((c) => { c["react-turn"][D] = cell(60, 49, { shipHits: 9 }); }).r9 === true && mod((c) => { c["react-stop"][D] = cell(60, 47, { shipHits: 99 }); }).r9 === true);
+    ok("!! R10: the median arrival time at most 1.25 times the nominal arm's IN EVERY behaviour (187.5 s of 150 holds, 188 fails; one behaviour over fails; the ratios are reported in BEHAVIOURS order; NaN fails)", mod((c) => { for (const b of R.BEHAVIOURS) c[b][D] = { ...c[b][D], medianTime: 187.5 }; }).r10 === true && mod((c) => { c["react-stop"][D] = { ...c["react-stop"][D], medianTime: 188 }; }).r10 === false && mod((c) => { c["react-none"][D] = { ...c["react-none"][D], medianTime: 188 }; }).r10 === false && same(mod((c) => { c["react-none"][D] = { ...c["react-none"][D], medianTime: 75 }; c["react-stop"][D] = { ...c["react-stop"][D], medianTime: 300 }; }).timeRatios, [0.5, 1, 2]) && mod((c) => { c["react-turn"][D] = { ...c["react-turn"][D], medianTime: NaN }; }).r10 === false);
+    ok("!! a missing cell is a miss, not a crash (no designated arm in react-turn: the gain, R2 stays, R4, R7, R8 and R9 fall; no behaviour at all: NOT SUPPORTED and every R false)", (() => { const j = mod((c) => { delete c["react-turn"][D]; }); const k = safe(() => St.judge({ cells: {} })); return !!j && j.gainTurn === false && j.r4 === false && j.r7 === false && j.r8 === false && j.r9 === false && j.r10 === false && j.verdict === "PARTLY SUPPORTED" && !!k && k.verdict === "NOT SUPPORTED" && [k.r1, k.r2, k.r3, k.r4, k.r5, k.r6, k.r7, k.r8, k.r9, k.r10].every((v) => v === false); })());
+}
+console.log("\n4. THE TEXT");
+{
+    const runs = [run(1, "react-turn", D), run(2, "react-turn", D, lose("collided")), run(1, "react-stop", N)];
+    const sum = St.summarize(runs), tbl = safe(() => St.table(sum, "A TITLE"), ""), vt = safe(() => St.verdictText(St.judge(sum)), "");
+    ok("!! the table has the title first, a header and a line for each cell flown (react-turn designated: 1/2 50%, 1 collided; react-stop nominal 1/1 100%) and no line for a cell not flown", tbl.split("\n")[0] === "A TITLE" && /^behaviour /.test(tbl.split("\n")[1]) && /react-turn\s+est\+predict\+edge\+yield\s+\| 1\/2 50%\s+\|\s+1 \( 0\)\s+0\s+0\s+0 \|/.test(tbl) && /^react-stop\s+any\+predict\+edge\+yield\s+\| 1\/1 100%/m.test(tbl) && !/react-none/.test(tbl) && tbl.split("\n").length === 4);
+    const hand = { cells: { "react-turn": { [D]: { n: 60, reached: 50, rate: 50 / 60, collided: 4, shipHits: 3, left: 2, timeout: 3, other: 1, medianTime: 123.45, medianChord: 1.234, medianClearance: 7.89 } } } }, htbl = safe(() => St.table(hand, "T"), "");
+    ok("!! each column of the table is its own number: reached 50/60 83%, collided 4 with (3) ship hits, left 2, timeout 3, other 1, then the median time 123.45, the median path over the chord 1.23, the median minimum clearance 7.89 (in that order, last)", /react-turn\s+est\+predict\+edge\+yield\s+\| 50\/60 83%\s+\|\s+4 \( 3\)\s+2\s+3\s+1 \|\s+123\.45 \|\s+1\.23 \|\s+7\.89$/m.test(htbl));
+    const jx = { gainTurn: true, gainStop: false, verdict: "PARTLY SUPPORTED", r1: false, r2: true, r3: false, r4: true, r5: false, r6: true, r7: false, r8: true, r9: false, r10: true, timeRatios: [1.1, 1.2, NaN] }, vx = safe(() => St.verdictText(jx), "").split("\n");
+    ok("!! each line of the verdict block reads ITS OWN judgement: the first the gain in react-turn HELD, in react-stop MISSED and the verdict; R1 MISSED, R2 HELD, R3 MISSED, R4 HELD, R5 MISSED, R6 HELD, R7 MISSED, R8 HELD, R9 MISSED, R10 HELD with the ratios 1.10, 1.20 and n/a",
+        vx.length === 11 && /in react-turn HELD, in react-stop MISSED => PARTLY SUPPORTED$/.test(vx[0]) && vx.slice(1).map((l, i) => l.startsWith("R" + (i + 1) + " ")).every(Boolean) && [1, 3, 5, 7, 9].every((i) => /MISSED$/.test(vx[i])) && [2, 4, 6, 8, 10].every((i) => /HELD$/.test(vx[i])) && /\(1\.10, 1\.20, n\/a\)/.test(vx[10]));
+    ok("!! the verdict block names the arms (est+predict+edge+yield and any+predict+edge+yield), the 5-flight gain and the thresholds 3, 2, 3 and 1.25", /^est\+predict\+edge\+yield reaches at least 5 more than any\+predict\+edge\+yield: in react-turn/.test(vt) && /within 3 of each other/.test(vt) && /at most 2 fewer in react-stop/.test(vt) && /at most 3 flights in all/.test(vt) && /at most 1\.25 times any\+predict\+edge\+yield's in every behaviour/.test(vt));
+}
+console.log("\n5. THE COMMAND");
+{
+    const call = (argv) => { const o = [], e = [], w = []; const code = safe(() => St.command(argv, { out: (m) => o.push(m), err: (m) => e.push(m), writeFile: (p, c) => w.push([p, c]) }), -1); return { code, out: o.join("\n"), err: e.join("\n"), w }; };
+    ok("!! a bad argument is exit 2 with a message naming it: an unknown flag, --set with an unknown name, --seeds that is not a positive whole number (0, 2.5, none), --write with the DEV set", call(["--bogus"]).code === 2 && /unknown argument "--bogus"/.test(call(["--bogus"]).err) && call(["--set", "held5"]).code === 2 && /--set needs one of dev, held6/.test(call(["--set", "held5"]).err) && ["0", "2.5", undefined].every((v) => call(["--seeds", v]).code === 2 && /--seeds needs a positive whole number/.test(call(["--seeds", v]).err)) && call(["--set", "dev", "--write"]).code === 2 && /--write goes with --set held6 only/.test(call(["--set", "dev", "--write"]).err));
+    const d = call(["--set", "dev", "--seeds", "1"]);
+    ok("!! a DEV run of one seed: exit 0, the first line names the set, the scenarios, the three behaviours and the three arms, the table has every behaviour and arm with 1 flight, the verdict block follows, nothing is written", d.code === 0 && /^DEV set: 1 scenarios of hard-traffic x 3 ship behaviours, 3 arms/.test(d.out) && R.BEHAVIOURS.every((b) => R.REACT_ARMS.every((a) => new RegExp("^" + b + "\\s+" + a.replace(/\+/g, "\\+") + "\\s+\\| \\d/1").test(d.out.split("\n").join("\n")) || d.out.split("\n").some((l) => l.startsWith(b) && l.includes(a) && /\| \d\/1 /.test(l)))) && /=> (SUPPORTED|PARTLY SUPPORTED|NOT SUPPORTED)/.test(d.out) && /^R10 /m.test(d.out) && d.w.length === 0 && /margin ladder 12, 8, 6, 3 m, 260 s a flight/.test(d.out) && /ships: clear 30 m, look 25 s, turn 0.07 rad\/s to 1.05 rad, stop 0.5 m\/s\^2, estimate over 3 s/.test(d.out));
+    const first = (argv) => { let line = null; try { St.command(argv, { out: (m) => { line = m; throw new Error("stop"); }, err: () => {}, writeFile: () => {} }); } catch { /* stopped on purpose after the first line */ } return line; };
+    ok("!! the scenarios flown are the set's: no --seeds is the WHOLE set (DEV 30, HELD6 60), --seeds N the first N (3), more than the set has is the set (99 of DEV: 30) -- read from the first line, before any flight", /^DEV set: 30 scenarios of hard-traffic x 3/.test(first([]) || "") && /^HELD6 set: 60 scenarios/.test(first(["--set", "held6"]) || "") && /^DEV set: 3 scenarios/.test(first(["--seeds", "3"]) || "") && /^DEV set: 30 scenarios/.test(first(["--seeds", "99"]) || ""));
+    const w = call(["--set", "held6", "--seeds", "1", "--write"]), lines = w.w.length ? w.w[0][1].trim().split("\n").map((l) => JSON.parse(l)) : [];
+    ok("!! --write with held6 puts one JSON line a flight in brain/subReactHeld6.jsonl (9 for one seed), each tagged set 'held6', seed 601, behaviour-major in BEHAVIOURS then REACT_ARMS order, and says so", w.code === 0 && w.w.length === 1 && path.isAbsolute(w.w[0][0]) && w.w[0][0].endsWith("brain/subReactHeld6.jsonl") && lines.length === 9 && lines.every((l) => l.set === "held6" && l.seed === 601) && same(lines.map((l) => l.behaviour + "|" + l.arm), R.BEHAVIOURS.flatMap((b) => R.REACT_ARMS.map((a) => b + "|" + a))) && /wrote 9 flights to brain\/subReactHeld6\.jsonl/.test(w.out));
+    const direct = safe(() => R.flyReact(St.pilot, H.hardScenario(601, "hard-traffic"), D, "react-turn")), rec = lines.find((r) => r.arm === D && r.behaviour === "react-turn");
+    ok("!! the flights in the file are the module's own flights of the HELD6 scenarios on the PD autopilot (seed 601, the designated arm in react-turn: the same status, ticks and path as a direct flyReact)", !!rec && !!direct && rec.status === direct.status && rec.ticks === direct.ticks && near(rec.path, direct.path, 1e-9));
+}
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+process.exit(fails ? 1 : 0);
