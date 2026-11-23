@@ -48,6 +48,13 @@ node tools/ship/peerJobsCmd.mjs cancel --id h69-search
 - **What is running, and where.** `status` (and the Queue button in the SweK server's panel) lists every claimed job with its peer and host and last beat, and every peer: idle, running which job at which round and phase, or not seen for N minutes.
 - **Order.** The highest priority is taken first, then the oldest, then the smaller id. `plan` turns a plan file into one job per round with the plan's priorities, so free peers take different rounds at once and a single peer takes them in the plan's order. The order in the repository is `tools/ship/rigOrder.json`; its gate row fails if the order a lone peer takes differs from the one written.
 
+## Can the registered runs go through the GPU Brain interface? (measured 2026-11-23)
+**As peers, yes; as GPU compute, no.** A GPU box is already a peer (`--gpu required` targets it, `--gpu forbidden` keeps a job off it), and its CPU cores run the rounds like any other peer's. Sending the flights themselves to the GPU does not pay, for three measured reasons:
+- A head-to-head flight is the tank simulation (`render/subAquariumSim.mjs`, 4800 ticks of 1/30 s for 160 s), not a network. Timed on this machine: 49 ms per flight with a four-weight law and 62 ms with the 963-weight network, so **the network is about 13 ms (21 percent) of a flight and the other 79 percent is the simulation, which the GPU Brain does not touch**. Free inference would save at most about a fifth.
+- The network's share is 2.7 microseconds per tick per flight. A WebGPU dispatch and read-back per tick costs far more than that, even batching all 144 flights of a train-set evaluation into one dispatch (the repo's own v4870 round found the same for a two-ship duel: a GPU does not make that kind of loop faster).
+- The GPU runs float32; the series' flights are float64 and every round is read against stored results ("byte for byte" the same loop). A GPU path would be a different experiment, not a faster run of this one.
+What would help is more CPU cores: the searches are four independent seeds (each can use a core) and every evaluation is 144 independent flights. Porting the whole tank simulation to the GPU would be a project of its own.
+
 ## Known limits
 - One job at a time per peer; a cancel does not kill a run that has begun.
 - Results go back into git: fine for zips of a few MB, not for gigabytes (large files would need LFS or a different store).
