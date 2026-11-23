@@ -3,6 +3,7 @@
 // THE STUDY OF A FLEET OF COURIERS: flies N couriers together through the tank's sea (brain/subFleetNav.mjs) at two fleet sizes under two arms (the tank navigator that does not see the other subs, and `fleet` that does) and reads the registered verdict and F1 to F6.
 //   node tools/ship/subFleetStudy.mjs --set dev [--seeds N]                DEV (seeds 1 to 10): the sanity run; not a result
 //   node tools/ship/subFleetStudy.mjs --set held12 [--seeds N] [--write]    HELD12, seeds 1201 to 1230, READ ONCE; --write puts every fleet run in brain/subFleetHeld12.jsonl
+//   --seconds S (DEV only; default 240) shortens a run for the gate; HELD12 is always 240 s.
 // Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
@@ -62,20 +63,22 @@ export function verdictText(j) {
 /** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile }. */
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync;
-    const o = { set: "dev", seeds: null, write: false };
+    const o = { set: "dev", seeds: null, write: false, seconds: F.SECONDS_FLEET };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--write") o.write = true;
         else if (a === "--set") { o.set = argv[++i]; if (!SETS[o.set]) { err(`subFleetStudy: --set needs one of ${Object.keys(SETS).join(", ")}`); return 2; } }
         else if (a === "--seeds") { const v = Number(argv[++i]); if (!Number.isInteger(v) || v <= 0) { err("subFleetStudy: --seeds needs a positive whole number"); return 2; } o.seeds = v; }
+        else if (a === "--seconds") { const v = Number(argv[++i]); if (!Number.isFinite(v) || v <= 0) { err("subFleetStudy: --seconds needs a positive number"); return 2; } o.seconds = v; }
         else { err(`subFleetStudy: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
     if (o.write && o.set !== "held12") { err("subFleetStudy: --write goes with --set held12 only"); return 2; }
+    if (o.seconds !== F.SECONDS_FLEET && o.set !== "dev") { err("subFleetStudy: --seconds goes with --set dev only (HELD12 is always 240 s)"); return 2; }
     const seeds = o.seeds ? SETS[o.set].slice(0, o.seeds) : SETS[o.set], runs = [];
-    out(`${o.set.toUpperCase()} set: ${seeds.length} seas x fleets of ${F.SIZES.join(" and ")} x ${F.FLEET_ARMS.length} arms, ${F.SECONDS_FLEET} s a run`);
-    for (const seed of seeds) for (const n of F.SIZES) for (const arm of F.FLEET_ARMS) runs.push(F.flyFleet(pilot, seed, n, arm));
+    out(`${o.set.toUpperCase()} set: ${seeds.length} seas x fleets of ${F.SIZES.join(" and ")} x ${F.FLEET_ARMS.length} arms, ${o.seconds} s a run`);
+    for (const seed of seeds) for (const n of F.SIZES) for (const arm of F.FLEET_ARMS) runs.push(F.flyFleet(pilot, seed, n, arm, { seconds: o.seconds }));
     const cells = summarize(runs);
-    out(""); out(table(cells, `standard 500 x 300 m tank, a sub contact under ${F.CONTACT_XY} m apart and ${F.CONTACT_Z} m in depth, other subs 4 m full-depth discs, replan every 3 s, ${F.SECONDS_FLEET} s`)); out(verdictText(judge(cells)));
+    out(""); out(table(cells, `standard 500 x 300 m tank, a sub contact under ${F.CONTACT_XY} m apart and ${F.CONTACT_Z} m in depth, other subs 4 m full-depth discs, replan every 3 s, ${o.seconds} s`)); out(verdictText(judge(cells)));
     if (o.write) { writeFile(path.join(ENG, OUT), runs.map((r) => JSON.stringify({ set: o.set, ...r })).join("\n") + "\n"); out(`wrote ${runs.length} runs to ${OUT}`); }
     return 0;
 }
