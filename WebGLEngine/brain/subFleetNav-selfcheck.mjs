@@ -82,6 +82,29 @@ console.log("\n4. THE NAVIGATOR");
     const a3 = F.createFleetNavigator(sc, { seed: 77, others: () => wall }), a4 = F.createFleetNavigator(sc, { seed: 77 }); a3.step(s2, 0, S.DT); a4.step(s2, 0, S.DT);
     ok("!! a ring of 60 subs 40 m round the courier closes every route: that plan is counted no-route (1) and the same plan with no ring is not (0)", a3.snapshot().noRoutePlans === 1 && a4.snapshot().noRoutePlans === 0, `${a3.snapshot().noRoutePlans} ${a4.snapshot().noRoutePlans}`);
 }
+{
+    const sc = TN.tankScene(2), model = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 })), isl = sc.obstacles.find((o) => o.type === "island" && o.keel === Infinity);
+    const at = (x, y, d = 25) => S.createState({ pos: [x, y, -d], speed: 2.5, heading: 0, pitch: 0, bank: 0, gamma: 0, w: [0, 0, 0], model }), nav = F.createFleetNavigator(sc, { seed: 5 });
+    const free = { x: 250, y: 150 };
+    let free2 = null; for (let x = 60; x < 440 && !free2; x += 10) for (let y = 60; y < 240 && !free2; y += 10) if (sc.obstacles.every((o) => (o.lane ? N.segmentDistance(x, y, ...TN.laneSegment(o)) : Math.hypot(x - o.x, y - o.y)) > o.r + 60)) free2 = { x, y };
+    let t = 0; const stepAt = (p, dt = 0.1) => { nav.step(at(p.x, p.y), t, dt); t += dt; return nav.snapshot().hits; };
+    const h1 = stepAt({ x: isl.x, y: isl.y }), h2 = stepAt({ x: isl.x, y: isl.y });
+    ok("!! the navigator counts a contact with the sea once (a sub on an island's centre: 1 hit, and the same position next tick is still 1)", h1 === 1 && h2 === 1, `${h1} ${h2}`);
+    let h3 = h2; for (let i = 0; i < 5; i++) h3 = stepAt(free2);
+    const h4 = stepAt({ x: isl.x, y: isl.y });
+    ok("!! clear for only 0.5 s (five ticks of 0.1 s) it is still the same contact: back on the island is NOT a new hit (1)", h3 === 1 && h4 === 1, `${h3} ${h4}`);
+    for (let i = 0; i < 12; i++) stepAt(free2);
+    const h5 = stepAt({ x: isl.x, y: isl.y });
+    ok("!! clear for 1.2 s it is over: back on the island is a NEW hit (2)", h5 === 2, `${h5}`);
+    const navG = F.createFleetNavigator(sc, { seed: 5 }), gapOutside = isl.r + N.HULL_HALF + 0.5;
+    navG.step(at(isl.x + gapOutside, isl.y), 0, 0.1);
+    ok("!! a gap of 0.5 m outside an island is NOT a contact (gap under 0 only)", navG.snapshot().hits === 0);
+    const out = (x, y) => F.createFleetNavigator(sc, { seed: 5 }).step(at(x, y), 0, 0.1);
+    const o1 = out(-10, 150), o2 = out(510, 150), o3 = out(250, -10), o4 = out(250, 310), io = out(0, 150), io2 = out(500, 150), io3 = out(250, 0), io4 = out(250, 300);
+    ok("!! outside the tank on any side the target is `back to the middle` at 2 m/s: heading atan2(-(150 - y), 250 - x) (the plan's convention), the goal's depth", [[o1, -10, 150], [o2, 510, 150], [o3, 250, -10], [o4, 250, 310]].every(([o, x, y]) => o.speed === 2 && near(o.heading, Math.atan2(-(150 - y), 250 - x), 1e-12)), JSON.stringify([o1, o2, o3, o4].map((o) => +o.heading.toFixed(3))));
+    ok("!! ON the tank's wall (x = 0, x = 500, y = 0, y = 300) the sub is still inside: the plan's target, not the 2 m/s way back", [io, io2, io3, io4].every((o) => o.speed !== 2));
+    ok("!! the way-back target carries the goal's own depth (within the tank's 14 to 40 m wander range)", o1.depth >= 14 && o1.depth <= 40 && o1.depth === o2.depth);
+}
 console.log("\n5. THE FLEET");
 {
     const fly = (starts, seconds, arm = "any+predict") => safe(() => F.flyFleet(pilot, 1, starts.length, arm, { seconds, starts })) || { subContacts: -1 };
@@ -89,6 +112,12 @@ console.log("\n5. THE FLEET");
     ok("!! the depth criterion: 2 m apart in plan but 16 m apart in depth is NO contact; 5 m apart in plan and 3 m in depth IS one", fly([{ x: 200, y: 150, depth: 14, heading: 0 }, { x: 202, y: 150, depth: 30, heading: 0 }], 1).subContacts === 0 && fly([{ x: 200, y: 150, depth: 25, heading: 0 }, { x: 205, y: 150, depth: 28, heading: 0 }], 1).subContacts === 1);
     ok("!! the plan-view threshold is 8 m: 7 m apart (same depth) is a contact, 9 m is not", fly([{ x: 200, y: 150, depth: 25, heading: 0 }, { x: 207, y: 150, depth: 25, heading: 0 }], 1).subContacts === 1 && fly([{ x: 200, y: 150, depth: 25, heading: 0 }, { x: 209, y: 150, depth: 25, heading: 0 }], 1).subContacts === 0);
     ok("!! the depth threshold is 5 m: 4 m apart in depth (5 m in plan) is a contact, 6 m is not", fly([{ x: 200, y: 150, depth: 25, heading: 0 }, { x: 205, y: 150, depth: 29, heading: 0 }], 1).subContacts === 1 && fly([{ x: 200, y: 150, depth: 25, heading: 0 }, { x: 205, y: 150, depth: 31, heading: 0 }], 1).subContacts === 0);
+    const cs = F.contactStep, ns = (st, near, dt) => safe(() => cs(st, near, dt));
+    const a1 = ns({ active: false, clearFor: 0 }, true, 0.1), a2 = ns(a1.state, true, 0.1), a3 = ns(a2.state, false, 0.9), a4 = ns(a3.state, true, 0.1), a5 = ns(a4.state, false, 0.5), a6 = ns(a5.state, false, 0.5), a7 = ns(a6.state, true, 0.1);
+    ok("!! the contact book: near starts one (a1), staying near does not (a2), 0.9 s apart is still the same contact and coming near again starts none (a3, a4), 0.5 + 0.5 s apart ends it (a6 inactive) and the next near starts a new one (a7); a pair that was never near starts nothing", !!a1 && a1.started === true && a2.started === false && a3.started === false && a3.state.active === true && near(a3.state.clearFor, 0.9) && a4.started === false && a4.state.clearFor === 0 && a5.state.active === true && a6.state.active === false && a7.started === true && ns({ active: false, clearFor: 0 }, false, 0.1).started === false);
+    ok("!! the clock is exact: 0.99 s apart is still active, 1.0 s ends it (HIT_CLEAR_S = 1)", ns({ active: true, clearFor: 0 }, false, 0.99).state.active === true && ns({ active: true, clearFor: 0 }, false, 1.0).state.active === false);
+    const lo = safe(() => F.flyFleet(pilot, 1, 2, "any+predict", { seconds: 3, starts: [{ x: 200, y: 150, depth: -10, heading: 0 }, { x: 300, y: 150, depth: 25, heading: 0 }] }));
+    ok("!! a sub that broaches is LOST (a sub started 10 m above the water: lost 1) and the other keeps flying (travel > 0)", !!lo && lo.lost === 1 && lo.travel > 1, JSON.stringify(lo && [lo.lost, lo.travel]));
     const r = safe(() => F.flyFleet(pilot, 2, 4, "fleet", { seconds: 20 }));
     ok("!! the record: arm, seed, n 4, subs 4, plans at least 4 (each sub plans at once), arrivals and sea hits counts, travel positive, lost 0, noRoutePlans a count", !!r && r.arm === "fleet" && r.seed === 2 && r.n === 4 && r.subs === 4 && r.plans >= 4 && r.travel > 100 && r.lost === 0 && Number.isInteger(r.noRoutePlans) && Number.isInteger(r.seaHits) && Number.isInteger(r.arrivals) && Number.isInteger(r.subContacts));
     ok("!! a fleet run is deterministic; an unknown arm throws, naming the arms", same(safe(() => F.flyFleet(pilot, 2, 4, "fleet", { seconds: 20 })), r) && (() => { try { F.flyFleet(pilot, 2, 4, "any+nothing", { seconds: 1 }); return false; } catch (e) { return /any\+predict, fleet/.test(e.message); } })());

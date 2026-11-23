@@ -81,6 +81,13 @@ export function fleetStarts(scene, n) {
     return out;
 }
 
+/** One tick of a pair's contact book: `st` { active, clearFor }, `near` whether the pair is in contact now. A new contact starts when the pair is near and not active; an active contact ends after TN.HIT_CLEAR_S s of not being near (any near tick resets that clock). Returns { started (a new contact), state }. */
+export function contactStep(st, near, dt) {
+    if (near) return { started: !st.active, state: { active: true, clearFor: 0 } };
+    if (!st.active) return { started: false, state: st };
+    const clearFor = st.clearFor + dt;
+    return { started: false, state: { active: clearFor < TN.HIT_CLEAR_S, clearFor } };
+}
 /**
  * Fly a fleet of n couriers in the sea tankScene(seed) under an arm of FLEET_ARMS for `seconds`. Returns { arm, seed, n, subs (flown), subContacts, seaHits, arrivals, travel (m, summed), plans (summed), noRoutePlans (`fleet` only: summed), lost (subs whose vessel ended: crushed, broached ...) }.
  * `starts` (the gate gives its own: sub contacts at known distances) replaces the drawn starts. A sub contact is two live subs under CONTACT_XY m apart in plan view and CONTACT_Z m apart in depth; a new one for the pair only after TN.HIT_CLEAR_S s clear.
@@ -104,9 +111,9 @@ export function flyFleet(pilot, seed, n, armName, { seconds = SECONDS_FLEET, dt 
         states = next;
         for (let a = 0; a < k; a++) for (let b = a + 1; b < k; b++) {
             if (!alive[a] || !alive[b]) continue;
-            const key = a * 1000 + b, st = pair.get(key) || { active: false, clearFor: 0 }, near = Math.hypot(states[a].pos[0] - states[b].pos[0], states[a].pos[1] - states[b].pos[1]) < CONTACT_XY && Math.abs(states[a].pos[2] - states[b].pos[2]) < CONTACT_Z;
-            if (near) { if (!st.active) { subContacts++; st.active = true; } st.clearFor = 0; } else if (st.active) { st.clearFor += dt; if (st.clearFor >= TN.HIT_CLEAR_S) st.active = false; }
-            pair.set(key, st);
+            const key = a * 1000 + b, near = Math.hypot(states[a].pos[0] - states[b].pos[0], states[a].pos[1] - states[b].pos[1]) < CONTACT_XY && Math.abs(states[a].pos[2] - states[b].pos[2]) < CONTACT_Z, nx = contactStep(pair.get(key) || { active: false, clearFor: 0 }, near, dt);
+            if (nx.started) subContacts++;
+            pair.set(key, nx.state);
         }
     }
     const snaps = navs.map((nv) => nv.snapshot());
