@@ -9,7 +9,11 @@
 //   4  THE NAVIGATOR   with no other sub it IS the tank navigator (target for target over 600 ticks); with one it plans round it; the plans are counted
 //   5  THE FLEET       sub contacts at known distances and depths, a new contact only after 1 s clear, errors, determinism, the record, a golden
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of brain/subFleetNav.mjs, one mutant per code line and operator, at most four of each operator on a line, two worktrees): 178 mutants; 126 red on the first pass and 52 survivors read one by one. The contact book was factored into `contactStep` and rows were added (the navigator's own hit counting with its 1 s clock, the gap-0 line, the way-back target on all four sides and ON the wall,
+//   the contact book by hand, a sub lost above the water); the whole pass was run again on the new file: 181 mutants, 151 red, 30 survivors, all EQUIVALENT or NOT REACHED: seabed 1000 -> 1001 (the floor never touches a flight at depth); the default seed of a navigator (`seed = 1` -> 2; every caller passes one); the contact clock's initial value (a navigator not in contact never reads it);
+//   the goal-draw check in routeFrom (a state index or an `<` against the unreachable sentinel BIG: the first candidate goal is routable on every sea of the gate, so the break fires at once either way) and the fallback goal after 200 failed draws (NOT REACHED: no sea of the gate exhausts them); `<` -> `<=` and the tries' bounds in goal and start draws on float ties and a tries count nothing reaches; the sub-group numbers (3000 + k: planShapes does not read a group);
+//   `j <= k`, `a <= k`, `b <= k` over the live subs (the extra index reads an undefined `alive` and is skipped); the contact test's `<` -> `<=` on a float tie; the pair key (unique for fewer than 1000 subs either way); and `&&` for `||` on a pair with one lost sub (NOT REACHED: a lost sub's frozen position is never met by a live one in any gate run).
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the golden freezes what the two arms do on three seas at N = 4 for 60 s today and does not say it is right.
 "use strict";
 import * as F from "./subFleetNav.mjs";
 import * as TN from "./subTankNav.mjs";
