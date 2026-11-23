@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h81",
+ "kind": "rounds",
+ "rounds": [
+  "81"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": -1,
+ "created": "2026-11-23T16:23:27Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H81: 0.12, between the two flown thrifty searches: smooth descent in power or a step",
+ "sig": "94c1ac95d6d8013090f080fd5ab8f968b00dc7027b6425c7efee6677035948fd"
+}
