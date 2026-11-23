@@ -638,3 +638,30 @@ The module, the study command and their gates were sabotaged first (the module 1
 **What this would not say.** FOLLOW-UP 3's, 5's, 6's lists stand. The 3 MJ battery is the needs layer's tank-scale default; a mission that used 1.6 to 2.3 MJ was chosen by the chord window I wrote (600 to 850 m) and not by any real task; the order is fixed, no waypoint is optional, no waypoint has a task; the detour is not priced INSIDE the plan (an edge cost in the field, the entry's second idea, is not done). The single speed cap of 2.5 m/s was not swept. HELD10's 60 missions per arm move by about nine between two sets for one arm.
 
 **What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-missions-and-cost` is CLOSED for what it asked (multi-waypoint missions, and the energy of a detour through the existing model); new **`nav-mission-energy-binds`**: the same missions on a battery sized so the cruise reference ends at a registered fraction of its charge (for instance 1.0 MJ, where 600 to 850 m at cruise needs 1.6 to 2.3 MJ), so energy decides between the arms, and the 2.5 m/s cap becomes a swept speed.
+
+## FOLLOW-UP 11: A DEPTH DIMENSION (nextRounds entry `nav-3d-terrain`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** The field is a plan view. An iceberg blocks it when its keel plus 5 m exceeds the SHALLOWER of the start and the waypoint depths (`minDepth`, about 20 m), so a berg with a keel under 15 m is passed beneath "by luck of the vessel's depth" and every deeper one is a column to go round, even where the water under it is deep enough to dive. And there is no seabed at all: the vessel could ground. The harder test's keel was the first step (31 of 57 paired flights changed path, 5 percent shorter at the median). Here: a seabed that rises, and a vertical plan.
+
+**One new thing, in a new module `brain/subTerrain3dNav.mjs` (`brain/subHardNav.mjs` and `brain/missionTask.mjs` are not edited; they supply the scenario, the plan, the field, the vessel and the seabed function).**
+1. **A seabed.** For every scenario a terrain `{ base, a1, l1, a2, l2, b, ly, ... }` in `missionTask.seabedAt`'s form from a seeded generator: base uniform in [65, 85] m, the along-track terms' amplitudes in [3, 8] and [1, 4] m (wavelengths [100, 160] and [50, 80] m), the cross-track term's in [2, 6] m (wavelength [120, 200] m): the floor lies between about 47 and 105 m. **GROUNDED** is `missionTask.fly`'s own test: the hull's lowest point (radius x cos pitch + half the length x |sin pitch|) at or under the floor.
+2. **Three arms**, each the HELD4 `any` plan (hard-islands, built once at t = 0) with:
+   * **`any`**: nothing else. The depth target is the waypoint's depth. Blind to the floor.
+   * **`any+floor`**: the depth target is the smaller of the waypoint's depth and the floor under the hull and 20 m ahead (the sonar range) minus **ALTITUDE = 10 m** (the terrain mission's own altitude). Plan unchanged (2D). Isolates the floor.
+   * **`any+3d`** (**designated**): `any+floor`'s floor clamp AND the vertical plan. A berg whose keel + VMARGIN (5 m) + VRADIUS (0.6 m) can be cleared with the floor 10 m below the hull at EVERY one of nine points of its footprint (the centre and eight on its circle) is PASSABLE UNDER and is removed from the plan's shapes (islands, full-depth walls and bergs that cannot be passed stay). Then the depth target is raised to that clearance (keel + 5.6 m) while the vessel is inside the berg's footprint grown by **DIVE_PAD = 20 m**, or its heading ray meets that footprint within **DIVE_LOOK_M = 90 m** (30 s at cruise); the clamp to the floor still applies and wins.
+3. **The record** adds the arm, the kind, `grounded` (a status), the least floor clearance and the number of ticks the vessel was held down by a keel (`dives`).
+
+**The set.** NEW: **HELD11, seeds 1101 to 1160 of hard-islands (60 scenarios x 3 arms, 180 flights), flown ONCE**, after the module, the study command (`tools/ship/subTerrainStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. The one amendment allowed before HELD11 is read: if DEV shows the seabed degenerate (the start or goal under the floor in most scenarios, or no berg ever passable under) I amend the terrain's ranges and write it here.
+
+**Designated comparison and verdict.** `any+3d` against `any+floor`, paired on the same seeds (the floor is the same, so the difference is the dive-under). **SHORTER** = the median over pairs both reached of path(any+3d) / path(any+floor) is **at most 0.97**. **SAFE** = `any+3d` reaches no fewer than `any+floor` minus 2 AND its groundings plus collisions are at most `any+floor`'s plus 2. **SUPPORTED** if both; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise.
+
+**Predictions, written before DEV and HELD11 (scored held or missed, moving nothing).**
+* **T1** (the floor is a real hazard): `any` grounds in at least 5 of 60. 55 percent.
+* **T2**: `any+floor` reaches at least as many as `any`. 85 percent.
+* **T3** (SHORTER): the median path ratio is at most 0.97. 55 percent.
+* **T4** (SAFE): holds. 55 percent.
+* **T5**: `any+3d` is held down by a keel in at least 30 of 60 flights. 60 percent.
+* **T6**: `any+3d`'s groundings are at most half `any+floor`'s. 30 percent.
+* **T7**: `any+3d`'s median arrival time is at most `any+floor`'s. 55 percent.
+
+**What a result would not say.** FOLLOW-UP 3's and 5's lists stand (a perfect position fix, an exact map, ships none here, the current none, one hull and one autopilot). The floor is READ EXACTLY (no sonar noise: the terrain mission's sensors are noisy and are not used here), so the grounding rate is a floor and not a ceiling; the seabed is smooth sinusoids, no cliffs, no overhangs, no caves; the vertical plan is a depth floor under a berg and not a 3D path search (the plan itself is still a plan view); the autopilot's dive rate limits how late the dive can start and DIVE_LOOK_M was not swept.
