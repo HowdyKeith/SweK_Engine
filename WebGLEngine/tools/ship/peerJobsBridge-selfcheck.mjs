@@ -135,8 +135,8 @@ sec("7. THE ONE-SHOT COMMANDS");
     ok("!! /peerjobs/queue runs `status` and returns its text", qu.o.ok === true && /job-one: RUN/.test(qu.o.out) && SPAWNS[0].args[1] === "status");
     reset(); const hung = mk("c7h"); const pend = call(hung.b, "GET", "/peerjobs/queue"); await settle(); const tm = TIMERS.find((x) => x.ms === 90000); tm.f(); const r = await pend;
     ok("!! a one-shot command that never answers is killed after 90 s (its timer) and reported as not ok, so a hung git cannot hold the page forever", !!tm && SPAWNS[0].child.killed === true && r.o.ok === false);
-    reset(); const nogit = mk("c7g", { isGit: () => false }); await call(nogit.b, "POST", "/peerjobs/config", { engineUrl: "https://example.com/e.git" }); AUTO = [{ code: 0, out: "x" }]; p = call(nogit.b, "GET", "/peerjobs/queue"); await settle();  await p;
-    ok("!! an engine that is not a git checkout passes --engine-dir (the peer's own clone folder) and --engine-url to every command; a git checkout passes neither", SPAWNS[0].args.includes("--engine-dir") && SPAWNS[0].args[SPAWNS[0].args.indexOf("--engine-dir") + 1] === path.join(nogit.home, "peerjobs", "engine") && SPAWNS[0].args[SPAWNS[0].args.indexOf("--engine-url") + 1] === "https://example.com/e.git" && !m.b.status().engineIsGit === false && nogit.b.status().engineIsGit === false);
+    reset(); const nogit = mk("c7g", { isGit: () => false }); const engineClone = path.join(nogit.home, "peerjobs", "engine"); await call(nogit.b, "POST", "/peerjobs/config", { engineUrl: "https://example.com/e.git" }); AUTO = [{ code: 0, out: "x" }]; p = call(nogit.b, "GET", "/peerjobs/queue"); await settle();  await p;
+    ok("!! an engine that is not a git checkout passes --engine-dir (the peer's own clone folder) and --engine-url to every command; a git checkout passes neither", SPAWNS[0].args.includes("--engine-dir") && SPAWNS[0].args[SPAWNS[0].args.indexOf("--engine-dir") + 1] === engineClone && SPAWNS[0].args[SPAWNS[0].args.indexOf("--engine-url") + 1] === "https://example.com/e.git" && !m.b.status().engineIsGit === false && nogit.b.status().engineIsGit === false);
 }
 sec("8. THE WIRING");
 {
