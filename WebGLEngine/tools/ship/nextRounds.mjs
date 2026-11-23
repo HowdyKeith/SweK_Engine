@@ -3089,10 +3089,18 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-margin-sweep-any",
-        blocker: "OPEN",
+        blocker: "CLOSED",
+        closed: "CLOSED 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 9 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, a 20-cell sweep (ladder top rung 8 to 24 m x vertical margin 2 to 12 m) on DEV (1,200 flights), then the DEV-chosen cell T12V2 against the incumbent T12V5 flown once on HELD9 (seeds 901 to 960 of hard-islands and hard-gaps, 240 flights in brain/subMarginHeld9.jsonl). NOT SUPPORTED: both reached 118 of 120 with the same two collisions; on DEV no cell beat the incumbent's 59 of 60 and the vertical margin changed no outcome. The any arm is at its ceiling on the two static kinds. NOT answered: the margins of the traffic arm, the cell arms and the current kind (entered as nav-margin-sweep-traffic).",
         what: "The any-angle arm's margin was never swept: 12 m was chosen on DEV for the cell arms, and the harder test adds a ladder 12, 8, 6, 3 m (Amendment 1) without sweeping its top rung or the 5 m vertical margin.",
         how: "A DEV sweep of the ladder's top rung and of the vertical margin on a fresh set, then one read of a fresh held set.",
         why: "Said as an open caveat in both write-ups.",
+    },
+    {
+        id: "nav-margin-sweep-traffic",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 9 found the any arm's margins flat on islands and gaps (a ceiling at 98 percent). The traffic arm `any+predict+edge+yield` is at 60 percent on HELD8 and its margins (the ladder's top rung, the edge band's +20 m, the yield's 30 m) were chosen on DEV once and never swept.",
+        how: "The same design as FOLLOW-UP 9 on hard-traffic: a DEV grid of the ladder's top rung and the edge band's extra width (and the yield clearance), the best non-incumbent cell against the incumbent on one fresh held set, the paired test beside it.",
+        why: "A margin can only matter where the arm is not at its ceiling; traffic is where it is not.",
     },
     {
         id: "nav-missions-and-cost",
