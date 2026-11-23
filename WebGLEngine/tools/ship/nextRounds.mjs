@@ -3104,10 +3104,18 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-missions-and-cost",
-        blocker: "OPEN",
+        blocker: "CLOSED",
+        closed: "CLOSED 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 10 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD10 (seeds 1001 to 1060, three-leg missions through hard-traffic on the needs layer's 3 MJ battery, four arms, 240 flights in brain/subMissionHeld10.jsonl). NOT SUPPORTED: the reference ran out of energy in 1 of 60 and the 2.5 m/s arm completed 43, the same as the reference; a metre's cost (2,675 J at cruise, 1,259 J at 2 m/s) saves 0.65 MJ a mission but collisions with ships, not energy, end the failing missions on this battery. NOT answered: a detour priced INSIDE the plan (an edge cost in the field solver) and a battery small enough to bind (entered as nav-mission-energy-binds).",
         what: "One waypoint per flight, and a detour costs nothing.",
         how: "Multi-waypoint missions through the field; the energy of a detour through the submarine needs model (physics/mechanics/subNeeds.mjs, brain/NEEDS_AND_LIMITS.md).",
         why: "any+predict flew paths 25 percent longer than replan's in traffic; whether that matters depends on what a metre costs.",
+    },
+    {
+        id: "nav-mission-energy-binds",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 10 found that on the 3 MJ battery a three-leg mission of 600 to 850 m uses 1.6 to 2.3 MJ and energy ended 1 mission in 60; collisions with ships decide. The metre's cost is real (the 2.5 m/s arm spends 0.65 MJ less) but it did not bind.",
+        how: "The same missions on a battery sized so the cruise reference ends at a registered fraction of its charge (1.0 MJ, where the chord window needs 1.6 to 2.3 MJ at cruise), the speed cap swept (2.0, 2.5, 3.0 m/s) on DEV and the chosen speed read once on a fresh held set against the reference, the paired test beside it.",
+        why: "Whether a slower, cheaper vessel beats a faster one is only a question once the energy can run out.",
     },
     {
         id: "nav-3d-terrain",
