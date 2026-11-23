@@ -81,50 +81,57 @@
    "note": "H81: 0.12, between the two flown thrifty searches: smooth descent in power or a step"
   },
   {
-   "round": "75",
+   "round": "82",
    "priority": -2,
+   "hours": 9,
+   "why": "redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate",
+   "note": "H82: redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate"
+  },
+  {
+   "round": "75",
+   "priority": -3,
    "hours": 6,
    "why": "0.32, where the descent in power ends",
    "note": "H75: 0.32, where the descent in power ends"
   },
   {
    "round": "65",
-   "priority": -3,
+   "priority": -4,
    "hours": 20,
    "why": "new seeds at 144 ids: does H41's tie replicate (about a day)",
    "note": "H65: new seeds at 144 ids: does H41's tie replicate (about a day)"
   },
   {
    "round": "69",
-   "priority": -4,
+   "priority": -5,
    "hours": 24,
    "why": "hard and easy train sets (two groups of searches, a day or more)",
    "note": "H69: hard and easy train sets (two groups of searches, a day or more)"
   },
   {
    "round": "67",
-   "priority": -5,
+   "priority": -6,
    "hours": 24,
    "why": "sigma 0.03 and 3.0 (two groups of searches, a day or more)",
    "note": "H67: sigma 0.03 and 3.0 (two groups of searches, a day or more)"
   },
   {
    "round": "64",
-   "priority": -6,
+   "priority": -7,
    "hours": 30,
    "why": "288 train ids (the dearest search)",
    "note": "H64: 288 train ids (the dearest search)"
   },
   {
    "round": "66",
-   "priority": -7,
+   "priority": -8,
    "hours": 24,
    "why": "0.005 at 144 ids (about a day)",
    "note": "H66: 0.005 at 144 ids (about a day)"
   },
   {
    "round": "70",
-   "priority": -8,
+   "priority": -9,
    "hours": 3,
    "why": "replicates H46 at 800 ids; last on purpose",
    "note": "H70: replicates H46 at 800 ids; last on purpose"
