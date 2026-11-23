@@ -3122,7 +3122,14 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         what: "The field is a plan view; obstacles are columns (islands) or columns with a keel (icebergs, ships).",
         how: "A depth dimension: a seabed that rises, a vertical plan (the sub dives under a keel rather than only passing beneath it by luck of its depth).",
-        why: "The keel of the harder test is the first step: in 31 of 57 paired flights it changed the path, 5 percent shorter at the median.",
+        why: "The keel of the harder test is the first step: in 31 of 57 paired flights it changed the path, 5 percent shorter at the median. PARTLY DONE 2026-11-23 (unnumbered, working branch, nothing shipped): FOLLOW-UP 11 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD11 (seeds 1101 to 1160 of hard-islands over a deep seabed, three arms, 180 flights in brain/subTerrainHeld11.jsonl). PARTLY SUPPORTED by its registered median rule: the vertical plan (dive under a berg the floor allows) flew a shorter path in 29 of 58 pairs and a longer one in none (p < 0.0001, 4 percent shorter over all pairs, up to 26 percent) with the same reach and no extra time, but the paired MEDIAN ratio was 1.00 because half the flights are unchanged. STILL OPEN: the seabed that rises -- on these ranges the floor was never a hazard (no arm grounded in 270 flights).",
+    },
+    {
+        id: "nav-3d-rough-floor",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 11 drew a floor 47 to 105 m deep and no arm ever grounded, so the floor clamp and the over/under/round choice were not tested; 161 bergs were passable under and the vessel dived under them.",
+        how: "The same three arms (any, any+floor, any+3d) on a floor drawn to come within the keels (a base of 25 to 45 m with a ridge crossing the route), a sonar with the terrain mission's own noise as a second condition; the paired test beside the median.",
+        why: "A seabed that rises is the first half of the entry and the part this round could not reach; the dive-under result is only as good as the floor it was read on.",
     },
     {
         id: "nav-fleet-avoidance",
