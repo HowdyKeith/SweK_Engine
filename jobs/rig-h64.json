@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h64",
+ "kind": "rounds",
+ "rounds": [
+  "64"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": -7,
+ "created": "2026-11-23T16:23:33Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H64: 288 train ids (the dearest search)",
+ "sig": "a865b18c18994e44e78f05dd27bee5a7e353df4523b77a5883d3018553da5695"
+}
