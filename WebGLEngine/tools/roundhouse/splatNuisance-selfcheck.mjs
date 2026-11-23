@@ -292,7 +292,7 @@ console.log("\n8. THE SABOTAGE DID NOT BITE, AND THAT IS THE ROUND'S REAL FINDIN
         report(`${name.padEnd(10)} live=${String(x.live).padEnd(5)} evidence: ${ev}`);
     }
     // *** THIS LINE WENT RED AT v3517 AND THAT IS THE GATE WORKING. *** It used to assert that kepler is LIVE
-    // WITH NO ADMISSIBLE EVIDENCE AT ALL, and named the fix as its own round. The round happened: keplerBind
+    // WITH NO ADMISSIBLE EVIDENCE AT ALL, and named the fix as its own round. The round happened (SETTLED at v3517): keplerBind
     // was passing NEITHER half of the registered knob, so slopeMeasured was bit-identical because nothing
     // reached it, and kepler now reports specificEnergy and angMomentum, which scale as lambda^2. REWRITTEN TO
     // ASSERT THE NEW PROPERTY RATHER THAN LOOSENED -- v3196's antidote, and the second time in three rounds
