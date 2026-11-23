@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h68",
+ "kind": "rounds",
+ "rounds": [
+  "68"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": 7,
+ "created": "2026-11-23T16:23:19Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H68: flight only: the stored networks at 80, 160 and 320 s horizons; cheap",
+ "sig": "fa7f4cb4126451482483d3805dc3132fe2af33b78b055e4ef0ba36fc1074762d"
+}
