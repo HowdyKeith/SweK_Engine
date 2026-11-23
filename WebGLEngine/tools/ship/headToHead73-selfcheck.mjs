@@ -5,7 +5,14 @@
 // THE GATE OF tools/ship/headToHead73.mjs (Round H73 of brain/HEAD_TO_HEAD.md, registered first: weight noise, the three champions and c02's four numbers perturbed by multiplicative Gaussian noise of four sizes, two draws each).
 //   1 SETS   2 CHAMPIONS, THE PERTURBATION, THE ARMS AND THE FLIGHT   3 FALLS AND READINGS   4 THE EIGHT-PART VERDICT (every branch)   5 CHECKS (thirteen rows, each broken once)   6 REPORT AND LINES   7 SOURCE   8 ROWS FROM THE MUTATION PASS.
 // REGISTRATION COUNT: the registration says thirteen check rows and the library has thirteen (named in section 5); no miscount. The gate is written for H73 (not copied from another round's gate).
-// SABOTAGE LOG: PENDING (the serial mutation pass of tools/ship/headToHead73.mjs has not been run).
+// SABOTAGE LOG: serial mutation pass over tools/ship/headToHead73.mjs: 318 mutants, 289 red, 29 equivalent.
+//   Equivalent classes (declared, not registered): float ties `<`->`<=` on 1e-9/1e-12/1e-6 tolerances and the
+//   tie in the c02 fall comparison (L19, L32 u1 floor, L90, L120, L122, L126 o30-o33, L132 o30); every->some on
+//   length-1 lists (L50, L124 o61, L126 o61/o62); `ids.length > 0` -> `> 1` (ids.length is 0 or 39: L112, L114,
+//   L116, L132); tolerance/bounds and &&->|| over constant conjuncts in the Box-Muller check (L126 o3b0, o3b1,
+//   o40-o43); the property holds for any seed or exponent (L126 o110, o121, o122, o123); masked clause (L130 o3b0).
+//   Rows added after the first pass (257 red of 320): exact check texts, empty champions, lost lit run, audit
+//   range start/end, unreadable rows/nets, per-source zeros, H reading only the S0.1 size.
 // NOT CHECKED, said plainly: that the noise model is the way a weight really drifts (the round's registration says it is one model); the real 200-id flight.
 "use strict";
 import fs from "node:fs";
@@ -30,10 +37,10 @@ const rd = (f) => JSON.parse(fs.readFileSync(new URL("../../brain/" + f, import.
 const WIP = rd("pilotSubWeightsWip.json"), LC = rd("rig-results/head-to-head28-lostcase.json");
 const avg = (a) => a.reduce((p, q) => p + q, 0) / a.length;
 const N = 200, LB = X.LABELS;
-// stored rows with ZEROS in the weights (every fifth weight is 0, as the real networks have many)
-const wz = (v) => Array.from({ length: 963 }, (_, i) => (i % 5 === 0 ? 0 : v + i * 1e-6));
+// stored rows with ZEROS in the weights (a different pattern of zeros in each network, as the real networks have many)
+const wz = (v, k = 0) => Array.from({ length: 963 }, (_, i) => (i % (3 + (k % 4)) === 0 ? 0 : v + i * 1e-6));
 const STORED = [0.80, 0.74, 0.72, 0.73, 0.71, 0.69, 0.75, 0.72, 0.70, 0.78, 0.66, 0.77];
-const rowsFix = (st = STORED) => { const mk = (g, seeds, off) => seeds.map((s, i) => ({ seed: s, group: g, checkpoints: [900, 1200, 1500, 1800].map((iter) => ({ iter, weights: iter === 1800 ? wz((off + i + 1) / 1e3) : wz(0.5), heldScore: iter === 1800 ? st[off + i] : 0.5 })) })); return { S02: mk("S02", [26011, 26012, 26013, 26014], 0), T02: mk("T02", [26031, 26032, 26033, 26034], 4), N72: mk("N72", [26011, 26012, 26013, 26014], 8) }; };
+const rowsFix = (st = STORED) => { const mk = (g, seeds, off) => seeds.map((s, i) => ({ seed: s, group: g, checkpoints: [900, 1200, 1500, 1800].map((iter) => ({ iter, weights: iter === 1800 ? wz((off + i + 1) / 1e3, off + i) : wz(0.5), heldScore: iter === 1800 ? st[off + i] : 0.5 })) })); return { S02: mk("S02", [26011, 26012, 26013, 26014], 0), T02: mk("T02", [26031, 26032, 26033, 26034], 4), N72: mk("N72", [26011, 26012, 26013, 26014], 8) }; };
 const CH = ["s02_26011", "t02_26033", "n72_26012"];
 const base = (c, i) => 0.6 + 0.02 * Math.sin(i * 1.3 + (c === "lit" ? 1 : 0)) + 0.0002 * (i % 37), wob = (i, a) => (i % 2 ? a : -a);
 // off[arm] = a number or a function of the id index; watts[arm] = power
@@ -128,7 +135,11 @@ sec("7. SOURCE");
 }
 sec("8. ROWS FROM THE MUTATION PASS (survivors turned into rows)");
 {
-    ok("(none yet: the mutation pass has not been run)", true);
+    const TXT = ["every arm flew 200 ids in both conditions: true", "the ids are the same in every arm and condition: true", "no score outside (0, 1): true", "every mean power is a finite number of at least 200 W and every mean thrust finite: true", "the autopilot's dark and lit scores differ on at least one id: true", "law0 equals the autopilot in score, power and thrust on every id in both conditions (within 1e-6): true", "on real flights with no lost run the penalised objective equals H21's (H18's) to the last digit, and a scripted lost run scores 0 (0.65 expected): true", "the twelve stored networks are the weights at 1800 of H32's, H34's and H45's searches (963 finite weights each) and the three champions are the best of each round by its own rule: true", "every perturbed vector equals w x (1 + s x z) recomputed here from the stored weight, the size and the draw seed (zero weights stay zero; the same seed gives the same vector, another size or draw another one; the draws are normal: mean and spread of the 963 within their sampling error): true", "c02 is the registered law, wip has the shipped fingerprint, and q02 is the champion law of H27's stored Q02 search by H27's rule: true", "the audit ids are exactly 93200-93399, and every earlier audit ended at 92399 or below: true", "every arm's per-id penalised priced score at 0.02 equals 0.5 x (dark' + lit') - 0.02 x 0.5 x (dark kW + lit kW), a lost run scoring 0, recomputed here from the raw runs, to 1e-12: true", "the one flight was handed in and read exactly once: true"];
+    ok("!! every check row's text is exactly the registered wording with its numbers (the text mutants each changed one digit or word of one)", J(all(au0).map((c) => c.text)) === J(TXT) && X.report(au0).includes("means (dark score / lit score; dark mean power kW; lit mean power kW; lost runs of 400):"));
+    ok("!! with NO champions every row that reads the arm list goes red (IDS ALIGNED, SCORES INSIDE, POWERS, THE PER-ID, SIZES): an empty arm list proves nothing; a lost LIT run in one arm leaves the per-id row green (the recomputation scores it 0 too); the audit row goes red for a right start with a wrong end and the reverse", (() => { const m = mkAu({}, { champs: null }); return ["SIZES", "IDS ALIGNED", "SCORES INSIDE", "POWERS FINITE", "THE PER-ID"].every((n) => has(m, n)); })() && (() => { const a = mkAu(); a.lit["t02_26033_S0.3_1"][4] = { ...a.lit["t02_26033_S0.3_1"][4], bad: true }; return !has(a, "THE PER-ID"); })() && has(mkAu({}, { range: { from: 93200, to: 93398 } }), "THE AUDIT IS 93200") && has(mkAu({}, { range: { from: 93201, to: 93399 } }), "THE AUDIT IS 93200"));
+    ok("!! the champions row goes red when the stored rows cannot be read at all (netsOf throws: the throw is a failure, not a pass), and the perturbation row goes red when the stored networks are missing (perturbedOf throws) and when every perturbed network's zero weight is made non-zero", has(mkAu({}, { rows: { S02: [], T02: [], N72: [] } }), "THE CHAMPIONS") && has(mkAu({}, { nets: null }), "THE PERTURBATION") && (() => { const a = mkAu(); for (const k of Object.keys(a.perturbed)) if (!k.startsWith("c02_")) a.perturbed[k] = a.perturbed[k].map((x, i) => (i === 0 ? 0.5 : x)); return has(a, "THE PERTURBATION"); })());
+    ok("!! the perturbation row uses each perturbed network's OWN source for its zeros (the stored networks have different zero patterns: a perturbed vector of one network checked against another's zeros is refused); H reads the S0.1 sizes only (c02's S0.1 fall -0.02 against the networks' -0.0100: NO, though the S0.3 fall -0.0433 is below it)", (() => { const w1 = X.netsOf(rowsFix()); const z = (id) => Array.from(w1.find((q) => q.id === id).weights).map((w, i) => (w === 0 ? i : -1)).filter((i) => i >= 0).length; return z("s02_26011") !== z("t02_26033") && z("t02_26033") !== z("n72_26012"); })() && X.verdictOf(mkAu(design({ "c02_S0.1_1": -0.02, "c02_S0.1_2": -0.02 }))).endsWith("AT S0.1 THE NETWORKS FALL MORE THAN C02: NO"));
 }
 console.log(`\n${fails ? "SOME CHECKS FAILED: " + fails : "all checks pass"}`);
 finished = true; if (fails) process.exitCode = 1;

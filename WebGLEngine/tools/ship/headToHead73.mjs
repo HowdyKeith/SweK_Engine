@@ -63,7 +63,6 @@ export function fly(h27, nets, champs, pert, { range = IDS, seconds = SECONDS, a
     for (const a of want) { dark[a] = flyFn(all[a], range, seconds, "dropout"); lit[a] = flyFn(all[a], range, seconds, null); }
     return { dark, lit };
 }
-const word = (r) => (r === "BETTER" ? "BEATS" : r === "WORSE" ? "IS BEHIND" : "TIES");
 const pen = (au, a, b) => penPair(au, a, b, PRICE);
 export const penMean = (au, a) => avg(penRunsAt(au, a, PRICE).map((r) => r.score));
 export const meanPower = (au, a) => (avg(au.dark[a].map((r) => r.watts)) + avg(au.lit[a].map((r) => r.watts))) / 2000;
