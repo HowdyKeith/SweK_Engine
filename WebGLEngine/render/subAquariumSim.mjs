@@ -56,7 +56,17 @@ export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "nav
 // Neither needs a tank: the sub keeps its hull's own model. The snapshot's `compass` says { valid, seen (the heading the pilot is shown, rad), error (seen less true, wrapped, rad) }.
 export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
 /** Is the compass reporting at event time t (seconds)? */
-export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS.period) % COMPASS.period; return !(p >= COMPASS.darkFrom && p < COMPASS.darkFrom + COMPASS.darkLen); };
+export const compassValidAt = (t, spec = COMPASS) => { const p = ((t % spec.period) + spec.period) % spec.period; return !(p >= spec.darkFrom && p < spec.darkFrom + spec.darkLen); };
+// UNNUMBERED (H72, unseen disturbances) -- AN OPTIONAL SCHEDULE FOR THE COMPASS EVENTS. `setEvent(id, "dropout" | "navigator" | an estimator event, { period, darkFrom, darkLen })` replaces the frozen COMPASS for that sub's event only; with no schedule given the
+// flight is the one that was always flown (a gate row shows it bit-identical). A bad schedule throws and changes nothing; a schedule for any other event throws.
+export function compassSpecOf(o) {
+    if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("subAquariumSim.setEvent: the compass schedule is { period, darkFrom, darkLen }");
+    for (const k of Object.keys(o)) if (!["period", "darkFrom", "darkLen"].includes(k)) throw new Error(`subAquariumSim.setEvent: unknown compass schedule field "${k}"`);
+    const { period, darkFrom, darkLen } = o;
+    if (![period, darkFrom, darkLen].every((x) => typeof x === "number" && Number.isFinite(x))) throw new Error("subAquariumSim.setEvent: period, darkFrom and darkLen are finite numbers of seconds");
+    if (!(period > 0) || !(darkFrom >= 0) || !(darkLen > 0) || darkFrom + darkLen > period) throw new Error("subAquariumSim.setEvent: a compass schedule needs period > 0, darkFrom >= 0, darkLen > 0 and darkFrom + darkLen <= period");
+    return Object.freeze({ period, darkFrom, darkLen });
+}
 export const ESTIMATORS = Object.freeze(["fly-estimator", "er-estimator"]);
 const isEstimator = (ev) => ESTIMATORS.includes(ev);
 const isCompass = (ev) => ev === "dropout" || ev === "navigator" || isEstimator(ev);
@@ -133,7 +143,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const inner = nav ? deadReckoning(sub.pilot) : estimators.has(kind) ? estimators.get(kind)(spy) : sub.pilot, tgt = {}; let held = null;
         return (state, t, current) => {
             Object.assign(tgt, t);
-            const valid = compassValidAt(sub.eventT), psi = S.attitude(state).heading;
+            const valid = compassValidAt(sub.eventT, sub.compassSpec || COMPASS), psi = S.attitude(state).heading;
             if (valid || held === null) held = psi;
             if (valid) { const cmd = inner(state, tgt, current, { compassValid: 1, dt: sub.tickDt }); sub.compass = { valid: true, seen: estimators.has(kind) ? seen.h : psi, error: estimators.has(kind) ? wrap(seen.h - psi) : 0 }; return cmd; }
             const sw = turnWorld(state, current, held - psi);
@@ -185,7 +195,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
-        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.survey = null; sub.pendingSurvey = null;
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.compassSpec = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.survey = null; sub.pendingSurvey = null;
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
@@ -321,18 +331,19 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          * Start (or, with null, end) an event on one sub: "flood", "sink" or "surface" (see EVENTS). Returns the event now running, or null. An unknown event name throws and changes nothing; an unknown id does nothing and returns null.
          * Starting one on a sub that already has one swaps it: the tank state is kept (a dropped weight stays dropped, the air stays spent), the leak and the clock start again.
          */
-        setEvent(id, ev) {
+        setEvent(id, ev, opts) {
             const sub = subs.get(id);
             if (sub && sub.steer && ev !== null && ev !== undefined && ev !== "") throw new Error("subAquariumSim.setEvent: clear the sub's steer first (an event wraps the pilot it was started with)");
             if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
             if (isEstimator(ev) && !estimators.has(ev)) throw new Error(`subAquariumSim.setEvent: no builder is registered for "${ev}" (a page registers one with registerEstimator)`);
+            const spec = opts === undefined || opts === null ? null : (isCompass(ev) ? compassSpecOf(opts) : (() => { throw new Error("subAquariumSim.setEvent: a compass schedule is only for the compass events"); })());
             if (!sub) return null;
             if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
             if (needsTank(ev)) {
                 if (!sub.state.tank) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
-            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null; sub.advisor = false; sub.advice = null;
+            sub.compassSpec = spec; sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null; sub.advisor = false; sub.advice = null;
             if (ev === "needs" || ev === "survey") { sub.needs = sub.pendingNeeds || N.initialNeeds("battery", { crushDepth: NEEDS_CRUSH }); sub.pendingNeeds = null; } else sub.needs = null;
             sub.survey = null; if (ev === "survey") { sub.survey = sub.pendingSurvey || { stations: surveyStations(hash(String(sub.id)), SURVEY.count, length, width).map((q) => ({ ...q, visited: false })), profile: "standard", gaugeSd: SURVEY.gaugeSd, seconds: SURVEY.seconds, damage0: sub.needs.damage, ticks: 0, done: false, status: "running", score: null, returned: false, stats: null }; sub.surveyResult = null; } sub.pendingSurvey = null;
             sub.eventPilot = ev === "needs" ? needsPilotOf(sub) : ev === "survey" ? surveyPilotOf(sub) : ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
