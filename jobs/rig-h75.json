@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h75",
+ "kind": "rounds",
+ "rounds": [
+  "75"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": -3,
+ "created": "2026-11-23T16:23:29Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H75: 0.32, where the descent in power ends",
+ "sig": "50234c7b965f8fa0901b3729622e176b655f512ffafa3d7994ae056fe35b082f"
+}
