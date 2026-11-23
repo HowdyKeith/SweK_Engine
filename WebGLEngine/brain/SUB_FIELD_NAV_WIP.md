@@ -537,3 +537,30 @@ The module, the study command and their gates were sabotaged first (the module 9
 **What this would not say.** The registration's list stands: the turn was tested as if instant (the real vessel takes about 35 m to turn, which makes the flown result WORSE than the rule's own test, not better), the ships hold course and the planner knows their velocity, the clearances were the ordinary-ship values of FOLLOW-UP 6 and not tuned, and one set of 60 moves by about nine flights. A 90-degree limit and a 15-degree step were not swept.
 
 **What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-traffic-avoid-not-slow` stays OPEN for a stop, a reverse, a capsule that is the ship's reach and the edge exits. New: **`nav-avoid-turn-radius`**, the same rule with the candidate tested against the vessel's own turning arc (a circle of about 35 m radius) instead of a straight line after an instant turn, on fresh seeds.
+
+## FOLLOW-UP 9: THE ANY-ANGLE ARM'S MARGINS SWEPT (nextRounds entry `nav-margin-sweep-any`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** The any-angle arm's margins were never swept. 12 m was chosen on DEV for the cell arms and carried over; the harder test added a ladder 12, 8, 6, 3 m without sweeping its top rung, and the vertical margin (**VMARGIN = 5 m**: the planner blocks an iceberg when its keel plus 5 m exceeds the shallower of the start and waypoint depths) was never moved. Both write-ups say so as an open caveat.
+
+**Two parameters, in a new module `brain/subMarginSweep.mjs` (`brain/subHardNav.mjs` is not edited; its `flyHard` already takes a ladder, and the vertical margin is moved through the scenario's `minDepth`).**
+1. **The ladder's top rung `T`** in {8, 12, 16, 20, 24} m. The ladder tried is `T` followed by the rungs of the incumbent ladder (12, 8, 6, 3) that are SMALLER than `T` (T = 12: 12, 8, 6, 3 = the incumbent; T = 8: 8, 6, 3; T = 20: 20, 12, 8, 6, 3).
+2. **The vertical margin `V`** in {2, 5, 8, 12} m. `keel + V > minDepth` equals `keel + 5 > minDepth - (V - 5)`, so a flight at `V` is flown on a copy of the scenario whose `minDepth` is `minDepth - (V - 5)`, which moves the plan's block test and the ship conflict test together and nothing else (the collision test reads the real keel and depth and is untouched).
+The incumbent is **(T, V) = (12, 5)**. 5 x 4 = 20 cells.
+
+**What is flown.** The arm is `any` (HELD4's designated arm in hard-islands and hard-gaps: the plan built once at t = 0), in the two static kinds **hard-islands** and **hard-gaps**. SECONDS_HARD 260 and everything else as in `flyHard`. No ships, no current in these kinds.
+
+**The selection rule (written before DEV).** DEV (seeds 1 to 30 of each kind: 20 cells x 2 kinds x 30 = 1,200 flights) is flown once and is NOT a result. The cell chosen is the **best NON-INCUMBENT cell on DEV**: the most reached (pooled over the two kinds), then the fewest collisions, then the smallest distance from the incumbent (|T - 12| + |V - 5|), then the smaller T. It is chosen from 19 cells on 60 scenarios, so its DEV margin over the incumbent is an overstatement by construction (the winner's curse); the held read is the safeguard and is the only result.
+
+**The set.** NEW: **HELD9, seeds 901 to 960 of each of hard-islands and hard-gaps (120 scenarios), flown ONCE**, the incumbent and the DEV-chosen cell on every scenario (240 flights), after the module, the study command (`tools/ship/subMarginStudy.mjs`) and their gates are sabotaged. No amendment is allowed after DEV is read; the grid and the rule above are the whole of it.
+
+**Designated comparison and verdict.** The DEV-chosen cell against the incumbent, paired on the same HELD9 seeds. **GAIN** = the chosen cell reaches at least **5 more** than the incumbent pooled over the 120 scenarios AND loses no more than **2** in either kind (reaches no fewer than the incumbent minus 2 in each kind). **SUPPORTED** (the incumbent margins were not the best and the sweep found better) if the gain holds; **NOT SUPPORTED** (the incumbent's margins stand) if the chosen cell reaches no more than 2 more pooled; **PARTLY SUPPORTED** otherwise (a gain of 3 to 4 pooled, or 5 or more with a kind losing more than 2).
+
+**Predictions, written before DEV and HELD9 (scored held or missed, moving nothing).**
+* **M1**: on DEV some non-incumbent cell reaches at least 3 more than the incumbent, pooled (of 60). 60 percent.
+* **M2**: the verdict is NOT SUPPORTED (the incumbent stands on a fresh set). 55 percent.
+* **M3**: the DEV-chosen cell has a top rung `T` above 12. 40 percent.
+* **M4**: the DEV-chosen cell's vertical margin is above 5. 40 percent.
+* **M5**: on DEV the cell (8, 2) (the thinnest margins) reaches fewer than the incumbent. 70 percent.
+* **M6**: on HELD9 the chosen cell reaches at least as many as the incumbent pooled. 60 percent.
+
+**What a result would not say.** One map generator, one hull, one autopilot, an exact map and fix, and no ships or current in the two kinds swept (the margin for traffic and for a current is a different question: FOLLOW-UP 7 found the raised margin did NOT help in a current). The sweep is a grid of 20 on one fixed `any` plan; the margin is not swept for the cell arms, nor against the edge band. HELD9's 60 scenarios per kind move by about nine flights between two sets for one arm (FOLLOW-UP 5), so a gain under five pooled over 120 is inside the noise this set has.
