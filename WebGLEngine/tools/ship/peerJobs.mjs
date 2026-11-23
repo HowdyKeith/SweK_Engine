@@ -12,6 +12,8 @@
 import crypto from "node:crypto";
 
 export const VERSION = 1, QUEUE_BRANCH = "peer-jobs", BEAT_S = 600, STALE_BEATS = 3, MAX_ROUNDS = 8, MAX_AFTER = 8;
+// A failed run is tried again (the runner resumes where it stopped) up to MAX_ATTEMPTS times, RETRY_S apart; a result file above RESULT_MAX_BYTES is left out (a git host refuses 100 MB); a saved state file above STATE_MAX_BYTES is not shared.
+export const MAX_ATTEMPTS = 3, RETRY_S = 600, RESULT_MAX_BYTES = 90e6, STATE_MAX_BYTES = 40e6, PRESENCE_FRESH_S = 1800;
 export const KINDS = Object.freeze(["rounds", "selftest"]), GPU = Object.freeze(["any", "required", "forbidden"]);
 const ID = /^[a-z0-9][a-z0-9-]{2,62}$/, ROUND = /^\d{1,3}$/, SHA = /^[0-9a-f]{40}$/, ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/, PEER = /^[A-Za-z0-9][\w.-]{0,39}$/, TEXT = /^[\x20-\x7e]{0,200}$/, CPU = /^[\w .()@-]{1,40}$/;
 const FIELDS = new Set(["version", "id", "kind", "rounds", "workers", "zip", "target", "priority", "created", "expires", "after", "commit", "by", "note", "sig"]), TARGET_FIELDS = new Set(["gpu", "minCores", "peers", "cpuMatch"]);
@@ -99,6 +101,9 @@ export function decide(job, caps, state) {
     const after = job.after || [], failed = after.filter((a) => done[a] && done[a].status !== "ok"), unmet = after.filter((a) => !done[a]);
     if (failed.length) return { action: "skip", reason: "a job it comes after failed: " + failed.join(", ") };
     if (unmet.length) return { action: "wait", reason: "comes after " + unmet.join(", ") };
+    const at = (state && state.attempts && state.attempts[job.id]) || null;
+    if (at && at.n >= MAX_ATTEMPTS) return { action: "skip", reason: `failed ${at.n} times` };
+    if (at && Number.isFinite(Date.parse(at.at)) && now < Date.parse(at.at) + RETRY_S * 1000) return { action: "wait", reason: `retrying after a failure (attempt ${at.n + 1} of ${MAX_ATTEMPTS})` };
     const c = claims[job.id];
     if (c && c.peer === caps.name) return { action: "run", reason: "resuming this peer's own claim" };
     if (c && claimFresh(c, now)) return { action: "skip", reason: "claimed by " + c.peer };
@@ -111,3 +116,69 @@ export function pick(items) {
     runs.sort((a, b) => (b.job.priority || 0) - (a.job.priority || 0) || Date.parse(a.job.created) - Date.parse(b.job.created) || (a.job.id < b.job.id ? -1 : a.job.id > b.job.id ? 1 : 0));
     return runs.length ? runs[0] : null;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// WHAT SURVIVES AN INTERRUPTION, WHAT THE PEERS SEE, AND THE ORDER A PLAN ASKS FOR (Keith, 2026-11-23: peers "keep resuming if interrupted, and return results on their own"; "the peers could see what is running, and on which peers")
+/** Whether a file of the runner's data folder belongs to a job that runs `rounds`: head-to-head<round> then a dash or a dot (so round 7 never takes round 70's files), a plain name, not an archive. */
+export function isStateFile(name, rounds) {
+    if (typeof name !== "string" || !Array.isArray(rounds) || /[\\/]/.test(name) || /\.(zip|gz|tar)$/i.test(name)) return false;
+    const m = /^head-to-head(\d{1,3})[-.][\w.-]*$/.exec(name);
+    return !!m && rounds.includes(m[1]);
+}
+const lines = (t) => String(t).split("\n").filter((l) => l.trim()).length;
+/** Which of two copies of one data file is further on: "a" or "b". Texts (null is no copy). A search file (.jsonl) by its lines, a state file (-state-<seed>.json) by its `iter`, any other file by its length; a tie keeps "a". */
+export function betterFile(name, a, b) {
+    if (a === null || a === undefined) return b === null || b === undefined ? "a" : "b";
+    if (b === null || b === undefined) return "a";
+    if (/\.jsonl$/.test(name)) return lines(b) > lines(a) ? "b" : "a";
+    if (/-state-[\w.-]*\.json$/.test(name)) {
+        const it = (t) => { try { const v = JSON.parse(t).iter; return Number.isInteger(v) ? v : -1; } catch (e) { return -1; } };
+        return it(b) > it(a) ? "b" : "a";
+    }
+    return String(b).length > String(a).length ? "b" : "a";
+}
+/** What a peer is doing, from the tail of the runner's output: { round, phase } of the last "[rig] ... H<round> <search|fly|read>:" line, or null. */
+export function progressOf(logTail) {
+    const all = [...String(logTail || "").matchAll(/\[rig\] \S+ H(\d{1,3}) (search|fly|read):/g)];
+    if (!all.length) return null;
+    const m = all[all.length - 1]; return { round: m[1], phase: m[2] };
+}
+/** A peer's presence record, one file per peer: who it is and what it is doing (`doing` null when idle, else { job, round, phase, rounds }). */
+export const makePresence = (caps, doing, now, extra = {}) => ({ version: VERSION, name: caps.name, host: caps.host || "", cores: caps.cores, cpu: caps.cpu || "", gpu: caps.gpu === true, doing: doing || null, since: extra.since || new Date(now).toISOString(), seen: new Date(now).toISOString() });
+/** A presence record is fresh while it was seen within PRESENCE_FRESH_S seconds. */
+export function presenceFresh(rec, now) { const t = rec && typeof rec.seen === "string" && ISO.test(rec.seen) ? Date.parse(rec.seen) : NaN; return Number.isFinite(t) && (now - t) / 1000 <= PRESENCE_FRESH_S; }
+/** The lines that say what is running and where, from the folder's state ({ jobs: [{ spec }], claims, done, peers }): one per claim (job, peer, how long ago its last beat) and one per peer (idle, or what it runs; a stale one says so). */
+export function whoLines(st, now) {
+    const out = [];
+    for (const [id, c] of Object.entries(st.claims || {})) out.push(`running ${id}: on ${c.peer}${c.host ? " (" + c.host + ")" : ""}, since ${c.since}, last beat ${Math.round(claimAge(c, now))} s ago (${claimFresh(c, now) ? "alive" : "STALE"})`);
+    for (const [name, r] of Object.entries(st.peers || {}).sort()) {
+        const fresh = presenceFresh(r, now), d = r.doing;
+        out.push(`peer ${name}: ${r.cores} cores${r.gpu ? ", GPU" : ""}, ${fresh ? (d ? `running ${d.job}${d.round ? " H" + d.round + " " + d.phase : ""}` : "idle") : "NOT SEEN for " + Math.round((now - Date.parse(r.seen)) / 60000) + " min"}`);
+    }
+    return out;
+}
+/**
+ * The jobs a plan asks for, in the order it asks for them. A plan = { prefix, jobs: [{ round | rounds, priority, target?, workers?, note? }] }; every job becomes ONE signed `rounds` job `<prefix>-h<round>` so
+ * that free peers take different rounds at once, and the order is the priority (highest first; then the order written). `ctx` = { commit, by, now }. Throws a message on a bad plan; an id or priority repeated, a priority outside
+ * -9 to 9 and a job that would not validate are all refused.
+ */
+export function planJobs(plan, ctx) {
+    if (!plan || typeof plan !== "object" || !Array.isArray(plan.jobs) || plan.jobs.length < 1) throw new Error("planJobs: a plan is { prefix, jobs: [..] } with at least one job");
+    const prefix = plan.prefix === undefined ? "rig" : plan.prefix;
+    if (typeof prefix !== "string" || !/^[a-z0-9][a-z0-9-]{0,30}$/.test(prefix)) throw new Error("planJobs: the prefix is 1 to 31 characters of a-z, 0-9 and -");
+    const seen = new Set(), out = [];
+    plan.jobs.forEach((j, i) => {
+        const rounds = j.rounds !== undefined ? j.rounds : [j.round];
+        if (!Array.isArray(rounds) || rounds.length < 1 || !rounds.every((r) => typeof r === "string" && ROUND.test(r))) throw new Error(`planJobs: job ${i + 1} needs a round (digits as a string)`);
+        const id = `${prefix}-h${rounds.join("-h")}`;
+        if (seen.has(id)) throw new Error(`planJobs: job ${id} is in the plan twice`);
+        seen.add(id);
+        const spec = { version: VERSION, id, kind: "rounds", rounds, target: j.target || { gpu: "any" }, priority: j.priority === undefined ? 0 : j.priority, created: new Date(ctx.now + i * 1000).toISOString().replace(/\.\d+Z$/, "Z"), commit: ctx.commit, by: ctx.by, ...(j.workers !== undefined ? { workers: j.workers } : {}), ...(j.note !== undefined ? { note: j.note } : {}) };
+        const bad = validateJob(spec);
+        if (bad.length) throw new Error(`planJobs: job ${id}: ${bad[0]}`);
+        out.push(spec);
+    });
+    return out;
+}
+/** The ids in the order the peers will take them (priority, then created, then id: `pick`'s order) for a list of specs. */
+export const orderOf = (specs) => [...specs].sort((a, b) => (b.priority || 0) - (a.priority || 0) || Date.parse(a.created) - Date.parse(b.created) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map((x) => x.id);

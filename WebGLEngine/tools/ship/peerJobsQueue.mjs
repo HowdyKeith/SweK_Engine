@@ -32,10 +32,12 @@ const readJson = (io, f) => { try { return { ok: true, value: JSON.parse(io.fs.r
 const listJson = (io, dir) => (io.fs.existsSync(dir) ? io.fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort() : []);
 /** Reads the whole folder: { jobs: [{ file, spec, errors }], claims: { id: claim }, cancels: { id: record }, done: { id: record } }. A file that is not JSON is listed with its error and never run. */
 export function read(io, q) {
-    const out = { jobs: [], claims: {}, cancels: {}, done: {} };
+    const out = { jobs: [], claims: {}, cancels: {}, done: {}, attempts: {}, peers: {} };
     for (const f of listJson(io, path.join(q.dir, "jobs"))) { const r = readJson(io, path.join(q.dir, "jobs", f)); out.jobs.push(r.ok ? { file: f, spec: r.value, errors: P.validateJob(r.value) } : { file: f, spec: null, errors: ["not JSON: " + r.error] }); }
     for (const f of listJson(io, path.join(q.dir, "claims"))) { const r = readJson(io, path.join(q.dir, "claims", f)); if (r.ok) out.claims[f.slice(0, -5)] = r.value; }
     for (const f of listJson(io, path.join(q.dir, "cancel"))) { const r = readJson(io, path.join(q.dir, "cancel", f)); if (r.ok) out.cancels[f.slice(0, -5)] = r.value; }
+    for (const f of listJson(io, path.join(q.dir, "attempts"))) { const r = readJson(io, path.join(q.dir, "attempts", f)); if (r.ok) out.attempts[f.slice(0, -5)] = r.value; }
+    for (const f of listJson(io, path.join(q.dir, "peers"))) { const r = readJson(io, path.join(q.dir, "peers", f)); if (r.ok && r.value && typeof r.value.name === "string") out.peers[f.slice(0, -5)] = r.value; }
     const rd = path.join(q.dir, "results");
     if (io.fs.existsSync(rd)) for (const id of io.fs.readdirSync(rd)) { const r = readJson(io, path.join(rd, id, "done.json")); if (r.ok) out.done[id] = r.value; }
     return out;
@@ -98,11 +100,60 @@ export function beat(io, q, id, peer, now) {
 }
 /** Writes the result: the files (`files` = [{ from, to }], `to` relative to results/<id>/), a done.json, removes the claim, pushes. { ok, why }. */
 export function finish(io, q, id, peer, outcome, now) {
-    const dir = path.join(q.dir, "results", id);
+    const dir = path.join(q.dir, "results", id), skipped = [];
     io.fs.mkdirSync(dir, { recursive: true });
-    for (const f of outcome.files || []) { const to = path.join(dir, f.to); io.fs.mkdirSync(path.dirname(to), { recursive: true }); io.fs.copyFileSync(f.from, to); }
-    io.fs.writeFileSync(path.join(dir, "done.json"), J({ id, peer: peer.name, status: outcome.status, exit: outcome.exit, seconds: outcome.seconds, files: (outcome.files || []).map((f) => f.to), finished: new Date(now).toISOString(), note: String(outcome.note || "").slice(0, 200) }));
+    for (const f of outcome.files || []) {
+        if (io.fs.statSync(f.from).size > P.RESULT_MAX_BYTES) { skipped.push(f.to); continue; }
+        const to = path.join(dir, f.to); io.fs.mkdirSync(path.dirname(to), { recursive: true }); io.fs.copyFileSync(f.from, to);
+    }
+    io.fs.writeFileSync(path.join(dir, "done.json"), J({ id, peer: peer.name, status: outcome.status, exit: outcome.exit, seconds: outcome.seconds, files: (outcome.files || []).map((f) => f.to).filter((t) => !skipped.includes(t)), skipped, finished: new Date(now).toISOString(), note: String(outcome.note || "").slice(0, 200) }));
     const c = path.join(q.dir, "claims", id + ".json");
     if (io.fs.existsSync(c)) io.fs.rmSync(c);
+    const st = path.join(q.dir, "state", id);
+    if (io.fs.existsSync(st)) io.fs.rmSync(st, { recursive: true, force: true });
     return publish(io, q, `result ${id}: ${outcome.status}`);
+}
+/** A failed run: counts the attempt, releases the claim so a peer (this one after RETRY_S) tries again from the saved state; at MAX_ATTEMPTS it becomes the result (status failed). { ok, final, n, why }. */
+export function fail(io, q, id, peer, outcome, now) {
+    sync(io, q);
+    const f = path.join(q.dir, "attempts", id + ".json"), prev = readJson(io, f), n = (prev.ok && Number.isInteger(prev.value.n) ? prev.value.n : 0) + 1;
+    io.fs.mkdirSync(path.dirname(f), { recursive: true });
+    io.fs.writeFileSync(f, J({ id, n, peer: peer.name, exit: outcome.exit, note: String(outcome.note || "").slice(0, 200), at: new Date(now).toISOString() }));
+    if (n >= P.MAX_ATTEMPTS) { const r = finish(io, q, id, peer, { ...outcome, status: "failed", note: `failed ${n} times: ${String(outcome.note || "").slice(0, 150)}` }, now); return { ok: r.ok, final: true, n, why: r.why }; }
+    const c = path.join(q.dir, "claims", id + ".json");
+    if (io.fs.existsSync(c)) io.fs.rmSync(c);
+    const r = publish(io, q, `attempt ${n} of ${id} failed`);
+    return { ok: r.ok, final: false, n, why: r.why };
+}
+/** Shares a job's data files so another peer (or this one after a restart) can resume: `files` = [{ from, name }] are copied to state/<id>/ and pushed, only when something differs. { ok, changed, why }. */
+export function saveState(io, q, id, files, now) {
+    sync(io, q);
+    const dir = path.join(q.dir, "state", id); let changed = 0;
+    io.fs.mkdirSync(dir, { recursive: true });
+    for (const f of files) {
+        if (!/^[\w.-]+$/.test(f.name)) continue;
+        const to = path.join(dir, f.name), cur = io.fs.existsSync(to) ? io.fs.readFileSync(to) : null, now2 = io.fs.readFileSync(f.from);
+        if (cur === null || !cur.equals(now2)) { io.fs.writeFileSync(to, now2); changed++; }
+    }
+    if (!changed) return { ok: true, changed: 0, why: "" };
+    io.fs.writeFileSync(path.join(dir, "saved.json"), J({ id, at: new Date(now).toISOString(), files: files.map((f) => f.name) }));
+    const r = publish(io, q, `state ${id}: ${changed} file(s)`);
+    return { ok: r.ok, changed, why: r.why };
+}
+/** The shared data files of a job: [{ name, from }] (the checkout is made equal to the remote first). */
+export function loadState(io, q, id) {
+    sync(io, q);
+    const dir = path.join(q.dir, "state", id);
+    return io.fs.existsSync(dir) ? io.fs.readdirSync(dir).filter((n) => n !== "saved.json").sort().map((n) => ({ name: n, from: path.join(dir, n) })) : [];
+}
+/** Says what this peer is doing so every peer can see it: peers/<name>.json, pushed only when what it is doing changed or the last push is older than `minAgeS` (default 300) seconds. { ok, pushed, why }. */
+export function presence(io, q, peer, doing, now, minAgeS = 300) {
+    const f = path.join(q.dir, "peers", peer.name + ".json"), prev = readJson(io, f);
+    const same = prev.ok && J(prev.value.doing || null) === J(doing || null) && P.presenceFresh(prev.value, now + (P.PRESENCE_FRESH_S - minAgeS) * 1000);
+    if (same) return { ok: true, pushed: false, why: "" };
+    sync(io, q);
+    const before = readJson(io, f), since = before.ok && J(before.value.doing || null) === J(doing || null) ? before.value.since : undefined;
+    io.fs.mkdirSync(path.dirname(f), { recursive: true }); io.fs.writeFileSync(f, J(P.makePresence(peer, doing, now, { since })));
+    const r = publish(io, q, `peer ${peer.name}: ${doing ? "running " + doing.job : "idle"}`);
+    return { ok: r.ok, pushed: r.ok, why: r.why };
 }
