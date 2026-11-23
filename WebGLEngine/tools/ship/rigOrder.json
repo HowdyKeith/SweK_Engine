@@ -88,6 +88,13 @@
    "note": "H82: redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate"
   },
   {
+   "round": "84",
+   "priority": -2,
+   "hours": 9,
+   "why": "redraws H38's two smaller networks on new seeds: does the pruned-versus-random reading replicate",
+   "note": "H84: redraws H38's two smaller networks on new seeds: does the pruned-versus-random reading replicate"
+  },
+  {
    "round": "75",
    "priority": -3,
    "hours": 6,
