@@ -2643,6 +2643,7 @@ const economyBridge = require("./economyBridge.js");   // v3045 - probe front do
 const terrainBuildBridge = require("./terrainBuildBridge.js");// v2858 - terrain-wasm BUILD front door at /terrain (box3d had one since v2289; terrain had none).// v2856 - mass-vs-merit front door at /policymass (does the brain favour what works? demos need no captured trace).
 const crossArchBridge = require("./crossArchBridge.js");  // v2865 - cross-arch session front door at /crossarch (Mac button on server.html; endpoint answers anywhere).
 const rigJobBridge = require("./rigJobBridge.js");        // v2870 - LONG physics experiments at /rigjob (Benard sweep, 2f). CLI-only was a rule violation.
+const peerJobsBridge = require("./peerJobsBridge.js");    // UNNUMBERED - the Brain Job Repo Report Runner: watches a git branch for signed jobs and runs them (OFF unless saved as enabled). docs/PEER_JOBS.md
 const buildName = require("./buildName.js");             // v2871 - ONE matcher for what a SweK build is called. The old regex only knew "EngineProject_vNNN" and went blind when the project was renamed.
 const androidPeerBridge = require("./androidPeerBridge.js");   /* v2922 android-peer (install) - front door for the Android peer round: /android/status, /android/verdict */
 const maigret = require("./maigret.js");                  // v1025 — OSINT username search
@@ -4787,6 +4788,14 @@ const server = http.createServer((req, res) => {
         // /rigjob - run the long lattice experiments from a page. These are the runs you want to start and walk
         // away from, which is exactly why shipping them CLI-only was wrong.
         Promise.resolve(rigJobBridge.handle(req, res, { sendJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "bridge", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
+
+    if (peerJobsBridge.owns(req.url)) {
+        // /peerjobs - the Brain Job Repo Report Runner. TRUSTED-ONLY (every route): a start or a submit is code that runs on this machine,
+        // so `_isTrustedReq` is handed in and the bridge cannot authorise itself. Off by default; see ai-bridge/peerJobsBridge.js.
+        Promise.resolve(peerJobsBridge.handle(req, res, { sendJson, isTrusted: _isTrustedReq }))
             .catch((e) => { try { sendJson({ ok: false, error: "bridge", message: String(e && e.message || e) }, 500); } catch {} });
         return;
     }
@@ -21493,6 +21502,8 @@ try { appServer.requestTimeout   = 0; } catch {}       // never kill a legitimat
 try { require("./portHandoff.js").installHandoff(appServer, PORT, { log: console.log }); } catch (e) { console.warn("[bridge] port handoff not installed:", e && e.message); }
 
 appServer.listen(PORT, () => {
+    // The Brain Job Repo Report Runner starts ONLY when its saved config says enabled (the default is off: no process, no network). A few seconds after the bind so boot is not slowed.
+    try { setTimeout(() => { try { peerJobsBridge.startIfEnabled(); } catch {} }, 8000).unref(); process.on("exit", () => { try { peerJobsBridge.stop(); } catch {} }); } catch {}
     // v3522 -- the bind SUCCEEDED, which is the one outcome the old server cannot infer from anywhere else.
     try { require("./bootTrace.js").record("bind-ok", { root: require("path").join(__dirname, ".."), port: PORT }); } catch {}
     // *** v4028 -- THE PORT BEACON, AND IT EXISTS BECAUSE v4014 BROKE THE BRAIN WITHOUT NOTICING. ***

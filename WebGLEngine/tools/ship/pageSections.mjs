@@ -1024,7 +1024,7 @@ export const CHIP_GROUPS = [
     // claim no page in SECTIONS, so this moves a chip and strands nothing.
     { id: "systools", tab: "systools", label: "System Tools",
       note: "the rig, the ship ritual, the record -- and the live verify surface",
-      chips: ["verify", "renderqa", "rigjob"] },
+      chips: ["verify", "renderqa", "rigjob", "peerjobs"] },
     // v4127 -- Keith: "'Homebrew formula' goes in Mac System". `brew install swek-engine` is macOS-only by
     // construction, so it belongs with the other things that need a Mac rather than in the top row. The slot
     // it moves into is added to the macsystem gpanel in server.html the same round -- a group with no slot is

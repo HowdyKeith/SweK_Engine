@@ -3,7 +3,8 @@
 //   node tools/ship/peerJobsCmd.mjs submit --id <job-id> --rounds 69,70 [--gpu any|required|forbidden] [--min-cores N] [--peers a,b] [--cpu-match Intel] [--priority N] [--after id,id] [--expires ISO] [--workers N] [--no-zip] [--commit <sha>] [--note "..."] | --selftest
 //   node tools/ship/peerJobsCmd.mjs status                  every job with what this peer would do with it, the claims, the results
 //   node tools/ship/peerJobsCmd.mjs cancel --id <job-id>    ask the peers to stop wanting it
-//   node tools/ship/peerJobsCmd.mjs watch [--once] [--dry-run] [--interval 120] [--name <peer>] [--gpu] [--no-gpu]     find a job this peer should run, claim it, run it, push the result, then look again
+//   node tools/ship/peerJobsCmd.mjs watch [--once] [--dry-run] [--interval 120] [--name <peer>] [--gpu] [--no-gpu] [--engine-dir <git clone of the engine> [--engine-url <url>]]     find a job this peer should run, claim it, run it, push the result, then look again
+// An engine that was installed from a zip is not a git checkout: such a peer gives --engine-dir (and --engine-url to have it cloned there) so a job can run in a worktree of its commit.
 // Shared: [--dir ~/.swek/peerjobs/queue] [--key-file ~/.swek/peerjobs.key] (or SWEK_PEERJOBS_KEY). The key is the secret every peer holds; a job whose signature does not verify under it is listed and never run.
 // A peer is a GPU box when --gpu is given, SWEK_PEER_GPU=1 is set, or `nvidia-smi -L` lists a card; --no-gpu says it is not. A job runs in a clean checkout (git worktree) of the commit it names, and its result files (rig-out/) go back to results/<id>/ on the queue branch.
 "use strict";
@@ -11,6 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as P from "./peerJobs.mjs";
 import * as Q from "./peerJobsQueue.mjs";
 const args = process.argv.slice(2), cmd = args[0], val = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith("--") ? args[i + 1] : d; }, has = (k) => args.includes(k);
@@ -19,7 +21,11 @@ const dir = path.resolve(val("--dir", path.join(home, "peerjobs", "queue"))), ke
 const io = { fs, git: (a, o = {}) => { const r = spawnSync("git", a, { cwd: o.cwd, encoding: "utf8" }); return { status: r.status === null ? 1 : r.status, stdout: r.stdout || "", stderr: r.stderr || "" }; } };
 const q = Q.queueOf({ dir });
 const key = () => (process.env.SWEK_PEERJOBS_KEY || (fs.existsSync(keyFile) ? fs.readFileSync(keyFile, "utf8").trim() : ""));
-const engine = () => { const r = io.git(["rev-parse", "--show-toplevel"], { cwd: path.dirname(new URL(import.meta.url).pathname) }); return r.stdout.trim(); };
+const engine = () => {
+    const given = val("--engine-dir", null), url = val("--engine-url", null);
+    if (given) { const d = path.resolve(given); if (url && !fs.existsSync(path.join(d, ".git"))) { fs.mkdirSync(path.dirname(d), { recursive: true }); io.git(["clone", "-q", url, d]); } return fs.existsSync(path.join(d, ".git")) ? d : ""; }
+    const r = io.git(["rev-parse", "--show-toplevel"], { cwd: path.dirname(fileURLToPath(import.meta.url)) }); return r.status === 0 ? r.stdout.trim() : "";
+};
 const gpuHere = () => { if (has("--no-gpu")) return false; if (has("--gpu") || process.env.SWEK_PEER_GPU === "1") return true; const r = spawnSync("nvidia-smi", ["-L"], { encoding: "utf8" }); return r.status === 0 && /GPU \d/.test(r.stdout || ""); };
 const caps = () => ({ name: val("--name", os.hostname().replace(/[^\w.-]/g, "-").slice(0, 40)), host: os.hostname(), cores: os.cpus().length, cpu: (os.cpus()[0] || {}).model || "", gpu: gpuHere() });
 const say = (s) => console.log(s);
@@ -32,6 +38,7 @@ const table = (st, c, now, busy) => st.jobs.map((j) => {
 async function runJob(job, c) {
     const eng = engine(), work = path.join(os.tmpdir(), "swek-peerjob-" + job.id), t0 = Date.now();
     const fail = (note) => ({ status: "failed", exit: -1, seconds: (Date.now() - t0) / 1000, files: [], note });
+    if (!eng) return fail("this peer has no engine checkout (a git clone): give --engine-dir, and --engine-url to clone it");
     if (io.git(["cat-file", "-e", job.commit + "^{commit}"], { cwd: eng }).status !== 0) io.git(["fetch", "-q", "origin", job.commit], { cwd: eng });
     if (io.git(["cat-file", "-e", job.commit + "^{commit}"], { cwd: eng }).status !== 0) return fail("the job's commit is not in this checkout");
     if (fs.existsSync(work)) { io.git(["worktree", "remove", "--force", work], { cwd: eng }); fs.rmSync(work, { recursive: true, force: true }); }

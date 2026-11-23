@@ -1,6 +1,6 @@
 # SweK peer jobs: a git branch as the queue for long runs
 
-Status: first slice (2026-11-23). Library, queue operations, command and gate exist (`WebGLEngine/tools/ship/peerJobs*.mjs`, gate `peerJobs-selfcheck.mjs`, 276 mutants, 7 declared equivalent). A job was run end to end by hand on one machine: submitted, claimed, run in a worktree of its commit, result pushed. **Not built yet:** running the watcher as a service inside the SweK server, a server.html panel, a second real machine.
+Status: second slice (2026-11-23). The SweK server drives it (below). Library, queue operations, command and gate exist (`WebGLEngine/tools/ship/peerJobs*.mjs`, gate `peerJobs-selfcheck.mjs`, 276 mutants, 7 declared equivalent). A job was run end to end by hand on one machine: submitted, claimed, run in a worktree of its commit, result pushed. **Not built yet:** a second real machine; results larger than a few MB.
 
 ## The idea
 Keith: push a job file to a git folder; whichever SweK peer is free picks it up, queues it if busy, checks it is still wanted when free, runs it on the box the job asked for (the GPU box, the Intel CPU box), and pushes the result back.
@@ -43,3 +43,9 @@ node tools/ship/peerJobsCmd.mjs cancel --id h69-search
 - Results go back into git: fine for zips of a few MB, not for gigabytes (large files would need LFS or a different store).
 - The queue checkout is the peer's own and is reset to the remote at every step; do not keep anything in it.
 - A rig that is not allowed to reach the git remote cannot take part.
+
+## In the SweK server (Brain Job Repo Report Runner)
+- **Boot Options checkbox** "Brain Job Repo Report Runner", **default off**. Ticked: the server starts the watcher (`peerJobsCmd.mjs watch`) as a child process, now and at every boot (a few seconds after the port is bound). Unticked: no process, no network, nothing fetched.
+- **Panel** (chip "Brain Job Runner", filed under System Tools): status, the queue repo address, this peer's name, GPU yes/no/detect, how often to look, an engine repo address (only when this engine is a zip install and not a git checkout, so a job can run at its commit), the **write-only signing key**, Start / Stop, the queue as the command prints it, a submit form and a cancel button, and the watcher's log.
+- **Bridge** `ai-bridge/peerJobsBridge.js` (`/peerjobs/*`, **trusted requests only**, every route): config in `~/.voxelbridge/peerjobs.json`, key in `~/.voxelbridge/peerjobs.key` (mode 600; no route returns it), queue checkout in `~/.voxelbridge/peerjobs/queue`. Every command is run with an argument list (no shell) after each field is validated. A watcher that dies is restarted after 30 s; one that keeps dying within 10 s is not restarted after the fifth time. Stopping kills the watcher's whole process tree, so a job in progress goes with it.
+- Gates: `peerJobs-selfcheck.mjs` (the queue and the rules), `peerJobsBridge-selfcheck.mjs` (the bridge, its wiring in `server.js` and the checkbox and panel in `server.html`).
