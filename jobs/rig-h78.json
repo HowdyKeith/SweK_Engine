@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h78",
+ "kind": "rounds",
+ "rounds": [
+  "78"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": 3,
+ "created": "2026-11-23T16:23:23Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H78: redraws H61 (0.16), the largest margin",
+ "sig": "1cc3269bbfadaa936339379b0fadddabcd4f5e16c0a4c2e72529463768beff51"
+}
