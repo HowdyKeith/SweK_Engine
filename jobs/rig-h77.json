@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "id": "rig-h77",
+ "kind": "rounds",
+ "rounds": [
+  "77"
+ ],
+ "target": {
+  "gpu": "any"
+ },
+ "priority": 4,
+ "created": "2026-11-23T16:23:22Z",
+ "commit": "3b69658a36de04dfcf94c5f0b9182e0828331074",
+ "by": "vm",
+ "note": "H77: the new question: a network against the law of its own price (0.04)",
+ "sig": "d2a9a89f46b82ae1c341491574db949cdd16b944179976f37ee4d0f74b613efe"
+}
