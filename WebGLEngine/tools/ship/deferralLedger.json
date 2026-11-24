@@ -1,5 +1,6 @@
 {
  "written": "2026-11-23",
+ "captured": "2026-11-23, by hand from the deferral census's UNDECIDED rows read one by one (no tool writes this file); deferralLedger-selfcheck holds each row to the census",
  "what": "Adjudication of the deferral census's UNDECIDED rows (tools/ship/deferralCensus.mjs): one row per hit, keyed by file and a hash of the trimmed line, with a verdict. SETTLED hits are not here: they carry a `SETTLED at vNNNN` marker beside the claim and are counted by the census as satisfied.",
  "verdicts": {
   "NOT_A_DEFERRAL": "the phrase is used for something else (a reader's note, a guard against a later change, a quotation); nothing is owed",

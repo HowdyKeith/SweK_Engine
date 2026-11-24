@@ -3196,6 +3196,13 @@ export const NEXT_ROUNDS = [
         why: "Most of the lost water is vertical separation the plan could use; whether using it keeps the contact gain and gives the arrivals back is the question.",
     },
     {
+        id: "name-branch-exports",
+        blocker: "OPEN",
+        what: "v4934 raised three definitionGates ratchets (tools/ship/definitionGates-selfcheck.mjs: wide 412 -> 462, all-shapes 865 -> 1467, import-owned 669 -> 1206) for exports in the 66 head-to-head and navigation files this branch added: constants and helpers re-exported from earlier rounds that their gates do not name one by one. The raise was said as one and was not Keith's direction.",
+        how: "Name each of the 602 exports in the gate of its module with a row that exercises it (or, where a re-export is only a pass-through, point the gate at the original definition), sabotage-confirm each batch, and ratchet the three numbers back down to 412, 865 and 669 as they close.",
+        why: "A ratchet raised for 600 symbols is a ratchet that no longer notices the next 600; the split that proved the whole rise is the branch's own is the evidence the debt is nameable.",
+    },
+    {
         id: "nav-match-consumes-layer",
         blocker: "UPSTREAM",
         what: "PARKED (UPSTREAM: it waits on a space scene with obstacles) 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): the arena approach has nothing to route around -- no space scene has static obstacles -- so a field-and-aim-point layer could only reproduce a straight line; a round would need an invented rock field and edits to two heavily gated files. Reopen once a space scene has obstacles of its own. WAS: brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",

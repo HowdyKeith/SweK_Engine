@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "6773dcae5f507aa983c3178a00f897043d0acd8b",
+ "head": "40d7d32392d891c8a6852071c290c4817175ef79",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -386,7 +386,7 @@
    {
     "path": "sub-aquarium.html",
     "bytes": 61813,
-    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "switchboard.html",
@@ -487,8 +487,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "clients.html",
@@ -497,8 +497,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 908174,
-    "sha": "94aa76bad72ddcf09ebf15b78422f4b37e9b1d00"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -837,8 +837,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "aquarelle.html",
@@ -1047,7 +1047,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3829710,
+    "bytes": 3828074,
     "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
    },
    {
@@ -1093,7 +1093,7 @@
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
     "bytes": 25349,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "render/subAquarium3dDark-selfcheck.mjs",
@@ -1152,8 +1152,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 908174,
-    "sha": "94aa76bad72ddcf09ebf15b78422f4b37e9b1d00"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "shipavatar.html",
@@ -1193,7 +1193,7 @@
    {
     "path": "sub-aquarium.html",
     "bytes": 61813,
-    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "svg-forge.html",
