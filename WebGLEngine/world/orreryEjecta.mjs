@@ -393,6 +393,12 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/roundhouse/magmapTaichi.mjs",
         "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
     ]),
+    // UNNUMBERED (v4933) -- vendor/smaa (SMAA 1x lookup textures) arrived with the SMAA pass; its dependants, each by name:
+    "smaa": Object.freeze([
+        "render/smaaPass.js",
+        "render/smaaPassGPU.mjs",
+        "tools/ship/smaaPass-selfcheck.mjs",
+    ]),
     "three": Object.freeze([
         // *** v4647p -- A FIXTURE, AND THE CENSUS CANNOT TELL IT FROM A REAL PATH DEPENDENCY. ***
         // This gate holds `const POSIX = "WebGLEngine/vendor/three/three.module.js"` and its Windows twin as
@@ -523,6 +529,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/subAquarium3dMarks-selfcheck.mjs",
         // v4932 -- render/subAquarium3dNav-selfcheck.mjs is GONE with main's navStore and render/subAquarium3dDark-selfcheck.mjs ARRIVED (named by orreryEjecta-selfcheck): the merge of claude/inspiring-mayer-9mdcut.
         "render/subAquarium3dDark-selfcheck.mjs",
+        // UNNUMBERED (v4933) -- ONE ARRIVAL, BY NAME: space-duel.html, the Space duels page, which imports the vendored three.
+        "space-duel.html",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -677,6 +685,13 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "brain/flyEmdLplc2Gf-selfcheck.mjs",
         "brain/openItems1-run.mjs",
         "brain/stealthRound3-run.mjs",
+        // UNNUMBERED (v4933) -- SIX ARRIVALS, BY NAME: the five fly pathways' gates and the gunner seat's (flySteering, flyTracking, helmCompassPolicy, helmSteerPolicy, maleCnsCircuits, seatTrackGunner), each reading the male-cns circuits.
+        "brain/flySteering-selfcheck.mjs",
+        "brain/flyTracking-selfcheck.mjs",
+        "brain/helmCompassPolicy-selfcheck.mjs",
+        "brain/helmSteerPolicy-selfcheck.mjs",
+        "brain/maleCnsCircuits-selfcheck.mjs",
+        "brain/seatTrackGunner-selfcheck.mjs",
     ]),
     // UNNUMBERED (the fish round) -- vendor/zebrafish arrived (the Fish1 TEN-analysis core, baked circuit JSON) with no entry, which importPosition-selfcheck's "every vendored body has an entry" turned red on. The list is dependantsOf() over
     // engineSources(), run, not typed: the command that writes it (tools/fishCircuit.mjs) and three files that read it (the fish circuit's gate, the fish pilot's gate, the aquarium bridge's gate, which writes a temp tree with a vendor/zebrafish/ in it).

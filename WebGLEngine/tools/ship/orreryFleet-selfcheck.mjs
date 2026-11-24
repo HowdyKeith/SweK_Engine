@@ -398,7 +398,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4905;   // v4905: the newest record; v4778's is graded below as history
+    const D = F.COMMIT_BELT_DRIFT_V4932;   // v4933: the newest record (v4932's object taken again in place: smaa arrived, male-cns carries the fly pathways line); v4778's is graded below as history
     // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
     // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
     // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
@@ -509,10 +509,11 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     }
     {
         const O = F.COMMIT_BELT_DRIFT_V4929, N = F.COMMIT_BELT_DRIFT_V4932;
-        const changed = Object.keys(O.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]).sort();
-        ok("!! the v4932 belt record is v4929's with TWO arrived bodies extended (male-cns: a1ecad48 and e5b750b6; zebrafish: 68c43c85; each in front of what it had); its moves are v4929's own object",
-           changed.join(",") === "male-cns,zebrafish" && O.at === "v4929" && N.at === "v4932" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
-           N.arrivedSince4475["male-cns"].now.slice(0, 2).join() === "a1ecad48,e5b750b6" && N.arrivedSince4475["male-cns"].now.slice(2).join() === O.arrivedSince4475["male-cns"].now.join() &&
+        const changed = Object.keys(N.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]).sort();
+        ok("!! the v4932 belt record (taken again in place at v4933) is v4929's with THREE arrived bodies changed (male-cns: thirteen commits in front of what it had, the last four of them a1ecad48 and e5b750b6 and the two older ones of the fly pathways line; smaa: the new body; zebrafish: 68c43c85 in front of what it had) and the fleet 29 bodies; its moves are v4929's own object",
+           changed.join(",") === "male-cns,smaa,zebrafish" && O.at === "v4929" && N.at === "v4933" && N.bodiesNow === 29 && O.bodiesNow === 28 && N.movedSince4475 === O.movedSince4475 &&
+           N.arrivedSince4475["male-cns"].now.slice(0, 9).join() === "daa9b8af,bea9121f,46164bcb,1cb4414b,402a8817,70394eb3,5badcb88,796d2849,889ddb7d" && N.arrivedSince4475["male-cns"].now.slice(9, 13).join() === "a1ecad48,e5b750b6,133bdc88,bb90f832" && N.arrivedSince4475["male-cns"].now.slice(13).join() === O.arrivedSince4475["male-cns"].now.join() &&
+           N.arrivedSince4475.smaa.now.join() === "ca358ce1,aa032543" && !O.arrivedSince4475.smaa &&
            N.arrivedSince4475.zebrafish.now[0] === "68c43c85" && N.arrivedSince4475.zebrafish.now.slice(1).join() === O.arrivedSince4475.zebrafish.now.join(),
            `arrived ${changed.join(", ")}`);
     }

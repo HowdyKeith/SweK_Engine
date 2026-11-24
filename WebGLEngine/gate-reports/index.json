@@ -1,5 +1,5 @@
 {
- "built": "2026-11-18",
+ "built": "2026-11-24",
  "reports": [
   "backendRouting-selfcheck.json",
   "brainStages-selfcheck.json",
@@ -59,6 +59,7 @@
   "genGateMeasure-selfcheck.json",
   "genGateRuleMeasure-selfcheck.json",
   "genGateTransfer-selfcheck.json",
+  "gpuTimerAuto-selfcheck.json",
   "hdrCost-selfcheck.json",
   "holeFillGPU-selfcheck.json",
   "labHome-selfcheck.json",

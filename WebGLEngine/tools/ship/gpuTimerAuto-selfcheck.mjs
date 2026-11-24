@@ -23,8 +23,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const require = createRequire(import.meta.url), ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const REPORT = gateReport("tools/ship/gpuTimerAuto-selfcheck.mjs");
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const section = async (fn) => { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
@@ -39,6 +41,7 @@ const DRAWS = ["avatarstage.html", "benchmark.html", "brain-room.html", "bzflag.
 const html = fs.readdirSync(ENG).filter((f) => f.endsWith(".html")).sort(), src = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
 const carriers = html.filter((f) => src(f).includes(TAG));
 
+REPORT.table("the pages that carry the timer line, by class (read from the source, so it is written on a box with no browser too)", ["page", "class"], carriers.map((pg) => [pg, ON_ASK.includes(pg) ? "context made on ask" : DRAWS.includes(pg) ? "draws at load or every frame" : "other"]));
 console.log("gpuTimerAuto-selfcheck -- the GPU timer on the other WebGL2 pages\n");
 
 console.log("1. THE SOURCE");
@@ -137,9 +140,11 @@ await section(async () => {
     const LABELS = { "water.html": ["sim", "caustics", "scene"], "raymarch-live.html": ["march"], "bzflag.html": ["world"] }, unnamed = Object.entries(LABELS).filter(([pg, ls]) => { const r = rows.find((x) => x.pg === pg); return !r || !ls.every((l) => r.on.labels && r.on.labels[l] > 0) || !ls.every((l) => new RegExp("^" + l + " ", "m").test(r.on.box || "")); });
     ok("!! THE PAGES THAT NAME THEIR PASSES HAVE THEM TIMED AND LISTED: water's sim, caustics and scene; raymarch-live's march; bzflag's world", unnamed.length === 0, unnamed.map(([pg]) => `${pg}: ${JSON.stringify((rows.find((x) => x.pg === pg) || { on: {} }).on.labels)}`).join("; "));
     for (const r of rest) console.log(`  ....  ${r.pg.padEnd(22)} ${r.on.canvas || ""}  ${r.on.box || ""}`);
+    REPORT.table("the pages that carry the timer line (not the on-ask ones), as this run timed them", ["page", "canvas", "overlay"], rest.map((r) => [r.pg, r.on.canvas || "", r.on.box || ""]));
     await browser.close(); srv.close();
 });
 
+REPORT.write();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
