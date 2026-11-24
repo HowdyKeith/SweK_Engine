@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-24T03:36:40.981Z",
+ "at": "2026-11-24T10:41:06.480Z",
  "poolAt": "2026-11-20T05:40:26.914Z",
  "poolHorizon": "2026-11-16T18:32:18.286Z",
  "budgetMs": 3000,
@@ -1550,10 +1550,10 @@
   },
   {
    "gate": "physics/render/albedoEstimator-selfcheck.mjs",
-   "ms": 3364,
+   "ms": 3571,
    "code": 0,
-   "priorMs": 3183,
-   "at": "2026-11-20T05:40:26.914Z"
+   "priorMs": 3364,
+   "at": "2026-11-24T10:40:13.156Z"
   },
   {
    "gate": "physics/render/bounces-selfcheck.mjs",
@@ -1655,10 +1655,10 @@
   },
   {
    "gate": "physics/render/pathTracerGpu-selfcheck.mjs",
-   "ms": 3369,
+   "ms": 4739,
    "code": 0,
-   "priorMs": 3517,
-   "at": "2026-11-20T02:31:47.592Z"
+   "priorMs": 3369,
+   "at": "2026-11-24T10:40:22.722Z"
   },
   {
    "gate": "physics/render/pathTracerNEE-selfcheck.mjs",
@@ -2722,10 +2722,10 @@
   },
   {
    "gate": "tools/mutate/shadowedDefaults-selfcheck.mjs",
-   "ms": 3765,
+   "ms": 4205,
    "code": 0,
-   "priorMs": 3737,
-   "at": "2026-11-17T01:53:26.513Z"
+   "priorMs": 3765,
+   "at": "2026-11-24T10:40:57.161Z"
   },
   {
    "gate": "tools/render-qa/edgeBiasOracle-selfcheck.mjs",
@@ -2897,10 +2897,10 @@
   },
   {
    "gate": "tools/roundhouse/corroborationSubmit-selfcheck.mjs",
-   "ms": 3719,
+   "ms": 4353,
    "code": 0,
-   "priorMs": 4211,
-   "at": "2026-11-20T02:31:47.592Z"
+   "priorMs": 3719,
+   "at": "2026-11-24T10:40:49.004Z"
   },
   {
    "gate": "tools/roundhouse/crossDevice-selfcheck.mjs",
@@ -2932,10 +2932,10 @@
   },
   {
    "gate": "tools/roundhouse/deviceReport-selfcheck.mjs",
-   "ms": 3946,
+   "ms": 4616,
    "code": 0,
-   "priorMs": 4089,
-   "at": "2026-11-20T02:31:47.592Z"
+   "priorMs": 3946,
+   "at": "2026-11-24T10:41:06.480Z"
   },
   {
    "gate": "tools/roundhouse/diffusion-selfcheck.mjs",
@@ -3611,10 +3611,10 @@
   },
   {
    "gate": "tools/ship/absenceScope-selfcheck.mjs",
-   "ms": 1652,
+   "ms": 2449,
    "code": 0,
-   "priorMs": 3123,
-   "at": "2026-10-05T19:00:40.618Z"
+   "priorMs": 3134,
+   "at": "2026-11-24T10:39:51.798Z"
   },
   {
    "gate": "tools/ship/adapterRecord-selfcheck.mjs",
@@ -3758,10 +3758,10 @@
   },
   {
    "gate": "tools/ship/backlogAbsence-selfcheck.mjs",
-   "ms": 3526,
+   "ms": 4228,
    "code": 0,
-   "priorMs": 3395,
-   "at": "2026-11-20T02:31:47.592Z"
+   "priorMs": 3526,
+   "at": "2026-11-24T10:40:40.374Z"
   },
   {
    "gate": "tools/ship/badTvDevicePass-selfcheck.mjs",
@@ -4038,10 +4038,10 @@
   },
   {
    "gate": "tools/ship/cliArgs-selfcheck.mjs",
-   "ms": 2788,
+   "ms": 2859,
    "code": 0,
-   "priorMs": 3330,
-   "at": "2026-11-22T23:49:40.989Z"
+   "priorMs": 3298,
+   "at": "2026-11-24T10:40:05.767Z"
   },
   {
    "gate": "tools/ship/cloneProvision-selfcheck.mjs",
@@ -4302,10 +4302,10 @@
   },
   {
    "gate": "tools/ship/deviceReach-selfcheck.mjs",
-   "ms": 3448,
+   "ms": 4351,
    "code": 0,
-   "priorMs": 3714,
-   "at": "2026-11-19T17:14:00.540Z"
+   "priorMs": 3448,
+   "at": "2026-11-24T10:40:31.579Z"
   },
   {
    "gate": "tools/ship/deviceTexture-selfcheck.mjs",
@@ -5855,10 +5855,10 @@
   },
   {
    "gate": "tools/ship/parallaxSampler-selfcheck.mjs",
-   "ms": 3292,
+   "ms": 3857,
    "code": 0,
-   "priorMs": 4274,
-   "at": "2026-11-19T16:00:41.621Z"
+   "priorMs": 3292,
+   "at": "2026-11-24T10:39:59.779Z"
   },
   {
    "gate": "tools/ship/passFootprint-selfcheck.mjs",
@@ -6282,6 +6282,13 @@
    "code": 0,
    "priorMs": 3551,
    "at": "2026-11-19T21:56:11.052Z"
+  },
+  {
+   "gate": "tools/ship/recordProbe-selfcheck.mjs",
+   "ms": 2641,
+   "code": 0,
+   "priorMs": 3119,
+   "at": "2026-11-24T10:39:46.661Z"
   },
   {
    "gate": "tools/ship/recordShape-selfcheck.mjs",
