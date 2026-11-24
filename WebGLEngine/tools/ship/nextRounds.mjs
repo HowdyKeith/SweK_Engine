@@ -3133,10 +3133,18 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-fleet-avoidance",
-        blocker: "OPEN",
+        blocker: "CLOSED",
+        closed: "CLOSED 2026-11-24 (unnumbered, working branch, nothing shipped): FOLLOW-UP 12 of brain/SUB_FIELD_NAV_WIP.md, registered before any code, flown once on HELD12 (30 seas, fleets of 4 and 8, two arms, 120 runs in brain/subFleetHeld12.jsonl). PARTLY SUPPORTED: the other subs as moving full-depth discs in each courier's plan cut sub contacts from 102 to 29 but lost 28 percent of the arrivals (0.75, the bar 0.9) and doubled contacts with the sea's obstacles; 14 percent of its plans found no route. NOT answered: the subs' vertical separation (entered as nav-fleet-vertical).",
         what: "Every courier in the Sub Aquarium's navigation scene (brain/subTankNav.mjs) sails alone: the other subs are not obstacles.",
         how: "Many couriers at once treating each other as traffic (each sub's position and velocity as a moving obstacle in the others' plans).",
         why: "The tank scene is where a crowd can be seen; today the subs pass through one another.",
+    },
+    {
+        id: "nav-fleet-vertical",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 12's fleet arm made every other sub a full-depth column: sub contacts fell 72 percent, but arrivals fell 28 percent, contacts with the sea doubled and 14 percent of plans found no route.",
+        how: "Each other sub as a disc with a keel (its depth plus a margin), so the plan passes above or below a sub at another depth as it already does for icebergs and ships; a sub that finds no route slows or holds instead of flying on; the same design on fresh seas, the paired test beside the totals.",
+        why: "Most of the lost water is vertical separation the plan could use; whether using it keeps the contact gain and gives the arrivals back is the question.",
     },
     {
         id: "nav-match-consumes-layer",
