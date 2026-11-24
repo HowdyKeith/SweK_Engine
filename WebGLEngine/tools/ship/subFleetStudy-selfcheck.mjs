@@ -8,7 +8,10 @@
 //   3  THE VERDICT     GAIN (sub contacts at most half), KEEPS MOVING (arrivals at least 0.9), the verdict over their combinations, F1 to F6 each at its boundary, a missing cell is a miss
 //   4  THE TEXT AND THE COMMAND   the table, the verdict block, bad arguments (exit 2, named), a short run end to end, run as a process, --write goes with held12 only
 //
-// SABOTAGE LOG: (filled by the serial mutation pass below)
+// SABOTAGE LOG (serial mutation pass of tools/ship/subFleetStudy.mjs, one mutant per code line and operator, at most four of each operator on a line): 93 mutants; 76 red on the first pass and 17 survivors read one by one: the thresholds' 0 and 1 boundaries, the `flown` test, the F1 and F6 line texts, the `--seconds` bound and its message, the entry point. Reading them found a REAL FLAW in the study command: GAIN required an N = 4 designated cell, so a
+//   study of N = 8 alone could not read GAIN; the command now accepts either size's cell. Rows were added (the 0 and 1 boundaries, a one-size study, a reference with exactly one contact, equal ratios, one plan, the exact F1, F6 and `--seconds` lines) and the survivors the rows could reach were run again: 16 mutants, 14 red. The 3 left are EQUIVALENT:
+//   `r.subContacts > 0` -> `>= 0` in the ratio (a reference with no contacts gives 0/0 or x/0, neither finite, so the ratio is not a number either way), `d("plans") > 0` -> `>= 0` in F5 (no plans gives 0/0, not at least 5 percent) and `process.argv[1]` -> `argv[2]` in the entry test (the process row passes arguments, so argv[2] is set; a run with NO arguments would differ and is the one thing not run here).
+//   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the DEV and HELD12 flights themselves are the module's gate's.
 "use strict";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
