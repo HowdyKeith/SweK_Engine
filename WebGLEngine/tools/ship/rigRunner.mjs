@@ -100,7 +100,7 @@ if (has("--dry-run")) process.exit(0);
 let failed = 0;
 for (const p of plan) {
     if (!p.o || p.done) continue;
-    const c = cmdOf(p.n), rel = path.relative(eng, c);
+    const c = cmdOf(p.n), rel = path.relative(eng, c).replace(/\\/g, "/");
     if (p.o.search) {
         const code = await phase(p.n, "search", [rel, "search", "--workers", String(workers)]);
         if (code !== 0) { failed++; console.log(`[rig] H${p.n} search did not finish (exit ${code}); run the same line again to resume it. Going on to the next round.`); continue; }
