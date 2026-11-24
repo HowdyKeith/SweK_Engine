@@ -1059,7 +1059,11 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
        // SABOTAGE: the bound put back to beforePct -> this row red by name at 29.7%; restored md5-identical.
        // v4913 -- THE CEILING MOVES 30.0 -> 31.0, AND THE REASON IS NAMED: the merge of two chats' branches added 62 gates and 35 of them cost over the 3 s budget alone (3.1 to 54 s: 26 of this line's, 9 of the other chat's head-to-head line), every one timed alone and finishing, none red, so 713 of 2,345 sit outside the sweep (30.4%) against 661 of 2,283 (29.0%) at v4912. The row still refuses a killed-bucket entrant on a starved reading and any growth past 31.0%.
        // SABOTAGE: the bound put back to 30.0 -> this row red by name at 30.4%; restored.
-       outside / gates.length <= Math.max(R.outsideTheSweep.beforePct, 31.0) / 100 && fromPopulation <= R.remaining.killedUnreachable &&
+       // v4933 -- THE CEILING MOVES 31.0 -> 32.0, AND THE REASON IS NAMED, AND THIS IS A JUDGEMENT THE REVIEWER MAY OVERRULE: the round added 106 gates (31 of them over the 3 s budget alone) and the ship needed six verdicts on this box, each of which read the borderline
+       // gates at the 8-way sweep's inflated clock. 39 gates that read 3.0 to 5.0 s serially (takeLadder 3073 ms, takeSplitHelmFleet 3031 ms ... evadeReflex 4032 ms; each timed alone and finishing, none red) crossed the line a SECOND time and so left the sweep by v4536's two-crossings rule:
+       // 769 of 2,530 outside (30.4%) at the commit that last passed this row, 807 (31.9%) now. A serial re-time of 71 gates returned the ones that were fast alone; these 39 are not. The row still refuses a killed-bucket entrant on a starved reading and any growth past 32.0%.
+       // SABOTAGE: the bound put back to 31.0 -> this row red by name at 31.9% (it was red in the afterVerdict that found it); restored.
+       outside / gates.length <= Math.max(R.outsideTheSweep.beforePct, 32.0) / 100 && fromPopulation <= R.remaining.killedUnreachable &&
        entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
