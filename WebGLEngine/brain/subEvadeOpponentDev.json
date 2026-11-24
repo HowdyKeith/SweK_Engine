@@ -1,0 +1,1499 @@
+{
+ "mode": "dev",
+ "set": "dev",
+ "first": 104001,
+ "count": 24,
+ "rules": {
+  "n": 5,
+  "fprime": [
+   "league7001",
+   "league7100",
+   "league7103",
+   "exploit7200",
+   "exploit7204"
+  ],
+  "replicates": true,
+  "labels": {
+   "U": {
+    "hand": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 1,
+      "label": "NO"
+     }
+    },
+    "champ": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 4,
+      "label": "YES"
+     }
+    },
+    "league7000": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 5,
+      "label": "YES"
+     }
+    }
+   },
+   "GT": {
+    "hand": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 3,
+      "label": "PARTIAL"
+     }
+    },
+    "champ": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 5,
+      "label": "YES"
+     }
+    },
+    "league7000": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 5,
+      "label": "YES"
+     }
+    }
+   },
+   "GN": {
+    "hand": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 0,
+      "label": "NO"
+     }
+    },
+    "champ": {
+     "beat": {
+      "count": 5,
+      "label": "YES"
+     },
+     "add": {
+      "count": 4,
+      "label": "YES"
+     }
+    },
+    "league7000": {
+     "beat": {
+      "count": 0,
+      "label": "NO"
+     },
+     "add": {
+      "count": 0,
+      "label": "NO"
+     }
+    }
+   }
+  },
+  "summary": {
+   "U": {
+    "beats": 3,
+    "adds": 2
+   },
+   "GT": {
+    "beats": 3,
+    "adds": 2
+   },
+   "GN": {
+    "beats": 2,
+    "adds": 1
+   }
+  },
+  "m1": false,
+  "m2": true,
+  "medU": {
+   "G": 2.0840422453703704,
+   "hand": 2.5956206597222224,
+   "champ": 1.9969343171296297,
+   "league7000": 2.0617520254629635
+  },
+  "forecast": {
+   "uBeat": [
+    true,
+    true,
+    true
+   ],
+   "uAdd": [
+    false,
+    true,
+    true
+   ],
+   "withinHalf": false,
+   "gtBeatChamp": true,
+   "gnBeatChamp": true,
+   "gnAddChamp": true,
+   "m1": false,
+   "m2": true
+  }
+ },
+ "rows": [
+  {
+   "id": "U:league7001@G",
+   "kind": "UvG",
+   "finder": "league7001",
+   "edge": 2.0840422453703704,
+   "se": 0.3703228418231129,
+   "z": 5.627636240612526,
+   "winsX": 39,
+   "draws": 1,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.4557378472222227,
+   "seatB": 1.7123466435185184,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "G"
+  },
+  {
+   "id": "U:league7100@G",
+   "kind": "UvG",
+   "finder": "league7100",
+   "edge": 2.073757233796296,
+   "se": 0.3699566270343682,
+   "z": 5.605406369984145,
+   "winsX": 39,
+   "draws": 1,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.468006365740741,
+   "seatB": 1.6795081018518518,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "G"
+  },
+  {
+   "id": "U:league7103@G",
+   "kind": "UvG",
+   "finder": "league7103",
+   "edge": 0.9783188657407407,
+   "se": 0.3672459088397204,
+   "z": 2.663934007683432,
+   "winsX": 31,
+   "draws": 0,
+   "winsY": 17,
+   "finds": true,
+   "seatA": 1.6833593750000004,
+   "seatB": 0.2732783564814812,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "G"
+  },
+  {
+   "id": "U:exploit7200@G",
+   "kind": "UvG",
+   "finder": "exploit7200",
+   "edge": 2.350703125,
+   "se": 0.28802700576735246,
+   "z": 8.161398333942092,
+   "winsX": 41,
+   "draws": 1,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 2.4609259259259253,
+   "seatB": 2.2404803240740745,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "G"
+  },
+  {
+   "id": "U:exploit7204@G",
+   "kind": "UvG",
+   "finder": "exploit7204",
+   "edge": 2.103660300925926,
+   "se": 0.3116922690865179,
+   "z": 6.749157773759229,
+   "winsX": 39,
+   "draws": 1,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.474140625,
+   "seatB": 1.7331799768518519,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "G"
+  },
+  {
+   "id": "G@hand",
+   "kind": "G",
+   "finder": "G",
+   "edge": 2.255133101851852,
+   "se": 0.3879886509317743,
+   "z": 5.812368728920386,
+   "winsX": 40,
+   "draws": 0,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 3.1014814814814815,
+   "seatB": 1.4087847222222223,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand"
+  },
+  {
+   "id": "G@champ",
+   "kind": "G",
+   "finder": "G",
+   "edge": 0.12200231481481487,
+   "se": 0.13850126219681014,
+   "z": 0.8808751117477162,
+   "winsX": 25,
+   "draws": 0,
+   "winsY": 23,
+   "finds": false,
+   "seatA": 1.0992563657407406,
+   "seatB": -0.8552517361111112,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ"
+  },
+  {
+   "id": "G@league7000",
+   "kind": "G",
+   "finder": "G",
+   "edge": 0.15650752314814817,
+   "se": 0.2476421755877031,
+   "z": 0.6319905839008454,
+   "winsX": 25,
+   "draws": 0,
+   "winsY": 23,
+   "finds": false,
+   "seatA": 1.1449739583333334,
+   "seatB": -0.8319589120370371,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000"
+  },
+  {
+   "id": "U:league7001@hand",
+   "kind": "U",
+   "finder": "league7001",
+   "edge": 2.6675115740740747,
+   "se": 0.22246803921680017,
+   "z": 11.990538431790302,
+   "winsX": 40,
+   "draws": 6,
+   "winsY": 2,
+   "finds": true,
+   "seatA": 2.9581741898148146,
+   "seatB": 2.376848958333334,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.4123784722222221,
+    "se": 0.3216094383945256,
+    "z": 1.2822337375445683,
+    "adds": false
+   }
+  },
+  {
+   "id": "U:league7100@hand",
+   "kind": "U",
+   "finder": "league7100",
+   "edge": 2.5956206597222224,
+   "se": 0.24443349247018514,
+   "z": 10.618923918696716,
+   "winsX": 40,
+   "draws": 5,
+   "winsY": 3,
+   "finds": true,
+   "seatA": 3.0967968750000003,
+   "seatB": 2.0944444444444446,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.3404875578703703,
+    "se": 0.37893536300968494,
+    "z": 0.8985372997813035,
+    "adds": false
+   }
+  },
+  {
+   "id": "U:league7103@hand",
+   "kind": "U",
+   "finder": "league7103",
+   "edge": 2.117410300925926,
+   "se": 0.3901853419429383,
+   "z": 5.426678230356438,
+   "winsX": 39,
+   "draws": 0,
+   "winsY": 9,
+   "finds": true,
+   "seatA": 3.1025144675925915,
+   "seatB": 1.1323061342592593,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": -0.137722800925926,
+    "se": 0.4217811748826807,
+    "z": -0.3265266662606123,
+    "adds": false
+   }
+  },
+  {
+   "id": "U:exploit7200@hand",
+   "kind": "U",
+   "finder": "exploit7200",
+   "edge": 2.586614583333333,
+   "se": 0.28290581959340394,
+   "z": 9.143023593685172,
+   "winsX": 39,
+   "draws": 7,
+   "winsY": 2,
+   "finds": true,
+   "seatA": 2.959985532407407,
+   "seatB": 2.213243634259259,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.33148148148148154,
+    "se": 0.37057673538102476,
+    "z": 0.8945015966548853,
+    "adds": false
+   }
+  },
+  {
+   "id": "U:exploit7204@hand",
+   "kind": "U",
+   "finder": "exploit7204",
+   "edge": 2.8053616898148146,
+   "se": 0.25872653269508566,
+   "z": 10.842960946417463,
+   "winsX": 42,
+   "draws": 4,
+   "winsY": 2,
+   "finds": true,
+   "seatA": 3.2405902777777773,
+   "seatB": 2.370133101851852,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.5502285879629628,
+    "se": 0.21174323456795516,
+    "z": 2.5985651399236414,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7001@champ",
+   "kind": "U",
+   "finder": "league7001",
+   "edge": 2.146299189814815,
+   "se": 0.35751162332202907,
+   "z": 6.0034389088422255,
+   "winsX": 39,
+   "draws": 2,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 2.4439583333333332,
+   "seatB": 1.8486400462962964,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 2.0242968750000006,
+    "se": 0.36693070785058074,
+    "z": 5.5168369168609415,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7100@champ",
+   "kind": "U",
+   "finder": "league7100",
+   "edge": 1.9969343171296297,
+   "se": 0.4147967960777283,
+   "z": 4.814247207337219,
+   "winsX": 38,
+   "draws": 2,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.452042824074074,
+   "seatB": 1.5418258101851852,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 1.8749320023148146,
+    "se": 0.4210109221380604,
+    "z": 4.453404659416355,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7103@champ",
+   "kind": "U",
+   "finder": "league7103",
+   "edge": 1.100554108796296,
+   "se": 0.42440391881893147,
+   "z": 2.5931761230174657,
+   "winsX": 32,
+   "draws": 0,
+   "winsY": 16,
+   "finds": true,
+   "seatA": 1.9434635416666666,
+   "seatB": 0.25764467592592594,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.9785517939814814,
+    "se": 0.5023625483750129,
+    "z": 1.9478995740164011,
+    "adds": false
+   }
+  },
+  {
+   "id": "U:exploit7200@champ",
+   "kind": "U",
+   "finder": "exploit7200",
+   "edge": 2.4667563657407405,
+   "se": 0.27077121199458176,
+   "z": 9.110113100908604,
+   "winsX": 42,
+   "draws": 1,
+   "winsY": 5,
+   "finds": true,
+   "seatA": 2.445633680555555,
+   "seatB": 2.487879050925926,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 2.344754050925926,
+    "se": 0.2916347554392445,
+    "z": 8.040036405792527,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:exploit7204@champ",
+   "kind": "U",
+   "finder": "exploit7204",
+   "edge": 1.89236400462963,
+   "se": 0.31411084112691684,
+   "z": 6.0245103220267975,
+   "winsX": 37,
+   "draws": 2,
+   "winsY": 9,
+   "finds": true,
+   "seatA": 2.1920167824074075,
+   "seatB": 1.5927112268518517,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 1.7703616898148147,
+    "se": 0.31988948340724144,
+    "z": 5.534291627715131,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7001@league7000",
+   "kind": "U",
+   "finder": "league7001",
+   "edge": 2.0409866898148152,
+   "se": 0.4311805433170414,
+   "z": 4.73348512925386,
+   "winsX": 39,
+   "draws": 0,
+   "winsY": 9,
+   "finds": true,
+   "seatA": 2.2257060185185185,
+   "seatB": 1.8562673611111113,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 1.8844791666666667,
+    "se": 0.38974161382399775,
+    "z": 4.835201322683682,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7100@league7000",
+   "kind": "U",
+   "finder": "league7100",
+   "edge": 2.156947337962963,
+   "se": 0.37566856220012373,
+   "z": 5.741623215237074,
+   "winsX": 40,
+   "draws": 0,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.2237557870370366,
+   "seatB": 2.0901388888888888,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.000439814814815,
+    "se": 0.38704835597760495,
+    "z": 5.168449326601874,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:league7103@league7000",
+   "kind": "U",
+   "finder": "league7103",
+   "edge": 1.4199551504629628,
+   "se": 0.3380827560491037,
+   "z": 4.20002240592456,
+   "winsX": 34,
+   "draws": 0,
+   "winsY": 14,
+   "finds": true,
+   "seatA": 2.2702199074074074,
+   "seatB": 0.5696903935185186,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 1.2634476273148152,
+    "se": 0.4830521983968453,
+    "z": 2.6155509311580567,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:exploit7200@league7000",
+   "kind": "U",
+   "finder": "exploit7200",
+   "edge": 2.579120370370371,
+   "se": 0.27295224677167257,
+   "z": 9.448980181972388,
+   "winsX": 43,
+   "draws": 0,
+   "winsY": 5,
+   "finds": true,
+   "seatA": 2.4882812499999996,
+   "seatB": 2.669959490740741,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.422612847222222,
+    "se": 0.29930974831311397,
+    "z": 8.093999145954571,
+    "adds": true
+   }
+  },
+  {
+   "id": "U:exploit7204@league7000",
+   "kind": "U",
+   "finder": "exploit7204",
+   "edge": 2.0617520254629635,
+   "se": 0.38269694524640485,
+   "z": 5.387427443758338,
+   "winsX": 39,
+   "draws": 0,
+   "winsY": 9,
+   "finds": true,
+   "seatA": 2.240170717592593,
+   "seatB": 1.8833333333333335,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 1.905244502314815,
+    "se": 0.33252330594411184,
+    "z": 5.729657044354765,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7001@hand",
+   "kind": "GT",
+   "finder": "league7001",
+   "edge": 2.810169270833333,
+   "se": 0.21780562150329852,
+   "z": 12.902188894104254,
+   "winsX": 41,
+   "draws": 6,
+   "winsY": 1,
+   "finds": true,
+   "seatA": 3.2408072916666666,
+   "seatB": 2.37953125,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.5550361689814814,
+    "se": 0.21449678943277747,
+    "z": 2.5876199380384097,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7100@hand",
+   "kind": "GT",
+   "finder": "league7100",
+   "edge": 2.810620659722222,
+   "se": 0.21778299669660814,
+   "z": 12.905601917296034,
+   "winsX": 41,
+   "draws": 6,
+   "winsY": 1,
+   "finds": true,
+   "seatA": 3.2408072916666666,
+   "seatB": 2.380434027777778,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.5554875578703703,
+    "se": 0.21467959149051602,
+    "z": 2.587519167581937,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7103@hand",
+   "kind": "GT",
+   "finder": "league7103",
+   "edge": 2.4711588541666667,
+   "se": 0.35975961792947264,
+   "z": 6.868916718304702,
+   "winsX": 41,
+   "draws": 1,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1035127314814814,
+   "seatB": 1.8388049768518524,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.21602575231481477,
+    "se": 0.14712993821383594,
+    "z": 1.4682650923216385,
+    "adds": false
+   }
+  },
+  {
+   "id": "GT:exploit7200@hand",
+   "kind": "GT",
+   "finder": "exploit7200",
+   "edge": 2.74763744212963,
+   "se": 0.2217952956744598,
+   "z": 12.388168260171202,
+   "winsX": 40,
+   "draws": 7,
+   "winsY": 1,
+   "finds": true,
+   "seatA": 3.2408072916666666,
+   "seatB": 2.2544675925925923,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.49250434027777784,
+    "se": 0.1884859285789777,
+    "z": 2.612950176126347,
+    "adds": false
+   }
+  },
+  {
+   "id": "GT:exploit7204@hand",
+   "kind": "GT",
+   "finder": "exploit7204",
+   "edge": 2.873350694444444,
+   "se": 0.21282935349764281,
+   "z": 13.500725568272085,
+   "winsX": 42,
+   "draws": 5,
+   "winsY": 1,
+   "finds": true,
+   "seatA": 3.2408072916666666,
+   "seatB": 2.5058940972222223,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.6182175925925925,
+    "se": 0.2370536497010526,
+    "z": 2.607922693332181,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7001@champ",
+   "kind": "GT",
+   "finder": "league7001",
+   "edge": 2.2294097222222224,
+   "se": 0.2850911230352783,
+   "z": 7.819989968422646,
+   "winsX": 39,
+   "draws": 3,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 2.454244791666666,
+   "seatB": 2.004574652777778,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 2.107407407407407,
+    "se": 0.2960656459022597,
+    "z": 7.1180410039979,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7100@champ",
+   "kind": "GT",
+   "finder": "league7100",
+   "edge": 2.6327719907407414,
+   "se": 0.23243822179731533,
+   "z": 11.326760161831311,
+   "winsX": 42,
+   "draws": 3,
+   "winsY": 3,
+   "finds": true,
+   "seatA": 2.7231770833333333,
+   "seatB": 2.5423668981481478,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 2.510769675925926,
+    "se": 0.2550067981984104,
+    "z": 9.845893104278728,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7103@champ",
+   "kind": "GT",
+   "finder": "league7103",
+   "edge": 0.8181221064814816,
+   "se": 0.2888500452891609,
+   "z": 2.8323419705975086,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.3851533564814815,
+   "seatB": 0.2510908564814816,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.6961197916666667,
+    "se": 0.27069331281899933,
+    "z": 2.5716179850077467,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:exploit7200@champ",
+   "kind": "GT",
+   "finder": "exploit7200",
+   "edge": 2.6928399884259258,
+   "se": 0.22871228035037547,
+   "z": 11.773919547741963,
+   "winsX": 43,
+   "draws": 2,
+   "winsY": 3,
+   "finds": true,
+   "seatA": 2.7244820601851854,
+   "seatB": 2.6611979166666657,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 2.570837673611111,
+    "se": 0.2533924709259558,
+    "z": 10.14567506373281,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:exploit7204@champ",
+   "kind": "GT",
+   "finder": "exploit7204",
+   "edge": 2.0309765625,
+   "se": 0.3079891679364433,
+   "z": 6.594311663970963,
+   "winsX": 38,
+   "draws": 2,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.1929427083333333,
+   "seatB": 1.8690104166666661,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 1.9089742476851852,
+    "se": 0.3147916720783917,
+    "z": 6.064246347691811,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7001@league7000",
+   "kind": "GT",
+   "finder": "league7001",
+   "edge": 2.6024160879629625,
+   "se": 0.27580178077072653,
+   "z": 9.43582046747677,
+   "winsX": 43,
+   "draws": 0,
+   "winsY": 5,
+   "finds": true,
+   "seatA": 2.5063859953703704,
+   "seatB": 2.6984461805555555,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.445908564814815,
+    "se": 0.29145441001662903,
+    "z": 8.392079449665088,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7100@league7000",
+   "kind": "GT",
+   "finder": "league7100",
+   "edge": 2.8735836226851847,
+   "se": 0.22265353475980593,
+   "z": 12.906076814747845,
+   "winsX": 45,
+   "draws": 0,
+   "winsY": 3,
+   "finds": true,
+   "seatA": 2.7750028935185185,
+   "seatB": 2.972164351851852,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.717076099537037,
+    "se": 0.3188978238334725,
+    "z": 8.52020897124681,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:league7103@league7000",
+   "kind": "GT",
+   "finder": "league7103",
+   "edge": 0.8576982060185184,
+   "se": 0.35655388240508123,
+   "z": 2.405521993570909,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.4288165509259263,
+   "seatB": 0.28657986111111106,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.7011906828703705,
+    "se": 0.273287147365442,
+    "z": 2.565765311797602,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:exploit7200@league7000",
+   "kind": "GT",
+   "finder": "exploit7200",
+   "edge": 2.740481770833334,
+   "se": 0.2536784008818643,
+   "z": 10.802976372078092,
+   "winsX": 44,
+   "draws": 0,
+   "winsY": 4,
+   "finds": true,
+   "seatA": 2.508946759259259,
+   "seatB": 2.9720167824074077,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.583974247685185,
+    "se": 0.27406430391036773,
+    "z": 9.428350247795382,
+    "adds": true
+   }
+  },
+  {
+   "id": "GT:exploit7204@league7000",
+   "kind": "GT",
+   "finder": "exploit7204",
+   "edge": 2.203968460648148,
+   "se": 0.37573260846108175,
+   "z": 5.865789689308892,
+   "winsX": 40,
+   "draws": 0,
+   "winsY": 8,
+   "finds": true,
+   "seatA": 2.2434317129629626,
+   "seatB": 2.1645052083333334,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 2.0474609375,
+    "se": 0.3245604130492231,
+    "z": 6.308412410078737,
+    "adds": true
+   }
+  },
+  {
+   "id": "GN:league7001@hand",
+   "kind": "GN",
+   "finder": "league7001",
+   "edge": 2.401319444444445,
+   "se": 0.3616906718447979,
+   "z": 6.639152268419173,
+   "winsX": 40,
+   "draws": 2,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1033015046296293,
+   "seatB": 1.6993373842592592,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.14618634259259258,
+    "se": 0.09673776798299802,
+    "z": 1.5111610040277683,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7100@hand",
+   "kind": "GN",
+   "finder": "league7100",
+   "edge": 2.3321310763888894,
+   "se": 0.37398581866886926,
+   "z": 6.235881041397939,
+   "winsX": 40,
+   "draws": 1,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 3.103252314814815,
+   "seatB": 1.5610098379629627,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.07699797453703704,
+    "se": 0.06970630373439629,
+    "z": 1.1046056154465511,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7103@hand",
+   "kind": "GN",
+   "finder": "league7103",
+   "edge": 2.401319444444445,
+   "se": 0.3616906718447979,
+   "z": 6.639152268419173,
+   "winsX": 40,
+   "draws": 2,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1033015046296293,
+   "seatB": 1.6993373842592592,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.14618634259259258,
+    "se": 0.09673776798299802,
+    "z": 1.5111610040277683,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:exploit7200@hand",
+   "kind": "GN",
+   "finder": "exploit7200",
+   "edge": 2.401319444444445,
+   "se": 0.3616906718447979,
+   "z": 6.639152268419173,
+   "winsX": 40,
+   "draws": 2,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1033015046296293,
+   "seatB": 1.6993373842592592,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.14618634259259258,
+    "se": 0.09673776798299802,
+    "z": 1.5111610040277683,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:exploit7204@hand",
+   "kind": "GN",
+   "finder": "exploit7204",
+   "edge": 2.3957971643518516,
+   "se": 0.3747420697587556,
+   "z": 6.393189763546358,
+   "winsX": 41,
+   "draws": 0,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 3.1031973379629627,
+   "seatB": 1.6883969907407403,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "hand",
+   "add": {
+    "mean": 0.1406640625,
+    "se": 0.1335501126211639,
+    "z": 1.0532680185678012,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7001@champ",
+   "kind": "GN",
+   "finder": "league7001",
+   "edge": 0.8134129050925925,
+   "se": 0.28860548271711967,
+   "z": 2.8184249912184427,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.3824276620370375,
+   "seatB": 0.24439814814814811,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.6914105902777776,
+    "se": 0.2703234730958922,
+    "z": 2.5577156965296632,
+    "adds": true
+   }
+  },
+  {
+   "id": "GN:league7100@champ",
+   "kind": "GN",
+   "finder": "league7100",
+   "edge": 0.8116073495370372,
+   "se": 0.2891155643404982,
+   "z": 2.807207392616152,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.381828703703704,
+   "seatB": 0.24138599537037042,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.6896050347222222,
+    "se": 0.27082866836399305,
+    "z": 2.546277832727054,
+    "adds": true
+   }
+  },
+  {
+   "id": "GN:league7103@champ",
+   "kind": "GN",
+   "finder": "league7103",
+   "edge": 0.8134129050925925,
+   "se": 0.28860548271711967,
+   "z": 2.8184249912184427,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.3824276620370375,
+   "seatB": 0.24439814814814811,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.6914105902777776,
+    "se": 0.2703234730958922,
+    "z": 2.5577156965296632,
+    "adds": true
+   }
+  },
+  {
+   "id": "GN:exploit7200@champ",
+   "kind": "GN",
+   "finder": "exploit7200",
+   "edge": 0.8134129050925925,
+   "se": 0.28860548271711967,
+   "z": 2.8184249912184427,
+   "winsX": 30,
+   "draws": 0,
+   "winsY": 18,
+   "finds": true,
+   "seatA": 1.3824276620370375,
+   "seatB": 0.24439814814814811,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.6914105902777776,
+    "se": 0.2703234730958922,
+    "z": 2.5577156965296632,
+    "adds": true
+   }
+  },
+  {
+   "id": "GN:exploit7204@champ",
+   "kind": "GN",
+   "finder": "exploit7204",
+   "edge": 0.5483767361111113,
+   "se": 0.24896349312689087,
+   "z": 2.2026391469034237,
+   "winsX": 28,
+   "draws": 0,
+   "winsY": 20,
+   "finds": true,
+   "seatA": 1.3816579861111113,
+   "seatB": -0.2849045138888889,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "champ",
+   "add": {
+    "mean": 0.42637442129629627,
+    "se": 0.22017607645885723,
+    "z": 1.9365156657970053,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7001@league7000",
+   "kind": "GN",
+   "finder": "league7001",
+   "edge": 0.5881380208333334,
+   "se": 0.32407434129183127,
+   "z": 1.8148243964298023,
+   "winsX": 28,
+   "draws": 0,
+   "winsY": 20,
+   "finds": false,
+   "seatA": 1.1635677083333336,
+   "seatB": 0.012708333333333358,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.4316304976851852,
+    "se": 0.22206329886855458,
+    "z": 1.9437273060627602,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7100@league7000",
+   "kind": "GN",
+   "finder": "league7100",
+   "edge": 0.4525998263888889,
+   "se": 0.30259654993357005,
+   "z": 1.495720379126099,
+   "winsX": 27,
+   "draws": 0,
+   "winsY": 21,
+   "finds": false,
+   "seatA": 1.1629253472222223,
+   "seatB": -0.25772569444444443,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.2960923032407408,
+    "se": 0.18496356259686678,
+    "z": 1.600814231103897,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:league7103@league7000",
+   "kind": "GN",
+   "finder": "league7103",
+   "edge": 0.5881380208333334,
+   "se": 0.32407434129183127,
+   "z": 1.8148243964298023,
+   "winsX": 28,
+   "draws": 0,
+   "winsY": 20,
+   "finds": false,
+   "seatA": 1.1635677083333336,
+   "seatB": 0.012708333333333358,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.4316304976851852,
+    "se": 0.22206329886855458,
+    "z": 1.9437273060627602,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:exploit7200@league7000",
+   "kind": "GN",
+   "finder": "exploit7200",
+   "edge": 0.5881380208333334,
+   "se": 0.32407434129183127,
+   "z": 1.8148243964298023,
+   "winsX": 28,
+   "draws": 0,
+   "winsY": 20,
+   "finds": false,
+   "seatA": 1.1635677083333336,
+   "seatB": 0.012708333333333358,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.4316304976851852,
+    "se": 0.22206329886855458,
+    "z": 1.9437273060627602,
+    "adds": false
+   }
+  },
+  {
+   "id": "GN:exploit7204@league7000",
+   "kind": "GN",
+   "finder": "exploit7204",
+   "edge": 0.4514858217592592,
+   "se": 0.3025976242225945,
+   "z": 1.4920335971545524,
+   "winsX": 27,
+   "draws": 0,
+   "winsY": 21,
+   "finds": false,
+   "seatA": 1.162554976851852,
+   "seatB": -0.25958333333333333,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7000",
+   "add": {
+    "mean": 0.2949782986111111,
+    "se": 0.18490936020962037,
+    "z": 1.5952588786025343,
+    "adds": false
+   }
+  },
+  {
+   "id": "M:league7001|league7100",
+   "kind": "mirror",
+   "finder": "league7001",
+   "edge": -1.0695601851851853,
+   "se": 0.2757607170321207,
+   "z": -3.8785806647746806,
+   "winsX": 6,
+   "draws": 19,
+   "winsY": 23,
+   "finds": false,
+   "seatA": -1.3658130787037035,
+   "seatB": -0.7733072916666667,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7100"
+  },
+  {
+   "id": "M:league7001|league7103",
+   "kind": "mirror",
+   "finder": "league7001",
+   "edge": 1.3167346643518518,
+   "se": 0.3916657963933815,
+   "z": 3.3618832087889268,
+   "winsX": 33,
+   "draws": 2,
+   "winsY": 13,
+   "finds": true,
+   "seatA": 0.6797829861111112,
+   "seatB": 1.9536863425925926,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7103"
+  },
+  {
+   "id": "M:league7001|exploit7200",
+   "kind": "mirror",
+   "finder": "league7001",
+   "edge": -0.379681712962963,
+   "se": 0.2691167990942849,
+   "z": -1.4108435974297606,
+   "winsX": 16,
+   "draws": 10,
+   "winsY": 22,
+   "finds": false,
+   "seatA": -1.1566550925925927,
+   "seatB": 0.39729166666666677,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7200"
+  },
+  {
+   "id": "M:league7001|exploit7204",
+   "kind": "mirror",
+   "finder": "league7001",
+   "edge": 0.3945601851851852,
+   "se": 0.2935155630399727,
+   "z": 1.3442564377121347,
+   "winsX": 26,
+   "draws": 2,
+   "winsY": 20,
+   "finds": false,
+   "seatA": -0.09600115740740732,
+   "seatB": 0.8851215277777778,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7204"
+  },
+  {
+   "id": "M:league7100|league7103",
+   "kind": "mirror",
+   "finder": "league7100",
+   "edge": 1.1109100115740742,
+   "se": 0.3279343954090087,
+   "z": 3.3875983340769027,
+   "winsX": 27,
+   "draws": 11,
+   "winsY": 10,
+   "finds": true,
+   "seatA": 0.5347685185185186,
+   "seatB": 1.6870515046296293,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "league7103"
+  },
+  {
+   "id": "M:league7100|exploit7200",
+   "kind": "mirror",
+   "finder": "league7100",
+   "edge": 0.5181076388888889,
+   "se": 0.27975227374276523,
+   "z": 1.8520229771762056,
+   "winsX": 17,
+   "draws": 22,
+   "winsY": 9,
+   "finds": false,
+   "seatA": 0.39502893518518517,
+   "seatB": 0.6411863425925927,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7200"
+  },
+  {
+   "id": "M:league7100|exploit7204",
+   "kind": "mirror",
+   "finder": "league7100",
+   "edge": 1.0203211805555557,
+   "se": 0.3132476837303281,
+   "z": 3.2572345576669623,
+   "winsX": 25,
+   "draws": 14,
+   "winsY": 9,
+   "finds": true,
+   "seatA": 0.6567824074074076,
+   "seatB": 1.3838599537037037,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7204"
+  },
+  {
+   "id": "M:league7103|exploit7200",
+   "kind": "mirror",
+   "finder": "league7103",
+   "edge": -1.7774189814814816,
+   "se": 0.3211307944820475,
+   "z": -5.534875546109753,
+   "winsX": 10,
+   "draws": 1,
+   "winsY": 37,
+   "finds": false,
+   "seatA": -2.3439988425925926,
+   "seatB": -1.2108391203703706,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7200"
+  },
+  {
+   "id": "M:league7103|exploit7204",
+   "kind": "mirror",
+   "finder": "league7103",
+   "edge": -0.928587962962963,
+   "se": 0.361006888043672,
+   "z": -2.5722167463204446,
+   "winsX": 17,
+   "draws": 0,
+   "winsY": 31,
+   "finds": false,
+   "seatA": -1.028498263888889,
+   "seatB": -0.8286776620370367,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7204"
+  },
+  {
+   "id": "M:exploit7200|exploit7204",
+   "kind": "mirror",
+   "finder": "exploit7200",
+   "edge": 0.6478399884259259,
+   "se": 0.26702908944033427,
+   "z": 2.426102675868507,
+   "winsX": 27,
+   "draws": 4,
+   "winsY": 17,
+   "finds": true,
+   "seatA": 0.006493055555555571,
+   "seatB": 1.2891869212962963,
+   "flew": 48,
+   "seedsOk": true,
+   "opponent": "exploit7204"
+  }
+ ],
+ "checks": []
+}

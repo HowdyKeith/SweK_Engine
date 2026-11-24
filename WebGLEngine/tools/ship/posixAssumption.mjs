@@ -190,7 +190,17 @@ export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
             why: "expects path.join(ENG, \"brain\", \"pilotSubWeightsFishWip.json\") against the fish circuit's out, which trainSubPilot.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
         Object.freeze({ at: "unnumbered line", gate: "tools/ship/trainDogfightLeague-selfcheck.mjs",
             why: "expects path.join(ENG, \"brain\", ...) against the path loadFile hands its reader (which joins the module's brain directory, a path.resolve, with the file name) and path.join(\"/elsewhere\", file) against the path loadFile joins from a directory it is given; each pair is built by the same join over the same parts" }),
+        // 2026-11-08 -- TWO GATES OF THIS BRANCH, each pair built by the same native producer over the same parts.
+        Object.freeze({ at: "2026-11-08 this branch", gate: "tools/ship/gpuTaskManBridge-selfcheck.mjs",
+            why: "expects path.join(\"/eng\", \"brain\", \"rig-results\", \"gpu-snapshots\") against path.dirname of the absolute path the bridge's save builds with path.join over the same root, so both sides are the platform's own normalised path" }),
+        Object.freeze({ at: "2026-11-08 this branch", gate: "tools/ship/winPathLint-selfcheck.mjs",
+            why: "expects path.join(real, \"f.txt\") against the join the shimmed child returns for a REAL root, which the shim deliberately leaves as the platform's own path.join (and its other hit is the text of a fixture, not a comparison the gate makes)" }),
         // 2026-11-05 -- the merge of the box3d line (six round gates whose results file is compared with the library's default) and the fish / fly line (two more): each pair is built by the same platform join over the same parts.
+        // v4933 -- TWO GATES OF THE ROUND THAT SHIPPED AS v4933, each side built by path.join over the same parts.
+        Object.freeze({ at: "v4933", gate: "ai-bridge/aiUsageBridge-selfcheck.mjs",
+            why: "expects path.join(home, \".claude\", \".credentials.json\") (and the codex and env-dir forms) against credentialPath, which ai-bridge/aiUsageBridge.js builds with path.join over the same parts" }),
+        Object.freeze({ at: "v4933", gate: "ai-bridge/tvpipeBridge-selfcheck.mjs",
+            why: "expects path.join(HERE, \"node_modules\", \"@tvpipe\", \"sdk\", \"package.json\") against the autoInstall registry entry's detect path, which ai-bridge/autoInstall.js builds with path.join over the same parts" }),
         Object.freeze({ at: "2026-11-05 merge", gate: "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
             why: "expects path.join(ENG, \"physics\", \"mechanics\", \"box3dAngularImpulseCapResults.json\") against the census's DEFAULT_RESULTS, which angularImpulseCensus.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
         Object.freeze({ at: "2026-11-05 merge", gate: "tools/roundhouse/box3dBothShips-selfcheck.mjs",
@@ -303,7 +313,9 @@ export const POSIX_AT_V4485 = Object.freeze({
     // THIS round's tools/ship/realGpuRun.mjs (nativeGateList's relative paths), the fifth, one past it. NOTHING WAS UN-NORMALISED: a re-take, not a tolerance.
     // v4896 -- 187 callers / 132 normalising -> 193 / 136: six more files that join a path (the TV commands and gates, the snowGpu split gates), four normalising and two not; calls 254 -> 272. Read off the gate, not typed.
     // v4904 -- 193 callers / 136 normalising -> 198 / 137: five more files that join a path (this round's gates and tools: the needs gate, the brain panel's page rows, the compass and steer rows, the shallow-clone and ICD rows), one normalising and four not; calls 272 -> 281. Read off the gate, not typed.
-    separator: Object.freeze({ callers: 198, calls: 281, normalised: 137, never: 61 }),
+    // 2026-11-08 -- 198 callers / 137 normalising -> 203 / 140, calls 281 -> 305 (never 61 -> 63), taken with the gate's own scan and skip list: this branch's new tools and gates that join a path (the round 7 to 11 readers and commands, the gputaskman bridge and client, the windows-path lint, the rotor, countermeasure and nav-3d commands), three normalising and two not -- the two being the path-using gates named in addedCorrect below. Read off the gate, not typed.
+    // v4933 -- 203 callers / 140 normalising -> 208 / 142, calls 305 -> 311 (never 63 -> 66), taken with the gate's own scan and skip list at the ship of the round that built the PlayCanvas line, the fly studies and their command (tools/ship/studyCmd.mjs): 5 more files that join a path, 2 of them normalising. Nothing was un-normalised. Read off the gate, not typed.
+    separator: Object.freeze({ callers: 208, calls: 311, normalised: 142, never: 66 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

@@ -1,0 +1,139 @@
+# Rig commands, with a fresh clone of the branch (2026-11-07; UNNUMBERED)
+
+Keith asked for the owed rig runs as commands he can paste, starting from a pull of the branch. **No Decider round is in this list** (held, 2026-11-07). Nothing below has been run on the rig; each run is resumable (run the same command again to go on) and each report prints its CHECK lines first: a failed check is the first line and the verdicts are then not read.
+
+## 0. Get the branch (PowerShell or cmd; the repository is HowdyKeith/SweK_Engine)
+
+A NEW clone (nothing of the rig's working files can collide):
+
+```
+git clone --branch claude/sweet-lovelace-8leivh https://github.com/HowdyKeith/SweK_Engine SweK_Engine_rig
+cd SweK_Engine_rig\WebGLEngine
+git log -1 --oneline
+```
+
+or, in the clone you already have:
+
+```
+git fetch origin claude/sweet-lovelace-8leivh
+git checkout claude/sweet-lovelace-8leivh
+git pull --ff-only origin claude/sweet-lovelace-8leivh
+cd WebGLEngine
+git log -1 --oneline
+```
+
+`git log -1` must name a commit at or after the one the sandbox last pushed (the final report of the session names it; any later commit on the branch also has everything below). Every command below is run from `WebGLEngine\`.
+
+## 1. CPU work, one after another (no eyes needed; do not run beside a GPU look)
+
+```
+node tools\ship\plainNetVariantsCmd.mjs run --specs all --out brain\plainNetVariants.jsonl --workers 8
+node tools\ship\plainNetVariantsCmd.mjs report --in brain\plainNetVariants.jsonl
+```
+`brain/PLAIN_NET_VARIANTS_WIP.md`. 10 of the 64 pilots are already in the file in the branch, so it resumes; about 9 of the 10.5 core-hours are left. It flies the first-order orientation step itself (Amendment A). Read once, when whole.
+
+```
+node tools\ship\trainSubVestibularCmd.mjs run --specs wiringShuffledFresh --out brain\fishVestibularGen6.jsonl --workers 4
+node tools\ship\trainSubVestibularCmd.mjs report --in brain\fishVestibularGen6.jsonl
+```
+`brain/FISH_WIRING_FRESH_WIP.md` (Addendum 16 of rung 4b); about 10.6 core-hours.
+
+```
+node tools\ship\trainSubVestibularCmd.mjs run --specs wiringPermutations --out brain\rig-results\fishVestibularGen2.jsonl --workers 4
+node tools\ship\trainSubVestibularCmd.mjs report --in brain\rig-results\fishVestibularGen2.jsonl
+```
+`brain/FISH_WIRING_RANK_WIP.md` (Addendum 17; resumes Addendum 12's own file); about 21 core-hours.
+
+```
+node tools\ship\trainPilotSub.mjs --circuit plain14 --seed 6310 --workers 4 --write --out brain\pilotSubPlain14Seed6310.json
+```
+About 20 minutes of 4 cores. Seeds 6320, 6330 ... (the same line with the seed and the file name changed) make a distribution of plain14 pilots.
+
+## 2. Needs a language model on the phone or the rig (any OpenAI-compatible server, PrivateLM included)
+
+Replace `<host:port>`, `<key>` (leave `--key` out if there is none) and `<model-id>`. The key goes into a request header and nowhere else. These two commands do NOT set the first-order step (the Sea OGRE numbers are the engine's default). Ask the dev set first (prompt development, not the registered read), then the registered set ONCE.
+
+After-action analyzer (`brain/AFTER_ACTION_WIP.md`):
+
+```
+node tools\ship\takeAfterActionCmd.mjs ask --base <host:port> --key <key> --model <model-id> --set dev --out brain\afterAction-dev-<model-id>.jsonl
+node tools\ship\takeAfterActionCmd.mjs report --in brain\afterAction-dev-<model-id>.jsonl
+node tools\ship\takeAfterActionCmd.mjs ask --base <host:port> --key <key> --model <model-id> --set registered --out brain\afterAction-<model-id>.jsonl
+node tools\ship\takeAfterActionCmd.mjs report --in brain\afterAction-<model-id>.jsonl
+```
+
+Counterfactual re-flights (`brain/COUNTERFACTUAL_WIP.md`; new this session): the model is shown a pair and asked for ONE re-flight request; the engine flies it.
+
+```
+node tools\ship\takeCounterfactualCmd.mjs propose --base <host:port> --key <key> --model <model-id> --set dev --out brain\counterfactual-dev-<model-id>.jsonl
+node tools\ship\takeCounterfactualCmd.mjs report --in brain\counterfactual-dev-<model-id>.jsonl
+node tools\ship\takeCounterfactualCmd.mjs propose --base <host:port> --key <key> --model <model-id> --set registered --out brain\counterfactual-<model-id>.jsonl
+node tools\ship\takeCounterfactualCmd.mjs report --in brain\counterfactual-<model-id>.jsonl
+```
+
+Engine-only (no model; the sandbox ran these, they are here so the rig can reproduce them):
+
+```
+node tools\ship\takeCounterfactualCmd.mjs subsets --seed 105
+node tools\ship\takeCounterfactualCmd.mjs fly --seed 105 --kit decoy
+```
+
+## 2b. Round 7, stage 1 -- DONE 2026-11-08, nothing more to run (result: `brain/PLAIN14_DISTRIBUTION_WIP.md` section 10; registered in the same note; the report tool is built, gated and swept): ten fly champions against ten plain 14-50-4 champions
+About 6.5 hours on 4 cores; the loop alternates the arms so a partial run is balanced. Run it from `WebGLEngine\`:
+
+```
+New-Item -ItemType Directory -Force brain\rig-results\plain14 | Out-Null
+foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
+  node tools\ship\trainPilotSub.mjs --circuit fly --seed $s --workers 4 --dump brain\rig-results\plain14\fly$s.json 2>&1 | Tee-Object brain\rig-results\plain14\flylog$s.txt
+  node tools\ship\trainPilotSub.mjs --circuit plain14 --seed $s --workers 4 --dump brain\rig-results\plain14\plain$s.json 2>&1 | Tee-Object brain\rig-results\plain14\plainlog$s.txt
+}
+```
+
+Then, ONCE, on the machine that made the dumps, when all twenty are in:
+
+```
+node tools\ship\plain14DistributionCmd.mjs report --dir brain\rig-results\plain14
+```
+
+It prints the four checks first (a failure is the first line and the reading is NOT WEIGHED), the twenty champions, the exact rank-sum readings (the safety audit marked READ ON) and the bottom line in the registration's words. With ten against ten, BEATS needs the fly's champions above the plain champions in at least 73 of the 100 pairs.
+
+## 3. Not here
+
+* **Matched controls for the other seven networks** (`#80`, about 20 searches each): the full eight-stage chain version still has no command (it needs three trainers changed and is about 90 hours of wall time); its cheap first step, the robust stage as ONE stage, is section 2e below.
+* **The station-and-price round** (`brain/STATION_AND_PRICE_WIP.md`) was trained, audited and read in the sandbox (RESULT in its section 10); nothing of it is owed on the rig.
+* **The one verify** (`Clone -> verify` of main's tip, `brain/RIG_SESSION_OWED_WIP.md` step 2) is the GitHub panel's button, not a command here.
+* **Any Decider round:** held by the owner.
+
+Send the results files back (or commit them under `brain/rig-results/` on this branch) and say which command made each; the registrations read each once.
+
+## 2c. Round 7, stage 1: CORRECTION (2026-11-08) -- DONE the same day: the plain arm ran under this loop and came back (the history of how it was run follows)
+The loop in 2b ran the fly arm for all ten seeds (those ten dumps are in and kept) and failed instantly on the plain arm (the checkout it ran in has no `plain14` circuit). The fly dumps were made under the FIRST-ORDER orientation step, so the plain arm must be too; the loop, the reason and the check after the first seed are in `brain/PLAIN14_DISTRIBUTION_WIP.md` section 9 (Amendment B). In short, from `WebGLEngine\` on this branch (`git log -1` at or after the commit that carries this section):
+```
+$env:SWEK_6DOF_ORIENTATION = "euler"
+foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
+  if (-not (Test-Path brain\rig-results\plain14\plain$s.json)) {
+    node tools\ship\trainPilotSub.mjs --circuit plain14 --seed $s --workers 4 --dump brain\rig-results\plain14\plain$s.json 2>&1 | Tee-Object brain\rig-results\plain14\plainlog$s.txt
+  }
+}
+```
+About 20 minutes a seed on 4 cores, about 3.5 hours. Send back the ten `plain<seed>.json` dumps and their logs; do not re-run the fly arm.
+
+## 2d. gputaskman: the page that installs it and runs a session (2026-11-08; `brain/GPUTASKMAN_WIP.md`)
+Not a study: a measurement of the machine. With the engine's bridge running (default port 8787), open `http://localhost:8787/gputaskman.html` (or the gputaskman link in `server.html`), then: **Check this machine**; **Install with uv** (or pipx; if it still says it cannot find gputaskman afterwards, restart the bridge from a NEW terminal); type a model exactly as `ollama list` shows it (pull it first: `ollama pull qwen2.5-coder:7b` is a good first try, it fits an 8 GB card); **Start the model, run gputaskman, save a snapshot**. The JSON appears in the page and is saved as `brain\rig-results\gpu-snapshots\gpusnap-<time>-<model>.json`. Look at it (it lists the programs using the GPU), then send that file back.
+
+**Added 2026-11-08, section 4 of the same page: watch the card, and watch the GPU brain.** (a) *Sample now*: press it, then start whatever you want watched (a game, the pilot-swarm demo, a model in another window); it takes a snapshot every second or so for the seconds you set (3 to 300) and saves `brain\rig-results\gpu-snapshots\gpuwatch-<time>-sample.json`. (b) *Run the GPU brain and watch it*: the page starts the engine's own swarm (`node tools\ship\gpuSwarm.mjs --hardware`, a browser opens, about two minutes at the defaults) with two snapshots before, one every second or so while it runs, and two after, and saves `gpuwatch-<time>-brain.json`. The summary at the bottom of the card says which programs used the card under which runtime: **the question is whether the browser's GPU process (chrome.exe or msedge.exe) shows up, under Direct3D, only while the swarm ran (`seen ONLY while it ran`).** If it says THE BROWSER USED A SOFTWARE ADAPTER the card was not used: check the browser's hardware acceleration and say so. It does NOT write the swarm's own results file (those timings were taken while being watched). For the model session, the box "also sample while it answers" (try 60) adds a series of snapshots while the test answer is generated, which shows whether the card sits idle while the CPU computes the part of a big model that did not fit. Send the `gpuwatch-*.json` and `gpusnap-*.json` files back. (`brain/GPUTASKMAN_WIP.md` section 7.)
+
+## 2e. Round 7, stage 2 as ONE STAGE (2026-11-08; `brain/PLAIN14_ROBUST_STAGE_WIP.md`): does the stage-1 tie hold under the five-vessel robust objective?
+Keith chose the one-stage control, not the eight-stage chain. The tool is built and gated; nothing is trained until the rig runs it. About 30 minutes of wall time a draw on 4 cores, about 10 hours for the twenty (the sandbox's figure times the factor of three this round's rig showed; NOT measured on the rig). From `WebGLEngine\` on this branch (the command sets the first-order orientation step itself, so there is nothing to set in the shell). The stage-1 dumps in `brain\rig-results\plain14\` must be there (they are committed).
+```
+node tools\ship\plain14RobustStageCmd.mjs run --all
+```
+It trains the twenty draws one after another, the arms alternating by seed (a partial run is balanced), four search processes at a time, and writes `brain\rig-results\plain14-robust\robust-<fly|plain>-<S>.json` for each (plus the four search files and the start file of each draw). **A draw whose record exists is skipped, so it can be stopped with Ctrl-C and resumed with the same command.** One draw: `node tools\ship\plain14RobustStageCmd.mjs run --arm fly --seed 6310`. Each search prints its progress behind `[search <seed>]`.
+
+When all twenty records are in, ONCE, on the machine that made them:
+```
+node tools\ship\plain14RobustStageCmd.mjs report
+```
+It reads the records and the stage-1 dumps; it trains and flies nothing. It prints the five checks first (a failure is the first line and the reading is NOT WEIGHED), the twenty draws, the three exact one-sided rank-sum readings (the 500-dive safety audit is the one that decides) and the bottom line in the registration's words. With ten against ten, BEATS needs the fly above in at least 73 of the 100 pairs.
+
+**What comes back: the whole folder `brain\rig-results\plain14-robust` (and, if you like, what the command printed).** Said plainly: this is one stage with the actuator retrain not repeated, so it says nothing about the other six stages of the chain; the chain control (`#80`) stays open and is about 90 hours of wall time.

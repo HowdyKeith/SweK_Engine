@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 498,
+ "count": 507,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1425,6 +1425,13 @@
    "p": 0
   },
   {
+   "f": "gizmo-demo.html",
+   "t": "gizmos",
+   "d": "",
+   "g": "recentnew",
+   "p": 0
+  },
+  {
    "f": "glb_viewer.html",
    "t": "Rigged GLB Viewer",
    "d": "Load a skinned/animated GLB (RigAnything output, Fox.glb, any rigged mesh). Plays skeletal + morph animations, shows the skeleton overlay.",
@@ -1443,6 +1450,13 @@
    "t": "SweK GPU rig check",
    "d": "",
    "g": "rendertsl",
+   "p": 0
+  },
+  {
+   "f": "gputaskman.html",
+   "t": "gputaskman",
+   "d": "Install gputaskman (a terminal monitor for what is inside your GPU), run a one-button session that starts an Ollama model, watch the card over time or while the GPU brain runs, and get one JSON file to send.",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -1835,6 +1849,20 @@
    "t": "LibreChat · SweK",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "lights-demo.html",
+   "t": "many lights",
+   "d": "",
+   "g": "recentnew",
+   "p": 0
+  },
+  {
+   "f": "lights-gpu.html",
+   "t": "many lights (WebGPU)",
+   "d": "",
+   "g": "recentnew",
    "p": 0
   },
   {
@@ -2356,6 +2384,13 @@
    "p": 0
   },
   {
+   "f": "privatelm.html",
+   "t": "PrivateLM",
+   "d": "Install PrivateLM (a phone app that runs language models on the phone) and use it from the engine: check the phone, chat with it, or make it the engine's local OpenAI-compatible brain.",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "probe-lab.html",
    "t": "Probe Lab - a released instrument on a timelike geodesic",
    "d": "",
@@ -2584,6 +2619,20 @@
    "t": "Rocket League RL &mdash; SweK Engine",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "rotor-league.html",
+   "t": "SweK &middot; Rotor League",
+   "d": "Every helicopter and quadrotor pilot against every other on the same scenarios: the hand autopilots, the hand pilot as a fruit-fly network, the trained fruit-fly pilots, two quadrotor MLPs and a pilot that does nothing, counted by scenarios won and rated.",
+   "g": "flybrain",
+   "p": 0
+  },
+  {
+   "f": "rotorcraft-demo.html",
+   "t": "SweK &middot; Rotorcraft Demo",
+   "d": "A helicopter or a quadrotor flown by a hand autopilot and by a trained pilot on the same scenario, replayed side by side: a hover in gusts you can turn up, a recovery, an engine or motor out, a terrain flight.",
+   "g": "flybrain",
    "p": 0
   },
   {
@@ -2895,6 +2944,13 @@
    "p": 0
   },
   {
+   "f": "space-duel.html",
+   "t": "SweK &middot; Space duel",
+   "d": "Space duel: a capital ship against a capital ship (brain/battleshipDuel.mjs) -- choose each side's gunners, helm and cannon, watch the fight a tick at a time, and see which gun seats are worked by a network and how many networks were asked each tick.",
+   "g": "spacecombat",
+   "p": 0
+  },
+  {
    "f": "spacedesk.html",
    "t": "spacedesk auto-launch",
    "d": "",
@@ -2927,6 +2983,13 @@
    "t": "Sphere impostor -- SweK",
    "d": "",
    "g": "renders",
+   "p": 0
+  },
+  {
+   "f": "splat-gpu.html",
+   "t": "Splats on the GPU",
+   "d": "",
+   "g": "recentnew",
    "p": 0
   },
   {

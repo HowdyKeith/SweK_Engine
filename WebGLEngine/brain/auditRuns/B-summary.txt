@@ -1,0 +1,3 @@
+both: plain light 13.6 deg, 64 spikes | plain dark 13.6 deg, 64 spikes | static 16.9 deg, 47 spikes | moving 6.8 deg, 94 spikes | receding plain light 57.0 deg, 44 spikes, receding plain dark 57.0 deg, 44 spikes
+off: plain light no alarm | plain dark 13.6 deg, 64 spikes | static 30.6 deg, 17 spikes | moving 14.1 deg, 61 spikes | receding plain light 57.0 deg, 44 spikes, receding plain dark no alarm
+on: plain light 13.6 deg, 64 spikes | plain dark no alarm | static 17.4 deg, 43 spikes | moving 14.3 deg, 57 spikes | receding plain light no alarm, receding plain dark 57.0 deg, 44 spikes

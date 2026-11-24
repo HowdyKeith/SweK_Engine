@@ -20,6 +20,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as PS from "../../brain/pilotSubPolicy.mjs";
 import * as PF from "../../brain/pilotSubFish.mjs";
+import * as PP from "../../brain/pilotSubPlain.mjs";
 import * as T from "../../brain/subTask.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
@@ -30,11 +31,12 @@ export const RECIPE = Object.freeze({ runs: 4, iters: 400, sigma: 0.3, maxK: 4 }
 export const AUDIT_BASE = 7000;
 /** How far below the autopilot's score a KIND of dive may be on the audits, and how far below its score on the reserve the champion may be: a chosen floor, not a test statistic. */
 export const KIND_SLACK = 0.02, RESERVE_SLACK = 0.01;
-/** The circuits this tool trains, by the same recipe on the same dives: `fly` the Giant Fiber Circuit (the stand-in the submarine pilot was first made with), `fish` the Fish1 core, `control` a random circuit of the fish's size. */
+/** The circuits this tool trains, by the same recipe on the same dives: `fly` the Giant Fiber Circuit (the stand-in the submarine pilot was first made with), `fish` the Fish1 core, `control` a random circuit of the fish's size, `plain14` a plain 14-50-4 relu net with NO wiring (954 weights: the control of the 963-weight networks, brain/pilotSubPlain.mjs). */
 export const CIRCUITS = Object.freeze({
     fly: Object.freeze({ id: "fly", policy: PS.FLY, seed: 6000, out: null, name: "the fruit fly's Giant Fiber Circuit", circuit: "male-cns:v1.0 Giant Fiber Circuit (stand-in)" }),
     fish: Object.freeze({ id: "fish", policy: PF.FISH, seed: 6100, out: path.resolve(HERE, "..", "..", "brain", "pilotSubWeightsFishWip.json"), name: "the Fish1 zebrafish core", circuit: "fish" }),
     control: Object.freeze({ id: "control", policy: PF.CONTROL, seed: 6200, out: null, name: "a random circuit of the fish's size", circuit: "random control" }),
+    plain14: Object.freeze({ id: "plain14", policy: PP.PLAIN14, seed: 6300, out: null, name: "a plain 14-50-4 relu net with no wiring", circuit: "plain14" }),
 });
 export const circuitOf = (opts) => { const c = CIRCUITS[(opts && opts.circuit) || "fly"]; if (!c) throw new Error(`unknown circuit ${JSON.stringify(opts.circuit)} (known: ${Object.keys(CIRCUITS).join(", ")})`); return c; };
 const FRESH = auditSets(AUDIT_BASE);

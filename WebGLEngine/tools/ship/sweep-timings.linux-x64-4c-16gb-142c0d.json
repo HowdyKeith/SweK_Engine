@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-06T17:12:20.713Z",
+ "captured": "2026-11-22T21:19:30.902Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -68,7 +68,113 @@
   "tools/ship/plannerTolerance-selfcheck.mjs": 13638,
   "tools/ship/headToHead2-selfcheck.mjs": 2833,
   "tools/ship/headToHead4-selfcheck.mjs": 643,
-  "tools/ship/headToHead5-selfcheck.mjs": 9018
+  "tools/ship/headToHead5-selfcheck.mjs": 9018,
+  "ai-bridge/aiUsageBridge-selfcheck.mjs": 129,
+  "ai-bridge/tvpipeBridge-selfcheck.mjs": 1524,
+  "brain/battleshipDuel-selfcheck.mjs": 27273,
+  "brain/evadeReflex-selfcheck.mjs": 2798,
+  "brain/flySteering-selfcheck.mjs": 13728,
+  "brain/flyTracking-selfcheck.mjs": 176567,
+  "brain/helmCompassPolicy-selfcheck.mjs": 2453,
+  "brain/helmSteerCannon-selfcheck.mjs": 4561,
+  "brain/helmSteerPolicy-selfcheck.mjs": 2097,
+  "brain/maleCnsCircuits-selfcheck.mjs": 177,
+  "brain/peerFleet-selfcheck.mjs": 18072,
+  "brain/seatGunnerFish-selfcheck.mjs": 27183,
+  "brain/seatTrackGunner-selfcheck.mjs": 3195,
+  "brain/seatTurretCircuit-selfcheck.mjs": 6975,
+  "brain/seatTurretGunner-selfcheck.mjs": 77235,
+  "render/spaceDuelCore-selfcheck.mjs": 22368,
+  "tools/denoiseKernelRound-selfcheck.mjs": 466,
+  "tools/denoiseLayers-selfcheck.mjs": 120345,
+  "tools/ship/cameraControls-selfcheck.mjs": 7406,
+  "tools/ship/cameraPages-selfcheck.mjs": 33019,
+  "tools/ship/clusteredLights-selfcheck.mjs": 104444,
+  "tools/ship/flightLights-selfcheck.mjs": 205304,
+  "tools/ship/gizmo-selfcheck.mjs": 62,
+  "tools/ship/gizmoOverlay-selfcheck.mjs": 29290,
+  "tools/ship/gpuTimerAuto-selfcheck.mjs": 169068,
+  "tools/ship/gpuTimerGL-selfcheck.mjs": 9461,
+  "tools/ship/infiniteGrid-selfcheck.mjs": 3749,
+  "tools/ship/runFlyWiredGates-selfcheck.mjs": 157,
+  "tools/ship/smaaPass-selfcheck.mjs": 1129,
+  "tools/ship/smaaPassGPU-selfcheck.mjs": 135402,
+  "tools/ship/softShadows-selfcheck.mjs": 66589,
+  "tools/ship/spaceDuelPage-selfcheck.mjs": 18761,
+  "tools/ship/splatGizmo-selfcheck.mjs": 24626,
+  "tools/ship/splatGpuPage-selfcheck.mjs": 19190,
+  "tools/ship/splatLod-selfcheck.mjs": 24916,
+  "tools/ship/splatRendererGPU-selfcheck.mjs": 37271,
+  "tools/ship/splatSH-selfcheck.mjs": 124,
+  "tools/ship/splatSortGPU-selfcheck.mjs": 8199,
+  "tools/ship/takeAmmoStudy-selfcheck.mjs": 2347,
+  "tools/ship/takeBestShipLoadout-selfcheck.mjs": 2833,
+  "tools/ship/takeBestShipLoadout2-selfcheck.mjs": 3317,
+  "tools/ship/takeBestShipLoadout3-selfcheck.mjs": 2728,
+  "tools/ship/takeButtonHardToday-selfcheck.mjs": 3006,
+  "tools/ship/takeButtonHarder-selfcheck.mjs": 3178,
+  "tools/ship/takeButtonLast-selfcheck.mjs": 2930,
+  "tools/ship/takeButtonNoCannon-selfcheck.mjs": 3100,
+  "tools/ship/takeButtonOneHard-selfcheck.mjs": 2998,
+  "tools/ship/takeButtonUntried-selfcheck.mjs": 2839,
+  "tools/ship/takeBySightLoadout-selfcheck.mjs": 3082,
+  "tools/ship/takeBySizeLoadout-selfcheck.mjs": 2854,
+  "tools/ship/takeCarToday-selfcheck.mjs": 3078,
+  "tools/ship/takeCarTodayEscorts-selfcheck.mjs": 3511,
+  "tools/ship/takeCarTodayNoCannon-selfcheck.mjs": 3709,
+  "tools/ship/takeCarTodayRations-selfcheck.mjs": 3177,
+  "tools/ship/takeFleetHandSizes-selfcheck.mjs": 2996,
+  "tools/ship/takeFlyVsSine-selfcheck.mjs": 6141,
+  "tools/ship/takeFlyWiredFights-selfcheck.mjs": 12628,
+  "tools/ship/takeFlyWiredGunner-selfcheck.mjs": 3036,
+  "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs": 3355,
+  "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs": 2851,
+  "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs": 2983,
+  "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs": 2877,
+  "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs": 2768,
+  "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs": 2666,
+  "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs": 2628,
+  "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs": 2680,
+  "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs": 2606,
+  "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs": 2658,
+  "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs": 4480,
+  "tools/ship/takeFlyWiredHelm-selfcheck.mjs": 4302,
+  "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs": 8892,
+  "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs": 2547,
+  "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs": 3821,
+  "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs": 7562,
+  "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs": 2729,
+  "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs": 2893,
+  "tools/ship/takeFlyWiredNext-selfcheck.mjs": 3878,
+  "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs": 2719,
+  "tools/ship/takeFlyWiredPilot-selfcheck.mjs": 9191,
+  "tools/ship/takeHelmLadder-selfcheck.mjs": 2649,
+  "tools/ship/takeLadder-selfcheck.mjs": 2719,
+  "tools/ship/takeLc11Gunner-selfcheck.mjs": 9345,
+  "tools/ship/takeLoomBench-selfcheck.mjs": 1674,
+  "tools/ship/takeLoomBenchGF-selfcheck.mjs": 1568,
+  "tools/ship/takePlacesControl-selfcheck.mjs": 4399,
+  "tools/ship/takePresetsHard-selfcheck.mjs": 2533,
+  "tools/ship/takeSineHelmBest-selfcheck.mjs": 2940,
+  "tools/ship/takeSineHelmNoCannon-selfcheck.mjs": 6982,
+  "tools/ship/takeSineTwins-selfcheck.mjs": 2718,
+  "tools/ship/takeSplitHelm-selfcheck.mjs": 2999,
+  "tools/ship/takeSplitHelmFleet-selfcheck.mjs": 2791,
+  "tools/ship/takeSplitHelmSizes-selfcheck.mjs": 2664,
+  "tools/ship/takeSteerCannon-selfcheck.mjs": 9353,
+  "tools/ship/trainHelm-selfcheck.mjs": 26876,
+  "tools/ship/trainHelmSteer-selfcheck.mjs": 12253,
+  "tools/ship/trainTrackSeat-selfcheck.mjs": 15879,
+  "tools/ship/trainTurretSeat-selfcheck.mjs": 40389,
+  "tools/ship/trainTurretSeatBig-selfcheck.mjs": 22404,
+  "tools/ship/trainTurretSeatFleet-selfcheck.mjs": 18464,
+  "tools/ship/trainTurretSeatFleet2-selfcheck.mjs": 17768,
+  "tools/ship/trainTurretSeatToday-selfcheck.mjs": 8336,
+  "tools/ship/tvOut-selfcheck.mjs": 5389,
+  "tools/ship/volumetricFog-selfcheck.mjs": 16777,
+  "tools/splatPack-selfcheck.mjs": 872,
+  "tools/ship/gpuTimerOverlay-selfcheck.mjs": 16206,
+  "tools/ship/takeSpaceEvadeSeat-selfcheck.mjs": 929
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -136,7 +242,113 @@
   "tools/ship/plannerTolerance-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
   "tools/ship/headToHead2-selfcheck.mjs": "2026-11-06T02:37:01.037Z",
   "tools/ship/headToHead4-selfcheck.mjs": "2026-11-06T02:51:50.265Z",
-  "tools/ship/headToHead5-selfcheck.mjs": "2026-11-06T17:12:20.713Z"
+  "tools/ship/headToHead5-selfcheck.mjs": "2026-11-06T17:12:20.713Z",
+  "ai-bridge/aiUsageBridge-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "ai-bridge/tvpipeBridge-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/battleshipDuel-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/evadeReflex-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/flySteering-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/flyTracking-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/helmCompassPolicy-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/helmSteerCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/helmSteerPolicy-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/maleCnsCircuits-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/peerFleet-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/seatGunnerFish-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/seatTrackGunner-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/seatTurretCircuit-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "brain/seatTurretGunner-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "render/spaceDuelCore-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/denoiseKernelRound-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/denoiseLayers-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/cameraControls-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/cameraPages-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/clusteredLights-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/flightLights-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/gizmo-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/gizmoOverlay-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/gpuTimerAuto-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/gpuTimerGL-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/infiniteGrid-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/runFlyWiredGates-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/smaaPass-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/smaaPassGPU-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/softShadows-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/spaceDuelPage-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatGizmo-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatGpuPage-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatLod-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatRendererGPU-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatSH-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/splatSortGPU-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeAmmoStudy-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeBestShipLoadout-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeBestShipLoadout2-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeBestShipLoadout3-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonHardToday-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonHarder-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonLast-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonNoCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonOneHard-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeButtonUntried-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeBySightLoadout-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeBySizeLoadout-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeCarToday-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeCarTodayEscorts-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeCarTodayNoCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeCarTodayRations-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFleetHandSizes-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyVsSine-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredFights-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunner-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelm-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredNext-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeFlyWiredPilot-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeHelmLadder-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeLadder-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeLc11Gunner-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeLoomBench-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeLoomBenchGF-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takePlacesControl-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takePresetsHard-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSineHelmBest-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSineHelmNoCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSineTwins-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSplitHelm-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSplitHelmFleet-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSplitHelmSizes-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/takeSteerCannon-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainHelm-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainHelmSteer-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTrackSeat-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTurretSeat-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTurretSeatBig-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTurretSeatFleet-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTurretSeatFleet2-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/trainTurretSeatToday-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/tvOut-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/volumetricFog-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/splatPack-selfcheck.mjs": "2026-11-22T19:37:15.899Z",
+  "tools/ship/gpuTimerOverlay-selfcheck.mjs": "2026-11-22T21:19:30.902Z",
+  "tools/ship/takeSpaceEvadeSeat-selfcheck.mjs": "2026-11-22T21:19:30.902Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -204,7 +416,113 @@
   "tools/ship/plannerTolerance-selfcheck.mjs": "alone",
   "tools/ship/headToHead2-selfcheck.mjs": "alone",
   "tools/ship/headToHead4-selfcheck.mjs": "alone",
-  "tools/ship/headToHead5-selfcheck.mjs": "alone"
+  "tools/ship/headToHead5-selfcheck.mjs": "alone",
+  "ai-bridge/aiUsageBridge-selfcheck.mjs": "alone",
+  "ai-bridge/tvpipeBridge-selfcheck.mjs": "alone",
+  "brain/battleshipDuel-selfcheck.mjs": "alone",
+  "brain/evadeReflex-selfcheck.mjs": "alone",
+  "brain/flySteering-selfcheck.mjs": "alone",
+  "brain/flyTracking-selfcheck.mjs": "alone",
+  "brain/helmCompassPolicy-selfcheck.mjs": "alone",
+  "brain/helmSteerCannon-selfcheck.mjs": "alone",
+  "brain/helmSteerPolicy-selfcheck.mjs": "alone",
+  "brain/maleCnsCircuits-selfcheck.mjs": "alone",
+  "brain/peerFleet-selfcheck.mjs": "alone",
+  "brain/seatGunnerFish-selfcheck.mjs": "alone",
+  "brain/seatTrackGunner-selfcheck.mjs": "alone",
+  "brain/seatTurretCircuit-selfcheck.mjs": "alone",
+  "brain/seatTurretGunner-selfcheck.mjs": "alone",
+  "render/spaceDuelCore-selfcheck.mjs": "alone",
+  "tools/denoiseKernelRound-selfcheck.mjs": "alone",
+  "tools/denoiseLayers-selfcheck.mjs": "alone",
+  "tools/ship/cameraControls-selfcheck.mjs": "alone",
+  "tools/ship/cameraPages-selfcheck.mjs": "alone",
+  "tools/ship/clusteredLights-selfcheck.mjs": "alone",
+  "tools/ship/flightLights-selfcheck.mjs": "alone",
+  "tools/ship/gizmo-selfcheck.mjs": "alone",
+  "tools/ship/gizmoOverlay-selfcheck.mjs": "alone",
+  "tools/ship/gpuTimerAuto-selfcheck.mjs": "alone",
+  "tools/ship/gpuTimerGL-selfcheck.mjs": "alone",
+  "tools/ship/infiniteGrid-selfcheck.mjs": "alone",
+  "tools/ship/runFlyWiredGates-selfcheck.mjs": "alone",
+  "tools/ship/smaaPass-selfcheck.mjs": "alone",
+  "tools/ship/smaaPassGPU-selfcheck.mjs": "alone",
+  "tools/ship/softShadows-selfcheck.mjs": "alone",
+  "tools/ship/spaceDuelPage-selfcheck.mjs": "alone",
+  "tools/ship/splatGizmo-selfcheck.mjs": "alone",
+  "tools/ship/splatGpuPage-selfcheck.mjs": "alone",
+  "tools/ship/splatLod-selfcheck.mjs": "alone",
+  "tools/ship/splatRendererGPU-selfcheck.mjs": "alone",
+  "tools/ship/splatSH-selfcheck.mjs": "alone",
+  "tools/ship/splatSortGPU-selfcheck.mjs": "alone",
+  "tools/ship/takeAmmoStudy-selfcheck.mjs": "alone",
+  "tools/ship/takeBestShipLoadout-selfcheck.mjs": "alone",
+  "tools/ship/takeBestShipLoadout2-selfcheck.mjs": "alone",
+  "tools/ship/takeBestShipLoadout3-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonHardToday-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonHarder-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonLast-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonNoCannon-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonOneHard-selfcheck.mjs": "alone",
+  "tools/ship/takeButtonUntried-selfcheck.mjs": "alone",
+  "tools/ship/takeBySightLoadout-selfcheck.mjs": "alone",
+  "tools/ship/takeBySizeLoadout-selfcheck.mjs": "alone",
+  "tools/ship/takeCarToday-selfcheck.mjs": "alone",
+  "tools/ship/takeCarTodayEscorts-selfcheck.mjs": "alone",
+  "tools/ship/takeCarTodayNoCannon-selfcheck.mjs": "alone",
+  "tools/ship/takeCarTodayRations-selfcheck.mjs": "alone",
+  "tools/ship/takeFleetHandSizes-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyVsSine-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredFights-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunner-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelm-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredNext-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs": "alone",
+  "tools/ship/takeFlyWiredPilot-selfcheck.mjs": "alone",
+  "tools/ship/takeHelmLadder-selfcheck.mjs": "alone",
+  "tools/ship/takeLadder-selfcheck.mjs": "alone",
+  "tools/ship/takeLc11Gunner-selfcheck.mjs": "alone",
+  "tools/ship/takeLoomBench-selfcheck.mjs": "alone",
+  "tools/ship/takeLoomBenchGF-selfcheck.mjs": "alone",
+  "tools/ship/takePlacesControl-selfcheck.mjs": "alone",
+  "tools/ship/takePresetsHard-selfcheck.mjs": "alone",
+  "tools/ship/takeSineHelmBest-selfcheck.mjs": "alone",
+  "tools/ship/takeSineHelmNoCannon-selfcheck.mjs": "alone",
+  "tools/ship/takeSineTwins-selfcheck.mjs": "alone",
+  "tools/ship/takeSplitHelm-selfcheck.mjs": "alone",
+  "tools/ship/takeSplitHelmFleet-selfcheck.mjs": "alone",
+  "tools/ship/takeSplitHelmSizes-selfcheck.mjs": "alone",
+  "tools/ship/takeSteerCannon-selfcheck.mjs": "alone",
+  "tools/ship/trainHelm-selfcheck.mjs": "alone",
+  "tools/ship/trainHelmSteer-selfcheck.mjs": "alone",
+  "tools/ship/trainTrackSeat-selfcheck.mjs": "alone",
+  "tools/ship/trainTurretSeat-selfcheck.mjs": "alone",
+  "tools/ship/trainTurretSeatBig-selfcheck.mjs": "alone",
+  "tools/ship/trainTurretSeatFleet-selfcheck.mjs": "alone",
+  "tools/ship/trainTurretSeatFleet2-selfcheck.mjs": "alone",
+  "tools/ship/trainTurretSeatToday-selfcheck.mjs": "alone",
+  "tools/ship/tvOut-selfcheck.mjs": "alone",
+  "tools/ship/volumetricFog-selfcheck.mjs": "alone",
+  "tools/splatPack-selfcheck.mjs": "alone",
+  "tools/ship/gpuTimerOverlay-selfcheck.mjs": "alone",
+  "tools/ship/takeSpaceEvadeSeat-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -272,7 +590,113 @@
   "tools/ship/plannerTolerance-selfcheck.mjs": 0,
   "tools/ship/headToHead2-selfcheck.mjs": 0,
   "tools/ship/headToHead4-selfcheck.mjs": 0,
-  "tools/ship/headToHead5-selfcheck.mjs": 0
+  "tools/ship/headToHead5-selfcheck.mjs": 0,
+  "ai-bridge/aiUsageBridge-selfcheck.mjs": 0,
+  "ai-bridge/tvpipeBridge-selfcheck.mjs": 0,
+  "brain/battleshipDuel-selfcheck.mjs": 0,
+  "brain/evadeReflex-selfcheck.mjs": 0,
+  "brain/flySteering-selfcheck.mjs": 0,
+  "brain/flyTracking-selfcheck.mjs": 0,
+  "brain/helmCompassPolicy-selfcheck.mjs": 0,
+  "brain/helmSteerCannon-selfcheck.mjs": 0,
+  "brain/helmSteerPolicy-selfcheck.mjs": 0,
+  "brain/maleCnsCircuits-selfcheck.mjs": 0,
+  "brain/peerFleet-selfcheck.mjs": 0,
+  "brain/seatGunnerFish-selfcheck.mjs": 0,
+  "brain/seatTrackGunner-selfcheck.mjs": 0,
+  "brain/seatTurretCircuit-selfcheck.mjs": 1,
+  "brain/seatTurretGunner-selfcheck.mjs": 0,
+  "render/spaceDuelCore-selfcheck.mjs": 0,
+  "tools/denoiseKernelRound-selfcheck.mjs": 0,
+  "tools/denoiseLayers-selfcheck.mjs": 0,
+  "tools/ship/cameraControls-selfcheck.mjs": 0,
+  "tools/ship/cameraPages-selfcheck.mjs": 0,
+  "tools/ship/clusteredLights-selfcheck.mjs": 0,
+  "tools/ship/flightLights-selfcheck.mjs": 1,
+  "tools/ship/gizmo-selfcheck.mjs": 0,
+  "tools/ship/gizmoOverlay-selfcheck.mjs": 0,
+  "tools/ship/gpuTimerAuto-selfcheck.mjs": 1,
+  "tools/ship/gpuTimerGL-selfcheck.mjs": 0,
+  "tools/ship/infiniteGrid-selfcheck.mjs": 0,
+  "tools/ship/runFlyWiredGates-selfcheck.mjs": 0,
+  "tools/ship/smaaPass-selfcheck.mjs": 0,
+  "tools/ship/smaaPassGPU-selfcheck.mjs": 0,
+  "tools/ship/softShadows-selfcheck.mjs": 0,
+  "tools/ship/spaceDuelPage-selfcheck.mjs": 0,
+  "tools/ship/splatGizmo-selfcheck.mjs": 0,
+  "tools/ship/splatGpuPage-selfcheck.mjs": 0,
+  "tools/ship/splatLod-selfcheck.mjs": 0,
+  "tools/ship/splatRendererGPU-selfcheck.mjs": 0,
+  "tools/ship/splatSH-selfcheck.mjs": 0,
+  "tools/ship/splatSortGPU-selfcheck.mjs": 0,
+  "tools/ship/takeAmmoStudy-selfcheck.mjs": 0,
+  "tools/ship/takeBestShipLoadout-selfcheck.mjs": 0,
+  "tools/ship/takeBestShipLoadout2-selfcheck.mjs": 0,
+  "tools/ship/takeBestShipLoadout3-selfcheck.mjs": 0,
+  "tools/ship/takeButtonHardToday-selfcheck.mjs": 0,
+  "tools/ship/takeButtonHarder-selfcheck.mjs": 0,
+  "tools/ship/takeButtonLast-selfcheck.mjs": 0,
+  "tools/ship/takeButtonNoCannon-selfcheck.mjs": 0,
+  "tools/ship/takeButtonOneHard-selfcheck.mjs": 0,
+  "tools/ship/takeButtonUntried-selfcheck.mjs": 0,
+  "tools/ship/takeBySightLoadout-selfcheck.mjs": 0,
+  "tools/ship/takeBySizeLoadout-selfcheck.mjs": 0,
+  "tools/ship/takeCarToday-selfcheck.mjs": 0,
+  "tools/ship/takeCarTodayEscorts-selfcheck.mjs": 0,
+  "tools/ship/takeCarTodayNoCannon-selfcheck.mjs": 0,
+  "tools/ship/takeCarTodayRations-selfcheck.mjs": 0,
+  "tools/ship/takeFleetHandSizes-selfcheck.mjs": 0,
+  "tools/ship/takeFlyVsSine-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredFights-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunner-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelm-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredNext-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs": 0,
+  "tools/ship/takeFlyWiredPilot-selfcheck.mjs": 0,
+  "tools/ship/takeHelmLadder-selfcheck.mjs": 0,
+  "tools/ship/takeLadder-selfcheck.mjs": 0,
+  "tools/ship/takeLc11Gunner-selfcheck.mjs": 0,
+  "tools/ship/takeLoomBench-selfcheck.mjs": 0,
+  "tools/ship/takeLoomBenchGF-selfcheck.mjs": 0,
+  "tools/ship/takePlacesControl-selfcheck.mjs": 0,
+  "tools/ship/takePresetsHard-selfcheck.mjs": 0,
+  "tools/ship/takeSineHelmBest-selfcheck.mjs": 0,
+  "tools/ship/takeSineHelmNoCannon-selfcheck.mjs": 0,
+  "tools/ship/takeSineTwins-selfcheck.mjs": 0,
+  "tools/ship/takeSplitHelm-selfcheck.mjs": 0,
+  "tools/ship/takeSplitHelmFleet-selfcheck.mjs": 0,
+  "tools/ship/takeSplitHelmSizes-selfcheck.mjs": 0,
+  "tools/ship/takeSteerCannon-selfcheck.mjs": 0,
+  "tools/ship/trainHelm-selfcheck.mjs": 0,
+  "tools/ship/trainHelmSteer-selfcheck.mjs": 0,
+  "tools/ship/trainTrackSeat-selfcheck.mjs": 0,
+  "tools/ship/trainTurretSeat-selfcheck.mjs": 0,
+  "tools/ship/trainTurretSeatBig-selfcheck.mjs": 0,
+  "tools/ship/trainTurretSeatFleet-selfcheck.mjs": 0,
+  "tools/ship/trainTurretSeatFleet2-selfcheck.mjs": 0,
+  "tools/ship/trainTurretSeatToday-selfcheck.mjs": 0,
+  "tools/ship/tvOut-selfcheck.mjs": 0,
+  "tools/ship/volumetricFog-selfcheck.mjs": 0,
+  "tools/splatPack-selfcheck.mjs": 0,
+  "tools/ship/gpuTimerOverlay-selfcheck.mjs": 0,
+  "tools/ship/takeSpaceEvadeSeat-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -599,6 +1023,324 @@
    9357,
    8990,
    9018
+  ],
+  "ai-bridge/aiUsageBridge-selfcheck.mjs": [
+   129
+  ],
+  "ai-bridge/tvpipeBridge-selfcheck.mjs": [
+   1524
+  ],
+  "brain/battleshipDuel-selfcheck.mjs": [
+   27273
+  ],
+  "brain/evadeReflex-selfcheck.mjs": [
+   2798
+  ],
+  "brain/flySteering-selfcheck.mjs": [
+   13728
+  ],
+  "brain/flyTracking-selfcheck.mjs": [
+   176567
+  ],
+  "brain/helmCompassPolicy-selfcheck.mjs": [
+   2453
+  ],
+  "brain/helmSteerCannon-selfcheck.mjs": [
+   4561
+  ],
+  "brain/helmSteerPolicy-selfcheck.mjs": [
+   2097
+  ],
+  "brain/maleCnsCircuits-selfcheck.mjs": [
+   177
+  ],
+  "brain/peerFleet-selfcheck.mjs": [
+   18072
+  ],
+  "brain/seatGunnerFish-selfcheck.mjs": [
+   27183
+  ],
+  "brain/seatTrackGunner-selfcheck.mjs": [
+   3195
+  ],
+  "brain/seatTurretCircuit-selfcheck.mjs": [
+   6975
+  ],
+  "brain/seatTurretGunner-selfcheck.mjs": [
+   77235
+  ],
+  "render/spaceDuelCore-selfcheck.mjs": [
+   22368
+  ],
+  "tools/denoiseKernelRound-selfcheck.mjs": [
+   466
+  ],
+  "tools/denoiseLayers-selfcheck.mjs": [
+   120345
+  ],
+  "tools/ship/cameraControls-selfcheck.mjs": [
+   7406
+  ],
+  "tools/ship/cameraPages-selfcheck.mjs": [
+   33019
+  ],
+  "tools/ship/clusteredLights-selfcheck.mjs": [
+   104444
+  ],
+  "tools/ship/flightLights-selfcheck.mjs": [
+   205304
+  ],
+  "tools/ship/gizmo-selfcheck.mjs": [
+   62
+  ],
+  "tools/ship/gizmoOverlay-selfcheck.mjs": [
+   29290
+  ],
+  "tools/ship/gpuTimerAuto-selfcheck.mjs": [
+   169068
+  ],
+  "tools/ship/gpuTimerGL-selfcheck.mjs": [
+   9461
+  ],
+  "tools/ship/infiniteGrid-selfcheck.mjs": [
+   3749
+  ],
+  "tools/ship/runFlyWiredGates-selfcheck.mjs": [
+   157
+  ],
+  "tools/ship/smaaPass-selfcheck.mjs": [
+   1129
+  ],
+  "tools/ship/smaaPassGPU-selfcheck.mjs": [
+   135402
+  ],
+  "tools/ship/softShadows-selfcheck.mjs": [
+   66589
+  ],
+  "tools/ship/spaceDuelPage-selfcheck.mjs": [
+   18761
+  ],
+  "tools/ship/splatGizmo-selfcheck.mjs": [
+   24626
+  ],
+  "tools/ship/splatGpuPage-selfcheck.mjs": [
+   19190
+  ],
+  "tools/ship/splatLod-selfcheck.mjs": [
+   24916
+  ],
+  "tools/ship/splatRendererGPU-selfcheck.mjs": [
+   37271
+  ],
+  "tools/ship/splatSH-selfcheck.mjs": [
+   124
+  ],
+  "tools/ship/splatSortGPU-selfcheck.mjs": [
+   8199
+  ],
+  "tools/ship/takeAmmoStudy-selfcheck.mjs": [
+   2347
+  ],
+  "tools/ship/takeBestShipLoadout-selfcheck.mjs": [
+   2833
+  ],
+  "tools/ship/takeBestShipLoadout2-selfcheck.mjs": [
+   3317
+  ],
+  "tools/ship/takeBestShipLoadout3-selfcheck.mjs": [
+   2728
+  ],
+  "tools/ship/takeButtonHardToday-selfcheck.mjs": [
+   3006
+  ],
+  "tools/ship/takeButtonHarder-selfcheck.mjs": [
+   3178
+  ],
+  "tools/ship/takeButtonLast-selfcheck.mjs": [
+   2930
+  ],
+  "tools/ship/takeButtonNoCannon-selfcheck.mjs": [
+   3100
+  ],
+  "tools/ship/takeButtonOneHard-selfcheck.mjs": [
+   2998
+  ],
+  "tools/ship/takeButtonUntried-selfcheck.mjs": [
+   2839
+  ],
+  "tools/ship/takeBySightLoadout-selfcheck.mjs": [
+   3082
+  ],
+  "tools/ship/takeBySizeLoadout-selfcheck.mjs": [
+   2854
+  ],
+  "tools/ship/takeCarToday-selfcheck.mjs": [
+   3078
+  ],
+  "tools/ship/takeCarTodayEscorts-selfcheck.mjs": [
+   3511
+  ],
+  "tools/ship/takeCarTodayNoCannon-selfcheck.mjs": [
+   3709
+  ],
+  "tools/ship/takeCarTodayRations-selfcheck.mjs": [
+   3177
+  ],
+  "tools/ship/takeFleetHandSizes-selfcheck.mjs": [
+   2996
+  ],
+  "tools/ship/takeFlyVsSine-selfcheck.mjs": [
+   6141
+  ],
+  "tools/ship/takeFlyWiredFights-selfcheck.mjs": [
+   12628
+  ],
+  "tools/ship/takeFlyWiredGunner-selfcheck.mjs": [
+   3036
+  ],
+  "tools/ship/takeFlyWiredGunnerControl-selfcheck.mjs": [
+   3355
+  ],
+  "tools/ship/takeFlyWiredGunnerFix-selfcheck.mjs": [
+   2851
+  ],
+  "tools/ship/takeFlyWiredGunnerHold-selfcheck.mjs": [
+   2983
+  ],
+  "tools/ship/takeFlyWiredGunnerHoldSees-selfcheck.mjs": [
+   2877
+  ],
+  "tools/ship/takeFlyWiredGunnerMixed-selfcheck.mjs": [
+   2768
+  ],
+  "tools/ship/takeFlyWiredGunnerNear-selfcheck.mjs": [
+   2666
+  ],
+  "tools/ship/takeFlyWiredGunnerSees-selfcheck.mjs": [
+   2628
+  ],
+  "tools/ship/takeFlyWiredGunnerShips-selfcheck.mjs": [
+   2680
+  ],
+  "tools/ship/takeFlyWiredGunnerTrigger-selfcheck.mjs": [
+   2606
+  ],
+  "tools/ship/takeFlyWiredGunnerTune-selfcheck.mjs": [
+   2658
+  ],
+  "tools/ship/takeFlyWiredGunnerVsPilot-selfcheck.mjs": [
+   4480
+  ],
+  "tools/ship/takeFlyWiredHelm-selfcheck.mjs": [
+   4302
+  ],
+  "tools/ship/takeFlyWiredHelmAxes-selfcheck.mjs": [
+   8892
+  ],
+  "tools/ship/takeFlyWiredHelmControl-selfcheck.mjs": [
+   2547
+  ],
+  "tools/ship/takeFlyWiredHelmFix-selfcheck.mjs": [
+   3821
+  ],
+  "tools/ship/takeFlyWiredHelmNoCannon-selfcheck.mjs": [
+   7562
+  ],
+  "tools/ship/takeFlyWiredHelmOneAxis-selfcheck.mjs": [
+   2729
+  ],
+  "tools/ship/takeFlyWiredHelmTune-selfcheck.mjs": [
+   2893
+  ],
+  "tools/ship/takeFlyWiredNext-selfcheck.mjs": [
+   3878
+  ],
+  "tools/ship/takeFlyWiredOneWindow-selfcheck.mjs": [
+   2719
+  ],
+  "tools/ship/takeFlyWiredPilot-selfcheck.mjs": [
+   9191
+  ],
+  "tools/ship/takeHelmLadder-selfcheck.mjs": [
+   2649
+  ],
+  "tools/ship/takeLadder-selfcheck.mjs": [
+   2719
+  ],
+  "tools/ship/takeLc11Gunner-selfcheck.mjs": [
+   9345
+  ],
+  "tools/ship/takeLoomBench-selfcheck.mjs": [
+   1674
+  ],
+  "tools/ship/takeLoomBenchGF-selfcheck.mjs": [
+   1568
+  ],
+  "tools/ship/takePlacesControl-selfcheck.mjs": [
+   4399
+  ],
+  "tools/ship/takePresetsHard-selfcheck.mjs": [
+   2533
+  ],
+  "tools/ship/takeSineHelmBest-selfcheck.mjs": [
+   2940
+  ],
+  "tools/ship/takeSineHelmNoCannon-selfcheck.mjs": [
+   6982
+  ],
+  "tools/ship/takeSineTwins-selfcheck.mjs": [
+   2718
+  ],
+  "tools/ship/takeSplitHelm-selfcheck.mjs": [
+   2999
+  ],
+  "tools/ship/takeSplitHelmFleet-selfcheck.mjs": [
+   2791
+  ],
+  "tools/ship/takeSplitHelmSizes-selfcheck.mjs": [
+   2664
+  ],
+  "tools/ship/takeSteerCannon-selfcheck.mjs": [
+   9353
+  ],
+  "tools/ship/trainHelm-selfcheck.mjs": [
+   26876
+  ],
+  "tools/ship/trainHelmSteer-selfcheck.mjs": [
+   12253
+  ],
+  "tools/ship/trainTrackSeat-selfcheck.mjs": [
+   15879
+  ],
+  "tools/ship/trainTurretSeat-selfcheck.mjs": [
+   40389
+  ],
+  "tools/ship/trainTurretSeatBig-selfcheck.mjs": [
+   22404
+  ],
+  "tools/ship/trainTurretSeatFleet-selfcheck.mjs": [
+   18464
+  ],
+  "tools/ship/trainTurretSeatFleet2-selfcheck.mjs": [
+   17768
+  ],
+  "tools/ship/trainTurretSeatToday-selfcheck.mjs": [
+   8336
+  ],
+  "tools/ship/tvOut-selfcheck.mjs": [
+   5389
+  ],
+  "tools/ship/volumetricFog-selfcheck.mjs": [
+   16777
+  ],
+  "tools/splatPack-selfcheck.mjs": [
+   872
+  ],
+  "tools/ship/gpuTimerOverlay-selfcheck.mjs": [
+   16206
+  ],
+  "tools/ship/takeSpaceEvadeSeat-selfcheck.mjs": [
+   929
   ]
  }
 }

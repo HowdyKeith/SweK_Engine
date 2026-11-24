@@ -263,7 +263,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // *** AND mh_state IS CALLED HERE NOW, FOR THE SAME REASON AND ON THE SAME TERMS -- v4644. *** Its
         // four outputs are 128 transcribed references across murmur's eighteen sources; this round spends
         // TWO of them, `settled` and the pair (complete, sweep) the ignition shell runs on, and leaves
-        // `drive` -- the RESPONDING lean, 45 references -- for its own round. SETTLED and COMPLETE are
+        // `drive` -- the RESPONDING lean, 45 references -- for its own round (SETTLED at v4653, DRIVE below). SETTLED and COMPLETE are
         // declared as vars for the same reason VOICE and PACE are: several readers sit inside a Loop body.
         const LIVE = KIT.mhLive(uniforms.voice, uniforms.activity, uniforms.stateIndex);
         const VOICE = LIVE.voice.toVar();

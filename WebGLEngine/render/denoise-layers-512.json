@@ -1,0 +1,445 @@
+{
+ "about": "tools/denoiseLayers.mjs: where the denoiser's time goes on this adapter, layer by layer, and a kernel set aimed at the slowest",
+ "adapter": {
+  "name": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+  "software": false,
+  "timestamps": true
+ },
+ "software": false,
+ "compiler": "DXC",
+ "size": [
+  512,
+  512
+ ],
+ "network": {
+  "name": "shipped",
+  "file": "render/denoise-net-r11.json",
+  "layers": [
+   {
+    "Cin": 10,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 81,
+    "k": 1
+   }
+  ]
+ },
+ "sets": [
+  "r12",
+  "r15",
+  "r18t",
+  "r18u",
+  "r27w",
+  "r40s",
+  "r57p"
+ ],
+ "whole": {
+  "r12": {
+   "gpuMs": 232.71424,
+   "perPass": [
+    {
+     "name": "layer 0 (tiled, 10 -> 32)",
+     "ms": 6.822912
+    },
+    {
+     "name": "layer 1 (tiled, 32 -> 32)",
+     "ms": 19.985408
+    },
+    {
+     "name": "layer 2 (tiled, 32 -> 32)",
+     "ms": 18.997248
+    },
+    {
+     "name": "layer 3 (tiled, 32 -> 32)",
+     "ms": 19.817472
+    },
+    {
+     "name": "layer 4 (direct, 32 -> 81)",
+     "ms": 155.83744
+    },
+    {
+     "name": "kernel (apply)",
+     "ms": 9.373696
+    }
+   ],
+   "passes": [
+    "layer 0 (tiled, 10 -> 32)",
+    "layer 1 (tiled, 32 -> 32)",
+    "layer 2 (tiled, 32 -> 32)",
+    "layer 3 (tiled, 32 -> 32)",
+    "layer 4 (direct, 32 -> 81)",
+    "kernel (apply)"
+   ]
+  },
+  "r15": {
+   "gpuMs": 9.802752,
+   "perPass": [
+    {
+     "name": "layer 0 (fast, 10 -> 32)",
+     "ms": 0.731136
+    },
+    {
+     "name": "layer 1 (fast, 32 -> 32)",
+     "ms": 2.193408
+    },
+    {
+     "name": "layer 2 (fast, 32 -> 32)",
+     "ms": 2.188288
+    },
+    {
+     "name": "layer 3 (fast, 32 -> 32)",
+     "ms": 2.19136
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.202624
+    }
+   ],
+   "passes": [
+    "layer 0 (fast, 10 -> 32)",
+    "layer 1 (fast, 32 -> 32)",
+    "layer 2 (fast, 32 -> 32)",
+    "layer 3 (fast, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r18t": {
+   "gpuMs": 9.127584,
+   "perPass": [
+    {
+     "name": "layer 0 (tile_inline, 10 -> 32)",
+     "ms": 0.669504
+    },
+    {
+     "name": "layer 1 (tile_inline, 32 -> 32)",
+     "ms": 2.070528
+    },
+    {
+     "name": "layer 2 (tile_inline, 32 -> 32)",
+     "ms": 2.071552
+    },
+    {
+     "name": "layer 3 (tile_inline, 32 -> 32)",
+     "ms": 2.06848
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.236416
+    }
+   ],
+   "passes": [
+    "layer 0 (tile_inline, 10 -> 32)",
+    "layer 1 (tile_inline, 32 -> 32)",
+    "layer 2 (tile_inline, 32 -> 32)",
+    "layer 3 (tile_inline, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r18u": {
+   "gpuMs": 15.279104,
+   "perPass": [
+    {
+     "name": "layer 0 (fast_unroll, 10 -> 32)",
+     "ms": 1.079296
+    },
+    {
+     "name": "layer 1 (fast_unroll, 32 -> 32)",
+     "ms": 3.877888
+    },
+    {
+     "name": "layer 2 (fast_unroll, 32 -> 32)",
+     "ms": 3.873792
+    },
+    {
+     "name": "layer 3 (fast_unroll, 32 -> 32)",
+     "ms": 3.873792
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.197504
+    }
+   ],
+   "passes": [
+    "layer 0 (fast_unroll, 10 -> 32)",
+    "layer 1 (fast_unroll, 32 -> 32)",
+    "layer 2 (fast_unroll, 32 -> 32)",
+    "layer 3 (fast_unroll, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r27w": {
+   "gpuMs": 29.707264,
+   "perPass": [
+    {
+     "name": "layer 0 (wino, 10 -> 32)",
+     "ms": 2.705408
+    },
+    {
+     "name": "layer 1 (wino, 32 -> 32)",
+     "ms": 8.262656
+    },
+    {
+     "name": "layer 2 (wino, 32 -> 32)",
+     "ms": 8.271872
+    },
+    {
+     "name": "layer 3 (wino, 32 -> 32)",
+     "ms": 8.27392
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.193408
+    }
+   ],
+   "passes": [
+    "layer 0 (wino, 10 -> 32)",
+    "layer 1 (wino, 32 -> 32)",
+    "layer 2 (wino, 32 -> 32)",
+    "layer 3 (wino, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r40s": {
+   "gpuMs": 32.56592,
+   "perPass": [
+    {
+     "name": "layer 0 (fast, 10 -> 32)",
+     "ms": 0.73072
+    },
+    {
+     "name": "layer 1 (sub, 32 -> 32)",
+     "ms": 9.905152
+    },
+    {
+     "name": "layer 2 (sub, 32 -> 32)",
+     "ms": 9.872384
+    },
+    {
+     "name": "layer 3 (sub, 32 -> 32)",
+     "ms": 9.873408
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.189312
+    }
+   ],
+   "passes": [
+    "layer 0 (fast, 10 -> 32)",
+    "layer 1 (sub, 32 -> 32)",
+    "layer 2 (sub, 32 -> 32)",
+    "layer 3 (sub, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r57p": {
+   "gpuMs": 9.445216,
+   "perPass": [
+    {
+     "name": "layer 0 (fast_unroll_p, 10 -> 32)",
+     "ms": 0.963584
+    },
+    {
+     "name": "layer 1 (fast_unroll_p, 32 -> 32)",
+     "ms": 2.079744
+    },
+    {
+     "name": "layer 2 (fast_unroll_p, 32 -> 32)",
+     "ms": 2.050048
+    },
+    {
+     "name": "layer 3 (fast_unroll_p, 32 -> 32)",
+     "ms": 2.130944
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 2.202624
+    }
+   ],
+   "passes": [
+    "layer 0 (fast_unroll_p, 10 -> 32)",
+    "layer 1 (fast_unroll_p, 32 -> 32)",
+    "layer 2 (fast_unroll_p, 32 -> 32)",
+    "layer 3 (fast_unroll_p, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  }
+ },
+ "aim": {
+  "best": "r18t",
+  "bestMs": 9.11648,
+  "perLayer": [
+   {
+    "layer": 0,
+    "set": "r18t",
+    "kernel": "tile_inline",
+    "ms": 0.669504,
+    "fastest": "r18t",
+    "bySet": {
+     "r12": 6.822912,
+     "r15": 0.731136,
+     "r18t": 0.669504,
+     "r18u": 1.079296,
+     "r27w": 2.705408,
+     "r40s": 0.73072,
+     "r57p": 0.963584
+    }
+   },
+   {
+    "layer": 1,
+    "set": "r18t",
+    "kernel": "tile_inline",
+    "ms": 2.070528,
+    "fastest": "r18t",
+    "bySet": {
+     "r12": 19.985408,
+     "r15": 2.193408,
+     "r18t": 2.070528,
+     "r18u": 3.877888,
+     "r27w": 8.262656,
+     "r40s": 9.905152,
+     "r57p": 2.079744
+    }
+   },
+   {
+    "layer": 2,
+    "set": "r18t",
+    "kernel": "tile_inline",
+    "ms": 2.071552,
+    "fastest": "r57p",
+    "bySet": {
+     "r12": 18.997248,
+     "r15": 2.188288,
+     "r18t": 2.071552,
+     "r18u": 3.873792,
+     "r27w": 8.271872,
+     "r40s": 9.872384,
+     "r57p": 2.050048
+    }
+   },
+   {
+    "layer": 3,
+    "set": "r18t",
+    "kernel": "tile_inline",
+    "ms": 2.06848,
+    "fastest": "r18t",
+    "bySet": {
+     "r12": 19.817472,
+     "r15": 2.19136,
+     "r18t": 2.06848,
+     "r18u": 3.873792,
+     "r27w": 8.27392,
+     "r40s": 9.873408,
+     "r57p": 2.130944
+    }
+   },
+   {
+    "layer": 4,
+    "set": "r18t",
+    "kernel": "head_apply",
+    "ms": 2.236416,
+    "fastest": "r40s",
+    "bySet": {
+     "r12": 165.21113599999998,
+     "r15": 2.202624,
+     "r18t": 2.236416,
+     "r18u": 2.197504,
+     "r27w": 2.193408,
+     "r40s": 2.189312,
+     "r57p": 2.202624
+    }
+   }
+  ],
+  "mixed": [
+   "r18t",
+   "r18t",
+   "r18t",
+   "r18t",
+   "r18t"
+  ],
+  "predictedMs": 9.11648,
+  "predictedGain": 1,
+  "slowest": [
+   {
+    "layer": 4,
+    "ms": 2.236416,
+    "share": 0.24531573589806596
+   },
+   {
+    "layer": 2,
+    "ms": 2.071552,
+    "share": 0.22723156305942646
+   },
+   {
+    "layer": 1,
+    "ms": 2.070528,
+    "share": 0.22711923900452807
+   },
+   {
+    "layer": 3,
+    "ms": 2.06848,
+    "share": 0.22689459089473132
+   },
+   {
+    "layer": 0,
+    "ms": 0.669504,
+    "share": 0.07343887114324828
+   }
+  ],
+  "uniform": true
+ },
+ "headToHead": {
+  "rounds": 5,
+  "mixed": {
+   "median": 8.873984,
+   "p10": 8.800256,
+   "p90": 11.177984,
+   "n": 50
+  },
+  "best": {
+   "median": 9.517056,
+   "p10": 9.077568,
+   "p90": 10.4448,
+   "n": 50
+  },
+  "gain": 1.072467112854835
+ },
+ "image": {
+  "worstVsF64": 0.0000023093323160207193,
+  "worstVsBest": 0,
+  "finite": true,
+  "built": [
+   "tile_inline",
+   "tile_inline",
+   "tile_inline",
+   "tile_inline",
+   "head_apply"
+  ],
+  "wanted": [
+   "tile_inline",
+   "tile_inline",
+   "tile_inline",
+   "tile_inline",
+   "head_apply"
+  ]
+ },
+ "at": "2026-11-22T00:28:03.310Z",
+ "package": "0.6.2"
+}

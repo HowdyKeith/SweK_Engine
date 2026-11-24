@@ -345,5 +345,8 @@ console.log("\n6. DETERMINISM, AND THE REPORTING");
     ok("!! a pilot that THROWS is not hidden: the task lets the exception out (a pilot with a bug is not a pilot that crashed)", attempt(() => { DT.fly(() => { throw new Error("boom"); }, DT.scenario(1, "hover")); return false; }, true));
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the drone task samples its trace every 6 ticks (TRACE_EVERY)", DT.TRACE_EVERY === 6);
 console.log(fails ? `\ndroneTask-selfcheck: ${fails} FAILED` : "\ndroneTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

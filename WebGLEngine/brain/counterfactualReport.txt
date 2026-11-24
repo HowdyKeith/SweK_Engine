@@ -1,0 +1,18 @@
+THE COUNTERFACTUAL RE-FLIGHTS: 12 pairs of the Sea OGRE (scenarios 101 to 112), 1 model(s)
+  checks: PIPELINE ok (the empty kit repeats run B and the full kit run K on every seed, a re-flight is deterministic, the new facts are numbered on, a request round-trips); TRANSCRIPTS whole
+  llama3.1:8b-t0: VALID 1.000 (12 of 12)  refused: none 0, many 0, json 0, shape 0, seed 0, kit 0, seedNotShown 0
+    of the 12 valid requests: 0 repeat a shown run (nothing new), 0 end in an outcome neither shown run had; kits asked for: decoy+screen 12
+      pair 101: asked for decoy+screen -> defended, score 2.184, 0 lost
+      pair 102: asked for decoy+screen -> defended, score 2.333, 0 lost
+      pair 103: asked for decoy+screen -> defended, score 2.346, 0 lost
+      pair 104: asked for decoy+screen -> defended, score 2.364, 0 lost
+      pair 105: asked for decoy+screen -> breached, score -0.317, 1 lost
+      pair 106: asked for decoy+screen -> defended, score 2.344, 0 lost
+      pair 107: asked for decoy+screen -> defended, score 2.329, 0 lost
+      pair 108: asked for decoy+screen -> defended, score 2.010, 1 lost
+      pair 109: asked for decoy+screen -> defended, score 2.343, 0 lost
+      pair 110: asked for decoy+screen -> defended, score 2.331, 0 lost
+      pair 111: asked for decoy+screen -> defended, score 2.363, 0 lost
+      pair 112: asked for decoy+screen -> breached, score -0.050, 0 lost
+BOTTOM LINE (llama3.1:8b-t0): THE MODEL CAN ASK FOR A RE-FLIGHT
+Limits, said plainly: VALID is the FORMAT and the seed, not the worth of the question asked; the engine states what the re-flight did and the model's words are neither a fact nor a result.

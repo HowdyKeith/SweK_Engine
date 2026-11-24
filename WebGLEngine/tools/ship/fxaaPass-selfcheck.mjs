@@ -244,9 +244,11 @@ async function main() {
         ok("fxaaPass is constructed (new FxaaPass(gl, ...))", /fxaaPass\s*=\s*new FxaaPass\(/.test(mainSrc));
         ok("fxaaPass is resized alongside bloom/phosphor on canvas resize", /fxaaPass\.resize\(canvas\.width,\s*canvas\.height\)/.test(mainSrc));
         ok("fxaaPass.enabled is driven from gfxSettings.get(\"fxaa\") every frame, like grass/moss/rootarch", /fxaaPass\.enabled\s*=\s*fxaaPass\.ok\s*&&\s*gfxSettings\.get\("fxaa"\)/.test(mainSrc));
-        ok("the composite branch redirects bloom's output into fxaaPass.inputFBO when fxaa is on", /bloomPass\.outputFBO\s*=\s*fxaaPass\.inputFBO/.test(mainSrc));
+        // 2026-11-22: the anti-aliasing SLOT (aaPass) holds render/smaaPass.js when its toggle is on and fxaaPass otherwise -- so FXAA is still what the chain runs by default
+        const slot = /const aaPass = smaaPass && smaaPass\.ok && smaaPass\.enabled \? smaaPass : fxaaPass;/.test(mainSrc);
+        ok("the composite branch redirects bloom's output into fxaaPass.inputFBO when fxaa is on (through the anti-aliasing slot, which holds fxaaPass unless SMAA is on)", slot && /bloomPass\.outputFBO\s*=\s*aaPass\.inputFBO/.test(mainSrc));
         ok("!! *** AND THE PHOSPHOR-ALSO-ON CASE CHAINS THROUGH IT: fxaaPass redirects into phosphorPass.inputFBO ***",
-           /fxaaPass\.outputFBO\s*=\s*phosphorPass\.inputFBO/.test(mainSrc));
+           slot && /aaPass\.outputFBO\s*=\s*phosphorPass\.inputFBO/.test(mainSrc));
         const gfxSrc = fs.readFileSync(path.join(ENG, "ui", "graphicsSettings.js"), "utf8");
         ok("ui/graphicsSettings.js registers the \"fxaa\" toggle, default OFF", /fxaa:\s*false/.test(gfxSrc));
         ok("and exposes it as a settings-panel row", /\["fxaa",/.test(gfxSrc));

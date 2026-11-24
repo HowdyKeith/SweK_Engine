@@ -40,12 +40,21 @@
 //      by making the entries injectable, so the gate feeds a synthetic backlog naming v1234 and requires the
 //      answer to follow -- the same "run the branch, do not argue about it" move v4478 needed for its
 //      unanswerable GPU case.
+//
+// ---- SECTION 6 SABOTAGE LOG (after v4928) -- 7 edits, 7 red by name, none 0 red ---------------------------
+// hydrostatic's marker moved two lines down (2: the census row names satisfied 21 -> 20, and the adjacency row);
+// HoleFillGPU's export renamed (1: the declaration row); the record's satisfied falsified to 22 (2: the census
+// row and the exact-accounting row); a tranche entry pointed at a missing file (1: adjacency, a failed row, no
+// crash); primeTrellis un-exported (1 here, the declaration row, and 1 in deferralAudit's restated Trellis row);
+// SpaceSuit's marker moved to the PREVIOUS line (2: the window is directional); freeRotation's marker version
+// changed to v4911 (1: the marker must name the version the tranche records).
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as D from "./deferralCensus.mjs";
 import { NEXT_ROUNDS } from "./nextRounds.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let fails = 0;
@@ -263,9 +272,44 @@ sec("5. *** THE LIMITS, STATED ***");
     const files = D.sourceFiles(D.ENGINE_ROOT);
     ok("the census walks the engine's own root: ENGINE_ROOT holds main.js, sourceFiles returns relative-to-root source files only, and readEngineVersion reads the LIVE marker (not a commented-out history line)",
         fs.existsSync(path.join(D.ENGINE_ROOT, "main.js")) && Array.isArray(files) && files.length > 1000 &&
-        files.every((f) => /\.(js|mjs|html)$/.test(typeof f === "string" ? f : f.file || "")) &&
+        files.every((f) => SOURCE_EXT.test(typeof f === "string" ? f : f.file || "")) &&
         /^v\d{4,5}$/.test(D.readEngineVersion()) && D.readEngineVersion() === D.readEngineVersion(D.ENGINE_ROOT),
         `${files.length} source files; the tree is at ${D.readEngineVersion()}`);
+}
+
+// ---- 6. THE SECOND TRANCHE, AFTER v4928 ---------------------------------------------------------------------
+sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A DECLARATION ***");
+{
+    const T = D.SETTLED_TRANCHE_AFTER_V4928;
+    const readRel = (rel) => { try { return fs.readFileSync(path.join(HERE, "../..", rel), "utf8"); } catch { return null; } };
+    // A marker counts only where the census itself would see it: a deferral line classed SATISFIED by a
+    // SETTLED at <settledAt> on that line or the next. A marker four lines away is the v4479 lesson again.
+    const unmarked = T.filter((t) => {
+        const src = readRel(t.file);
+        if (src === null) return true;
+        const L = src.split("\n"), tag = new RegExp("SETTLED at " + t.settledAt + "\\b");
+        return !L.some((l, i) => D.TIGHT.test(l) &&
+            D.classifyLine(t.file, l, L[i - 1] || "", L[i + 1] || "") === D.CLASS.SATISFIED &&
+            (tag.test(l) || tag.test(L[i + 1] || "")));
+    });
+    ok("!! thirteen settled notes carry SETTLED at <version> on the claim's line or the next, where the census sees it",
+        T.length === 13 && new Set(T.map((t) => t.file)).size === 13 && unmarked.length === 0,
+        unmarked.length ? "not adjacent or not classed satisfied: " + unmarked.map((t) => t.file).join(", ")
+                        : T.map((t) => t.file.split("/").pop() + " " + t.settledAt).join("; "));
+    const missing = T.flatMap((t) => t.decl.filter(([rel, re]) => { const src = readRel(rel); return src === null || !new RegExp(re).test(src); })
+        .map(([rel, re]) => t.file + " -> " + rel + " /" + re + "/"));
+    ok("!! *** and every settlement is held against a DECLARATION, never against the sentence that claims it ***",
+        missing.length === 0 && T.every((t) => t.decl.length > 0),
+        missing.length ? "the work a marker points at is gone, so the marker is false: " + missing.join("; ")
+                       : T.reduce((n, t) => n + t.decl.length, 0) + " declarations found: primeTrellis, STREAMED, readAngularVelocities in box3d and Jolt, taitB, " +
+                         "STATE.drive, HoleFillGPU, makeLockLife, CSBomb, evaluateGuards in DungeonAI, the forceslate plant, chunkAudit and resumePlan, _dry, mountMiniAvatar");
+    // v4934 MERGE: the branch's own adjudication pass (deferralLedger.json) marked 14 hits SETTLED while main marked the
+    // 13 above; 2 files are in both, so the merged record moves by 13 + 12 = 25 and not 26, and the 12 are named by their count here.
+    const LEDGER_PASS_NEW = 12;
+    ok("the tranche accounts for the record's move EXACTLY: satisfied +25 and undecided -25 (main's 13 plus the ledger pass's 12 not in it), from the counts v4906 left",
+        REC.satisfied - 8 === T.length + LEDGER_PASS_NEW && 217 - REC.undecided === T.length + LEDGER_PASS_NEW,
+        `satisfied 8 -> ${REC.satisfied}, undecided 217 -> ${REC.undecided}. The other seventeen were read and are still open; ` +
+        "they stay undecided because nothing structural decides them, and the ones no entry named were filed as backlog entries");
 }
 
 console.log();

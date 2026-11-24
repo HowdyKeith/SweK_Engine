@@ -1,0 +1,32 @@
+ROUND 7 STAGE 1: 10 fly draws against 10 plain 14-50-4 draws (brain/PLAIN14_DISTRIBUTION_WIP.md); each draw is a 4-search training, the champion read once on the audit (36 dives), the safety audit (500) and the reserve (18)
+  PASS SEEDS: ten fly draws and ten plain14 draws, seeds 6310 to 6400 once each
+  PASS RECIPE: every dump trained by the base recipe (4 runs, 400 iterations, sigma 0.3, maxK 4, slice 1)
+  PASS ONE ENVIRONMENT: all 20 dumps carry the same autopilot numbers (audit -0.4956, safety -0.5564, reserve -0.5146; the committed note's are -0.4956, -0.5564, -0.5146, history and not a check)
+  PASS CHAMPIONS: at least 8 draws of each arm have a champion (fly 10, plain14 10)
+fly (Giant Fiber Circuit, 963 weights): audit / safety audit / reserve of each draw's champion
+  seed 6310: -0.3270  -0.3514  -0.3576  QUALIFIES
+  seed 6320: -0.3127  -0.3385  -0.3266  QUALIFIES
+  seed 6330: -0.3313  -0.3603  -0.3468  QUALIFIES
+  seed 6340: -0.3105  -0.3364  -0.3196  QUALIFIES
+  seed 6350: -0.2987  -0.3212  -0.3105  QUALIFIES
+  seed 6360: -0.3300  -0.3592  -0.3542  QUALIFIES
+  seed 6370: -0.3110  -0.3364  -0.3297  QUALIFIES
+  seed 6380: -0.3234  -0.3488  -0.3469  QUALIFIES
+  seed 6390: -0.3234  -0.3520  -0.3413  QUALIFIES
+  seed 6400: -0.3002  -0.3316  -0.3134  QUALIFIES
+plain14 (14-50-4, 954 weights): audit / safety audit / reserve of each draw's champion
+  seed 6310: -0.3253  -0.3561  -0.3454  QUALIFIES
+  seed 6320: -0.3209  -0.3474  -0.3304  QUALIFIES
+  seed 6330: -0.3168  -0.3414  -0.3335  QUALIFIES
+  seed 6340: -0.3386  -0.3745  -0.3546  QUALIFIES
+  seed 6350: -0.3195  -0.3448  -0.3359  QUALIFIES
+  seed 6360: -0.3179  -0.3425  -0.3318  QUALIFIES
+  seed 6370: -0.3246  -0.3513  -0.3399  QUALIFIES
+  seed 6380: -0.3323  -0.3593  -0.3480  QUALIFIES
+  seed 6390: -0.3265  -0.3522  -0.3462  QUALIFIES
+  seed 6400: -0.3184  -0.3475  -0.3271  QUALIFIES
+audit: fly mean -0.3168 (range -0.3313 to -0.2987), plain14 mean -0.3241 (range -0.3386 to -0.3168), difference +0.0073; exact one-sided p fly higher 0.1237, fly lower 0.8912: TIES
+READ ON safetyAudit: fly mean -0.3436 (range -0.3603 to -0.3212), plain14 mean -0.3517 (range -0.3745 to -0.3414), difference +0.0081; exact one-sided p fly higher 0.1237, fly lower 0.8912: TIES
+reserve: fly mean -0.3347 (range -0.3576 to -0.3105), plain14 mean -0.3393 (range -0.3546 to -0.3271), difference +0.0046; exact one-sided p fly higher 0.2894, fly lower 0.7356: TIES
+draws that QUALIFY (the trainer's own test): fly 10 of 10, plain14 10 of 10
+BOTTOM LINE: THE FLY CANNOT BE TOLD APART FROM ITS PLAIN CONTROLS (safety audit: fly mean -0.3436 of 10, plain14 mean -0.3517 of 10, difference +0.0081; exact one-sided p that the fly is higher 0.1237, lower 0.8912)

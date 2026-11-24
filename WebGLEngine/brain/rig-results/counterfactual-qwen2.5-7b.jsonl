@@ -1,0 +1,13 @@
+{"kind":"counterfactual-transcript","schema":1,"model":"llama3.1:8b-t0","params":{"temperature":0,"max_tokens":600},"set":"registered","requested":"qwen2.5:7b"}
+{"key":"74d0730e","seed":101,"promptHash":"2726d895","reply":"REQUEST {\"seed\":101,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"bc2f2c33","seed":102,"promptHash":"8581fd28","reply":"REQUEST {\"seed\":102,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"1f05252d","seed":103,"promptHash":"cc236556","reply":"REQUEST {\"seed\":103,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"c0448027","seed":104,"promptHash":"9c7f7590","reply":"REQUEST {\"seed\":104,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"3883ae2f","seed":105,"promptHash":"146e5036","reply":"REQUEST {\"seed\":105,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"d7c65beb","seed":106,"promptHash":"ca86f9fe","reply":"REQUEST {\"seed\":106,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"dc10dc93","seed":107,"promptHash":"939e41d0","reply":"REQUEST {\"seed\":107,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"b5ed5ebc","seed":108,"promptHash":"ad8778cd","reply":"REQUEST {\"seed\":108,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"e3f48d9b","seed":109,"promptHash":"cf724842","reply":"REQUEST {\"seed\":109,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"25f55894","seed":110,"promptHash":"35d5f575","reply":"REQUEST {\"seed\":110,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"be15d234","seed":111,"promptHash":"fb8a8c41","reply":"REQUEST {\"seed\":111,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"395831e3","seed":112,"promptHash":"a06570ec","reply":"REQUEST {\"seed\":112,\"kit\":[\"decoy\",\"screen\"]}"}

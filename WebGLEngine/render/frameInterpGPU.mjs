@@ -40,8 +40,7 @@ export class FrameInterpGPU {
     }
     _f32(a) { return a instanceof Float32Array ? a : Float32Array.from(a); }
 
-    /** Mirrors interpolateFrameCPU, minus `fill` -- render/holeFill.mjs is a separate pass and a later round. */
-    // SETTLED at v4777: the pass is render/holeFillGPU.mjs.
+    /** Mirrors interpolateFrameCPU, minus `fill` -- render/holeFill.mjs is a separate pass and a later round (SETTLED at v4687: render/holeFillGPU.mjs). */
     async interpolate({ prev, cur, w, h, flow, bw, bh, block, depthBlock, indexedBy, nearerIsLess = true, t = 0.5 }) {
         if (!(block >= 1) || block !== Math.floor(block))
             throw new Error(`frameInterpGPU.interpolate: block must be a whole number of pixels, at least 1 -- got ${block}`);

@@ -83,5 +83,6 @@ console.log();
 console.log("  ----  NOT DONE, AND EACH FOR A STATED REASON: the phone-peer front door (needs a page design and");
 console.log("  ----  a port decision -- 3923 by default, against swek_free_port); and the per-chunk resume this");
 console.log("  ----  comparison uncovered, which changes verifiedPrefix's contract and wants its own round.");
+// SETTLED at v3175: built beside verifiedPrefix rather than by changing it -- ai-bridge/chunkVerify.mjs chunkAudit (v3167), resumePlan (v3175).
 if (fails) { console.log("copypartyRegistry-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("copypartyRegistry-selfcheck: all checks pass");

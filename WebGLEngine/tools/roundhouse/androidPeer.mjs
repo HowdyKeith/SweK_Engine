@@ -95,6 +95,9 @@ export const DEP_CLASSIFICATION = {
     // "gypfile": true anywhere under ai-bridge/node_modules, so `npm install --omit=optional` still has no gyp
     // step and installing it anyway would not add one.
     "@modelcontextprotocol/sdk": { kind: "pure-js", note: "TypeScript compiled to JS; would run on bionic fine. Optional because tools/mcp/physicsAi.mjs is a rig-only shim -- no selfcheck path awaits it, so an absent SDK stays green" },
+    // v4933 -- the TV-out line added @tvpipe/sdk to ai-bridge's optionalDependencies: its package.json lists one per-platform package each (darwin, linux and win32, arm64 and x64) holding a prebuilt
+    // tvpipe executable the SDK spawns, and NO android one -- read from its own optionalDependencies. Optional: ai-bridge/tvpipeBridge.js requires it lazily and the dock's TV buttons say "not installed".
+    "@tvpipe/sdk":        { kind: "binary",  note: "a prebuilt tvpipe executable per desktop platform (Apache-2.0), spawned by the SDK; no android build; skipped by --omit=optional" },
     "ffmpeg-static":      { kind: "binary",  note: "prebuilt ffmpeg; no android binary; skipped by --omit=optional" },
     "puppeteer-core":     { kind: "pure-js", note: "pure JS, but drives a desktop Chrome that is not there; optional" },
     // v4778 -- the rtx merge added these three to ai-bridge's optionalDependencies and NOT to this table, the

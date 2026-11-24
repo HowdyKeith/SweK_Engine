@@ -13,6 +13,7 @@
 //   - water_ssr   -> water screen-space reflection on/off
 //   - water_refraction -> see-through refraction down to the lakebed
 //   - fxaa        -> screen-space anti-aliasing pass on/off (render/fxaaPass.js), default off
+//   - smaa        -> SMAA 1x instead of FXAA in the same slot (render/smaaPass.js), default off
 //
 // Each setting reads/writes window._gfxSettings — main.js's render
 // loop reads from the same object every frame. Cheap; no event bus
@@ -32,6 +33,7 @@ const DEFAULTS = {
     slopes:    true,      // v432 — smooth ramps over stair-stepped terrain
     mc_terrain: false,    // v434 — experimental marching-cubes smooth terrain (opt-in)
     fxaa:      false,     // screen-space anti-aliasing (opt-in -- the retro/CRT look often reads jaggies as in-theme)
+    smaa:      false,     // 2026-11-22: SMAA 1x (render/smaaPass.js) -- sharper than FXAA; when on it takes the anti-aliasing slot instead of FXAA
 };
 
 export class GraphicsSettings {
@@ -110,6 +112,7 @@ export class GraphicsSettings {
             ["slopes",    "Smooth slopes",    "Ramp over stair-stepped terrain (mountains)"],
             ["mc_terrain","Smooth terrain (MC)","Experimental: round the whole world via marching cubes. Heavier."],
             ["fxaa",      "Anti-aliasing",    "Smooths jagged edges (FXAA). Off by default -- this engine's retro look often reads aliasing as in-theme."],
+            ["smaa",      "SMAA",             "Sharper anti-aliasing (SMAA 1x): follows each edge to its ends and blends by the area it covers. Used instead of FXAA when on. Off by default."],
         ];
         for (const [key, label, hint] of rows) {
             const row = document.createElement("div");

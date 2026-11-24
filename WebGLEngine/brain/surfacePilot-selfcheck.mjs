@@ -1,6 +1,6 @@
 // WebGLEngine/brain/surfacePilot-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/surfacePilot-selfcheck.mjs      (~3 s)
+// Run: node brain/surfacePilot-selfcheck.mjs      (~1.5 s)
 //
 // COMING UP, AND STAYING UP. brain/surfacePilot.mjs adds one optional field, `surface: true`, to the target of any submarine pilot. This gate holds:
 //

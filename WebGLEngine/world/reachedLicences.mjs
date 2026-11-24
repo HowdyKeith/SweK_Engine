@@ -209,6 +209,28 @@ export const REACHED_SOURCES = Object.freeze([
              "repository's code. Read for what it names; nothing ported.",
     },
     // =========================================================================================================
+    // v4933 -- THE RADIX SORT'S SECOND-HAND CREDIT, READ FIRST-HAND. render/splatSortGPU.mjs is PlayCanvas's multi-pass
+    // radix sort (MIT, its copyright and grant kept in that file's header), and PlayCanvas's header credits
+    // kishimisu/WebGPU-Radix-Sort, which the port repeats. Read at the ship of v4933: the repository has no LICENSE,
+    // LICENSE.md or LICENSE.txt on main, and the npm tarball webgpu-radix-sort-1.0.7.tgz carries none either -- only
+    // package.json's license "MIT" and author kishimisu. The ZachSaucier rule: a manifest field without the text is
+    // UNPAPERED. Nothing was taken from this repository directly; what the tree holds came through PlayCanvas's file.
+    // =========================================================================================================
+    {
+        repo: "kishimisu/WebGPU-Radix-Sort", sourceUrl: "https://github.com/kishimisu/WebGPU-Radix-Sort",
+        grantorHoldsRights: true, licenceExists: false, publisher: "kishimisu", year: null,
+        spdx: null, licence: null,
+        licenceNote: "NO LICENSE FILE, read first-hand at v4933: none of LICENSE, LICENSE.md or LICENSE.txt on main " +
+             "(raw.githubusercontent answers 404), and the npm package webgpu-radix-sort 1.0.7's tarball lists none; " +
+             "package.json carries license \"MIT\" and author kishimisu. A manifest field without the licence text is " +
+             "recorded as UNPAPERED, the same posture as ZachSaucier/Asset-Loading-Effects.",
+        redistributable: false, posture: POSTURE.REACHED,
+        taken: null, takenPaths: [], citedPaths: ["render/splatSortGPU.mjs", "tools/ship/splatSortGPU-selfcheck.mjs"],
+        why: "Named because the port repeats PlayCanvas's credit line, so the census finds it in a header. The code " +
+             "the tree holds is PlayCanvas's WGSL under PlayCanvas's MIT grant, which is papered; this repository is " +
+             "upstream of that, and nothing was read into the tree from it.",
+    },
+    // =========================================================================================================
     // v4511 -- A COLLIDER FOR A SPLAT SCENE, THE GAP THE SPLAT STACK HAD LEFT OPEN.
     //
     // physics/splat/gaussianSplat.js grades the projection math and says Spark stays a viewer; nothing in the

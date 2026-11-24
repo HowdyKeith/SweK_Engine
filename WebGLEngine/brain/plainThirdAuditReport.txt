@@ -1,0 +1,12 @@
+THE THIRD AUDIT OF THE PLAIN NET (brain/PLAIN_THIRD_AUDIT_WIP.md): plain:2 (circuit-plain) against rule-low06, paired dive by dive
+  PASS ARMS: rule-low06 and plain:2, once each
+  PASS WEIGHTS: plain:2 flew the weights of the plain net the earlier audits flew (digest c916e7f5)
+  PASS KEYS: both arms flew the same 1200 dives in the same order (seeds 20001 to 20600 of far and both)
+  PASS SCORES: every score is a number in [0, 1] and every strain a number or null
+Q1 (THE VERDICT) the lead on 1200 dives: -0.0006 (se 0.0027, -0.2279 se); better 153, worse 141, same 906: TIE
+  the first audit (seeds 17001 to 17300): +0.0050 (se 0.0037, 600 dives)
+  the second audit (seeds 18001 to 18300): +0.0066 (se 0.0034, 600 dives)
+Q2a the pool of 3 audits by inverse variance: +0.0028 (se 0.0018, 1.5498 se); reaches the series' floor of 0.02: NO
+Q2c the hull -- plain:2: strain above 0.92 in 323 of 1200 dives, above 0.95 in 90, largest 0.9999, crushed 2, stranded 0; rule-low06: 0, 0, largest 0.9181, crushed 0, stranded 0; Round 33's test (crushed plus stranded 2 against 0): NO WORSE
+Q2d the fourth reading, round 1's flight (seeds 19001 to 19600, 1200 dives): +0.0063 (se 0.0027), beside this one and not pooled into the verdict
+BOTTOM LINE: THE PLAIN NET'S GAIN DOES NOT REPLICATE (A TIE) (-0.0006, se 0.0027, on 1200 dives of seeds 20001 to 20600; the hull: NO WORSE, 323 dives above 0.92 against 0)

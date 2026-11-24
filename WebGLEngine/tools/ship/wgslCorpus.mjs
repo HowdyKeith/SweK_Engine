@@ -684,6 +684,22 @@ export function corpus() {
               return { code: R.bvhProbeWgsl(rayCount), outCount: rayCount * 2, workgroups: Math.ceil(rayCount / 64),
                        inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
           })() },
+        // v4918 -- the instance probe: what a ray hits among placed meshes and how many instances it entered, by the
+        // list here (the tree is the same kernel with one option; rtPipeline-selfcheck section 17 holds the two together).
+        { id: "rtPipeline.instanceProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "one ray per invocation against three instances of a unit cube -- distance, instance, triangle and instances entered; graded against a brute search over CPU-placed meshes by rtPipeline-selfcheck.mjs section 17, here for the corpus's own shader-compiles-and-runs claim",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const bvh = R.bvhBuffersFromMesh(positions, indices);
+              const at = (x) => [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0];
+              const inst = R.instanceBuffer([{ transform: at(-3), albedo: 0.5 }, { transform: at(0), albedo: 0.5 }, { transform: at(3), albedo: 0.5 }], { meshes: bvh });
+              const rays = new Float32Array([-3, 0, -5, 0, 0, 1, 0, 0, -5, 0, 0, 1, 3, 0, -5, 0, 0, 1, -8, 0, 0, 1, 0, 0, 0, 9, 0, 0, 1, 0, 1.5, 0, -5, 0, 0, 1, 0, 5, 0, 0, -1, 0, 8, 0.5, 0.5, -1, 0, 0]);
+              const rayCount = rays.length / 6, U = new Float32Array(96);
+              U[R.MESH_META_SLOT * 4] = 1; U[R.MESH_META_SLOT * 4 + 3] = 3;
+              return { code: R.instanceProbeWgsl(rayCount), outCount: rayCount * 4, workgroups: Math.ceil(rayCount / 64), uniforms: U,
+                       inputs: [...R.bvhInputs(bvh), { binding: R.BVH_BINDINGS.instances, data: inst }, { binding: 6, data: rays }] };
+          })() },
         { id: "rtPipeline.bvhShadeProbeWgsl", from: "physics/render/rtPipeline.mjs",
           why: "the interpolated vertex colour at each ray's hit point, over the same cube with a hand-designed per-vertex gradient -- graded against meshBVH.mjs's independent baryAt() by rtPipeline-selfcheck.mjs; here for the second backend",
           opts: (() => {
@@ -1021,6 +1037,8 @@ export const EXCLUDED = Object.freeze([
     // and the pass itself is graded end to end by tools/ship/gpuDriven-selfcheck.mjs on the browser harness.
     Object.freeze({ id: "gpuDriven.cullLodWgsl", kind: "lives on its own gate",
                     why: "four bindings (uniform, instances, indirect commands, records) and an atomicAdd -- outside the one-buffer harness signature; graded by gpuDriven-selfcheck through gfx/device.js" }),
+    Object.freeze({ id: "reservoirPilotGpu.READOUT_WGSL", kind: "lives on its own gate",
+                    why: "v4926: the fly pilot's readout and the autopilot's laws on the device -- six bindings (controls, counts, the reservoir's activity, the features, the law and readout tables, the output cells), outside the one-buffer harness signature; graded against the CPU pilot to 1e-4 by brain/reservoirPilotGpu-selfcheck" }),
     Object.freeze({ id: "gpuHaul.haulWgsl", kind: "lives on its own gate",
                     why: "reads a flights buffer and writes a records buffer -- two storage bindings; graded against the economy's own positions by gpuUniverse-selfcheck" }),
     Object.freeze({ id: "conv2d.conv2dSubWgsl", kind: "lives on its own gate",
@@ -1275,6 +1293,19 @@ export const EXCLUDED = Object.freeze([
         why: "the upsample, the hold on Bt's light and the composite, reading U_TH's head output; held with the chain to compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4" }),
     Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_TH's last pass, the half-size head's residual upsampled and the hold at full size, reading what the four conv passes wrote; held to holdCpu(half) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
+    // ---- v4933 -- THE PLAYCANVAS LINE'S RENDER PASSES: each a vertex/fragment pass (or a chunk pasted into one), drawn on WebGPU by its own gate ----
+    Object.freeze({ id: "clusteredLights.clusteredWGSL", kind: "render pass, graded through the device", why: "a lighting chunk (clusteredLight(), shadows, cookies) pasted into a page's fragment shader with four storage buffers and the shadow atlas bound; tools/ship/clusteredLights-selfcheck.mjs section 5 draws lights-gpu.html on WebGPU and holds it to the WebGL2 page and to shadeCPU" }),
+    Object.freeze({ id: "infiniteGrid.GRID_WGSL", kind: "render pass, graded through the device", why: "the infinite grid's full-screen vertex and fragment pass; tools/ship/infiniteGrid-selfcheck.mjs draws it on WebGPU and holds its alpha to gridAlphaCPU" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_VS_WGSL", kind: "render pass, graded through the device", why: "SMAA's shared vertex stage for its three passes; tools/ship/smaaPassGPU-selfcheck.mjs runs the chain on WebGPU and compares it with the WebGL2 pass" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_EDGE_WGSL", kind: "render pass, graded through the device", why: "SMAA's edge pass (a render pass into a texture, not a dispatch); graded by tools/ship/smaaPassGPU-selfcheck.mjs against the WebGL2 edges" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_WEIGHTS_WGSL", kind: "render pass, graded through the device", why: "SMAA's blend-weight pass, reading the vendored area and search tables; graded by tools/ship/smaaPassGPU-selfcheck.mjs against the WebGL2 weights" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_BLEND_WGSL", kind: "render pass, graded through the device", why: "SMAA's neighbourhood blend; graded by tools/ship/smaaPassGPU-selfcheck.mjs, picture against picture" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_REPROJECT_WGSL", kind: "render pass, graded through the device", why: "T2x's history reprojection by plane or depth, with disocclusion; graded by tools/ship/smaaPassGPU-selfcheck.mjs sections 6 and 7 against the reprojection's CPU form" }),
+    Object.freeze({ id: "smaaPassGPU.SMAA_RESOLVE_WGSL", kind: "render pass, graded through the device", why: "T2x's two-frame resolve; graded by tools/ship/smaaPassGPU-selfcheck.mjs, a still scene's resolve against its single frame" }),
+    Object.freeze({ id: "splatRendererGPU.SPLAT_WGSL", kind: "render pass, graded through the device", why: "the splat renderer's vertex and fragment pass over the sorted order; tools/ship/splatRendererGPU-selfcheck.mjs draws it on WebGPU and holds it to the WebGL2 renderer" }),
+    Object.freeze({ id: "splatSH.SH_WGSL", kind: "render pass, graded through the device", why: "a function-body fragment (the SH colour) the splat renderer pastes into its vertex shader; graded through tools/ship/splatRendererGPU-selfcheck.mjs and tools/ship/splatSH-selfcheck.mjs against shRest" }),
+    Object.freeze({ id: "volumetricFog.FOG_WGSL", kind: "render pass, graded through the device", why: "the fog's full-screen post pass; tools/ship/volumetricFog-selfcheck.mjs draws it on WebGPU and holds it to fogCPU" }),
+    Object.freeze({ id: "volumetricFog.fogWGSL", kind: "render pass, graded through the device", why: "the generator of FOG_WGSL and of its shafts variant (the sun's shadow sampled per step); tools/ship/softShadows-selfcheck.mjs holds the shafts to fogCPU's march with the shadow cast on the CPU" }),
 ]);
 
 /**

@@ -1,0 +1,22 @@
+{
+ "report": [
+  "ROUND 38: the aquarium's circuit profiles (C06, C04, R06, SEAT-04) under REF and +0.10 BIAS; seeds 51001-51300, both",
+  "  PASS GENERATOR: the scenarios are needsTask.scenario's on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in both conditions: true",
+  "  PASS ALIGNED: every arm and condition flies the same scenarios in the same order: true",
+  "  PASS THE FAULT REACHES THE PILOT: every arm's BIAS dives differ from its REF dives on at least one dive: true",
+  "  PASS THE ARMS DIFFER: every pair of arms differs on at least one REF dive: true",
+  "  PASS C06 AND R06 ARE THE AQUARIUM'S PROFILES: C06 and R06 against subAquariumCircuit.circuitSeat(\"circuit\") and (\"rule\") on the gate's two dives, fingerprint for fingerprint: true",
+  "  PASS SEAT-04 IS THE SHIPPED SEAT: the SEAT-04 arm against surveyPilot() on the gate's two dives, fingerprint for fingerprint: true",
+  "  C06      REF 0.8104 (1/0)  BIAS 0.6127 (88/0)  V1 C06 PAYS MORE UNDER BIAS",
+  "  C04      REF 0.8032 (1/0)  BIAS 0.7095 (51/0)  V1 C04 PAYS MORE UNDER BIAS",
+  "  R06      REF 0.8043 (0/0)  BIAS 0.8106 (14/0)  V1 R06 PAYS MORE UNDER BIAS",
+  "  SEAT-04  REF 0.8050 (0/0)  BIAS 0.8432 (1/0)  V1 SEAT-04 HOLDS ITS HULL UNDER BIAS",
+  "  V2  C06'S HULL IS WORSE THAN THE SHIPPED SEAT'S UNDER BIAS (88 against 1)",
+  "  V2b C04'S HULL IS WORSE THAN THE SHIPPED SEAT'S UNDER BIAS (51 against 1)",
+  "  V3  the price of the move at REF, C04 minus C06: -0.0072 (se 0.0030) HURTS",
+  "REPORTED, NOT WEIGHED: C06 minus SEAT-04 REF +0.0054 (se 0.0059), BIAS -0.2305 (se 0.0217); C04 minus SEAT-04 REF -0.0018 (se 0.0054), BIAS -0.1337 (se 0.0180); R06 crushed under BIAS 14 (Round 34's L06: 8 of 300)",
+  "BOTTOM LINE: THE CIRCUIT PROFILE PAYS MORE UNDER BIAS ON EITHER BASE",
+  "BOTTOM LINE: THE RULE PROFILE ON -0.06 PAYS MORE UNDER BIAS"
+ ]
+}

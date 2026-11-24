@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Zoom Blur (a radial march beside the god rays)">
 <meta name="demo:desc" content="A zoom blur on gfx/device.js: every pixel averages the scene along the line toward a centre that follows the pointer, in both shader languages, with no luminance or depth gate and the output replacing the scene. Beside it, render/bloomPass.js's GODRAYS_FS run raw on the same scene toward the same centre. Held to a CPU twin by tools/ship/zoomBlur-selfcheck.mjs.">

@@ -1,0 +1,63 @@
+DEEP AND PLAIN AUDIT (brain/DEEP_PLAIN_WIP.md): the rule and the sixteen eligible old searches on seeds 120001 to 121000 of deep and plain (2000 dives an arm), beside the three earlier far-and-both audits
+  PASS SPECS: the old eligible searches are the registered sixteen
+  PASS ARMS: the rule and the sixteen eligible old searches, once each
+  PASS WEIGHTS: every search flew the weights of its line of the old ledgers (by digest)
+  PASS BLOCK: the file flew seeds 120001 to 121000 of deep, plain
+  PASS KEYS: every arm flew the same 2000 dives in the same order
+  PASS SCORES: every score is a number in [0, 1] and every strain a number or null
+  PASS DISJOINT: no dive is in the new file and in the 40-dive set, BIG, MIXED, round 1's block, AUDIT 2 or AUDIT 3
+  PASS EARLIER: the three earlier far-and-both audits are the registered blocks and hold the same sixteen searches with the same weights
+the sixteen eligible old searches: lead over the rule (se) on deep and on plain dives of this block (dives better / worse / same), on far and on both from the three earlier audits pooled, and the mean of the four kinds (se); CH a family champion
+  cx:0               deep +0.0001 (se 0.0030; 74/81/845)  plain +0.0106 (se 0.0031; 36/12/952)  far +0.0036  both -0.0417  four-kind -0.0069 (se 0.0017)
+  cx:1            CH deep -0.0093 (se 0.0026; 60/105/835)  plain +0.0153 (se 0.0028; 37/3/960)  far +0.0004  both -0.0122  four-kind -0.0015 (se 0.0013)
+  nostate:1          deep -0.0039 (se 0.0015; 5/16/979)  plain -0.0081 (se 0.0031; 15/33/952)  far -0.0018  both -0.0014  four-kind -0.0038 (se 0.0009)
+  nostate:2       CH deep -0.0181 (se 0.0039; 64/121/815)  plain -0.0001 (se 0.0039; 39/38/923)  far -0.0014  both +0.0005  four-kind -0.0048 (se 0.0016)
+  nostate:3          deep -0.0105 (se 0.0035; 60/94/846)  plain +0.0084 (se 0.0035; 40/20/940)  far -0.0056  both -0.0109  four-kind -0.0046 (se 0.0016)
+  plain:2         CH deep -0.0021 (se 0.0026; 61/92/847)  plain +0.0138 (se 0.0026; 33/2/965)  far +0.0039  both +0.0060  four-kind +0.0054 (se 0.0012)
+  plain:3            deep -0.0200 (se 0.0037; 59/120/821)  plain +0.0100 (se 0.0036; 42/19/939)  far +0.0038  both +0.0020  four-kind -0.0011 (se 0.0015)
+  station-large:0    deep +0.0078 (se 0.0023; 69/45/886)  plain +0.0129 (se 0.0028; 34/5/961)  far -0.0019  both -0.0073  four-kind +0.0029 (se 0.0011)
+  station-large:1    deep +0.0048 (se 0.0022; 58/44/898)  plain +0.0178 (se 0.0029; 42/2/956)  far -0.0051  both -0.0117  four-kind +0.0015 (se 0.0011)
+  station-large:2 CH deep +0.0071 (se 0.0023; 62/41/897)  plain +0.0106 (se 0.0027; 30/6/964)  far +0.0026  both -0.0069  four-kind +0.0034 (se 0.0010)
+  station-small:0 CH deep +0.0036 (se 0.0022; 51/43/906)  plain +0.0097 (se 0.0027; 30/8/962)  far +0.0020  both -0.0010  four-kind +0.0036 (se 0.0010)
+  station-small:1    deep -0.0018 (se 0.0028; 57/68/875)  plain +0.0123 (se 0.0028; 34/7/959)  far -0.0040  both -0.0045  four-kind +0.0005 (se 0.0011)
+  station-small:2    deep +0.0064 (se 0.0023; 64/43/893)  plain +0.0132 (se 0.0027; 34/5/961)  far -0.0112  both -0.0126  four-kind -0.0010 (se 0.0011)
+  station-small:3    deep +0.0051 (se 0.0023; 65/51/884)  plain +0.0156 (se 0.0030; 41/6/953)  far -0.0338  both -0.0236  four-kind -0.0092 (se 0.0012)
+  plain-priced:2  CH deep -0.0049 (se 0.0025; 57/91/852)  plain +0.0115 (se 0.0025; 29/3/968)  far +0.0051  both +0.0053  four-kind +0.0043 (se 0.0011)
+  plain-priced:3     deep -0.0160 (se 0.0038; 64/104/832)  plain +0.0071 (se 0.0038; 42/23/935)  far +0.0002  both +0.0038  four-kind -0.0012 (se 0.0015)
+Q1 (VERDICT 1: DEEP) the average of plain:2, plain:3, plain-priced:2, plain-priced:3 on the 1000 deep dives: mean lead -0.0108 (se 0.0025), z -4.30: THE FOUR OLD PLAIN-FAMILY SEARCHES TRAIL THE RULE ON DEEP DIVES
+Q2 (VERDICT 2: PLAIN) the same on the 1000 plain dives: mean lead +0.0106 (se 0.0028), z 3.85: THE FOUR OLD PLAIN-FAMILY SEARCHES LEAD THE RULE ON PLAIN DIVES
+Q3 all sixteen by kind and family (reported; the searches share dives, so no test): the mean lead and how many are above 0
+  cx             deep: mean -0.0046, 1 of 2 above 0; plain: mean +0.0130, 2 of 2 above 0
+  nostate        deep: mean -0.0108, 0 of 3 above 0; plain: mean +0.0001, 1 of 3 above 0
+  plain          deep: mean -0.0111, 0 of 2 above 0; plain: mean +0.0119, 2 of 2 above 0
+  station-large  deep: mean +0.0066, 3 of 3 above 0; plain: mean +0.0138, 3 of 3 above 0
+  station-small  deep: mean +0.0033, 3 of 4 above 0; plain: mean +0.0127, 4 of 4 above 0
+  plain-priced   deep: mean -0.0105, 0 of 2 above 0; plain: mean +0.0093, 2 of 2 above 0
+Q4 the four-kind lead (the survey task's weighting: the mean of the lead on far, both, deep and plain; reported, the far and both leads come from blocks already read)
+  the four old ones: far +0.0033, both +0.0043, deep -0.0108, plain +0.0106; four-kind lead +0.0018 (se 0.0011, z 1.67)
+  champion cx:1            four-kind -0.0015 (se 0.0013): far +0.0004, both -0.0122, deep -0.0093, plain +0.0153
+  champion nostate:2       four-kind -0.0048 (se 0.0016): far -0.0014, both +0.0005, deep -0.0181, plain -0.0001
+  champion plain:2         four-kind +0.0054 (se 0.0012): far +0.0039, both +0.0060, deep -0.0021, plain +0.0138
+  champion station-large:2 four-kind +0.0034 (se 0.0010): far +0.0026, both -0.0069, deep +0.0071, plain +0.0106
+  champion station-small:0 four-kind +0.0036 (se 0.0010): far +0.0020, both -0.0010, deep +0.0036, plain +0.0097
+  champion plain-priced:2  four-kind +0.0043 (se 0.0011): far +0.0051, both +0.0053, deep -0.0049, plain +0.0115
+Q5 the hull on the new block: dives above strain 0.92 and 0.95, the largest strain, crushed, stranded, on deep dives and on plain dives (the rule first)
+  rule-low06      deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5164, crushed 0, stranded 0
+  cx:0            deep: 415 of 1000 above 0.92, 9 above 0.95, largest 1.0000, crushed 4, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5424, crushed 0, stranded 1
+  cx:1            deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9182, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5166, crushed 0, stranded 0
+  nostate:1       deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5164, crushed 0, stranded 0
+  nostate:2       deep: 389 of 1000 above 0.92, 95 above 0.95, largest 0.9999, crushed 3, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5400, crushed 0, stranded 0
+  nostate:3       deep: 303 of 1000 above 0.92, 3 above 0.95, largest 0.9994, crushed 3, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5265, crushed 0, stranded 1
+  plain:2         deep: 534 of 1000 above 0.92, 139 above 0.95, largest 0.9701, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5162, crushed 0, stranded 0
+  plain:3         deep: 175 of 1000 above 0.92, 2 above 0.95, largest 0.9999, crushed 2, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5468, crushed 0, stranded 3
+  station-large:0 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5158, crushed 0, stranded 0
+  station-large:1 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5162, crushed 0, stranded 0
+  station-large:2 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5163, crushed 0, stranded 0
+  station-small:0 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5159, crushed 0, stranded 0
+  station-small:1 deep: 1 of 1000 above 0.92, 0 above 0.95, largest 0.9201, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5159, crushed 0, stranded 0
+  station-small:2 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9196, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5260, crushed 0, stranded 0
+  station-small:3 deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9198, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5166, crushed 0, stranded 0
+  plain-priced:2  deep: 0 of 1000 above 0.92, 0 above 0.95, largest 0.9190, crushed 0, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5162, crushed 0, stranded 0
+  plain-priced:3  deep: 161 of 1000 above 0.92, 1 above 0.95, largest 0.9997, crushed 1, stranded 0; plain: 0 of 1000 above 0.92, 0 above 0.95, largest 0.5165, crushed 0, stranded 2
+BOTTOM LINE (DEEP): THE FOUR OLD PLAIN-FAMILY SEARCHES TRAIL THE RULE ON DEEP DIVES (mean lead -0.0108, se 0.0025, z -4.30)
+BOTTOM LINE (PLAIN): THE FOUR OLD PLAIN-FAMILY SEARCHES LEAD THE RULE ON PLAIN DIVES (mean lead +0.0106, se 0.0028, z 3.85)

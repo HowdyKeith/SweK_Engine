@@ -1,6 +1,7 @@
 // WebGLEngine/physics/mechanics/subTorpedo-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/subTorpedo-selfcheck.mjs      (~0.2 s)
+// Run: node physics/mechanics/subTorpedo-selfcheck.mjs      (~0.1 s)
+// v4920 -- re-taken from ~0.2 s: 95, 133, 93, 79, 96 ms alone on linux-x64-4c-16gb-142c0d, and the record's ring reads 134, 92, 88.
 //
 // THE TORPEDO HELD TO ITS CLOSED FORMS. physics/mechanics/subTorpedo.mjs is a point body with a cone seeker, a homing law, an arming distance and a proximity fuse; this gate holds each to the number a pencil gives:
 //   1  THE DAMAGE   100 inside 3 m, 40 at 8 m, linear between (70 at 5.5 m), none beyond 8 m, and none for a NaN
@@ -114,7 +115,7 @@ console.log("\n6. THE STATE");
 console.log("\n7. THE FRONT DOOR");
 {
     const l = Tp.reportLines();
-    ok("!! the export list is pinned", Object.keys(Tp).sort().join(",") === "TORPEDO,damageAt,launch,platformOf,reportLines,seekerNoise,seekerRange,seekerSNR,stepTorpedo", Object.keys(Tp).sort().join(","));
+    ok("!! the export list is pinned", Object.keys(Tp).sort().join(",") === "TORPEDO,damageAt,launch,platformOf,reportLines,screenLoss,seekerNoise,seekerRange,seekerSNR,stepTorpedo", Object.keys(Tp).sort().join(","));
     ok("the report says real numbers and the seeker ranges 66 / 259 / 563 m", l.length === 2 && l.every((x) => !/NaN|undefined/.test(x)) && /66 \/ 259 \/ 563/.test(l[1]), l[1]);
     ok("TORPEDO is frozen", Object.isFrozen(Tp.TORPEDO));
 }

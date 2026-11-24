@@ -11657,3 +11657,52 @@ shuffled-target U_TH on the adaptive history) is far worse (mean d -3.32). By th
 a uniform 4 samples, does not turn uneven samples into a better image. The few pixels given more gain less than the many given fewer
 lose. Sampling by history is not opened as a device round. A denoiser trained on uneven samples is the question section 186 named next; it
 is not set up.
+
+## 189. ROUND 83's VERDICT -- BOTH HOLD: WITH THE LIGHTS MOVING, U_TH STILL BEATS Bt AND Bt STILL BEATS ONE FRAME. THE HISTORY PAYS LESS, NOT NOTHING
+
+**The run.** render/denoise-results-upscale-lights-r83.json, run on Keith's rig at commit 203c1403 (which holds round 83's code; the study,
+scene, motion and cache files are the same bytes from there to main) in 3.5 hours, round 72's U_TH (seed 1, 670c28bd). 24 scenes, each with
+its lights moving and its still twin: 48 sequences, 40 rendered and 8 read from the rig's cache. The seeds and the moving-light cache key
+first exist at 203c1403, so those 8 were made by this round's code; which earlier start of the harvest made them is not recorded. **It was
+committed unread** (fc0d6ea3, sha-256 4fd93eff...; main's copy, from bf74bb92, is the same bytes) before anything below was read.
+
+**The verdict: both hold.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on the moving-light history) is far worse than Bt
+(mean d -3.72).
+- **H83a SUPPORTED:** with the lights moving, U_TH's chain is 8.10 % below Bt's (section 159's 1 % rule: met), better on 19 of 24,
+  sign-flip p 0.00010 under Holm's 0.025.
+- **H83b SUPPORTED:** with the lights moving, Bt is 3.94 % below B1 (the 1 % rule: met), better on 15 of 24, sign-flip p 0.0116 under
+  Holm's 0.05. The count alone would not carry it (sign test p 0.154); the registered statistic is the sign flip, and it does.
+
+| | still twins | lights moving | moving against still |
+|---|---|---|---|
+| U_TH on Bt | 1.4520e-3 | 1.5320e-3 | 5.51 % worse, on 20 of 24 |
+| Bt | 1.5762e-3 | 1.6671e-3 | 5.77 % worse, on 20 of 24 |
+| B1 (one frame) | 1.7355e-3 | 1.7355e-3 | the same measured frame, bit for bit |
+| U_TH's gain over Bt | 7.88 % (21 of 24) | 8.10 % (19 of 24) | no drop (-0.22 points) |
+| Bt's gain over B1 | 9.18 % (16 of 24) | 3.94 % (15 of 24) | down 5.24 points |
+
+The descriptive figures, deciding nothing:
+- **Bt's mean history is 5.12 moving and 5.13 still**, and no scene's moves by more than 0.08. reproject() keeps the history it kept before,
+  as section 188 said it would, and that history is the stale one.
+- **By family:** Bt's gain over B1 held in R (17.46 % still, 17.27 % moving, 10 of 12) and almost vanished in C (7.15 % still, 0.68 %
+  moving, 5 of 12). U_TH's gain over Bt held in both (R 8.72 %, 10 of 12; C 7.98 %, 9 of 12).
+- **U_TH's mean correction** is 0.0096 (R 0.0038, C 0.0154; per scene 0.0020 to 0.0252).
+- The lights moved at 0.014 to 0.074 units a frame (mean 0.042), one or two to a scene.
+- For scale only, on other scenes: with the OBJECTS moving at section 176's speeds, round 81's Bt kept 1.69 % over B1 against 14.85 % still.
+
+**The predictions.**
+- **P1 HELD:** C1 (the candidate beat the noisy input on 24 of 24 for H83a and 23 of 24 for H83b; 22 needed) and C3 (no scene near the
+  reference floor).
+- **P2 MISSED:** H83a is supported, but at 8.10 %, not 1-4 %, and above the still twins' 7.88 %, not below it.
+- **P3 MISSED:** H83b is supported. Bt is 3.94 % below B1, not within 1 % of it. My forecast that a moving light leaves a history that is
+  long and worthless was wrong at these speeds.
+- **P4 HELD:** Bt's mean history is 5.12 against the still twins' 5.13, inside 0.3.
+- **P5 HELD:** on the still twins Bt is 9.18 % below B1.
+
+**What it means, as section 188 fixed it** (its "both hold" reading). Bt's clamp handles moving lights at these speeds and the history keeps
+paying: less than with the lights still (3.94 % over one frame against 9.18 %), but it pays, and U_TH's gain over Bt is as large as on the
+still twins. Nothing changes in the chain. The luminance-change rejection that section 188 named was fixed to follow only if H83b failed; it
+is not opened.
+
+**Not registered, a lead only:** the history's loss is almost all in family C (7.15 % to 0.68 %, 5 of 12). Whether a luminance-change
+rejection would win C back is a question for a new registration on fresh scenes. This file cannot answer it: it has been read, once.

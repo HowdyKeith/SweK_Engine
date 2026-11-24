@@ -1,0 +1,6 @@
+both r/v 0.05 plainLight 1300 plainDark 1300 | vs light: static 0.885 down 0.756 up 0.902 | (vs dark: static 0.885 down 0.756 )
+both r/v 0.1 plainLight 1820 plainDark 1820 | vs light: static 0.955 down 1.000 up 0.993 | (vs dark: static 0.955 down 1.000 )
+off  r/v 0.05 plainLight 0 plainDark 1300 | vs light: static NaN down Infinity up Infinity | (vs dark: static 0.000 down 0.123 )
+off  r/v 0.1 plainLight 0 plainDark 1820 | vs light: static Infinity down Infinity up Infinity | (vs dark: static 0.344 down 0.414 )
+on   r/v 0.05 plainLight 1300 plainDark 0 | vs light: static 0.885 down 0.756 up 0.902 | (vs dark: static Infinity down Infinity )
+on   r/v 0.1 plainLight 1820 plainDark 0 | vs light: static 0.860 down 1.000 up 1.000 | (vs dark: static Infinity down Infinity )

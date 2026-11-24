@@ -1,0 +1,21 @@
+detector  contrast  stripes  margin(ms)
+fly       1       none    183
+crab      1       none    2798
+fly       1       moving  183
+crab      1       moving  6131
+fly       0.6       none    183
+crab      0.6       none    2231
+fly       0.6       moving  183
+crab      0.6       moving  6131
+fly       0.4       none    183
+crab      0.4       none    1665
+fly       0.4       moving  183
+crab      0.4       moving  6131
+fly       0.2       none    183
+crab      0.2       none    1065
+fly       0.2       moving  183
+crab      0.2       moving  4165
+
+verdict by detector (T_min fly 100 ms, crab 300 ms, ASSUMED):
+fly: camouflaged false, betrays false -> NEUTRAL
+crab: camouflaged false, betrays true -> BETRAYS

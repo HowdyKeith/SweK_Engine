@@ -32,6 +32,7 @@
 //   those two runs, so ALL 112 mutants were run again on the edited gate: 111 red by name, L05 equivalent. Before the first run the gate itself had five red rows of its own: the autopilot's pitch command saturates at 1 near 0.08 rad of pitch and with any pitch rate, and a residual on a saturated command is clamped away, so the rows now use a 0.02 rad pitch for the
 //   pitch signal and a second state (a bank and the rates) for the other three.
 // NOT SABOTAGED: the report line's text beyond the label, the widths and the weight count; the speed of a long run.
+// TANH ROUND (2026-11-05: the option activation "relu" | "tanh" for brain/PLAIN_NET_VARIANTS_WIP.md; 33 mutants of the changed lines of pilotSubPlainNet.mjs, 18 mechanical and 15 by hand): 28 red BY NAME, 3 THREW, 2 equivalent survivors. The first pass left 3: the policy's activation not handed to the forward pass (T08: a tanh policy flew as relu, and a ZERO readout cannot tell -- closed by the row on the toy weights under tanh, yaw 2 tanh(0.1)); `s >= 0` for `s > 0` in the relu (P0003: the value at 0 is 0 either way) and `j <= nOut` in the unit loop (P0004: the extra pass reads one weight past the layer and writes past the end of a typed array, which is ignored) -- both equivalent.
 "use strict";
 import fs from "node:fs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
@@ -109,6 +110,11 @@ sec("2. THE NET (worked by hand)");
     ok("!! the answer goes into the buffer it was given and that buffer is returned", (() => { const dest = new Float64Array(4); return fw(w, Float64Array.from([0.2, 0.4, 0, 0]), dest) === dest && near(dest[0], 0.3, 1e-6); })());
     const wz = new Float32Array(22); wz[8] = 5; wz[9] = 5; wz[18] = 0.3;
     ok("!! hidden biases alone drive the net with no input: biases [5, 5] and an output bias of 0.3 on pitch give pitch 0.3 (output weights zero)", near(fw(wz, new Float64Array(4), new Float64Array(4))[0], 0.3, 1e-6));
+    const th = P.makeForward(P.layoutOf([2]).layers, "tanh"), ta = Array.from(th(w, Float64Array.from([0.2, 0.4, 0, 0]), new Float64Array(4))), tb = Array.from(th(w, Float64Array.from([-0.5, 2, 0, 0]), new Float64Array(4)));
+    // tanh: x = (0.2, 0.4): h = tanh([0.3, -0.6]) = [0.2913126, -0.5370496]; out = [h0, h1, 0.5 h0, 0.5 h1 - h0 + 0.05] = [0.2913126, -0.5370496, 0.1456563, -0.5098374]; x = (-0.5, 2): h = tanh([-0.4, 1]) = [-0.3799490, 0.7615942]; out = [-0.3799490, 0.7615942, -0.1899745, 0.8107460]
+    ok("!! with the activation tanh the same toy is worked by hand: x = (0.2, 0.4) gives hidden tanh([0.3, -0.6]) = [0.2913126, -0.5370496] and outputs [0.2913126, -0.5370496, 0.1456563, -0.5098374] (a negative sum is NOT held at 0); x = (-0.5, 2) gives [-0.3799490, 0.7615942, -0.1899745, 0.8107460]; the output layer has no tanh (0.8107 passes untouched)", same(ta, [0.2913126, -0.5370496, 0.1456563, -0.5098374]) && same(tb, [-0.3799490, 0.7615942, -0.1899745, 0.8107460]));
+    const fr = P.makeForward(P.layoutOf([2]).layers, "relu"), fd = P.makeForward(P.layoutOf([2]).layers);
+    ok("!! the activation is relu unless asked: an explicit relu and no argument give the relu answers of the rows above; an unknown activation (sigmoid, TANH, 5, null) is refused naming the choices", same(Array.from(fr(w, Float64Array.from([0.2, 0.4, 0, 0]), new Float64Array(4))), a) && same(Array.from(fd(w, Float64Array.from([-0.5, 2, 0, 0]), new Float64Array(4))), b) && ["sigmoid", "TANH", 5, null].every((x) => /activation is one of relu, tanh/.test(throws(() => P.makeForward(P.layoutOf([2]).layers, x)) || "")));
 }
 
 sec("3. THE START (zero readout, seeded hidden layers, the autopilot exactly)");
@@ -152,6 +158,8 @@ sec("4. THE PILOT (the signals, the mirror, the relu, the clamps, no state)");
     ok("!! a NOSE-DOWN body of 0.02 rad reads pTonic 0.02 in BOTH copies: pitch residual 0.04 (even) and nothing on yaw, thrust or ballast (0.02 and not more: the autopilot's own pitch command saturates at 1 near 0.08 rad, and a residual on a saturated command is clamped away)", same(nd, [0.04, 0, 0, 0], 1e-5), J(nd.map((v) => +v.toFixed(5))));
     ok("!! a NOSE-UP body gives no pitch residual: the relu holds the negative signal at 0 (the net does not see signs it has no unit for)", same(nu, [0, 0, 0, 0], 1e-5));
     ok("!! a RIGHT-SIDE-DOWN body of 0.1 gives yaw +0.1: the right copy reads +0.1 and the left copy, whose roll signal is flipped, reads -0.1 and its relu holds 0", same(rd, [0, 0.1, 0, 0], 1e-5), J(rd.map((v) => +v.toFixed(5))));
+    const tt = toyNet(), tanhP = P.createPlainNetPolicy([4], "toyT", { activation: "tanh" }), rt = resid(tanhP.pilotFor(tt.w), st({ bank: 0.1 })), lt = resid(tanhP.pilotFor(tt.w), st({ bank: -0.1 }));
+    ok("!! the policy's activation reaches the pilot: the same toy weights under tanh give, for a RIGHT-SIDE-DOWN body of 0.1, yaw 2 tanh(0.1) = 0.19934 (the left copy's -0.1 is NOT held at 0: tanh(-0.1) = -0.0997, subtracted) against the relu net's 0.1 above, and -0.19934 for the left-side-down body", near(rt[1], 2 * Math.tanh(0.1), 1e-5) && near(lt[1], -2 * Math.tanh(0.1), 1e-5) && Math.abs(rt[0]) < 1e-5 && Math.abs(rt[2]) < 1e-5 && Math.abs(rt[3]) < 1e-5, J(rt.map((v) => +v.toFixed(5))));
     ok("!! MIRROR end to end: the LEFT-side-down body gives yaw -0.1 (the left copy answers it, its yaw negated), the same size as the right-side-down body and the opposite sign, and nothing else", same(ld, [0, -0.1, 0, 0], 1e-5));
     ok("!! at rest there is no residual at all (zero biases, zero signals)", same(rest, [0, 0, 0, 0], 1e-9));
     const sc = { pTonic: 2, rTonic: 3, pPhasic: 5, rPhasic: 7 };
@@ -235,6 +243,10 @@ sec("6. THE CONTRACT (what the trainer reads) AND THE REPORT");
     ok("!! the default scales are all 1 and an option merges over them", J(mn.scales) === J({ pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }) && P.createPlainNetPolicy([4], "s", { scales: { rTonic: 4 } }).scales.rTonic === 4 && P.createPlainNetPolicy([4], "s", { scales: { rTonic: 4 } }).scales.pTonic === 1);
     const rep = mn.reportLines();
     ok("!! the report names the net, its widths, that it has no state, the four signals, the autopilot and the weight count", rep.length === 1 && /P\/B\/mn:0 \(65 relu units\) as a NO-STATE mirrored pair/.test(rep[0]) && /4 tilt signals/.test(rep[0]) && /added to the autopilot's/.test(rep[0]) && /589 trained weights/.test(rep[0]) && /32-32 relu units/.test(mg.reportLines()[0]) && /1348 trained weights/.test(mg.reportLines()[0]));
+    const tp = P.createPlainNetPolicy([9], "t", { activation: "tanh" }), rp = P.createPlainNetPolicy([9], "r");
+    ok("!! the policy carries its activation: relu by default, tanh when asked; the report says tanh units; the weight count is the same for both; an unknown activation is refused when the policy is made, not when a pilot is", rp.activation === "relu" && tp.activation === "tanh" && tp.WEIGHT_COUNT === rp.WEIGHT_COUNT && /\(9 tanh units\)/.test(tp.reportLines()[0]) && /\(9 relu units\)/.test(rp.reportLines()[0]) && /activation is one of relu, tanh, got "gelu"/.test(throws(() => P.createPlainNetPolicy([9], "x", { activation: "gelu" })) || "") && P.ACTIVATIONS.join() === "relu,tanh" && Object.isFrozen(P.ACTIVATIONS));
+    const hw = tp.handWeights(), hr = rp.handWeights(), stt = st({ bank: 0.1, pitch: -0.02, w: [0.1, 0.2, 0] }), ct = tp.pilotFor(hw)(stt, { depth: 30, heading: 0, speed: 2 }), cr = rp.pilotFor(hr)(stt, { depth: 30, heading: 0, speed: 2 });
+    ok("!! a tanh net STARTS AS THE AUTOPILOT too (the readout is zero whatever the hidden activation): the tanh pilot's commands equal the relu pilot's at the start, to the bit", J(ct) === J(cr) && Object.values(ct).every(Number.isFinite));
     ok("!! a hidden width list that is not one is refused when a pilot is made, too", /layoutOf/.test(throws(() => P.createPlainNetPolicy([])) || "") && /layoutOf/.test(throws(() => P.createPlainNetPolicy(null)) || ""));
 }
 

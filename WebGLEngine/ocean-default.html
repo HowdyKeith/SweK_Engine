@@ -78,6 +78,9 @@
   import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
   import { buildWater, buoy } from "/world/oceanWater.mjs";
   import * as OT from "/ui/oceanTier.mjs";
+  import { createCameraControls, bindCameraControls } from "/render/cameraControls.mjs";   // 2026-11-22: the shared camera
+  import { createGpuTimerGL } from "/render/gpuTimerGL.mjs";
+  import { timerLines } from "/render/gpuTimer.mjs";
 
   const $ = (id) => document.getElementById(id);
   const cv = $("cv"), hud = $("hud");
@@ -170,21 +173,22 @@
     const mul = (a, b) => { const r = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let rr = 0; rr < 4; rr++) for (let k = 0; k < 4; k++) r[c * 4 + rr] += a[k * 4 + rr] * b[c * 4 + k]; return r; };
 
     // ---- controls ----
-    let sea = defaultSurface(1), n = 96, paused = false, simT = 0, last = performance.now(), yaw = 0.6, pitch = 0.42, dist = 150;
+    let sea = defaultSurface(1), n = 96, paused = false, simT = 0, last = performance.now();
     $("detailSel").addEventListener("change", () => { n = +$("detailSel").value; state.n = n; });
     $("seedSel").addEventListener("change", () => { state.seed = +$("seedSel").value; sea = defaultSurface(state.seed); });
     $("pauseBtn").addEventListener("click", () => { paused = !paused; $("pauseBtn").textContent = paused ? "Resume" : "Pause"; });
-    let drag = null;
-    cv.addEventListener("pointerdown", (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
-    cv.addEventListener("pointermove", (e) => { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.006; pitch = Math.min(1.45, Math.max(0.06, pitch + (e.clientY - drag[1]) * 0.005)); drag = [e.clientX, e.clientY]; });
-    const endDrag = () => { drag = null; cv.style.cursor = "grab"; };
-    cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
-    cv.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.min(320, Math.max(30, dist * (e.deltaY > 0 ? 1.1 : 0.91))); }, { passive: false });
-
+    // 2026-11-22: render/cameraControls.mjs in place of this page's own drag and wheel: the same eye formula about the origin, the same drag feel (0.006 rad a pixel), pitch
+    // range (0.06 to 1.45) and zoom range (30 to 320 m); right or shift-drag pans, F frames the sea, W A S D Q E fly. The old eye sat 2 m above the orbit; this one orbits the
+    // origin itself (the view moves by those 2 m and nothing else)
+    const controls = createCameraControls({ up: "y", yaw: 0.6, pitch: 0.42, distance: 150, target: [0, 0, 0], fovY: 0.9, minPitch: 0.06, maxPitch: 1.45, minDistance: 30, maxDistance: 320 });
+    const camInput = bindCameraControls(cv, controls, { radiansPerPixel: 0.006, focusOn: () => ({ center: [0, 0, 0], radius: 150 }) });
+    window.__camera = { controls, input: camInput };
+    // 2026-11-22: the water and the buoys timed on the card (render/gpuTimerGL.mjs); ?gputimer=0 turns it off
+    const gpuTimer = createGpuTimerGL(new URLSearchParams(location.search).get("gputimer") === "0" ? null : gl);
     const BUOYS = [[0, 0], [22, -14], [-30, 18], [45, 40], [-55, -38]];
     let fpsAcc = 0, fpsN = 0, fps = 0;
     function frame(now) {
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const dt = Math.min(0.1, (now - last) / 1000); last = now; camInput.tick(dt);
       if (!paused) simT += dt;
       const w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight), dpr = Math.min(2, window.devicePixelRatio || 1);
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
@@ -195,13 +199,13 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, bNor); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.normals);
       gl.bindBuffer(gl.ARRAY_BUFFER, bFoam); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.foam);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx); gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, m.indices);
-      const eye = [Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 2, Math.cos(yaw) * Math.cos(pitch) * dist];
-      const vp = mul(persp(0.9, w / h, 0.5, 2000), look(eye, [0, 0, 0], [0, 1, 0]));
+      const pose = controls.pose(), eye = pose.eye;
+      const vp = mul(persp(0.9, w / h, 0.5, 2000), look(eye, pose.target, [0, 1, 0]));
       gl.useProgram(prog); gl.uniformMatrix4fv(uVP, false, new Float32Array(vp)); gl.uniform3fv(uEye, eye);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl.uniform1i(uMode, 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0);
+      gpuTimer.begin("water"); gl.uniform1i(uMode, 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0); gpuTimer.end();
       // buoys: on the physics surface, leaning with its normal
-      gl.bindVertexArray(vaoB); gl.uniform1i(uMode, 1);
+      gl.bindVertexArray(vaoB); gl.uniform1i(uMode, 1); gpuTimer.begin("buoys");
       for (const [bx, bz] of BUOYS) {
         const b = buoy(sea, bx, bz, simT);
         let ax = [1, 0, 0]; const ny = [b.nx, b.ny, b.nz];
@@ -211,6 +215,7 @@
         gl.uniformMatrix3fv(uBasis, false, new Float32Array([t2[0] * S, t2[1] * S, t2[2] * S, ny[0] * S, ny[1] * S, ny[2] * S, t1[0] * S, t1[1] * S, t1[2] * S]));
         gl.uniform3f(uOffset, b.x, b.y, b.z); gl.drawArrays(gl.TRIANGLES, 0, oct.count);
       }
+      gpuTimer.end(); gpuTimer.finish(); const gst = gpuTimer.collect(); if (gst.frames) state.gpuTimes = Object.fromEntries(Object.entries(gst.labels).map(([k, v]) => [k, v.ms]));
       // the measurement: re-ask the physics about 32 drawn vertices
       let worst = 0;
       for (let k = 0; k < 32; k++) {
@@ -222,6 +227,7 @@
       fpsAcc += dt; fpsN++; if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
       hud.textContent = `${fps.toFixed(0)} fps   ${m.count} vertices   ${m.indices.length / 3} triangles   t = ${simT.toFixed(1)} s\n` +
         `physics vs drawn, 32 vertices re-asked: largest height gap ${worst.toExponential(1)} m\nseed ${state.seed}, ${sea.components.length} waves, steepness ${sea.steepness.toFixed(2)}` +
+        (gst.frames ? `\n${timerLines(gst).join("\n")}` : gst.supported ? "" : "\nGPU timer: this browser offers no EXT_disjoint_timer_query_webgl2") +
         (state.tier ? `\n${OT.reportLines(state.tier).join("\n")}\nthe GPU sea itself arrives with slice 4; this page always draws the water above` : "");
       requestAnimationFrame(frame);
     }

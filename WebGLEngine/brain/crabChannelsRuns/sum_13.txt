@@ -1,0 +1,4 @@
+R13 sum plain light: r (gray/static/moving) 0.2: 0.42/0.44/0.83  0.4: 0.66/0.60/0.85  0.6: 0.75/0.66/0.85  0.8: 0.77/0.72/0.91  1: 0.82/0.77/0.91
+   C1 true C2 false C3 true C4 false -> 2/4
+R13 sum plain dark: r (gray/static/moving) 0.2: 0.42/0.44/0.83  0.4: 0.66/0.60/0.85  0.6: 0.75/0.66/0.85  0.8: 0.77/0.72/0.91  1: 0.82/0.77/0.91
+   C1 true C2 false C3 true C4 false -> 2/4

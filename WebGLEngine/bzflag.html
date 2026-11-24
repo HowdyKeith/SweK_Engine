@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BZFlag world viewer — SweK</title>
 <style>
@@ -365,6 +366,7 @@ gl.cullFace(gl.BACK);
 gl.clearColor(0.04, 0.05, 0.06, 1);
 
 let last = performance.now();
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
 
@@ -436,7 +438,7 @@ function frame(now) {
     gl.uniformMatrix4fv(uModel, false, IDENT);
     gl.uniform3f(uTint, 1, 1, 1);
     gl.bindVertexArray(vao);
-    gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0);
+    gpuTime("world", () => gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0));
 
     if (tankVao && tank) {
       gl.bindVertexArray(tankVao);

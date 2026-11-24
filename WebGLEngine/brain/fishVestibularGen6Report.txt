@@ -1,0 +1,39 @@
+RUNG 4b: 32 circuits in 2 verdict cell(s)
+  [ok]      TASK RE-CHECK (4b-P, cost): the disturbance costs the autopilot 0.052 of mean dive score on the training dives (needs 0.05)
+  [ok]      RUNNER AND SIGN SELF-TESTS: run() reproduces subTask.fly() with no disturbance and every sign row holds
+  [ok]      START CHECK: every arm's untrained pilot is the autopilot on 4 training dives: B same, E same, whole same, whole-dense same
+  CELL P/B (aligned):
+    WIRING VERDICT P/B: NOT ASSESSED -- no cx record
+  CELL P/whole:
+    WIRING VERDICT P/whole: NOT ASSESSED -- no cx record
+  GEN 6 P/B/fns (NO STATE on the real wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.437 sd 0.006 [-0.444..-0.430] | a2 -0.387 sd 0.006 [-0.392..-0.379] | a3 -0.420 sd 0.004 [-0.423..-0.414]; against the autopilot +0.230 (off it) | +0.179 (off it) | +0.203 (off it)
+    against the P/B fer replicates: 0.052 (needs 0.020: ahead) | 0.037 (needs 0.020: ahead) | 0.044 (needs 0.020: ahead)
+    against the P/B fcl replicates: 0.023 (needs 0.021: ahead) | 0.016 (needs 0.020: tie) | 0.018 (needs 0.020: tie)
+    against the P/B fdg replicates: 0.069 (needs 0.032: ahead) | 0.049 (needs 0.026: ahead) | 0.062 (needs 0.040: ahead)
+  GEN 6 P/B/fer (NO STATE on a er-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.489 sd 0.008 [-0.494..-0.477] | a2 -0.425 sd 0.006 [-0.433..-0.419] | a3 -0.464 sd 0.005 [-0.469..-0.456]; against the autopilot +0.178 (off it) | +0.142 (off it) | +0.159 (off it)
+  GEN 6 P/B/fcl (NO STATE on a class-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.460 sd 0.010 [-0.469..-0.446] | a2 -0.404 sd 0.008 [-0.413..-0.394] | a3 -0.438 sd 0.009 [-0.445..-0.426]; against the autopilot +0.207 (off it) | +0.163 (off it) | +0.185 (off it)
+  GEN 6 P/B/fdg (NO STATE on a degree-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.506 sd 0.016 [-0.521..-0.486] | a2 -0.436 sd 0.013 [-0.450..-0.418] | a3 -0.482 sd 0.020 [-0.504..-0.459]; against the autopilot +0.161 (off it) | +0.131 (off it) | +0.141 (off it)
+  GEN 6 P/whole/fns (NO STATE on the real wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.439 sd 0.013 [-0.452..-0.425] | a2 -0.378 sd 0.009 [-0.388..-0.370] | a3 -0.415 sd 0.011 [-0.431..-0.408]; against the autopilot +0.228 (off it) | +0.189 (off it) | +0.207 (off it)
+    against the P/whole fer replicates: 0.052 (needs 0.023: ahead) | 0.045 (needs 0.020: ahead) | 0.049 (needs 0.020: ahead)
+    against the P/whole fcl replicates: 0.022 (needs 0.039: tie) | 0.021 (needs 0.020: ahead) | 0.022 (needs 0.028: tie)
+    against the P/whole fdg replicates: 0.036 (needs 0.059: tie) | 0.035 (needs 0.039: tie) | 0.031 (needs 0.037: tie)
+  GEN 6 P/whole/fer (NO STATE on a er-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.491 sd 0.011 [-0.504..-0.477] | a2 -0.424 sd 0.004 [-0.428..-0.419] | a3 -0.464 sd 0.005 [-0.468..-0.457]; against the autopilot +0.176 (off it) | +0.143 (off it) | +0.159 (off it)
+  GEN 6 P/whole/fcl (NO STATE on a class-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.461 sd 0.020 [-0.481..-0.443] | a2 -0.399 sd 0.009 [-0.410..-0.391] | a3 -0.437 sd 0.014 [-0.455..-0.426]; against the autopilot +0.205 (off it) | +0.168 (off it) | +0.185 (off it)
+  GEN 6 P/whole/fdg (NO STATE on a degree-shuffled wiring, Addendum 16; REPORTED, NOT JUDGED, fresh audits 87001-87060): 4 circuit(s), 0 with no eligible champion
+    a1 -0.475 sd 0.029 [-0.519..-0.455] | a2 -0.413 sd 0.020 [-0.442..-0.402] | a3 -0.446 sd 0.019 [-0.474..-0.436]; against the autopilot +0.191 (off it) | +0.154 (off it) | +0.176 (off it)
+  WIRING WITHOUT MEMORY P/B (Addendum 16; REGISTERED TEST, brain/FISH_WIRING_FRESH_WIP.md): the 4 real-wiring NO STATE searches against the 12 shuffled ones, each scored as the mean of its three audits: U 48 of 48, exact one-sided p 0.0005; registered line p <= 0.05: MET
+  WIRING WITHOUT MEMORY P/whole (Addendum 16; REGISTERED TEST, brain/FISH_WIRING_FRESH_WIP.md): the 4 real-wiring NO STATE searches against the 12 shuffled ones, each scored as the mean of its three audits: U 46 of 48, exact one-sided p 0.0022; registered line p <= 0.05: MET
+  DIRECTION P/B (Addendum 16; registered beside the test): the real wiring's mean is above the pooled shuffled mean on 3 of 3 audits -> REPLICATES THE DIRECTION
+  DIRECTION P/whole (Addendum 16; registered beside the test): the real wiring's mean is above the pooled shuffled mean on 3 of 3 audits -> REPLICATES THE DIRECTION
+  ADDENDUM 16 OVERALL (registered): SUPPORTED (2 of 2 complete cells at p <= 0.05)
+  TWO-PATHWAY P: NOT ASSESSED -- no aligned cx record
+  TWO-PATHWAY E: NOT ASSESSED -- no aligned cx record
+RUNG 4b: 0 of 0 assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")
+RUNG 4b TWO-PATHWAY CLAIM: NOT ASSESSED

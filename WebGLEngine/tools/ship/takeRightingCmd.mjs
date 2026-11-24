@@ -1,0 +1,5 @@
+// WebGLEngine/tools/ship/takeRightingCmd.mjs -- UNNUMBERED. The command line of tools/ship/takeRighting.mjs, so that the library has a caller beside its own gate:
+//   node tools\ship\takeRightingCmd.mjs [the same arguments as node tools\ship\takeRighting.mjs]
+// (the library still runs by itself when it is the entry, as it always did; this file adds nothing to what it does).
+const { command } = await import("./takeRighting.mjs");
+process.exitCode = await command(process.argv.slice(2));

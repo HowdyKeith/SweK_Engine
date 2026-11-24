@@ -68,7 +68,8 @@ export class FluidSystem {
      * 46,223 -> 108,086 -> 190,949 -> 258,808 -> 325,344 water voxels over thirty seconds, linear, about
      * 10,000 per second on a world of 3,686,400 cells, with simulate() going from 0.03 ms to 0.7 ms. So the
      * wetting path was made opt-in and left OFF, and giving this system a sink was filed as its own round.
-     * SETTLED at v4563: the round below.
+     * SETTLED at v4563 -- the next paragraph (dryTicks, _dry).
+     *
      * *** v4563 IS THAT ROUND, AND THE DEFECT WAS THAT THIS CODE CREATED WATER. *** Three things were wrong
      * and they bound different quantities:
      *

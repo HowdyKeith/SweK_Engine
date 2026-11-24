@@ -14,6 +14,7 @@
 // NOT CHECKED, said plainly: whether planning under uncertainty helps (that is the experiment).
 // SABOTAGE LOG (46 mutants of tools/ship/plannerEnsemble.mjs and of the `ensemble` option in brain/plannerPerturbed.mjs, run against a copy of this gate): 6 went 0 red on the first pass and all 6 got rows -- the cost and plan count as the MEAN over a set's dives (pinned 782, 726.5 and 754.25), the separator in the list of worse arms, the printed difference from the twin (its own sign: -0.0500, not a plus sign from the arm's gain), and three about the option's arithmetic (the value of an order is the MEAN of its rollouts over the offsets, not their sum and not a fixed divisor, and nearest-first's value is that mean too: pinned on both 3501 at 600 s, where the three rollouts score 0.550, 0.775 and 1.000). None is equivalent. All 46 are red. (The gate takes about 40 s: the arithmetic rows fly 600-second rollouts.)
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-16 -- the planner costs this gate pins (rollout seconds, plan counts) were measured under the first-order orientation step, so it flies that step (see that file); RK4's default missed it and it sat red, outside the quick sweep
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };

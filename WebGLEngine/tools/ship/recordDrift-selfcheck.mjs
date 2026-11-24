@@ -146,7 +146,11 @@ console.log("\n2. handed a stale record, each check names it");
 {
     // sweep timings: a gate with a reading but NO capture stamp of its own
     const real = await import("./assertionShape.mjs");
-    const one = real.gateFiles(ENG)[0];
+    // v4933 -- THE FIXTURE'S GATE IS ONE THE SHARED RECORD TIMES. It took gateFiles()[0], and a round whose first gate alphabetically was NEW
+    // (ai-bridge/aiUsageBridge-selfcheck.mjs, in no shared record because a foreign box cannot write that record) left the masking witness below
+    // with nothing in the shared record to hole -- so the "not masked" control read masked and went red for a reason about the fixture, not the code.
+    const sharedTimes = new Set(Object.keys((((await import("./boxTimings.mjs")).records(ENG).find((r) => r.kind === "shared") || {}).rec || {}).timings || {}));
+    const one = real.gateFiles(ENG).find((g) => sharedTimes.has(path.relative(ENG, g).replace(/\\/g, "/"))) || real.gateFiles(ENG)[0];
     const rel = path.relative(ENG, one).replace(/\\/g, "/");
     // *** THIS WAS A BARE JSON.parse OF THE FILE quickSweep REWRITES AT RUN END, AND IT WENT RED INSIDE A
     // SWEEP. *** Exactly the torn read tools/ship/recordReach.mjs was repaired for at v4550 -- red twice

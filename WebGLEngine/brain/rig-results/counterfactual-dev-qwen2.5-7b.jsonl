@@ -1,0 +1,5 @@
+{"kind":"counterfactual-transcript","schema":1,"model":"llama3.1:8b-t0","params":{"temperature":0,"max_tokens":600},"set":"dev","requested":"qwen2.5:7b"}
+{"key":"0889ded7","seed":1,"promptHash":"2f98b0ec","reply":"REQUEST {\"seed\":1,\"kit\":[\"decoy\",\"screen\"]}."}
+{"key":"928e5ac7","seed":2,"promptHash":"5f3f36dc","reply":"REQUEST {\"seed\":2,\"kit\":[\"decoy\",\"screen\"]}"}
+{"key":"169fdc90","seed":3,"promptHash":"f062b9c7","reply":"REQUEST {\"seed\":3,\"kit\":[\"decoy\",\"screen\"]}."}
+{"key":"83c97435","seed":4,"promptHash":"35696352","reply":"REQUEST {\"seed\":4,\"kit\":[\"decoy\",\"screen\"]}"}

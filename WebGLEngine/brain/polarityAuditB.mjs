@@ -1,0 +1,6 @@
+// WebGLEngine/brain/polarityAuditB.mjs -- Round 21 (B), registered before the run: the crab network with the plain ellipse LIGHT (azimuth 135, r/v 0.3 s, contrast 1). node brain/polarityAuditB.mjs
+import * as C from "./crabMlg1.mjs";
+import { loomingEllipse } from "./stealthLoomStimuli.mjs";
+const W = 180, H = 60, fps = 30, SEG = 6;
+const run = (st, plain, pol, receding = false) => { const s = loomingEllipse({ rv: 0.3, w: W, h: H, fovDeg: 144, step: 1 / fps, startPx: 3, endPx: 37, cx: 67, cy: 30, stripes: st, plain, receding }), net = C.createNetwork({ W, H, params: { polarity: pol } }); let a = null, sp = 0; s.frames.forEach((f, k) => { const r = net.step({ w: W, h: H, data: f.data.map((v) => v * 255) }); if (r.spike[SEG]) sp++; if (r.alarm[SEG] && a === null) a = k; }); return a === null ? "no alarm" : `${(s.width[a] * 2).toFixed(1)} deg, ${sp} spikes`; };
+for (const pol of ["both", "off", "on"]) console.log(`${pol}: plain light ${run("none", "light", pol)} | plain dark ${run("none", "dark", pol)} | static ${run("static", "dark", pol)} | moving ${run("moving", "dark", pol)} | receding plain light ${run("none", "light", pol, true)}, receding plain dark ${run("none", "dark", pol, true)}`);

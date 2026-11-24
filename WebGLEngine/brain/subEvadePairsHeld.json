@@ -1,0 +1,718 @@
+{
+ "mode": "held",
+ "set": "held",
+ "first": 113001,
+ "count": 48,
+ "rules": {
+  "replicates": true,
+  "pairs": [
+   {
+    "a": "league7001",
+    "b": "league7100",
+    "u": {
+     "edge": -1.0482899305555555,
+     "z": -6.654925343877492
+    },
+    "p": {
+     "edge": -0.031584924768518506,
+     "z": -0.4260654111687449
+    },
+    "category": "LOST"
+   },
+   {
+    "a": "league7001",
+    "b": "league7103",
+    "u": {
+     "edge": 1.402372685185185,
+     "z": 4.379686084909628
+    },
+    "p": {
+     "edge": 1.656088686342593,
+     "z": 7.113576625511972
+    },
+    "category": "CARRIED"
+   },
+   {
+    "a": "league7001",
+    "b": "exploit7200",
+    "u": {
+     "edge": -0.5748965567129628,
+     "z": -2.97805436976357
+    },
+    "p": {
+     "edge": -0.06472222222222224,
+     "z": -0.9705260809373523
+    },
+    "category": "LOST"
+   },
+   {
+    "a": "league7001",
+    "b": "exploit7204",
+    "u": {
+     "edge": -0.005014467592592618,
+     "z": -0.02504156616712998
+    },
+    "p": {
+     "edge": 0.03265769675925926,
+     "z": 0.597365339932221
+    },
+    "category": "BOTH UNDECIDED"
+   },
+   {
+    "a": "league7100",
+    "b": "league7103",
+    "u": {
+     "edge": 1.6380287905092592,
+     "z": 6.015018291228928
+    },
+    "p": {
+     "edge": 1.718057002314815,
+     "z": 7.4017654807642925
+    },
+    "category": "CARRIED"
+   },
+   {
+    "a": "league7100",
+    "b": "exploit7200",
+    "u": {
+     "edge": 0.43413773148148155,
+     "z": 1.9986281667362689
+    },
+    "p": {
+     "edge": -0.0017144097222222543,
+     "z": -0.03829525376479645
+    },
+    "category": "BOTH UNDECIDED"
+   },
+   {
+    "a": "league7100",
+    "b": "exploit7204",
+    "u": {
+     "edge": 1.2152727141203703,
+     "z": 5.662093449745226
+    },
+    "p": {
+     "edge": 0.09525245949074072,
+     "z": 1.304485629991122
+    },
+    "category": "LOST"
+   },
+   {
+    "a": "league7103",
+    "b": "exploit7200",
+    "u": {
+     "edge": -2.0205772569444447,
+     "z": -8.485428817755155
+    },
+    "p": {
+     "edge": -1.7206778067129622,
+     "z": -7.409002629912286
+    },
+    "category": "CARRIED"
+   },
+   {
+    "a": "league7103",
+    "b": "exploit7204",
+    "u": {
+     "edge": -1.7443359375,
+     "z": -6.89934335792371
+    },
+    "p": {
+     "edge": -1.653721064814815,
+     "z": -7.105313445134571
+    },
+    "category": "CARRIED"
+   },
+   {
+    "a": "exploit7200",
+    "b": "exploit7204",
+    "u": {
+     "edge": 0.7092281539351851,
+     "z": 3.2502590900120616
+    },
+    "p": {
+     "edge": 0.12842954282407407,
+     "z": 1.630790382557116
+    },
+    "category": "LOST"
+   }
+  ],
+  "counts": {
+   "carried": 4,
+   "lost": 4,
+   "contradicted": 0,
+   "spurious": 0
+  },
+  "d": 8,
+  "rp1": "PARTIAL",
+  "rp2": true,
+  "oddLoses": 4,
+  "rp3": true,
+  "rp4": true,
+  "steps": {
+   "S@2.80": "FLAT",
+   "S@2.70": "FLAT",
+   "N@4.32": "FLAT",
+   "N@4.50": "FLAT"
+  },
+  "headline": "NEITHER",
+  "rb2": "undecided",
+  "forecast": {
+   "rp1Yes": false,
+   "rp1Partial": true,
+   "rp1No": false,
+   "noContradiction": true,
+   "oddExplained": true,
+   "strongAlike": true,
+   "duoDecidedFor7100": false,
+   "neither": true,
+   "speed": false,
+   "turn": false
+  }
+ },
+ "rows": [
+  {
+   "id": "P:league7001",
+   "kind": "arm",
+   "finder": "league7001",
+   "edge": 2.697329282407407,
+   "se": 0.16653908591710442,
+   "z": 16.196373767477112,
+   "winsX": 87,
+   "draws": 2,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 3.1723697916666667,
+   "seatB": 2.222288773148149,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "P:league7100",
+   "kind": "arm",
+   "finder": "league7100",
+   "edge": 2.7598582175925928,
+   "se": 0.15663391277048688,
+   "z": 17.619800008677355,
+   "winsX": 88,
+   "draws": 2,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1697497106481483,
+   "seatB": 2.3499667245370373,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "P:league7103",
+   "kind": "arm",
+   "finder": "league7103",
+   "edge": 1.0986002604166667,
+   "se": 0.219314284260241,
+   "z": 5.009250829795721,
+   "winsX": 64,
+   "draws": 0,
+   "winsY": 32,
+   "finds": true,
+   "seatA": 2.1116594328703697,
+   "seatB": 0.08554108796296307,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "P:exploit7200",
+   "kind": "arm",
+   "finder": "exploit7200",
+   "edge": 2.7628971354166665,
+   "se": 0.15682582917982263,
+   "z": 17.6176153498836,
+   "winsX": 88,
+   "draws": 2,
+   "winsY": 6,
+   "finds": true,
+   "seatA": 3.1718084490740743,
+   "seatB": 2.353985821759259,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "P:exploit7204",
+   "kind": "arm",
+   "finder": "exploit7204",
+   "edge": 2.693237847222223,
+   "se": 0.1663480432411499,
+   "z": 16.190378887222103,
+   "winsX": 87,
+   "draws": 2,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 3.1702112268518525,
+   "seatB": 2.216264467592593,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "F:4.50/2.80",
+   "kind": "arm",
+   "finder": "F",
+   "edge": 2.828874421296296,
+   "se": 0.14595436621956714,
+   "z": 19.381910213228327,
+   "winsX": 89,
+   "draws": 2,
+   "winsY": 5,
+   "finds": true,
+   "seatA": 3.171354166666667,
+   "seatB": 2.486394675925926,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "F:4.32/2.70",
+   "kind": "arm",
+   "finder": "F",
+   "edge": 2.694956597222222,
+   "se": 0.16646741931916245,
+   "z": 16.189093386828272,
+   "winsX": 87,
+   "draws": 2,
+   "winsY": 7,
+   "finds": true,
+   "seatA": 3.1710112847222227,
+   "seatB": 2.2189019097222227,
+   "flew": 96,
+   "seedsOk": true
+  }
+ ],
+ "pps": [
+  {
+   "id": "PP:league7001|league7100",
+   "kind": "pp",
+   "finder": "league7001",
+   "edge": -0.031584924768518506,
+   "se": 0.07413163317312602,
+   "z": -0.4260654111687449,
+   "winsX": 40,
+   "draws": 15,
+   "winsY": 41,
+   "finds": false,
+   "seatA": -0.7361067708333334,
+   "seatB": 0.6729369212962965,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "league7100"
+  },
+  {
+   "id": "PP:league7001|league7103",
+   "kind": "pp",
+   "finder": "league7001",
+   "edge": 1.656088686342593,
+   "se": 0.23280675439739182,
+   "z": 7.113576625511972,
+   "winsX": 71,
+   "draws": 4,
+   "winsY": 21,
+   "finds": true,
+   "seatA": 1.3856192129629628,
+   "seatB": 1.9265581597222223,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "league7103"
+  },
+  {
+   "id": "PP:league7001|exploit7200",
+   "kind": "pp",
+   "finder": "league7001",
+   "edge": -0.06472222222222224,
+   "se": 0.06668777222319704,
+   "z": -0.9705260809373523,
+   "winsX": 40,
+   "draws": 14,
+   "winsY": 42,
+   "finds": false,
+   "seatA": -0.8009910300925925,
+   "seatB": 0.6715465856481481,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "exploit7200"
+  },
+  {
+   "id": "PP:league7001|exploit7204",
+   "kind": "pp",
+   "finder": "league7001",
+   "edge": 0.03265769675925926,
+   "se": 0.0546695540838789,
+   "z": 0.597365339932221,
+   "winsX": 42,
+   "draws": 13,
+   "winsY": 41,
+   "finds": false,
+   "seatA": -0.6074971064814815,
+   "seatB": 0.6728125000000001,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "exploit7204"
+  },
+  {
+   "id": "PP:league7100|league7103",
+   "kind": "pp",
+   "finder": "league7100",
+   "edge": 1.718057002314815,
+   "se": 0.23211448765564124,
+   "z": 7.4017654807642925,
+   "winsX": 72,
+   "draws": 4,
+   "winsY": 20,
+   "finds": true,
+   "seatA": 1.3830873842592595,
+   "seatB": 2.05302662037037,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "league7103"
+  },
+  {
+   "id": "PP:league7100|exploit7200",
+   "kind": "pp",
+   "finder": "league7100",
+   "edge": -0.0017144097222222543,
+   "se": 0.04476820372445877,
+   "z": -0.03829525376479645,
+   "winsX": 39,
+   "draws": 18,
+   "winsY": 39,
+   "finds": false,
+   "seatA": -0.6768185763888889,
+   "seatB": 0.6733897569444446,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "exploit7200"
+  },
+  {
+   "id": "PP:league7100|exploit7204",
+   "kind": "pp",
+   "finder": "league7100",
+   "edge": 0.09525245949074072,
+   "se": 0.07301917115897166,
+   "z": 1.304485629991122,
+   "winsX": 41,
+   "draws": 17,
+   "winsY": 38,
+   "finds": false,
+   "seatA": -0.5464612268518519,
+   "seatB": 0.7369661458333332,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "exploit7204"
+  },
+  {
+   "id": "PP:league7103|exploit7200",
+   "kind": "pp",
+   "finder": "league7103",
+   "edge": -1.7206778067129622,
+   "se": 0.23224148953140986,
+   "z": -7.409002629912286,
+   "winsX": 20,
+   "draws": 4,
+   "winsY": 72,
+   "finds": false,
+   "seatA": -2.056400462962963,
+   "seatB": -1.3849551504629634,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7103",
+   "b": "exploit7200"
+  },
+  {
+   "id": "PP:league7103|exploit7204",
+   "kind": "pp",
+   "finder": "league7103",
+   "edge": -1.653721064814815,
+   "se": 0.2327442804014812,
+   "z": -7.105313445134571,
+   "winsX": 21,
+   "draws": 4,
+   "winsY": 71,
+   "finds": false,
+   "seatA": -1.923289930555556,
+   "seatB": -1.384152199074074,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7103",
+   "b": "exploit7204"
+  },
+  {
+   "id": "PP:exploit7200|exploit7204",
+   "kind": "pp",
+   "finder": "exploit7200",
+   "edge": 0.12842954282407407,
+   "se": 0.07875294347928007,
+   "z": 1.630790382557116,
+   "winsX": 42,
+   "draws": 16,
+   "winsY": 38,
+   "finds": false,
+   "seatA": -0.5450607638888888,
+   "seatB": 0.801919849537037,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "exploit7200",
+   "b": "exploit7204"
+  }
+ ],
+ "uus": [
+  {
+   "id": "UU:league7001|league7100",
+   "kind": "uu",
+   "finder": "league7001",
+   "edge": -1.0482899305555555,
+   "se": 0.1575209151699919,
+   "z": -6.654925343877492,
+   "winsX": 10,
+   "draws": 43,
+   "winsY": 43,
+   "finds": false,
+   "seatA": -1.5001938657407405,
+   "seatB": -0.5963859953703704,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "league7100"
+  },
+  {
+   "id": "UU:league7001|league7103",
+   "kind": "uu",
+   "finder": "league7001",
+   "edge": 1.402372685185185,
+   "se": 0.3201993608667782,
+   "z": 4.379686084909628,
+   "winsX": 68,
+   "draws": 2,
+   "winsY": 26,
+   "finds": true,
+   "seatA": 0.9999522569444443,
+   "seatB": 1.8047931134259256,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "league7103"
+  },
+  {
+   "id": "UU:league7001|exploit7200",
+   "kind": "uu",
+   "finder": "league7001",
+   "edge": -0.5748965567129628,
+   "se": 0.19304434551294114,
+   "z": -2.97805436976357,
+   "winsX": 29,
+   "draws": 20,
+   "winsY": 47,
+   "finds": false,
+   "seatA": -1.3199233217592592,
+   "seatB": 0.17013020833333325,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "exploit7200"
+  },
+  {
+   "id": "UU:league7001|exploit7204",
+   "kind": "uu",
+   "finder": "league7001",
+   "edge": -0.005014467592592618,
+   "se": 0.2002457657450635,
+   "z": -0.02504156616712998,
+   "winsX": 44,
+   "draws": 8,
+   "winsY": 44,
+   "finds": false,
+   "seatA": -1.00658275462963,
+   "seatB": 0.9965538194444447,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7001",
+   "b": "exploit7204"
+  },
+  {
+   "id": "UU:league7100|league7103",
+   "kind": "uu",
+   "finder": "league7100",
+   "edge": 1.6380287905092592,
+   "se": 0.2723231603298406,
+   "z": 6.015018291228928,
+   "winsX": 63,
+   "draws": 20,
+   "winsY": 13,
+   "finds": true,
+   "seatA": 1.2686255787037035,
+   "seatB": 2.0074320023148142,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "league7103"
+  },
+  {
+   "id": "UU:league7100|exploit7200",
+   "kind": "uu",
+   "finder": "league7100",
+   "edge": 0.43413773148148155,
+   "se": 0.21721785908302405,
+   "z": 1.9986281667362689,
+   "winsX": 33,
+   "draws": 44,
+   "winsY": 19,
+   "finds": false,
+   "seatA": -0.20178096064814813,
+   "seatB": 1.0700564236111114,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "exploit7200"
+  },
+  {
+   "id": "UU:league7100|exploit7204",
+   "kind": "uu",
+   "finder": "league7100",
+   "edge": 1.2152727141203703,
+   "se": 0.2146331078613782,
+   "z": 5.662093449745226,
+   "winsX": 51,
+   "draws": 32,
+   "winsY": 13,
+   "finds": true,
+   "seatA": 0.5278776041666667,
+   "seatB": 1.902667824074074,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7100",
+   "b": "exploit7204"
+  },
+  {
+   "id": "UU:league7103|exploit7200",
+   "kind": "uu",
+   "finder": "league7103",
+   "edge": -2.0205772569444447,
+   "se": 0.23812317566279392,
+   "z": -8.485428817755155,
+   "winsX": 15,
+   "draws": 5,
+   "winsY": 76,
+   "finds": false,
+   "seatA": -2.262550636574074,
+   "seatB": -1.7786038773148147,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7103",
+   "b": "exploit7200"
+  },
+  {
+   "id": "UU:league7103|exploit7204",
+   "kind": "uu",
+   "finder": "league7103",
+   "edge": -1.7443359375,
+   "se": 0.25282637013516324,
+   "z": -6.89934335792371,
+   "winsX": 22,
+   "draws": 0,
+   "winsY": 74,
+   "finds": false,
+   "seatA": -1.9458781828703702,
+   "seatB": -1.5427936921296297,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "league7103",
+   "b": "exploit7204"
+  },
+  {
+   "id": "UU:exploit7200|exploit7204",
+   "kind": "uu",
+   "finder": "exploit7200",
+   "edge": 0.7092281539351851,
+   "se": 0.2182066519295707,
+   "z": 3.2502590900120616,
+   "winsX": 54,
+   "draws": 10,
+   "winsY": 32,
+   "finds": true,
+   "seatA": -0.15502459490740747,
+   "seatB": 1.5734809027777776,
+   "flew": 96,
+   "seedsOk": true,
+   "a": "exploit7200",
+   "b": "exploit7204"
+  }
+ ],
+ "steps": [
+  {
+   "id": "S@2.80",
+   "kind": "step",
+   "finder": "S",
+   "edge": 0.06738498263888887,
+   "se": 0.10469096546302238,
+   "z": 0.6436561391984654,
+   "winsX": 41,
+   "draws": 16,
+   "winsY": 39,
+   "finds": false,
+   "seatA": -0.6718127893518518,
+   "seatB": 0.8065827546296297,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "S@2.70",
+   "kind": "step",
+   "finder": "S",
+   "edge": 0.06308666087962965,
+   "se": 0.08033720062463436,
+   "z": 0.785273327787388,
+   "winsX": 41,
+   "draws": 16,
+   "winsY": 39,
+   "finds": false,
+   "seatA": -0.6103935185185184,
+   "seatB": 0.736566840277778,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "N@4.32",
+   "kind": "step",
+   "finder": "S",
+   "edge": -0.09421368634259258,
+   "se": 0.06969877106607475,
+   "z": -1.35172665029169,
+   "winsX": 40,
+   "draws": 13,
+   "winsY": 43,
+   "finds": false,
+   "seatA": -0.7349016203703703,
+   "seatB": 0.5464742476851852,
+   "flew": 96,
+   "seedsOk": true
+  },
+  {
+   "id": "N@4.50",
+   "kind": "step",
+   "finder": "S",
+   "edge": -0.03571759259259259,
+   "se": 0.08656650304104072,
+   "z": -0.41260292766659495,
+   "winsX": 37,
+   "draws": 21,
+   "winsY": 38,
+   "finds": false,
+   "seatA": -0.6825911458333334,
+   "seatB": 0.6111559606481483,
+   "flew": 96,
+   "seedsOk": true
+  }
+ ],
+ "checks": []
+}

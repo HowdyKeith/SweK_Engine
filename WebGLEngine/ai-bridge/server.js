@@ -2009,6 +2009,7 @@ const bookloreBridge = require("./bookloreBridge.js");     // v1135 — self-hos
 const comicBridge = require("./comicBridge.js");           // v1138 — built-in cross-platform .cbz/.cbr viewer
 const autoInstall = require("./autoInstall.js");           // v1199 — Auto-Install registry: per-panel deps + global auto toggle
 const mlxInstallBridge = require("./mlxInstallBridge.js"); // v1139 — Mac MLX server install/detect
+const gpuTaskManBridge = require("./gpuTaskManBridge.js"); // UNNUMBERED -- gputaskman.html: install, snapshot and an Ollama session for github.com/shanselman/gputaskman
 const keepAwakeBridge = require("./keepAwakeBridge.js");   // v1149 — hold the PC awake during long cloud jobs
 const terminalBridge = require("./terminalBridge.js");     // v1154 — localhost-only opt-in shell (xterm.js terminal)
 const googleHomeBridge = require("./googleHomeBridge.js");  // v1162 — mint the ha-google-home master token
@@ -2620,6 +2621,8 @@ const fleetBridge = require("./fleetBridge.js");
 const subAquariumBridge = require("./subAquariumBridge.js"); // UNNUMBERED -- the sub aquarium: peers send their subs here; the FISH BRAIN / FLY BRAIN chips poll its health routes
 const subAquarium = subAquariumBridge.createBridge({ root: path.resolve(__dirname, "..") });
 const exportBridge = require("./exportBridge.js");
+const aiUsageBridge = require("./aiUsageBridge.js");
+const tvpipeBridge = require("./tvpipeBridge.js");   // SweK to a TV (AirPlay, Chromecast) through tvpipe: /tv/*   // the dock's AI usage-limit gauges: GET /ai/usage
 const codemapBridge = require("./codemapBridge.js");   // v2519 -- the tree as a 3D city, coloured by the vNNNN markers it already carries   // /export/mp4 : webm clip -> YouTube-ready mp4 + description sidecar   // v2221 — POST /fleet/announce : when a peer sails into/out of the fleet, fan the event out to peers as an announcement. Trusted requests only: it broadcasts.
 const httpRange = require("./httpRange.js");   // v2208 — RFC 7233 byte ranges: seeking in a <video>, a page out of a CBZ, a television.
 const jellyfinBridge = require("./jellyfinBridge.js");   // v2209 — detect + link a media LIBRARY. Not a transport: live LAN streams go through go2rtc.
@@ -12351,6 +12354,13 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/mlx/pull" && req.method === "POST") { readJson(d => mlxInstallBridge.pullModel((d || {}).model).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.url === "/mlx/status" && req.method === "GET") { sendJson(mlxInstallBridge.managedStatus()); return; }
     if (req.url === "/mlx/stop" && req.method === "POST") { sendJson(mlxInstallBridge.stopManaged("manual")); return; }
+    // gputaskman.html's six routes (UNNUMBERED; see ai-bridge/gpuTaskManBridge.js for what each does and does not do). Only the fields named here are passed on from a request body.
+    if (req.url === "/gputaskman/status" && req.method === "GET") { gpuTaskManBridge.detect().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
+    if (req.url === "/gputaskman/install" && req.method === "POST") { readJson(d => gpuTaskManBridge.install((d || {}).method).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.url === "/gputaskman/snapshot" && req.method === "POST") { readJson(d => gpuTaskManBridge.snapshot({ gpu: (d || {}).gpu }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.url === "/gputaskman/session" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startSession({ model: d.model, base: d.base, numPredict: d.numPredict, settleMs: d.settleMs, unloadWhenDone: !!d.unloadWhenDone, sampleSeconds: d.sampleSeconds, sampleIntervalMs: d.sampleIntervalMs })); }); return; }
+    if (req.url === "/gputaskman/watch" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startWatch({ mode: d.mode, seconds: d.seconds, intervalMs: d.intervalMs, gpu: d.gpu, sizes: d.sizes, rounds: d.rounds, swarmSeconds: d.swarmSeconds })); }); return; }
+    if (req.url.split("?")[0] === "/gputaskman/job" && req.method === "GET") { const q = new URLSearchParams(req.url.split("?")[1] || ""); sendJson(gpuTaskManBridge.jobStatus(q.get("id"))); return; }
     if (req.url === "/keepawake/status" && req.method === "GET") { sendJson(keepAwakeBridge.status()); return; }
     if (req.url === "/keepawake/config" && req.method === "POST") { readJson(d => sendJson(keepAwakeBridge.setEnabled(!!(d && d.enabled)))); return; }
     if (req.url === "/terminal/status" && req.method === "GET") { sendJson(terminalBridge.status()); return; }
@@ -12522,6 +12532,27 @@ ${text.replace(/'/g, "''")}
     // BRACE it sits inside is not, and nothing about reading the handler tells you that. It is the same family as
     // the v2760 EDITING LAW (an insertion that landed inside a multi-line import) -- an edit placed by position
     // rather than by scope. Both compile. Both are silent.
+    // /tv/* -- SweK to a TV through tvpipe (Apple TV / AirPlay, Chromecast / Google Cast): see ai-bridge/tvpipeBridge.js for every route and what it
+    // refuses. Trusted callers only: each route puts something on somebody's television.
+    if (req.url.split("?")[0].startsWith("/tv/")) {
+        const p = req.url.split("?")[0];
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only: this puts a picture on a television" }, 403); return; }
+        if (p === "/tv/status" && req.method === "GET") { sendJson(tvpipeBridge.status()); return; }
+        if (p === "/tv/devices" && req.method === "GET") { const t = new URL(req.url, "http://x").searchParams.get("timeout"); tvpipeBridge.devices({ timeout: t ? Number(t) : undefined }).then(sendJson, (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); return; }
+        if (req.method === "POST" && (p === "/tv/share" || p === "/tv/play" || p === "/tv/pattern")) { readJson((d) => { tvpipeBridge.start(p.slice(4), d || {}).then(sendJson, (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); }); return; }
+        if (req.method === "POST" && p === "/tv/stop") { readJson((d) => { tvpipeBridge.stop(d && d.id).then((ids) => sendJson({ ok: true, stopped: ids }), (e) => sendJson({ ok: false, error: String((e && e.message) || e) })); }); return; }
+        if (req.method === "POST" && p === "/tv/pin") { readJson((d) => sendJson(tvpipeBridge.answerPin(d && d.id, d && d.pin))); return; }
+        sendJson({ ok: false, error: "no such /tv/ route" }, 404); return;
+    }
+    // GET /ai/usage -- how much of the Claude Code and Codex subscription limits is used (five-hour session and week), for the dock's
+    // CLAUDE 5H / CLAUDE WK / CODEX 5H / CODEX WK gauges. See ai-bridge/aiUsageBridge.js: it borrows each CLI's own sign-in READ-ONLY, never
+    // returns or logs a token, and caches for two minutes (?force=1 skips that). Trusted callers only, because it spends this machine's sign-ins.
+    if (req.url.split("?")[0] === "/ai/usage" && req.method === "GET") {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "auth required", why: "AI usage is only shown on this machine's own pages" }); return; }
+        const force = new URL(req.url, "http://x").searchParams.get("force") === "1";
+        aiUsageBridge.usage({ force }).then((j) => sendJson(j), (e) => sendJson({ ok: false, error: String((e && e.message) || e) }));
+        return;
+    }
     if (req.url.split("?")[0] === "/codemap" && req.method === "GET") {
         if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "auth required" }); return; }
         try {
@@ -20035,6 +20066,10 @@ broadcastSpectatorViewerCount = function() {
 })();
 
 wss.on("connection", (ws, req) => {
+    // /tv/live -- the page's canvas, encoded in the page, to a TV through tvpipe (ai-bridge/tvpipeBridge.js). Taken here, inside the one WebSocketServer,
+    // rather than by a second "upgrade" listener: ws answers every upgrade on the port, so a second listener would fight it for the socket. The
+    // server's verifyClient has already applied the bridge's trust rule to this socket.
+    if (String(req.url || "").split("?")[0] === "/tv/live") { tvpipeBridge.attachLive(ws); return; }
     // v1234 — swallow per-client WS errors (client dropped off network, etc.) so
     // they don't bubble to uncaughtException. Without this, a phone leaving wifi
     // mid-send raises an unhandled 'error' on the ws.

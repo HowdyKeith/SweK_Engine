@@ -43,7 +43,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, holdFrames, heldFrames, FRAME_HOLD_MS } from "./playwrightResolve.mjs";
 import { decodePNG, subjectFraction } from "./pngCoverage.mjs";
 import { noComments } from "./sourceScan.mjs";
 
@@ -87,8 +87,10 @@ if (skip) {
 }
 
 const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl", "--ignore-gpu-blocklist"] });
+const HELD = [];
 async function shotFraction(url, selector) {
     const page = await (await b.newContext({ viewport: { width: 900, height: 700 } })).newPage();
+    await holdFrames(page);   // v4923 -- the frame loop held while this gate looks: see frameHold in tools/ship/playwrightResolve.mjs, and the row below.
     await page.route("**/*", (route) => {
         const u = new URL(route.request().url());
         const p = path.join(ROOT, decodeURIComponent(u.pathname));
@@ -103,6 +105,7 @@ async function shotFraction(url, selector) {
     await page.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
     await page.waitForTimeout(3500);
     const buf = await page.locator(selector).screenshot().catch(() => null);
+    HELD.push([url, await heldFrames(page)]);
     await page.close();
     if (!buf) return null;
     return subjectFraction(decodePNG(buf));
@@ -116,6 +119,10 @@ try { robot = await shot2("RobotExpressive.html", "#robot-canvas"); } catch (e) 
 try { stage = await shot2("avatarstage.html?glb=RobotExpressive", "#stageCanvas"); } catch (e) { stage = { error: String(e && e.message || e) }; }
 try { blob = await shot2("blob-avatar.html", "#c"); } catch (e) { blob = { error: String(e && e.message || e) }; }
 await b.close();
+
+// v4923 -- measured: 28.9 and 34.2 s for this gate unheld, 16.6 and 16.6 s held. The pages animate an avatar on every frame.
+ok(`every page this gate captured had its frame loop HELD to one frame per ${FRAME_HOLD_MS} ms, and the loop ran: ${HELD.map(([u, n]) => u.split("?")[0] + " " + n).join(", ")}`,
+   HELD.length > 0 && HELD.every(([, n]) => n > 0), "a count of -1 means the hold was never installed on that page; 0 means it stopped the loop");
 
 if (typeof robot === "number") {
     // v4033 -- 0.08 was the first guess and it was too loose: a LIVE sabotage of _updateRootFollow (reverting

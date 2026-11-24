@@ -1,0 +1,112 @@
+<!doctype html>
+<!-- rotor-league.html -- UNNUMBERED (the version is chosen at ship time): EVERY HELICOPTER AND QUADROTOR PILOT AGAINST EVERY OTHER, ON THE SAME SCENARIOS.
+
+     brain/rotorcraftBoard.mjs flies each pilot (the hand autopilot, the hand pilot written as the 1,167-weight fruit-fly network, the trained fruit-fly network, for the quadrotor two MLPs, and the zero-weight floor) on the same seeds of the flying tasks, and brain/rotorLeague.mjs counts the scenarios each one wins against each other and rates them
+     with dogfightTournament's own Bradley-Terry fit. A ROTORCRAFT FLIES ALONE: there are no seats and no shooting, so a "fight" is one scenario flown by two pilots and COMPARED BY SCORE (a win is a lead of more than the margin). It is a different way of counting the flights the board averages, and the page says so.
+     The registration is brain/ROTOR_LEAGUE_WIP.md. Nothing here comes from the network except the JSON the repository ships (brain/*.json), fetched as data. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Rotor League">
+<meta name="demo:desc" content="Every helicopter and quadrotor pilot against every other on the same scenarios: the hand autopilots, the hand pilot as a fruit-fly network, the trained fruit-fly pilots, two quadrotor MLPs and a pilot that does nothing, counted by scenarios won and rated.">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Rotor League</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; } h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.6; margin:0 0 6px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 16px; }
+  button, select, input[type=number] { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; font:inherit; }
+  button { cursor:pointer; } button:hover { border-color:var(--cyan); } button:disabled { opacity:.5; cursor:default; } button.on { border-color:var(--cyan); color:var(--cyan); }
+  main { display:grid; grid-template-columns:minmax(240px,1fr) minmax(0,2.4fr); gap:12px; padding:6px 16px 20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:0; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .panel h2 .hint { color:var(--dim); letter-spacing:0; text-transform:none; font-weight:400; }
+  label.pilot { display:flex; gap:6px; align-items:flex-start; padding:3px 0; line-height:1.4; } label.pilot small { color:var(--dim); display:block; }
+  table { border-collapse:collapse; width:100%; font-size:12px; } th, td { border:1px solid var(--line); padding:3px 5px; text-align:center; } th { color:var(--dim); font-weight:400; } td.name, th.name { text-align:left; white-space:nowrap; }
+  td.win { background:#123a26; color:var(--green); } td.loss { background:#3a1218; color:var(--red); } td.even { color:var(--dim); } td.self { background:#0a1018; }
+  .bars { display:grid; grid-template-columns:auto 1fr auto; gap:3px 8px; align-items:center; margin-top:8px; } .bars .b { height:10px; background:var(--cyan); border-radius:2px; } .bars .b.neg { background:var(--amber); }
+  .note { color:var(--dim); line-height:1.6; font-size:12px; margin:6px 0 0; } pre { margin:6px 0 0; white-space:pre-wrap; color:var(--dim); font-size:11.5px; line-height:1.5; max-height:260px; overflow:auto; }
+  .err { color:var(--red); } @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9670; Rotor League</h1>
+  <p class="desc">Every pilot against every other on the <b>same scenarios</b>. A helicopter or a quadrotor <b>flies alone</b>: there are no seats and no shooting, so a fight is one scenario flown by two pilots and <b>compared by score</b> &mdash; a win is a lead of more than the margin, anything closer is a draw. The league is a different way of counting the flights the board averages: by scenarios won, which a few lost flights with a large score cannot dominate. The rating is Bradley-Terry on the Elo scale (read differences).</p>
+</header>
+<div class="bar">
+  <label>machine <select id="which"><option value="rotor">helicopter</option><option value="drone">quadrotor</option></select></label>
+  <label>seeds a kind <input id="nSeeds" type="number" min="1" max="40" value="6" style="width:64px"></label>
+  <label>first seed <input id="first" type="number" min="1" max="99999" value="1" style="width:78px"></label>
+  <label>margin <input id="margin" type="number" min="0.001" max="1" step="0.001" value="0.01" style="width:78px"></label>
+  <button id="runBtn">Run the league</button>
+  <span id="tabs"><button data-lg="all" class="on">all kinds</button> <button data-lg="standing">standing kinds</button> <button data-lg="failure">the failure kind</button></span>
+  <span id="msg" class="note"></span>
+</div>
+<main>
+  <section class="panel"><h2>Pilots <span class="hint" id="rosterNote"></span></h2><div id="roster"></div></section>
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <section class="panel"><h2>Head to head <span class="hint" id="leagueName">scenarios won - drawn - lost, in rating order; green and red are decisive leads (sign test)</span></h2><div id="matrix" style="overflow-x:auto"></div><div id="ratings" class="bars"></div><p class="note" id="matrixNote">Press Run. The quadrotor cannot survive a motor failure under any pilot here, so its &ldquo;failure kind&rdquo; compares how softly each one crashes, which is why the standing kinds are the league to read for flying.</p></section>
+    <section class="panel"><h2>The numbers <span class="hint">the same lines the command prints</span></h2><pre id="lines"></pre></section>
+  </div>
+</main>
+<script type="module">
+import * as RB from "/brain/rotorcraftBoard.mjs";
+import * as L from "/brain/rotorLeague.mjs";
+import * as V from "/render/rotorLeagueView.mjs";
+
+const $ = (id) => document.getElementById(id);
+const weights = { rotor: {}, drone: {} };
+let busy = false, view = null, lg = "all";
+const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const tick = () => new Promise((r) => setTimeout(r, 0));
+async function load() {
+  const [rf, df, dm, dm2] = await Promise.all(["/brain/pilotRotorWeightsDefault.json", "/brain/pilotDroneWeightsV2.json", "/brain/pilotDroneMlpWeightsDefault.json", "/brain/pilotDroneMlpWeightsV2.json"].map(fetchJson));
+  weights.rotor = rf && rf.weights ? { fly: rf.weights } : {};
+  weights.drone = { ...(df && df.weights ? { fly: df.weights } : {}), ...(dm && dm.weights ? { mlp: dm.weights } : {}), ...(dm2 && dm2.weights ? { mlpV2: dm2.weights } : {}) };
+  renderRoster();
+}
+function renderRoster() {
+  const which = $("which").value, box = $("roster"); box.textContent = "";
+  const ps = V.roster(which, weights[which]);
+  for (const p of ps) { const l = document.createElement("label"); l.className = "pilot"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = true; c.dataset.id = p.id; const t = document.createElement("span"); t.textContent = p.id; const s = document.createElement("small"); s.textContent = p.note; t.appendChild(s); l.append(c, t); box.appendChild(l); }
+  $("rosterNote").textContent = ps.length + " pilots" + (ps.length < RB.ARM_IDS[which].length ? " (some weight files did not load)" : "");
+}
+const chosen = () => [...document.querySelectorAll("#roster input")].filter((c) => c.checked).map((c) => c.dataset.id);
+async function run() {
+  if (busy) return; const ids = chosen(); if (ids.length < 2) { $("msg").textContent = "tick at least two pilots"; return; }
+  busy = true; $("runBtn").disabled = true;
+  const which = $("which").value, n = Math.max(1, Math.min(40, Number($("nSeeds").value) || 6)), first = Math.max(1, Number($("first").value) || 1), margin = Number($("margin").value) > 0 ? Number($("margin").value) : L.DECISIVE;
+  const board = RB.rotorcraftBoard(which, weights[which]), runs = Object.fromEntries(ids.map((id) => [id, []])), t0 = performance.now();
+  for (let s = 0; s < n; s++) {
+    $("msg").textContent = `flying seed ${first + s} of ${first}-${first + n - 1} (${ids.length} pilots, 4 kinds) ...`; await tick();
+    const one = board.run(which, ids, { from: first + s, to: first + s });
+    for (const id of ids) runs[id].push(...one.runs[id]);
+  }
+  view = { which, runs, margin, leagues: V.leaguesOf(which, runs, margin), checks: L.checksOf(which, runs, margin) };
+  $("msg").textContent = `${ids.length * n * 4} flights in ${((performance.now() - t0) / 1000).toFixed(1)} s` + (view.checks.ok ? "" : " - A CHECK FAILED, the readings are not weighed");
+  show(); busy = false; $("runBtn").disabled = false;
+}
+function show() {
+  if (!view) return; const g = view.leagues[lg], mat = $("matrix"), bars = $("ratings"); mat.textContent = ""; bars.textContent = "";
+  if (!g) { $("lines").textContent = "this league has no scenarios in this run"; return; }
+  const tb = document.createElement("table"), hr = document.createElement("tr"); hr.appendChild(document.createElement("th"));
+  for (const id of g.matrix.order) { const th = document.createElement("th"); th.textContent = id; hr.appendChild(th); } tb.appendChild(hr);
+  for (const r of g.matrix.rows) { const tr = document.createElement("tr"), nm = document.createElement("td"); nm.className = "name"; nm.textContent = r.id; tr.appendChild(nm); for (const c of r.cells) { const td = document.createElement("td"); td.className = c.tone; td.textContent = c.text; td.title = c.tone === "self" ? "" : `${r.id} ${c.reading || "TIES"} ${c.id}: sign p ${c.p.toFixed(4)}, edge ${c.edge.toFixed(4)}, z ${Number.isFinite(c.z) ? c.z.toFixed(2) : c.z}`; tr.appendChild(td); } tb.appendChild(tr); }
+  mat.appendChild(tb);
+  for (const b of g.bars) { const a = document.createElement("span"); a.textContent = b.id; const d = document.createElement("div"); d.className = "b" + (b.negative ? " neg" : ""); d.style.width = Math.max(2, b.width) + "%"; const v = document.createElement("span"); v.textContent = (b.rating >= 0 ? "+" : "") + b.rating.toFixed(0); bars.append(a, d, v); }
+  $("lines").textContent = (view.checks.ok ? "" : view.checks.failures.map((f) => "CHECK FAILED -- the readings are NOT WEIGHED: " + f).join("\n") + "\n") + L.readLines(view.which, view.runs, view.margin).join("\n");
+  $("leagueName").textContent = `${lg} kinds: scenarios won - drawn - lost, in rating order; green and red are decisive leads (sign test)`;
+}
+$("runBtn").onclick = run; $("which").onchange = () => { view = null; $("matrix").textContent = ""; $("ratings").textContent = ""; $("lines").textContent = ""; renderRoster(); };
+for (const b of document.querySelectorAll("#tabs button")) b.onclick = () => { lg = b.dataset.lg; for (const o of document.querySelectorAll("#tabs button")) o.classList.toggle("on", o === b); show(); };
+load();
+window.__rotorLeague = { get view() { return view; }, run };
+</script>
+<script type="module" src="/ui/pageNotesMount.mjs"></script>
+</body>
+</html>

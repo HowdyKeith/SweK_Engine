@@ -1,0 +1,56 @@
+THE PLAIN-NET CONTROL ACROSS ARCHITECTURES (registered in brain/PLAIN_NET_VARIANTS_WIP.md): does the plain net's reading survive the circuit's cell count as its width, and a tanh activation?
+64 of 64 variant pilots in the file
+  CHECK PASS  FIRST ROUND: the first round's own checks pass (9 rows)
+  CHECK PASS  START CHECK: all 64 pilots start as the autopilot (the untrained pilot scores the autopilot's on 4 training dives)
+  CHECK PASS  SIZES: every pilot is the registered width and activation (MC 42 / 47 / 5 / 47 relu units, MT the weight-matched tanh width)
+MC CELL P/B: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -0.606 | REAL -0.415 | MC -0.391 (sd 0.003) | REAL against it: behind (-0.024 against 0.020) | keeps 113 percent of REAL's gain
+  a2: autopilot -0.593 | REAL -0.415 | MC -0.383 (sd 0.003) | REAL against it: behind (-0.031 against 0.020) | keeps 117 percent of REAL's gain
+  a3: autopilot -0.635 | REAL -0.445 | MC -0.421 (sd 0.004) | REAL against it: behind (-0.024 against 0.020) | keeps 113 percent of REAL's gain
+  REGISTERED TEST: REAL above MC, U 0 of 32, exact one-sided p 1.0000 over 495 splits -> not supported
+  MC against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.001 against 0.020) | a2 tie (0.002 against 0.020) | a3 tie (0.005 against 0.020)
+MC CELL P/whole: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -0.606 | REAL -0.414 | MC -0.394 (sd 0.005) | REAL against it: tie (-0.020 against 0.020) | keeps 110 percent of REAL's gain
+  a2: autopilot -0.593 | REAL -0.413 | MC -0.386 (sd 0.005) | REAL against it: behind (-0.027 against 0.020) | keeps 115 percent of REAL's gain
+  a3: autopilot -0.635 | REAL -0.447 | MC -0.424 (sd 0.005) | REAL against it: behind (-0.023 against 0.020) | keeps 112 percent of REAL's gain
+  REGISTERED TEST: REAL above MC, U 1 of 32, exact one-sided p 0.9980 over 495 splits -> not supported
+  MC against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.002 against 0.020) | a2 tie (0.002 against 0.020) | a3 tie (-0.000 against 0.020)
+MC CELL E/E: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -3.795 | REAL -1.392 | MC -1.089 (sd 0.329) | REAL against it: tie (-0.303 against 0.659) | keeps 113 percent of REAL's gain
+  a2: autopilot -3.801 | REAL -1.145 | MC -1.053 (sd 0.463) | REAL against it: tie (-0.092 against 0.927) | keeps 103 percent of REAL's gain
+  a3: autopilot -3.519 | REAL -1.121 | MC -1.047 (sd 0.389) | REAL against it: tie (-0.075 against 0.778) | keeps 103 percent of REAL's gain
+  REGISTERED TEST: REAL above MC, U 11 of 32, exact one-sided p 0.8162 over 495 splits -> not supported
+  MC against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.262 against 0.659) | a2 tie (0.009 against 0.927) | a3 tie (0.073 against 0.778)
+MC CELL E/whole: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -3.795 | REAL -1.351 | MC -1.158 (sd 0.353) | REAL against it: tie (-0.193 against 0.706) | keeps 108 percent of REAL's gain
+  a2: autopilot -3.801 | REAL -0.988 | MC -1.079 (sd 0.278) | REAL against it: tie (0.090 against 0.555) | keeps 97 percent of REAL's gain
+  a3: autopilot -3.519 | REAL -1.099 | MC -1.203 (sd 0.359) | REAL against it: tie (0.104 against 0.718) | keeps 96 percent of REAL's gain
+  REGISTERED TEST: REAL above MC, U 9 of 32, exact one-sided p 0.8929 over 495 splits -> not supported
+  MC against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.030 against 0.706) | a2 tie (-0.123 against 0.555) | a3 tie (-0.190 against 0.718)
+MT CELL P/B: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -0.606 | REAL -0.415 | MT -0.397 (sd 0.002) | REAL against it: tie (-0.018 against 0.020) | keeps 109 percent of REAL's gain
+  a2: autopilot -0.593 | REAL -0.415 | MT -0.394 (sd 0.002) | REAL against it: behind (-0.021 against 0.020) | keeps 112 percent of REAL's gain
+  a3: autopilot -0.635 | REAL -0.445 | MT -0.435 (sd 0.001) | REAL against it: tie (-0.010 against 0.020) | keeps 105 percent of REAL's gain
+  REGISTERED TEST: REAL above MT, U 0 of 32, exact one-sided p 1.0000 over 495 splits -> not supported
+  MT against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (-0.005 against 0.020) | a2 tie (-0.008 against 0.020) | a3 tie (-0.010 against 0.020)
+MT CELL P/whole: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -0.606 | REAL -0.414 | MT -0.398 (sd 0.003) | REAL against it: tie (-0.016 against 0.020) | keeps 108 percent of REAL's gain
+  a2: autopilot -0.593 | REAL -0.413 | MT -0.393 (sd 0.002) | REAL against it: behind (-0.020 against 0.020) | keeps 111 percent of REAL's gain
+  a3: autopilot -0.635 | REAL -0.447 | MT -0.436 (sd 0.002) | REAL against it: tie (-0.012 against 0.020) | keeps 106 percent of REAL's gain
+  REGISTERED TEST: REAL above MT, U 8 of 32, exact one-sided p 0.9232 over 495 splits -> not supported
+  MT against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (-0.002 against 0.020) | a2 tie (-0.005 against 0.020) | a3 tie (-0.011 against 0.020)
+MT CELL E/E: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -3.795 | REAL -1.392 | MT -1.138 (sd 0.320) | REAL against it: tie (-0.254 against 0.640) | keeps 111 percent of REAL's gain
+  a2: autopilot -3.801 | REAL -1.145 | MT -1.125 (sd 0.338) | REAL against it: tie (-0.020 against 0.676) | keeps 101 percent of REAL's gain
+  a3: autopilot -3.519 | REAL -1.121 | MT -1.175 (sd 0.219) | REAL against it: tie (0.054 against 0.437) | keeps 98 percent of REAL's gain
+  REGISTERED TEST: REAL above MT, U 14 of 32, exact one-sided p 0.6586 over 495 splits -> not supported
+  MT against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.213 against 0.640) | a2 tie (-0.062 against 0.676) | a3 tie (-0.055 against 0.437)
+MT CELL E/whole: NOT SUPPORTED (8 of 8 pilots)
+  a1: autopilot -3.795 | REAL -1.351 | MT -0.990 (sd 0.243) | REAL against it: tie (-0.362 against 0.485) | keeps 115 percent of REAL's gain
+  a2: autopilot -3.801 | REAL -0.988 | MT -0.987 (sd 0.162) | REAL against it: tie (-0.001 against 0.323) | keeps 100 percent of REAL's gain
+  a3: autopilot -3.519 | REAL -1.099 | MT -1.045 (sd 0.180) | REAL against it: tie (-0.054 against 0.359) | keeps 102 percent of REAL's gain
+  REGISTERED TEST: REAL above MT, U 4 of 32, exact one-sided p 0.9859 over 495 splits -> not supported
+  MT against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): a1 tie (0.198 against 0.485) | a2 tie (-0.032 against 0.323) | a3 tie (-0.031 against 0.359)
+MC: NOT SUPPORTED (0 of 4 assessed cells supported); keeps 90 percent of REAL's gain on at least 2 audits in 4 of 4 cells
+MT: NOT SUPPORTED (0 of 4 assessed cells supported); keeps 90 percent of REAL's gain on at least 2 audits in 4 of 4 cells
+VERDICT: THE FIRST ROUND'S READING HOLDS ACROSS THESE VARIANTS

@@ -10,7 +10,7 @@
 // learn is where to point: the enemy it faces is the rule's (the nearest), and a ship with no helm (the `crew` option) has no network either.
 //
 // *** THE HAND WEIGHTS ARE THE RULE: ZERO. *** A network whose outputs are all tanh(0) = 0 corrects nothing, so a helm given them does what the rule does, to the bit (the gate flies both in the same fights and compares the tallies and the states). The zero weights are therefore the same network, and
-// there is NO network here that does nothing: unlike the gunner's trigger, which a network replaces, the helm's outputs are all corrections, and the identity is the origin. NO HELM WAS TRAINED. Everything below is the means to hold one to account when there is one.
+// there is NO network here that does nothing: unlike the gunner's trigger, which a network replaces, the helm's outputs are all corrections, and the identity is the origin. NO HELM WAS TRAINED WHEN THIS WAS WRITTEN; ONE WAS LATER, FOR ONE FIGHT (2026-11-13: brain/helmWeightsDefault.json, by tools/ship/trainHelm.mjs, for the ship-against-ship duel of brain/battleshipDuel.mjs behind the bow-on rule -- its file says what it did where it was not trained; nothing in this file loads it). Everything below is the means to hold one to account when there is one.
 //
 // THE NETWORK is pilot6dofPolicy's -- the 34 neurons of the real male-cns Giant Fiber Circuit, 313 real synapses, three weight-tied recurrent steps, 930 weights -- used as it is (the arithmetic of forward() and the memoised layers are its own), with the five outputs read as: torque corrections about x, y and z,
 // the throttle correction, and a fifth that is not used (the pilot's trigger).
@@ -53,7 +53,7 @@ export const helmFactory = (w) => () => helmFor(w);
 export function reportLines() {
     const nz = Array.from(handWeights()).filter((v) => v !== 0).length;
     return ["[helmPolicy] a learned helm for a capital ship: the rule (face the nearest enemy at the hull's torque limit, cruise) and a fruit fly's escape-circuit network for a correction to it (torque about each axis, throttle)",
-        `  ${FEATURES} features, ${HIDDEN} hidden neurons (the male-cns Giant Fiber Circuit, ${REC_EDGES} synapses), ${OUTPUTS} outputs: ${WEIGHT_COUNT} weights; the rule is the network with ${nz} non-zero weights (every output a correction: zero corrects nothing); no helm network was trained`];
+        `  ${FEATURES} features, ${HIDDEN} hidden neurons (the male-cns Giant Fiber Circuit, ${REC_EDGES} synapses), ${OUTPUTS} outputs: ${WEIGHT_COUNT} weights; the rule is the network with ${nz} non-zero weights (every output a correction: zero corrects nothing); a helm trained for the ship-against-ship duel is brain/helmWeightsDefault.json (tools/ship/trainHelm.mjs)`];
 }
 
 if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic

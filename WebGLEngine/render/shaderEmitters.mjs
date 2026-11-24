@@ -316,6 +316,11 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "ui/seaDepthTint-selfcheck.mjs", kind: "quoter", why: null }),
     // v4896 -- ONE FILE THE D3D12 ROUND ADDED, read by hand: the truncation guard's gate holds the v4895 bug's WGSL as fixtures (a dims() that returns a reciprocal, and the repair); it is a quoter
     Object.freeze({ file: "tools/ship/truncationGuard-selfcheck.mjs", kind: "quoter", why: null }),
+    // v4933 -- TWO FILES THE PLAYCANVAS LINE ADDED, read by hand: render/splatSH.mjs exports the spherical-harmonic colour's WGSL (SH_WGSL) and GLSL as function-body
+    // fragments the splat renderers paste into their vertex shaders -- an emitter whose host supplies the header; tools/ship/splatRendererGPU-selfcheck.mjs holds the
+    // renderer's generated WGSL only inside regular expressions it tests that WGSL with -- a quoter.
+    Object.freeze({ file: "render/splatSH.mjs", kind: "emitter", why: REASONS.EMITTED }),
+    Object.freeze({ file: "tools/ship/splatRendererGPU-selfcheck.mjs", kind: "quoter", why: null }),
 ]);
 
 /** The rows the shipped thresholds get wrong, named rather than excluded. See the header. One at v4486; two since v4880. */
@@ -357,16 +362,17 @@ export const RESIDUALS = Object.freeze([Object.freeze({
 export const TUNING = Object.freeze({
     floors: Object.freeze([2, 3, 4, 5, 6, 7, 8]),
     byRadius: Object.freeze({
+        // v4933: every cell +2 -- the two files added by hand (render/splatSH.mjs, tools/ship/splatRendererGPU-selfcheck.mjs), both read as the key says at every radius and floor; the SHAPE is unchanged
         // v4895: every cell +4 -- the six files added by hand, four of which the thresholds classify as read (the two they do not are the new residuals); the SHAPE is unchanged: the same spike, the same four-wide run
-        80: Object.freeze([48, 48, 44, 41, 40, 38, 34]),
-        100: Object.freeze([48, 48, 45, 43, 42, 40, 38]),
-        140: Object.freeze([48, 48, 49, 46, 44, 42, 40]),
-        200: Object.freeze([47, 48, 48, 48, 48, 44, 41]),
-        300: Object.freeze([46, 46, 47, 47, 48, 46, 46]),
+        80: Object.freeze([50, 50, 46, 43, 42, 40, 36]),
+        100: Object.freeze([50, 50, 47, 45, 44, 42, 40]),
+        140: Object.freeze([50, 50, 51, 48, 46, 44, 42]),
+        200: Object.freeze([49, 50, 50, 50, 50, 46, 43]),
+        300: Object.freeze([48, 48, 49, 49, 50, 48, 48]),
     }),
-    peak: Object.freeze({ radius: 140, floor: 4, agreement: 49, shipped: false,
+    peak: Object.freeze({ radius: 140, floor: 4, agreement: 51, shipped: false,
         note: "a spike -- every neighbour reads lower -- which is what a threshold fitted to its own key looks like" }),
-    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 48,
+    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 50,
         note: "inside the widest run at the best non-spike score: FOUR floors wide (3 through 6), where every other radius manages at most two" }),
     // Derived by the gate from byRadius, not typed: the length of each radius' longest run at its own best score.
     runAtBest: Object.freeze({ 80: 2, 100: 2, 140: 1, 200: 4, 300: 1 }),
@@ -387,7 +393,7 @@ export function census(root, io, preambleKind) {
             if (skip.has(e.name)) continue;
             const p = io.join(dir, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!io.isSource(e.name)) continue;   // handed in (SOURCE_EXT), so this module stays free of node:fs -- shaderRefs counts hand-spelled filters
             out.scanned++;
             const text = io.readFile(p);
             if (preambleKind(text) !== "none") { out.seenByPreamble++; continue; }
@@ -418,13 +424,13 @@ export const MEASURED_AT_V4486 = Object.freeze({
     v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
     // v4895 -- six files read by hand (two emitters, four quoters); the thresholds now miss four of the 52 rows (two more quoters read as emitters).
     v4895: Object.freeze({ rows: 52, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 29, reportedEmitters: 25, reportedQuoters: 27 }),
-    v4896: Object.freeze({ rows: 53, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 30, reportedEmitters: 26, reportedQuoters: 27 }),
+    v4896: Object.freeze({ rows: 55, agreement: 50, handVerifiedEmitters: 24, handVerifiedQuoters: 31, reportedEmitters: 27, reportedQuoters: 28 }),   // v4933: +2 rows (render/splatSH.mjs an emitter, tools/ship/splatRendererGPU-selfcheck.mjs a quoter), both read the way the key says
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 170, wgslBearing: 136, both: 27 }),   // the FSR4 branch's rounds 70-76 merged over v4908: wgslBearing 135 -> 136 with backendParity (render/learnedUpscaleTemporalGPU.mjs). v4901: wgslBearing 134 -> 135 with backendParity (render/denoiseFrameGenGPU.mjs, merged from the FSR4 branch). v4897: wgslBearing 132 -> 134 with backendParity (render/deformTexture.mjs and its gate). v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
+    preambleCensus: Object.freeze({ glslBearing: 178, wgslBearing: 148, both: 29 }),   // v4933: 170/138/27 -> 178/148/29, the PlayCanvas line's files (render/backendParity.mjs's PARITY_BASELINE names them);   // v4926: wgslBearing 137 -> 138, brain/reservoirPilotGpu.mjs (READOUT_WGSL, a compute shader only).   // v4922: wgslBearing 136 -> 137, brain/reservoirGpu.mjs (a compute shader only).   // the FSR4 branch's rounds 70-76 merged over v4908: wgslBearing 135 -> 136 with backendParity (render/learnedUpscaleTemporalGPU.mjs). v4901: wgslBearing 134 -> 135 with backendParity (render/denoiseFrameGenGPU.mjs, merged from the FSR4 branch). v4897: wgslBearing 132 -> 134 with backendParity (render/deformTexture.mjs and its gate). v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,
     // Which rejection actually rejects, over every tell in the tree. See the header: escapeOnly is 0 today and
     // the gate reports it rather than pinning it, because the day it stops being 0 is the day it starts working.
-    rejections: Object.freeze({ escapeOnly: 2, callOnly: 22, both: 23, neither: 109 }),   // v4895: were 2 / 20 / 20 / 73 at v4880 (0 / 16 / 16 / 58 before); the new snow/aerial/skyBake sources add 3 + 8 tells
+    rejections: Object.freeze({ escapeOnly: 2, callOnly: 23, both: 24, neither: 113 }),   // v4933: were 2 / 22 / 23 / 109; the PlayCanvas line's shader sources and their gates added one call-only, one both and four neither tells   // v4895: were 2 / 20 / 20 / 73 at v4880 (0 / 16 / 16 / 58 before); the new snow/aerial/skyBake sources add 3 + 8 tells
 });

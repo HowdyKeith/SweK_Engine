@@ -174,5 +174,16 @@ guard("5", () => {
         same([a.arrivals, a.hits, a.replans], [3, 2, 4]) && same([b.arrivals, b.hits, b.replans], [3, 2, 0]) && same([c.arrivals, c.hits, c.replans], [3, 1, 102]) && same([d.arrivals, d.hits, d.replans], [3, 1, 100]) && a.noRoute === false && c.margin === 12 && near(a.travel, 866, 5) && near(b.travel, 873, 5));
 });
 
+console.log("\n6. THE FLEET");
+guard("6", () => {
+    ok("!! FLEET_R is a hull's half-length (N.HULL_HALF, 4 m) and SUB_CONTACT_DZ is 2 m", T.FLEET_R === N.HULL_HALF && T.FLEET_R === 4 && T.SUB_CONTACT_DZ === 2);
+    const others = [{ id: "b", x: 100, y: 50, vx: 2, vy: -1, depth: 20 }, { id: "c", x: 300, y: 200, vx: 0, vy: 0, depth: 30 }], fo = T.fleetObstacles(others, 7);
+    ok("!! fleetObstacles: each other sub a full-depth column of radius FLEET_R stamped with the plan's time t0; none given is none", fo.length === 2 && same(fo[0], { type: "sub", id: "b", x: 100, y: 50, vx: 2, vy: -1, r: T.FLEET_R, keel: Infinity, t0: 7 }) && fo[1].id === "c" && fo[1].r === T.FLEET_R && same(T.fleetObstacles(null, 0), []) && same(T.fleetObstacles(undefined, 3), []));
+    const ship = { type: "ship", group: 5, x: 50, y: 100, r: 8, keel: 6, lane: { axis: "x", fixed: 100, lo: 40, hi: 160, c0: 50, v: 3 } };
+    ok("!! fleetAt: a sub runs straight along its velocity from t0 (at t0 + 5 it is 5 v on); anything else is where sceneAt puts it", same(T.fleetAt(fo[0], 7), [100, 50]) && same(T.fleetAt(fo[0], 12), [110, 45]) && same(T.fleetAt(fo[1], 99), [300, 200]) && same(T.fleetAt(O({ x: 70, y: 80 }), 50), T.sceneAt(O({ x: 70, y: 80 }), 50)) && same(T.fleetAt(ship, 11), T.sceneAt(ship, 11)) && same(T.fleetAt(ship, 11), [83, 100]));
+    const q = [{ x: 0, y: 0, depth: 20 }];
+    ok("!! subTouch is three-dimensional: within 2 HULL_HALF on the plane AND SUB_CONTACT_DZ in depth; at either edge or beyond, or with no others, no touch", T.subTouch(7.9, 0, 21.9, q) && T.subTouch(3, 3, 18.5, q) && !T.subTouch(8, 0, 20, q) && !T.subTouch(0, 0, 22, q) && !T.subTouch(0, 0, 17.5, q) && !T.subTouch(0, 0, 20, null) && !T.subTouch(0, 0, 20, []));
+});
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

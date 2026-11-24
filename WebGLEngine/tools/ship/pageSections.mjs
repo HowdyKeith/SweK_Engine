@@ -333,7 +333,12 @@ export const SECTIONS = [
               // the OTHER half of this shelf's note -- an opt-in install button, fetched onto your machine, never in
               // the zip -- because System Tools, where install and rig pages live, is at MAX_PER_PANEL (15 of 15)
               // and this shelf is its own sub-drawer. Nine of fifteen.
-              "install-fsr-caches.html"] },
+              "install-fsr-caches.html",
+              // privatelm.html JOINS (2026-11-07, Keith: "add this to swek-engine, either use features, or at least have an install button"): an install page for orailnoor/cross-platform-llm-client (MIT), which this engine did not write; it also
+              // talks to the OpenAI-compatible server the app can run on a phone. Ten of fifteen.
+              "privatelm.html",
+              // gputaskman.html JOINS (2026-11-08, Keith: "let's add a install link/page to swek engine that installs gputaskman. can we have swek also start the model, run gputaskman, save snapshot, and give me the json to send to you?"): an install page for shanselman/gputaskman (MIT), a GPU monitor this engine did not write, and a one-button session that loads an Ollama model, takes GPU snapshots and hands back one JSON file. Eleven of fifteen.
+              "gputaskman.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
@@ -696,8 +701,8 @@ export const SECTIONS = [
     // A text match followed through imports also finds index, orrery, orrery-gpu, instruments, lab-home, method-lab,
     // panel-brain, race-car, es-box3d-6dof and es-aircraft, and every one of those is a COMMENT or a catalogue string
     // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
-    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
-      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html"] },
+    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it (a helicopter and a quadrotor among them, beside their hand autopilots)",
+      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html", "rotorcraft-demo.html", "rotor-league.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,
@@ -719,7 +724,38 @@ export const SECTIONS = [
     // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
     { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
       pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "switchboard.html", "sea-ogre.html", "battleship3d.html"] },
+    // UNNUMBERED (2026-11-14) -- SPACE COMBAT, KEITH'S CALL. space-duel.html arrived with Flight Simulation at its fifteen; asked whether it should have a drawer of its own or stay a loose link, Keith: "'Space Combat' is good." The pages that FIGHT in vacuum: the 6DOF fleet fight
+    // (es-box3d-6dof.html), the capital ship against fighters (space-battleship.html) and the capital ship against a capital ship (space-duel.html). FILED AFTER Flight Simulation, so the first two keep their homes there and are CLONED here, and Flight Simulation stays at fifteen; the duel page lives here.
+    { id: "spacecombat", tab: "spacecombat", label: "Space Combat", note: "the pages that fight in vacuum: the 6DOF fleets, a capital ship against fighters, a capital ship against a capital ship",
+      pages: ["es-box3d-6dof.html", "space-battleship.html", "space-duel.html"] },
+    // UNNUMBERED (2026-11-23) -- RECENT NEW PAGES, KEITH'S DEFAULT. Four new pages (splat-gpu, gizmo-demo, lights-demo, lights-gpu) had no drawer: the WebGPU one was full at 15 of 15 and
+    // the rest were drawer decisions, so they sat in UNPLACED -- an inbox that, by this file's own v3227 finding, nobody empties. Keith: "By default, if a new page cannot be placed anywhere, it can go
+    // into the Recent New Pages section. New pages that are less than a week old could also be listed." and, asked how to date a page: "use the file's first commit date, one week."
+    // SO THE DEFAULT HOME OF A PAGE WITH NO DRAWER IS THIS ONE, AND IT IS A LEASE, NOT A HOME: every page here carries `added`, the date of its file's FIRST commit (git log --follow
+    // --diff-filter=A, earliest), and once it is more than RECENT_DAYS (7) old it is OVERDUE -- pageSections-selfcheck goes red naming it, and it must go into a drawer or back into UNPLACED
+    // with a reason. THAT IS HOW A PAGE "STOPS BEING RECENT AND DROPS OFF", which the Arriving row promised for 900 versions and never did. The date is declared, not read at load, because the
+    // page is static markup and a shallow clone cannot read history; the gate checks the declaration against git instead (never later than git's earliest, and equal when the clone is full).
+    // A page claimed by an earlier section keeps its anchor there and gets a clone here, as every duplicate does (v4778), so a page may be listed here AND in its drawer.
+    { id: "recentnew", tab: "recentnew", label: "Recent New Pages", note: "new pages with no drawer yet, for a week from the day their file was first committed",
+      added: { "splat-gpu.html": "2026-11-21", "gizmo-demo.html": "2026-11-22", "lights-demo.html": "2026-11-22", "lights-gpu.html": "2026-11-22" },
+      pages: ["splat-gpu.html", "gizmo-demo.html", "lights-demo.html", "lights-gpu.html"] },
 ];
+
+/** Keith: "use the file's first commit date, one week." A page in the recentnew section stays while it is at most this many whole days old. */
+export const RECENT_DAYS = 7;
+export const RECENT_ID = "recentnew";
+/** Whole days from `added` (YYYY-MM-DD) to `now` (a Date or ISO string); NaN for a date that is not YYYY-MM-DD. */
+export function ageDays(added, now) {
+    if (typeof added !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(added)) return NaN;
+    const a = Date.parse(added + "T00:00:00Z"), b = new Date(now).getTime();
+    return Number.isFinite(a) && Number.isFinite(b) ? Math.floor((b - a) / 86400000) : NaN;
+}
+/** The pages of `section` that are OVERDUE at `now`: no valid `added`, or older than RECENT_DAYS. [{ page, added, age }] */
+export function overdue(section, now, days = RECENT_DAYS) {
+    const out = [];
+    for (const page of section.pages) { const added = (section.added || {})[page], age = ageDays(added, now); if (!(age <= days)) out.push({ page, added, age }); }
+    return out;
+}
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
 // v3434 -- KEITH'S RULE, RAISED FROM TEN: "allow the panel to grow past 10, but when it reaches the 15th item,
@@ -909,6 +945,8 @@ export const UNPLACED = new Map([
     // as born invisible at the first verdict). WHICH DRAWER IS KEITH'S CALL, as it was for the rtx pages: the fruit-fly drawer already holds es-flight6dof.html, whose pilots
     // these pages fly, but a combat page is not obviously a brain page, and the choice is one he makes with the three side by side.
     // UNNUMBERED -- the sub aquarium (WIP, the submarine line). Linked from Arriving so it is reachable, and it is the FISH BRAIN chip's click-through; the drawer is Keith's call: it is a brain page (the GFC pilots) AND a fleet page (peers send subs).
+    // v4933 -- FOUR PAGES OF THE PLAYCANVAS LINE, linked from server.html (beside blackhole.html) at the ship so pageReach could see them. Which drawer is Keith's call:
+    // the WebGPU drawer they would join is full at 15 of 15, and gizmo-demo and lights-demo are WebGL2. Waiting here, said, until he files them.
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */
@@ -921,7 +959,7 @@ export function claimedPages() {
 /** The shape an export hands back: flat, readable, and editable by a person in a text box. */
 export function toJSON() {
     return { version: 1, maxPerPanel: MAX_PER_PANEL,
-             sections: SECTIONS.map((s) => ({ id: s.id, tab: s.tab, label: s.label, note: s.note, pages: s.pages.slice() })) };
+             sections: SECTIONS.map((s) => ({ id: s.id, tab: s.tab, label: s.label, note: s.note, pages: s.pages.slice(), ...(s.added ? { added: { ...s.added } } : {}) })) };
 }
 
 /**

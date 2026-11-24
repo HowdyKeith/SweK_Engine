@@ -979,5 +979,67 @@
    "DIR=\"$HOME/VoxelBAK/Tools/node3d\"; command -v node >/dev/null || { echo 'node not found - install Node.js 24+ (brew install node) then rerun'; exit 1; }; ARCH=$(node -p 'process.arch'); if [ \"$ARCH\" = \"arm64\" ]; then echo 'REFUSED: @node-3d has no darwin-arm64 prebuilt. Apple Silicon is not supported upstream; Intel Macs are. Nothing installed.'; exit 1; fi; mkdir -p \"$DIR\" && cd \"$DIR\" && [ -f package.json ] || npm init -y >/dev/null; npm i @node-3d/core && node -e \"import('@node-3d/webgl').then(m=>console.log('webgl addon loaded')).catch(e=>{console.error('LOAD FAILED:',e.message);process.exit(1)})\""
   ],
   "checkPath": "C:\\VoxelBAK\\Tools\\node3d\\node_modules\\@node-3d\\webgl\\package.json"
+ },
+ "app-muelle": {
+  "description": "crafter-station/muelle (MIT) - a macOS-style dock and optional top menu bar that REPLACES the Windows 10/11 taskbar: magnification, live window thumbnails, a genie minimise effect, app groups, a folder-of-shortcuts stack, auto-hide, and a top-bar 'island' showing your Claude Code / Codex / Gemini CLI usage limits. Rust. Installs for your user only (no admin, about two seconds) from the latest GitHub release; SmartScreen may say it protected your PC (More info -> Run anyway). To get the Windows taskbar back: right-click the dock -> Quit Muelle; uninstall from Settings -> Apps. A DESKTOP app beside SweK, not a SweK feature; SweK's own docked gauges live in the browser page.",
+  "timeoutMs": 300000,
+  "cmds": [
+   "$f = Join-Path $env:TEMP 'Muelle-Setup.exe'; Write-Host 'downloading Muelle-Setup.exe (latest release)...'; Invoke-WebRequest -UseBasicParsing 'https://github.com/crafter-station/Muelle/releases/latest/download/Muelle-Setup.exe' -OutFile $f; Write-Host 'running the per-user installer (no admin)...'; Start-Process -FilePath $f -Wait; Write-Host 'done - the dock replaces the taskbar; right-click it -> Quit Muelle to get the taskbar back'"
+  ],
+  "cmdsMac": [
+   "echo 'Muelle is a Windows 10/11 taskbar replacement -- there is no Mac build. On the Mac the Dock already does this.'; exit 1"
+  ],
+  "requires": {
+   "os": [
+    "win32"
+   ],
+   "why": "A Windows 10/11 taskbar replacement: it hooks the Windows shell (DWM thumbnails, the tray, the taskbar), so there is nothing to run on a Mac or Linux box."
+  }
+ },
+ "app-opentaskbar": {
+  "description": "alztrk/opentaskbar (MIT) - a floating dock and modular WIDGET system that replaces the Windows 10/11 taskbar: fisheye magnification, live DWM thumbnails, native jump lists, smart auto-hide (IntelliHide), multi-monitor docks, theme/icon packs, and widgets for AI usage limits (Claude, Codex, Copilot, OpenRouter...), Bluetooth device batteries, CPU/RAM/GPU meters and GPU temperature, media controls, weather, Pomodoro, network speed and drive usage. .NET 10 WPF. Portable: downloads OpenTaskbar.exe from the latest release into C:\\VoxelBAK\\OpenTaskbar and starts it (no installer, no admin). A DESKTOP app beside SweK, not a SweK feature.",
+  "timeoutMs": 300000,
+  "cmds": [
+   "$d = 'C:\\VoxelBAK\\OpenTaskbar'; New-Item -ItemType Directory -Force -Path $d | Out-Null; $exe = Join-Path $d 'OpenTaskbar.exe'; if (Test-Path $exe) { Write-Host 'OpenTaskbar already there - starting it'; Start-Process $exe; exit 0 }; $h = @{ 'User-Agent' = 'swek-install' }; $r = Invoke-RestMethod -Headers $h 'https://api.github.com/repos/alztrk/opentaskbar/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*.exe' } | Select-Object -First 1; if (-not $a) { Write-Host 'no .exe in the latest release - open https://github.com/alztrk/opentaskbar/releases'; exit 1 }; Write-Host ('downloading ' + $a.name + ' (' + $r.tag_name + ')...'); Invoke-WebRequest -UseBasicParsing $a.browser_download_url -OutFile $exe; Start-Process $exe; Write-Host ('started ' + $exe)"
+  ],
+  "cmdsMac": [
+   "echo 'OpenTaskbar is a Windows 10/11 WPF app -- there is no Mac build.'; exit 1"
+  ],
+  "requires": {
+   "os": [
+    "win32"
+   ],
+   "why": "A Windows 10/11 taskbar replacement: it hooks the Windows shell (DWM thumbnails, the tray, the taskbar), so there is nothing to run on a Mac or Linux box."
+  }
+ },
+ "tool-tvpipe": {
+  "description": "mitsuhiko/tvpipe (Apache-2.0/MIT) - low-latency MIRRORING to AirPlay and Google Cast receivers (Apple TV, smart TVs, Chromecast) and to browser tabs, using the real-time mirroring protocols (a fraction of a second behind), not URL playback. One self-contained binary with its own mDNS. `tvpipe discover`; `tvpipe pair \"Living Room\"` (Apple TV, once); `tvpipe screen --to Kitchen` mirrors the screen with sound; `tvpipe share <url> --to Kitchen` puts a web page (a SweK page) on the TV; `tvpipe play` sends a file. Playing files needs ffmpeg (the tool-ffmpeg row). SweK already FINDS Cast/AirPlay devices (ai-bridge/mdnsDiscovery.js) but does not stream to them; this is the piece that does.",
+  "timeoutMs": 300000,
+  "cmds": [
+   "if (Get-Command tvpipe -ErrorAction SilentlyContinue) { Write-Host 'tvpipe already on PATH'; tvpipe --version; exit 0 }; Write-Host 'installing tvpipe (official installer)...'; irm https://tvpipe.party/install.ps1 | iex; Write-Host 'done - open a NEW terminal, then: tvpipe discover'"
+  ],
+  "cmdsMac": [
+   "if command -v tvpipe >/dev/null 2>&1; then echo 'tvpipe already installed'; tvpipe --version; exit 0; fi; curl -fsSL https://tvpipe.party/install.sh | sh && echo 'done - open a new terminal, then: tvpipe discover'"
+  ]
+ },
+ "lib-playcanvas": {
+  "description": "playcanvas/engine (MIT) - the PlayCanvas WebGL2/WebGPU game engine: glTF 2.0, PBR, clustered lighting, Gaussian splats (.ply/.sog), Ammo.js physics, an entity-component system, an animation state graph, spatial audio, WebXR, and a large examples browser. This row CLONES the engine into C:\\VoxelBAK\\playcanvas-engine (shallow) and installs its dev dependencies so its examples can be browsed and its code read beside SweK's; to USE it in a page, `npm i playcanvas` there. A second engine to learn from, not one SweK runs on. Needs git and Node 18+ (the tool-git row). What SweK could take from it: WebGLEngine/docs/playcanvas-comparison.md.",
+  "timeoutMs": 900000,
+  "cmds": [
+   "$d = 'C:\\VoxelBAK\\playcanvas-engine'; if (Test-Path (Join-Path $d '.git')) { Write-Host 'already cloned - pulling'; git -C $d pull --ff-only } else { git clone --depth 1 https://github.com/playcanvas/engine $d }; Push-Location $d; npm install; Pop-Location; Write-Host ('done - the examples: cd ' + $d + '\\examples; npm install; npm run develop')"
+  ],
+  "cmdsMac": [
+   "d=\"$HOME/playcanvas-engine\"; if [ -d \"$d/.git\" ]; then git -C \"$d\" pull --ff-only; else git clone --depth 1 https://github.com/playcanvas/engine \"$d\"; fi && (cd \"$d\" && npm install) && echo \"done - the examples: cd $d/examples && npm install && npm run develop\""
+  ]
+ },
+ "skill-floorplan": {
+  "description": "haydenschmitty/floorplan (MIT) - a Claude Code (or Codex) PLUGIN that reads a codebase and draws an interactive, zoomable map of it: every part, file and endpoint with a plain-English name, the connections between them, flows, a health check (secrets in code, open endpoints, huge files) and a 'Recent work' board of what the agent just changed. Node 18+, zero dependencies. This row adds the plugin to Claude Code; then in a new Claude Code session at the SweK root ask for 'a floorplan'. SweK already carries a starting map: copy WebGLEngine/tools/floorplan/architecture.json to floorplan/architecture.json at the repo root first, so the plugin refreshes it instead of starting over. For your CODING AGENT, not the engine.",
+  "timeoutMs": 180000,
+  "cmds": [
+   "if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { Write-Host 'Claude Code CLI not found - install it first (npm i -g @anthropic-ai/claude-code), then re-run'; exit 1 }; claude plugin marketplace add haydenschmitty/floorplan; claude plugin install floorplan@floorplan; Write-Host 'done - start a NEW Claude Code session and ask for a floorplan'"
+  ],
+  "cmdsMac": [
+   "if ! command -v claude >/dev/null 2>&1; then echo 'Claude Code CLI not found - install it first (npm i -g @anthropic-ai/claude-code), then re-run'; exit 1; fi; claude plugin marketplace add haydenschmitty/floorplan && claude plugin install floorplan@floorplan && echo 'done - start a NEW Claude Code session and ask for a floorplan'"
+  ]
  }
 }

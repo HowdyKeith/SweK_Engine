@@ -401,3 +401,36 @@ export function dxcAdvice(text) {
          + "run `node tools/ship/ensureDxc.mjs --write` from WebGLEngine to copy it next to the executable "
          + "(the PATH route was tried at v4646 and measured NOT to work -- see launchEnv above).";
 }
+
+// *** v4923 -- THE FRAME HOLD, ONE COPY FOR EVERY PAGE GATE THAT NEEDS IT. ***
+// A page that asks for an animation frame every frame -- a canvas repainted whether or not anything changed -- asks
+// a headless shell on a software GL for 60 presentations a second it cannot make. They queue, and a screenshot, which
+// waits for a presented frame, waits behind them: v4920 found this as the rig's orreryPost timeout (7.4 s, 44 s, then
+// past 120 s) and held that one page. v4923 measured the other page gates that screenshot: three spend real time
+// behind the queue (subAquariumPage 32.8/32.4 s unheld against 17.1/18.3 s held, avatarFraming 28.9/34.2 against
+// 16.6/16.6, seaThree 7.9/6.8 against 4.8/5.6, two runs each on linux-x64-4c-16gb-46f962) and five do not.
+// frameHold is the in-page function: requestAnimationFrame is replaced by a queue that the browser's own
+// requestAnimationFrame drains at most once per `ms`, running EVERY callback waiting at that moment, together. All of
+// them, and not one: Playwright's own waitForFunction polls on animation frames too, and v4920's first draft, which
+// let one caller through per frame, starved it. A callback that throws is re-thrown on a timer, so the page still
+// sees its error and the callbacks behind it still run. window.__heldFrames counts the frames released, so a gate
+// can show the loop was held and not stopped.
+// NOT a fix to any page: the page's file is not touched and its callbacks run unchanged, later. A browser with a GPU
+// presents 60 a second and never builds the queue.
+export const FRAME_HOLD_MS = 100;
+export function frameHold(ms) {
+    const raf = window.requestAnimationFrame.bind(window);
+    let last = -Infinity, queue = [], driving = false;
+    window.__heldFrames = 0;
+    const drive = (t) => {
+        if (t - last < ms) return raf(drive);
+        last = t; driving = false; window.__heldFrames++;
+        const run = queue; queue = [];
+        for (const cb of run) { try { cb(t); } catch (e) { setTimeout(() => { throw e; }); } }
+    };
+    window.requestAnimationFrame = (cb) => { queue.push(cb); if (!driving) { driving = true; raf(drive); } return queue.length; };
+}
+/** Hold the frame loop of every page `target` (a Page or a BrowserContext) loads from now on. */
+export async function holdFrames(target, ms = FRAME_HOLD_MS) { await target.addInitScript(frameHold, ms); }
+/** Frames released so far on `page`, or -1 when the hold was never installed there. */
+export async function heldFrames(page) { return page.evaluate(() => (typeof window.__heldFrames === "number" ? window.__heldFrames : -1)).catch(() => -1); }

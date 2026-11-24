@@ -291,18 +291,25 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/box3d/box3d.wasm rebuilt from box3d v0.1.0 with four new exports (angular velocity, damping, inertia), 829,117 to 830,021 bytes, so its cargo went from 202 to 203; " +
                    "PROVENANCE.md grew from 2,106 to 3,414 bytes and stays at one ton. Its top-level `bytes` moved too (1,082,363 to 1,084,575) and reaches nothing, as recorded",
             control: "on today's tree, putting back ONLY box3d.wasm's size gives d10dceab -- exactly the previous key -- and putting back only PROVENANCE.md's size or only `bytes` leaves f51215a5" }),
+        // v4933 -- FOUR BODIES' FILE LISTS, ONE OF THEM A NEW BODY. The fly pathways line baked more files into hemibrain (hemibrain-cx-steering.json) and male-cns (twelve circuit and position files) and zebrafish, and the SMAA pass vendored vendor/smaa
+        // (smaaLookup.mjs: a new body, so also a new `arrived`). MEASURED (world/orrery.mjs through makeGitEconomy, seed 7, 400 ticks), not read off the diff.
+        Object.freeze({ version: "v4933", commit: "ca358ce1", hash: "75d804b9", file: "orrery.json",
+            field: "files", bodiesTouched: 4,
+            cause: "hemibrain, male-cns and zebrafish gained data files (stockOfFiles turns every file into cargo at max(1, round(bytes / 4096))) and vendor/smaa arrived as a new body with its own files and arrival date; " +
+                   "`sha` and a body's top-level `bytes` reach nothing, as recorded",
+            control: "on today's tree, main's bake with ONLY hemibrain's current form gives 5e9fa610, only male-cns's 6a6ad5a4, only smaa's 5455f533 and only zebrafish's fde3cee0; putting each one back into today's gives eac8bd5a, faadafb1, caf8f577 and 6a0eee99 -- none is the previous key f51215a5, so all four move it together" }),
     ]),
-    current: "f51215a5",
+    current: "75d804b9",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 28, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 29, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
-              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880; snowflow made it 25 at v4895 and hemibrain, zebrafish and zebrafish-vestibular made it 28 at v4898, and the probe is re-run rather than the count adjusted" }),
+              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880; snowflow made it 25 at v4895 and hemibrain, zebrafish and zebrafish-vestibular made it 28 at v4898 and smaa made it 29 at v4933, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in

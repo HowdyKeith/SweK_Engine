@@ -118,7 +118,7 @@ const codeOf = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter(
        count >= 4,
        count + " files carry an 'its own round' note. ALL are now classified: SEVEN deferrals settled (six met, " +
        "one REFUSED by census at v3133), FOUR matches that were never deferrals but narration of completed " +
-       "rounds, ONE genuinely open (Trellis warmup), ONE unmeasured. NOT ONE of the fifteen was work waiting to " +
+       "rounds, ONE then read as open (Trellis warmup -- restated after v4928 as SETTLED, section 7), ONE unmeasured. NOT ONE of the fifteen was work waiting to " +
        "be done that somebody had not already done or decided against");
 }
 
@@ -157,9 +157,14 @@ const codeOf = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter(
 // ---- 7. WHAT REMAINS, INCLUDING ONE THIS ROUND COULD NOT SETTLE ----------------------------------------------------------
 {
     const cs = read("ai/ColdStartPrimer.js");
-    ok("ColdStartPrimer's Trellis warmup deferral is still OPEN",
-       /belongs in its own round/.test(cs),
-       "warming Trellis means posting a real workflow JSON, which is genuine work nobody has done");
+    // RESTATED after v4928. v3314 called this deferral OPEN, and by v3845 at the latest it was not: the same file
+    // exports primeTrellis (Round 202), which runs a real 256px pipeline through ComfyUIClient.runImageToGLB. Git
+    // starts at the v3845 mirror, so whether v3314's reading was already stale cannot be recovered. The row now
+    // holds the note as history, the work by its declaration, and the marker beside the note.
+    ok("ColdStartPrimer's Trellis warmup deferral is SETTLED (restated after v4928; v3314 read it as OPEN)",
+       /belongs in its own round/.test(cs) && /export async function primeTrellis\b/.test(cs) &&
+       /belongs in its own round\.\n\/\/\s+SETTLED at v3845/.test(cs),
+       "the note stays as history; primeTrellis below it posts the real workflow the note asked for, opt-in behind coldStartTrellis");
 
     // *** AND THE ONE THIS ROUND FAILED TO SETTLE, FILED AS NEITHER ANSWER. ***
     const dps = read("tools/roundhouse/defaultPlacementSweep-selfcheck.mjs");

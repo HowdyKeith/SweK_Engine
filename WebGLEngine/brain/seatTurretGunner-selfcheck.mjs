@@ -1,0 +1,175 @@
+// WebGLEngine/brain/seatTurretGunner-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node brain/seatTurretGunner-selfcheck.mjs      (about fifteen seconds: 74 fights)
+//
+// THE RACE CAR'S TURRET GUNNER IN A GUN SEAT, HELD TO WHAT ITS HEADER SAYS. brain/seatTurretGunner.mjs seats brain/gunnerPolicy.mjs's network -- the car's, weight for weight -- in a capital ship's gun seat, laying the gun by rates. Seven things hold it:
+//
+//   1  IT IS THE CAR'S NETWORK   the sizes, the names, forward(), layersOf(), the hand weights and the zero weights are brain/gunnerPolicy.mjs's own (the same functions), and the policy id is the car's
+//   2  THE FEATURES              the eleven, on a seat and a target placed by hand: the errors still to turn, the range over half the reach, the closing and crossing speeds over 200, the sight's flag as `aligned`, and the four the seat holds constant
+//   3  THE COMMAND               the outputs are RATES: a full output turns the laid gun by the seat's slew in a tick, inside the arc; the trigger is the third output; the car's drop and ignite change nothing; with no target the gun holds (or rests, when asked); the zero weights never move or fire
+//   4  THE HAND'S ERROR          `sigma` shakes the command about where the gun is laid -- the stated size, no drift, not fed back into what the network is shown -- from a stream of the seat's own; with none the command is the laid gun exactly
+//   4b THE ROUNDS-LEFT SENSE     off by default (the feature is 0, every fight the fight it was); on, the share of the magazine spent; battleshipDuel turns it on exactly in a rationed fight, where a network wired to it rations its rounds
+//   5  THE TWO HALVES            decide is finish(prepare, forward); `net` is what a batch needs and its layers and post give forward's numbers
+//   6  THE FINDINGS, PINNED      (twelve ship-against-ship pairs a row, seeds 1-3 of each kind) the car's hand weights against the seat's hand gunner behind regular and perfect sights WITH the hand's error, and behind regular sights WITHOUT it -- the lead that was a filter
+//   7  THE FRONT DOOR            the car's brain file is seated by battleshipDuel.sideFromBrains under the car's own policy id; where the weights are; the export list; the report
+//
+// SABOTAGE LOG: (28 mutants, each applied to a COPY of brain/seatTurretGunner.mjs with a copy of this gate importing it, the copies deleted by name; the number is how many rows went red. ONE ROW IS RED IN EVERY COPY AND IS NOT COUNTED: section 7's seat row asks that the module battleshipDuel seats IS this file,
+// and a copy is another module.)
+//   T1 the bearing is over pi/2 5 | T2 the pitch error is the sight's pitch 5 | T3 the range is over the whole reach 2 | T4 the range is not capped 1 | T5 closing has the wrong sign 2 | T6 the ship's own velocity is not taken off 3 | T7 reachable is 0 1 | T8 aligned is always 1 5 | T9 the outputs are angles, not rates 7
+//   T10 pitch turns at the yaw slew 4 | T11 the arc is not kept 3 | T12 the trigger is the drop output 6 | T13 the trigger is the sight's 1 | T14 with no target the seat rests 3 | T15 any idle is taken 1 | T16 the hand's error is fed back 4 | T17 the hand's error is half 3 | T18 the pitch error is the yaw error 2
+//   T19 the shake does not depend on the tick 3 | T20 every seat shares one stream 3 | T21 every seat shares one sight 4 | T22 the network is asked with no target 2 (both are sections that THREW: red by the section's own row, not by a row that names the fault) | T23 post leaves the trigger unsquashed 1
+//   T24 the synapses start one late 6 | T25 the output weights are indexed by unit first 1 | T26 the policy id is the seat's 2 | T27 the default tick is a tenth 7 | T28 the hand's error is on by default 4
+// AND THREE ON brain/battleshipFight.mjs ONCE IT PASSED THE HAND'S ERROR (section 6b): E1 the hand's error is not passed 1 | E2 every ship's seats share their streams 1 | E3 the error is always the regular gunner's 1. E2 WENT 0 RED THE FIRST TIME: the row compared the seats' COMMANDS, which differ anyway because each
+// ship's sights have noise of their own; the gunner now says its hand's shake apart (`decide.shake`) and the row reads that.
+// AND TEN ON THE ROUNDS-LEFT SENSE (section 4b; the last three on tools/ship/trainTurretSeat.mjs against its own gate): V1 the sense is on by default 2 | V2 the sense is the share LEFT 3 | V3 the sense is never on 3 | V4 the sense is on another feature 4 | V5 the sense is not clamped 2
+//   W1 a rationed fight does not turn the sense on 1 | W2 the sense is on in every fight 1 | X1 a path child ignores the features given 1 | X2 awake ignores the features given 1 | X3 the default draws the rationed features 1. W2 WENT 0 RED THE FIRST TIME: no fight with the whole magazines runs long enough for a seat to
+//   spend half of them, so a gunner wired to stop at half looked the same with the sense on (a row now reads what the seats are shown).
+// AND FOUR ON THE `handOn` OPTION (2026-11-18), each on a hard-linked copy of the whole tree so that every importer sees the mutant (a no-op copy 0 red): H1 the predicate ignored 1 | H2 no target not the hand's 1 |
+//   H3 the hand's tick answered with the idle hold 2 | H4 the network's laid gun kept over a hand stretch 1 (0 red until the last row: a target switch through an empty tick resets it anyway; one straight from a fighter back to a ship does not).
+// AND TWO ON `handRest` (2026-11-19), tree copies, both red: R1 handRest ignored 1 | R2 handRest inverted 2
+// AND FOUR ON `alwaysFire` (2026-11-20), tree copies, all red: F1 not held on the hand's ticks 1 | F2 not held on the network's 1 | F3 held with no target 1 | F4 on by default 8
+// None of the first twenty-eight went 0 red. NOT CHECKED: a gunner actually TRAINED on the race page and exported (none is in the tree: the page keeps them in the browser);  the GPU batch.
+"use strict";
+import * as ST from "./seatTurretGunner.mjs";
+import * as GP from "./gunnerPolicy.mjs";
+import * as D from "./battleshipDuel.mjs";
+import * as PB from "./peerBrain.mjs";
+import * as CS from "../physics/mechanics/capitalShip.mjs";
+import * as GS from "../physics/mechanics/gunSeats.mjs";
+import * as BF from "./battleshipFight.mjs";
+import * as SA from "./spaceArena.mjs";
+
+let fails = 0;
+function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
+const section = (fn) => { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
+const throwsWith = (f, re) => { try { f(); return false; } catch (e) { return re.test(e.message); } };
+const SHIP = CS.createCapitalShip(), PD = SHIP.seats.find((s) => s.id === "pd-p1"), MAIN = SHIP.seats.find((s) => s.id === "main-a"), BODY = { pos: [0, 0, 0], vel: [10, 0, 0], q: [1, 0, 0, 0], w: [0, 0, 0] };
+const TG = { id: 9, pos: [0, 300, 0], vel: [10, -50, 40], radius: 6 }, near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
+const sightAt = (yaw, pitch, fire = false, target = 9) => () => ({ yaw, pitch, fire, target }), DT = 1 / 30;
+const biasNet = (o, v) => { const w = ST.zeroWeights(); w[ST.biasAt(o)] = v; return w; };
+
+console.log("seatTurretGunner-selfcheck -- the race car's turret gunner in a gun seat\n");
+
+console.log("1. IT IS THE CAR'S NETWORK");
+section(() => {
+    ok("!! 11 features, 34 neurons, 313 synapses, 5 outputs, 896 weights, and the functions are brain/gunnerPolicy.mjs's own: forward, layersOf, handWeights, zeroWeights, perturb, the names", ST.FEATURES === 11 && ST.HIDDEN === 34 && ST.REC_EDGES === 313 && ST.OUTPUTS === 5 && ST.WEIGHT_COUNT === 896 && ST.WEIGHT_COUNT === GP.WEIGHT_COUNT && ST.forward === GP.forward && ST.layersOf === GP.layersOf && ST.handWeights === GP.handWeights && ST.zeroWeights === GP.zeroWeights && ST.perturb === GP.perturb && ST.FEATURE_NAMES === GP.FEATURE_NAMES && ST.OUTPUT_NAMES === GP.OUTPUT_NAMES);
+    ok("the policy id is the car's (`gunnerPolicy`): a file from the race is a file for this seat; a seat reads outputs 0-2 and the features that vary in a seat are seven of the eleven", ST.POLICY_ID === "gunnerPolicy" && ST.READ_OUTPUTS.join() === "0,1,2" && ST.LIVE_FEATURES.join() === "0,1,2,3,4,5,8" && ST.REACH === 600 && ST.CLOSING === 200);
+});
+
+console.log("2. THE FEATURES");
+section(() => {
+    const x = ST.features(PD, { yaw: 0.2, pitch: -0.1 }, BODY, { yaw: 0.5, pitch: 0.3, fire: true, target: 9 }, TG, 600);
+    ok("!! a target 300 units to port, the sight asking for yaw 0.5 and pitch 0.3 of a seat at 0.2 and -0.1: bias 1; bearing 0.3 / pi; pitch 0.4 / (pi / 2); range 300 / 300 = 1; closing 50 / 200 (it comes at 50); crossing 40 / 200 (the ship's own 10 along x is taken off); reloading 0; reachable 1; aligned 1; the two oil features 0",
+        x.length === 11 && x[0] === 1 && near(x[1], 0.3 / Math.PI) && near(x[2], 0.4 / (Math.PI / 2)) && near(x[3], 1) && near(x[4], 0.25) && near(x[5], 0.2) && x[6] === 0 && x[7] === 1 && x[8] === 1 && x[9] === 0 && x[10] === 0);
+    const far = ST.features(PD, { yaw: 0, pitch: 0 }, BODY, { yaw: 0, pitch: 0, fire: false, target: 9 }, { ...TG, pos: [0, 900, 0], vel: [10, 80, 0] }, 600), half = ST.features(PD, { yaw: 0, pitch: 0 }, BODY, { yaw: 0, pitch: 0, fire: false, target: 9 }, TG, 1200);
+    ok("the range stops at 2 (900 of a reach of 600), a target going away closes at -0.4, `aligned` is the sight's flag (0 when it is off), and the reach scales the range (300 of 1,200 is 0.5)", far[3] === 2 && near(far[4], -0.4) && far[5] === 0 && far[8] === 0 && near(half[3], 0.5));
+    const bad = ST.features(PD, { yaw: NaN, pitch: 0 }, BODY, { yaw: 0, pitch: Infinity, fire: false, target: 9 }, { ...TG, vel: undefined }, 600);
+    ok("a number that is not finite is shown as 0, and a target with no velocity is one at rest (the ship's own 10 closes on nothing: it is across)", bad.every(Number.isFinite) && bad[1] === 0 && bad[2] === 0 && near(bad[5], 10 / 200));
+});
+
+console.log("3. THE COMMAND");
+section(() => {
+    const st = { yaw: 0.2, pitch: -0.1 }, g = (w, sight = sightAt(1, 1), o = {}) => ST.gunnerFor(w, sight, o)(PD, st, BODY, [TG], 0);
+    const z = g(ST.zeroWeights()), full = g(biasNet(0, 20)), back = g(biasNet(0, -20)), up = g(biasNet(1, 20)), fire = g(biasNet(2, 0.1)), hold = g(biasNet(2, -0.1));
+    ok("!! the zero weights leave the gun where it is and never fire, whatever the sight asks; a full yaw output turns it by the seat's slew in a tick (3 rad/s x 1/30) and a full negative one back by the same; a full pitch output lifts it by 2.5 x 1/30; the trigger is the third output's sign", z.yaw === 0.2 && z.pitch === -0.1 && z.fire === false && z.target === 9 && near(full.yaw, 0.2 + PD.slew.yaw * DT, 1e-6) && near(back.yaw, 0.2 - PD.slew.yaw * DT, 1e-6) && full.pitch === -0.1 && near(up.pitch, -0.1 + PD.slew.pitch * DT, 1e-6) && fire.fire === true && hold.fire === false && PD.slew.yaw === 3 && PD.slew.pitch === 2.5);
+    ok("the tick the rates are turned over is `dt`, and a main turret turns at its own slower slew", near(g(biasNet(0, 20), sightAt(1, 1), { dt: 0.1 }).yaw, 0.2 + 0.3, 1e-6) && near(ST.gunnerFor(biasNet(0, 20), sightAt(1, 1))(MAIN, st, BODY, [TG], 0).yaw, 0.2 + MAIN.slew.yaw * DT, 1e-6) && MAIN.slew.yaw === 0.5);
+    const edge = ST.gunnerFor(biasNet(0, 20), sightAt(1, 1))(PD, { yaw: PD.arc.yaw[1] - 0.01, pitch: 0 }, BODY, [TG], 0);
+    ok("the laid gun stays in the seat's arc: a full turn from 0.01 inside the edge stops at the edge", edge.yaw === PD.arc.yaw[1]);
+    const both = ST.zeroWeights(); both[ST.biasAt(3)] = 5; both[ST.biasAt(4)] = 5;
+    ok("the car's drop and ignite outputs are not a ship's: a network that pulls both does nothing a seat can see", JSON.stringify(g(both)) === JSON.stringify(z));
+    const none = () => ({ yaw: 0, pitch: 0, fire: false, target: null }), gone = sightAt(1, 1, true, 77);
+    ok("!! with no target (or one the arena no longer shows) the gun HOLDS and does not fire, the network is not asked (`last` is null); with `idle: \"rest\"` it is sent to yaw 0, pitch 0 as the hand gunner's is; another `idle` is refused by name", JSON.stringify(g(biasNet(2, 5), none)) === '{"yaw":0.2,"pitch":-0.1,"fire":false,"target":null}' && JSON.stringify(g(biasNet(2, 5), gone)) === '{"yaw":0.2,"pitch":-0.1,"fire":false,"target":null}' && JSON.stringify(g(biasNet(2, 5), none, { idle: "rest" })) === '{"yaw":0,"pitch":0,"fire":false,"target":null}'
+        && (() => { const d = ST.gunnerFor(biasNet(2, 5), none); d(PD, st, BODY, [TG], 0); return d.last === null; })() && throwsWith(() => ST.gunnerFor(ST.zeroWeights(), none, { idle: "park" }), /idle is "hold" or "rest" \(got park\)/));
+    const hw = ST.handWeights(), turn = ST.gunnerFor(hw, sightAt(0.5, 0.3, true))(PD, st, BODY, [TG], 0), want = GP.forward(hw, ST.features(PD, st, BODY, { yaw: 0.5, pitch: 0.3, fire: true }, TG, 600));
+    ok("the car's hand weights in a seat: they turn toward the sight's aim at tanh(12 x the bearing) of the slew and lift at tanh(8 x the pitch), and fire when the sight says the gun is on", near(turn.yaw, 0.2 + want[0] * 3 * DT, 1e-9) && near(want[0], Math.tanh(12 * 0.3 / Math.PI), 1e-5) && near(want[1], Math.tanh(8 * 0.4 / (Math.PI / 2)), 1e-5) && turn.fire === true && ST.gunnerFor(hw, sightAt(0.5, 0.3, false))(PD, st, BODY, [TG], 0).fire === false);
+});
+
+console.log("4. THE HAND'S ERROR");
+section(() => {
+    const run = (sigma, seed, n = 2000, w = biasNet(0, 0.05)) => { const d = ST.gunnerFor(w, sightAt(1, 1), { sigma, seed }), out = []; let st = { yaw: 0, pitch: 0 }; for (let i = 0; i < n; i++) { const c = d(PD, st, BODY, [TG], i * DT); out.push({ c, x: d.last.x }); st = { yaw: c.yaw, pitch: c.pitch }; } return out; };
+    const clean = run(0, 5), shaky = run(0.03, 5), dy = shaky.map((r, i) => r.c.yaw - clean[i].c.yaw), dp = shaky.map((r, i) => r.c.pitch - clean[i].c.pitch), mean = (a) => a.reduce((x, y) => x + y, 0) / a.length, sd = (a) => Math.sqrt(mean(a.map((v) => (v - mean(a)) ** 2)));
+    ok("!! with sigma 0.03 the command is the laid gun plus an error of that size on each axis (standard deviation 0.027-0.033 over 2,000 ticks, mean within 0.003 of nothing) and the error does NOT drift: the last 500 ticks' is the size of the first 500's", sd(dy) > 0.027 && sd(dy) < 0.033 && sd(dp) > 0.027 && sd(dp) < 0.033 && Math.abs(mean(dy)) < 0.003 && Math.abs(mean(dp)) < 0.003 && sd(dy.slice(-500)) < 1.2 * sd(dy.slice(0, 500)), `yaw ${sd(dy).toFixed(4)}, pitch ${sd(dp).toFixed(4)}`);
+    ok("!! the error is not fed back: what the network is shown tick by tick is what it is shown with no error at all (the seat that follows the shaken command is not where the gun is laid)", shaky.every((r, i) => r.x.join() === clean[i].x.join()) && clean[1999].x[1] !== clean[0].x[1]);
+    ok("with sigma 0 the command is exactly the laid gun (the seat's angle plus the rate's step)", near(clean[0].c.yaw, Math.tanh(0.05) * 3 * DT, 1e-9) && clean[0].c.pitch === 0);
+    const a = run(0.03, 5, 50), b = run(0.03, 5, 50), c = run(0.03, 6, 50);
+    ok("the same seed is the same shake and another seed another; the factory gives seat k the stream of `seed` + k and each seat its own sight", a.map((r) => r.c.yaw).join() === b.map((r) => r.c.yaw).join() && a[3].c.yaw !== c[3].c.yaw && (() => { const seen = [], f = ST.gunnerFactory(biasNet(0, 0.05), (seat, k) => { seen.push(k); return sightAt(1, 1); }, { sigma: 0.03, seed: 4 }), k0 = f(PD, 0)(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0), k1 = f(PD, 1)(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0), direct = ST.gunnerFor(biasNet(0, 0.05), sightAt(1, 1), { sigma: 0.03, seed: 5 })(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0); return seen.join() === "0,1" && k0.yaw !== k1.yaw && k1.yaw === direct.yaw; })());
+});
+
+console.log("4b. THE ROUNDS-LEFT SENSE (`ammoSense`)");
+section(() => {
+    const gun = (ammo) => ({ yaw: 0, pitch: 0, gun: { ammo } }), seen = (o, ammo) => { const d = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), o); d(PD, gun(ammo), BODY, [TG], 0); return d.last ? d.last.x[6] : null; };
+    const z = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3)); z(PD, gun(100), BODY, [TG], 0);
+    ok("!! OFF BY DEFAULT: the `reloading` feature is 0 whatever the magazine holds -- so every fight flown without the sense is the fight it was; ON, it is the share of the seat's magazine SPENT: 0 full, a half at half, 1 empty (a point-defence mount carries 900)", PD.gun.magazine === 900 && seen({}, 900) === 0 && seen({}, 100) === 0 && seen({}, 0) === 0 && seen({ ammoSense: true }, 900) === 0 && seen({ ammoSense: true }, 450) === 0.5 && seen({ ammoSense: true }, 0) === 1 && seen({ ammoSense: true }, 225) === 0.75);
+    ok("the other ten features are untouched by it, a state with no gun reads 0, and the features that vary with the sense on are the seven and the sixth", (() => { const a = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3)), b = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), { ammoSense: true }); a(PD, gun(300), BODY, [TG], 0); b(PD, gun(300), BODY, [TG], 0); const c = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), { ammoSense: true }); c(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0); return a.last.x.every((v, i) => i === 6 || v === b.last.x[i]) && c.last.x[6] === 0; })() && ST.LIVE_FEATURES_RATIONED.join() === "0,1,2,3,4,5,6,8" && ST.features(PD, { yaw: 0, pitch: 0 }, BODY, { yaw: 0, pitch: 0, fire: false }, TG, 600, 7)[6] === 1);
+    // a gunner that fires only while it has spent less than half its magazine: unit 9 = relu(1 - 2 x spent), read by the trigger
+    const miser = ST.handWeights(); miser[ST.outputAt(2, 4)] = 0; miser[ST.outputAt(2, 5)] = 0; miser[ST.encoderAt(9, 0)] = 1; miser[ST.encoderAt(9, 6)] = -2; miser[ST.outputAt(2, 9)] = 5;
+    const side = D.makeSide("miser", { network: { module: ST, weights: miser }, cannon: false }), other = D.makeSide("o", { cannon: false }), spentOf = (ammo) => { const b = D.build(side, other, 3, "broadside", { ammo }); while (!D.finished(b)) SA.stepSpaceArena(b.arena); return b.arena.crafts[0].seats.map((q) => [q.state.gun.fired, q.seat.gun.magazine]); };
+    const rationed = spentOf(0.0625), whole = spentOf(1);
+    const shown = (ammo) => { const b = D.build(side, other, 3, "broadside", { ammo }), xs = []; for (let i = 0; i < 600 && !D.finished(b); i++) { SA.stepSpaceArena(b.arena); for (const q of b.arena.crafts[0].seats) if (q.decide.last && q.state.gun.fired > 0) xs.push(q.decide.last.x[6]); } return xs; };
+    ok("!! battleshipDuel turns the sense on EXACTLY in a rationed fight: with the whole magazines a seat that has fired is still shown 0 on that feature (hundreds of readings, every one 0); at a sixteenth it is shown what it has spent", (() => { const w = shown(1), r = shown(0.0625); return w.length > 100 && w.every((v) => v === 0) && r.length > 100 && r.some((v) => v > 0.2) && r.every((v) => v >= 0 && v <= 1); })());
+    ok("!! IN A RATIONED FIGHT THE SENSE IS ON AND A NETWORK CAN USE IT: a gunner wired to fire only while it has spent less than half its magazine stops at half in every seat (ten rounds a main gun: none fires more than five; 56 a mount: none more than 28) and some reach that; with the whole magazines the sense is off and the same gunner fires on past any half", rationed.every(([f, m]) => f <= Math.ceil(m / 2)) && rationed.some(([f, m]) => f === Math.ceil(m / 2)) && rationed.every(([, m]) => m === 10 || m === 56) && whole.some(([f]) => f > 60), `rationed ${rationed.map(([f]) => f).join(",")}`);
+});
+
+console.log("5. THE TWO HALVES");
+section(() => {
+    const w = ST.perturb(ST.handWeights(), 0.2, ST.rngFor(3)), st = { yaw: 0.2, pitch: -0.1 }, d = ST.gunnerFor(w, sightAt(0.5, 0.3, true)), whole = d(PD, st, BODY, [TG], 0), e = ST.gunnerFor(w, sightAt(0.5, 0.3, true)), p = e.prepare(PD, st, BODY, [TG], 0), parts = e.finish(p, e.net.forward(e.net.w, p.x));
+    ok("decide is finish(prepare, the network): the same command; `last` holds what the network was shown and said", JSON.stringify(whole) === JSON.stringify(parts) && d.last.x.join() === p.x.join() && d.last.y.length === 5 && e.net.w === w && e.net.forward === GP.forward);
+    let h = Float32Array.from(p.x); const L = e.net.layersOf(w); for (const l of L) { const o = new Float32Array(l.nOut); for (let i = 0; i < l.nOut; i++) { let a = l.b[i]; for (let j = 0; j < l.nIn; j++) a += l.W[i * l.nIn + j] * h[j]; o[i] = l.act === "relu" ? Math.max(0, a) : a; } h = o; }
+    ok("!! what a batch needs gives the same numbers: the layers of `net.layersOf` run plainly here, then `net.post`, are forward()'s five outputs to 1e-5", L.length === 5 && e.net.post(h).every((v, i) => near(v, GP.forward(w, p.x)[i], 1e-5)) && e.net.post([0, 0, 0, 0, 0]).length === 5);
+});
+
+console.log("6. THE FINDINGS, PINNED (twelve pairs a row: seeds 1-3 of each kind)");
+section(() => {
+    const row = (X, Y) => { let w = 0, l = 0, lead = 0; for (const kind of D.KINDS) for (const seed of [1, 2, 3]) { const p = D.pair(X, Y, seed, kind, { countBrains: false }); lead += p.lead; w += p.lead > D.DECISIVE ? 1 : 0; l += p.lead < -D.DECISIVE ? 1 : 0; } return { w, l, lead: lead / 12 }; };
+    const net = { module: ST, weights: ST.handWeights() }, steady = { ...ST, gunnerFactory: (w, mk, o = {}) => ST.gunnerFactory(w, mk, { ...o, sigma: 0 }) };
+    const reg = row(D.makeSide("car", { network: net }), D.makeSide("hand"));
+    ok("!! the car's hand weights, carried over untrained, on THESE twelve pairs behind regular sights: 6 won, 4 lost, mean lead -0.183 -- A PIN OF THE ARITHMETIC AND NOT A FINDING: this row once said they TRAIL the hand gunner, and 600 fresh pairs (tools/ship/takeTurretAudit.mjs) say they LEAD it, +0.099 (se 0.033)", reg.w === 6 && reg.l === 4 && near(reg.lead, -0.183, 0.0005), `${reg.w} won, ${reg.l} lost, ${reg.lead.toFixed(3)}`);
+    const per = row(D.makeSide("car", { network: net, gunners: "perfect" }), D.makeSide("hand", { gunners: "perfect" }));
+    ok("... and plainly behind perfect sights, where a proportional turn's lag is all there is: none won, 9 lost, -0.881", per.w === 0 && per.l === 9 && near(per.lead, -0.881, 0.0005), `${per.w} won, ${per.l} lost, ${per.lead.toFixed(3)}`);
+    const filt = row(D.makeSide("car-steady", { network: { module: steady, weights: ST.handWeights() } }), D.makeSide("hand"));
+    ok("!! *** WITHOUT THE HAND'S ERROR THE SAME WEIGHTS LEAD BY +1.710 (10 won, none lost): THE LEAD IS THE FILTER, which is why the error is put back *** ", filt.w === 10 && filt.l === 0 && near(filt.lead, 1.710, 0.0005), `${filt.w} won, ${filt.l} lost, ${filt.lead.toFixed(3)}`);
+});
+
+console.log("6b. THE SHIP-AGAINST-FIGHTERS FIGHT CARRIES THE HAND'S ERROR TOO (brain/battleshipFight.mjs, since 2026-11-14)");
+section(() => {
+    const net = { module: ST, weights: ST.handWeights() }, steady = { ...ST, gunnerFactory: (w, mk, o = {}) => ST.gunnerFactory(w, mk, { ...o, sigma: 0 }) }, key = (t) => `${t.killed}/${t.damageOnShip}/${t.ship.seatRounds}/${t.ship.hitsDealt}`;
+    const withErr = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: net }))), without = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: { module: steady, weights: ST.handWeights() } }))), zero = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: net, gunners: { ...BF.GUNNERS.regular, sigma: 0 } }))), zeroSteady = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: { module: steady, weights: ST.handWeights() }, gunners: { ...BF.GUNNERS.regular, sigma: 0 } })));
+    ok("!! two swarm attacks with the car's hand weights in the seats behind regular sights: the fight WITH the setting's aim error on the hand is not the fight with it forced off, so the error reaches this seat; and where the setting's own error is 0, forcing it off changes nothing", withErr.join() !== without.join() && zero.join() === zeroSteady.join(), `with ${withErr.join(" ")} | forced off ${without.join(" ")}`);
+    const b1 = BF.build(1, "swarm", { network: net, ships: 2 }), caps = b1.arena.crafts.filter((c) => c.kind === "capital"), shake = (c, k) => { const d = c.seats[k].decide, tg = [{ id: 99, pos: [c.body.pos[0], c.body.pos[1] + 200, c.body.pos[2] + 20], vel: [0, 0, 0], radius: 1.5 }]; let out = null; for (let i = 0; i < 40; i++) out = d(c.seats[k].seat, { yaw: 0, pitch: 0 }, c.body, tg, i / 30); return out && out.target === 99 ? d.shake.join() : null; };
+    const a3 = shake(caps[0], 3), b3 = shake(caps[1], 3), a4 = shake(caps[0], 4), again = shake(BF.build(1, "swarm", { network: net, ships: 2 }).arena.crafts.filter((c) => c.kind === "capital")[0], 3);
+    ok("!! each seat of each ship has a stream of its own for the HAND'S shake (read off the gunner's `shake`, apart from the sight's own noise): the same seat of the two ships is shaken differently, and so are two seats of one ship; the same fight built again shakes the same; the shake is not nothing", a3 !== null && a3 !== "0,0" && a3 !== b3 && a3 !== a4 && a3 === again, `${a3} | ${b3}`);
+});
+
+console.log("7. THE FRONT DOOR");
+section(() => {
+    const blob = PB.exportBrain(PB.describePolicy("gunnerPolicy", GP), GP.handWeights(), { by: "a car's gunner" }), r = D.sideFromBrains("car", [blob]), d = D.duel(r.side, D.makeSide("hand"), 1, "broadside");
+    ok("!! a brain exported for the CAR'S policy (described from brain/gunnerPolicy.mjs itself) is seated in all thirteen seats by battleshipDuel.sideFromBrains, through this module, and fights: the networks are asked and the seats fire", r.refused.length === 0 && r.seated[0].policy === "gunnerPolicy" && r.seated[0].where.length === 13 && D.seatNetOf(r.side, "pd-p1").module === ST && d.brains.seated.join() === "13,0" && d.brains.asked > 500 && d.rounds[0] > 20, `${d.brains.asked} forward passes, ${d.rounds[0]} rounds`);
+    const x = Float32Array.from([1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0]), w = ST.zeroWeights(); w[ST.encoderAt(7, 1)] = 2; w[ST.outputAt(1, 7)] = 1; w[ST.biasAt(2)] = 0.5; w[ST.hiddenBiasAt(3)] = 1; w[ST.outputAt(0, 3)] = -1;
+    const k = GP.layersOf(ST.zeroWeights())[1].W.length && 5, s = ST.zeroWeights(); s[ST.synapseAt(k)] = 0.25; s[ST.synapseAt(0)] = -1;
+    ok("where the weights are, against the network's own forward(): feature 1 into unit 7 into output 1 answers tanh(2 x 0.5); a hidden bias of 1 into output 0 with -1 answers tanh(-1); output 2's bias answers tanh(0.5); and synapsesUsed counts the synapses that carry a weight (0, then 2)", near(GP.forward(w, x)[1], Math.tanh(1), 1e-6) && near(GP.forward(w, x)[0], Math.tanh(-1), 1e-6) && near(GP.forward(w, x)[2], Math.tanh(0.5), 1e-6) && ST.synapsesUsed(w) === 0 && ST.synapsesUsed(s) === 2 && ST.synapsesUsed(ST.handWeights()) === 0 && ST.biasAt(4) === 895 && ST.synapseAt(0) === 11 * 34 + 34);
+    ok("the report says real numbers", ST.reportLines().length === 2 && /11 features, 34 hidden neurons .* 313 synapses\), 5 outputs of which a seat reads 3: 896 weights, policy gunnerPolicy; .*\(18 non-zero weights\)/.test(ST.reportLines()[1]));
+    const modOf = (o) => ({ WEIGHT_COUNT: ST.WEIGHT_COUNT, gunnerFactory: (w, ms, opts) => ST.gunnerFactory(w, ms, { ...opts, ...o }) }), fp = (o, ships) => D.duel(D.makeSide("n", { cannon: false, network: { module: o === null ? ST : modOf(o), weights: ST.handWeights() } }), D.makeSide("h", { cannon: false }), 90003, "crossing", { ships }).fingerprint;
+    const BFm = BF, ftp = (o) => JSON.stringify(BFm.fight(99001, "swarm", { network: { module: o === null ? ST : modOf(o), weights: ST.handWeights() } })), fpE = (o) => D.duel(D.makeSide("n", { cannon: false, network: { module: o === null ? ST : modOf(o), weights: ST.handWeights() } }), D.makeSide("h", { cannon: false }), 90003, "crossing", { ships: 3, escorts: 4 }).fingerprint;
+    ok("!! `sticky: \"ships\"`: against fighters alone it is the plain gunner to the bit (where `sticky: true` is not), in a fleet with no fighters the sticky gunner to the bit, and in a fleet WITH escort fighters neither", ftp({ sticky: "ships" }) === ftp(null) && ftp({ sticky: true }) !== ftp(null) && fp({ sticky: "ships" }, 3) === fp({ sticky: true }, 3) && fpE({ sticky: "ships" }) !== fpE({ sticky: true }) && fpE({ sticky: "ships" }) !== fpE(null));
+    const plain = JSON.stringify(BF.fight(99001, "swarm", {})), plainB = JSON.stringify(BF.fight(99001, "beam", {})), ftk = (o, kind = "swarm") => JSON.stringify(BF.fight(99001, kind, { network: { module: modOf(o), weights: ST.handWeights() } }));
+    ok("!! THE `handOn` OPTION (2026-11-18): with a predicate that holds for every target the network is never asked and the seat IS THE HAND GUNNER -- against fighters (swarm and beam) the plain ship to the bit, its gun going back to rest when it has no target as the hand's does; with one that holds for none it is the network gunner with `idle: \"rest\"` to the bit (no target is the hand's: its gun goes back to rest) and so not the default gunner, whose gun holds; and off by default", ftk({ handOn: () => true }) === plain && ftk({ handOn: () => true }, "beam") === plainB && ftk({ handOn: () => false }) === ftk({ idle: "rest" }) && ftk({ handOn: () => false }) !== ftp(null) && ftp(null) !== plain && fp({ handOn: null }, 3) === fp(null, 3));
+    ok("!! `handRest: false` (2026-11-19): with no target the seat keeps the NETWORK'S HOLD where the hand's would rest -- with a predicate that holds for none it is the default network gunner to the bit (not the resting one), with one that holds for every target it is not the plain ship (whose gun rests) yet fires as the hand does on a target; and `handRest` alone, with no `handOn`, changes nothing", ftk({ handOn: () => false, handRest: false }) === ftp(null) && ftk({ handOn: () => false, handRest: false }) !== ftk({ handOn: () => false }) && ftk({ handOn: () => true, handRest: false }) !== plain && ftk({ handRest: false }) === ftp(null) && fp({ handRest: false }, 3) === fp(null, 3));
+    const asked = []; ftk({ handOn: (q, rule, st, seat) => { if (asked.length < 3) asked.push([typeof q.id, typeof rule.yaw, typeof st.yaw, typeof seat.slew]); return false; } });
+    ok("!! `handOn` is asked with the target, the sight's command, the seat's state and the seat (2026-11-20: a predicate may ask how near the gun is to the solution)", asked.length === 3 && asked.every((a) => a.join() === "number,number,number,object"), JSON.stringify(asked[0]));
+    const trig = (() => { const c = BF.build(1, "swarm", { ships: 2 }).arena.crafts.filter((q) => q.kind === "capital")[0], seat = c.seats[3].seat, p = c.body.pos, tg = [{ id: 1, pos: [p[0] + 150, p[1] + 200, p[2] + 20], vel: [0, 0, 0], radius: 6 }], st = { yaw: 0.1, pitch: 0.05 };
+        const go = (o, target, handAll) => { const d = ST.gunnerFor(ST.handWeights(), () => ({ yaw: 0.3, pitch: 0.1, fire: false, target }), { ...o, ...(handAll ? { handOn: () => true } : {}) }); return d(seat, st, c.body, target == null ? [] : tg, 0); };
+        return [go({ alwaysFire: true }, 1, false).fire, go({ alwaysFire: true }, 1, true).fire, go({ alwaysFire: true }, null, false).fire, go({ alwaysFire: true }, null, true).fire, go({}, 1, true).fire]; })();
+    ok("!! `alwaysFire` (2026-11-20): with a target the trigger is HELD whoever lays the gun (the network, or the hand where `handOn` holds) though the sight says not to fire; with no target it is not; off by default (the hand's own trigger then), and off it changes no fight", trig.join() === "true,true,false,false,false" && ftk({ alwaysFire: false }) === ftp(null) && ftk({ alwaysFire: true }) !== ftp(null), trig.join());
+    const lay = (() => { const c = BF.build(1, "swarm", { ships: 2 }).arena.crafts.filter((q) => q.kind === "capital")[0], seat = c.seats[3].seat, p = c.body.pos, A = { id: 1, pos: [p[0] + 150, p[1] + 200, p[2] + 20], vel: [0, 0, 0], radius: 6 }, B = { id: 2, pos: [p[0] - 60, p[1] + 80, p[2] + 20], vel: [0, 0, 0], radius: 1.5 };
+        const real = GS.handGunner({ seed: 5, ...BF.GUNNERS.regular }), d = ST.gunnerFor(ST.handWeights(), real, { sigma: 0.03, seed: 3, handOn: (q) => q.id === 2 }), seen = new Set(); let o, st = { yaw: 0, pitch: 0 }, i = 0;
+        for (; i < 60; i++) { o = d(seat, st, c.body, [A], i / 30); st = { yaw: o.yaw, pitch: o.pitch }; } const net = st.yaw;
+        for (; i < 120; i++) { o = d(seat, st, c.body, [A, B], i / 30); seen.add(o.target); st = { yaw: o.yaw, pitch: o.pitch }; } const hand = st.yaw;
+        for (; i < 160; i++) { o = d(seat, st, c.body, [A], i / 30); if (o.target === 1) break; st = { yaw: o.yaw, pitch: o.pitch }; }
+        return { net, hand, back: o.yaw, seen: [...seen].sort().join(), step: seat.slew.yaw / 30 }; })();
+    ok("!! a seat the hand has laid ON A FIGHTER and that goes straight back to a ship (the fighter gone) lays the network's gun FROM WHERE THE SEAT IS, not from where the network last left it: the hand stretch happened (targets 1 then 2), and the first command back is within a tick's slew and the hand's shake of the hand's gun, far from the network's old one", lay.seen === "1,2" && Math.abs(lay.back - lay.hand) <= lay.step + 0.12 && Math.abs(lay.back - lay.net) > 0.5, `net ${lay.net.toFixed(3)} hand ${lay.hand.toFixed(3)} back ${lay.back.toFixed(3)}`);
+    ok("!! THE `sticky` OPTION: off by default (the gunner with none is the gunner with sticky: false, to the bit, in a fleet); on, it is another fight in a FLEET OF THREE and the same fight one ship a side", fp(null, 3) === fp({ sticky: false }, 3) && fp({ sticky: true }, 3) !== fp(null, 3) && fp({ sticky: true }, 1) === fp(null, 1));
+    ok("the export list", Object.keys(ST).sort().join() === "CLOSING,FEATURES,FEATURE_NAMES,HIDDEN,LIVE_FEATURES,LIVE_FEATURES_RATIONED,OUTPUTS,OUTPUT_NAMES,POLICY_ID,REACH,READ_OUTPUTS,REC_EDGES,REC_STEPS,SHIPS_ONLY,SHIP_RADIUS_MIN,WEIGHT_COUNT,biasAt,encoderAt,features,forward,gunnerFactory,gunnerFor,handWeights,hiddenBiasAt,layersOf,outputAt,perturb,post,reportLines,rngFor,stickySight,synapseAt,synapsesUsed,zeroWeights");
+});
+
+console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
+process.exit(fails === 0 ? 0 : 1);

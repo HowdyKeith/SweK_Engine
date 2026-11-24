@@ -183,64 +183,22 @@ console.log("\n2b. THE CONNING TOWER AND THE TAIL: built here with the real thre
     mat.dispose(); for (const k of Object.keys(geo)) geo[k].dispose();
 }
 
-console.log("\n2d. THE NAVIGATION SEA IN THREE DIMENSIONS (unnumbered, 2026-11-23: the nextRounds entry tank-nav-3d): islands as columns, icebergs as discs with a keel, ships as hulls, goals as buoys");
+console.log("\n2c. THE DARK-COMPASS MARK: the pure arithmetic, and its store built with the real three.js (no GL needed). The obstacles, goals and survey stations are render/subAquarium3dMarks.mjs's (its own gate).");
 {
-    const isl = V3.navPose({ type: "island", x: 120, y: 80, r: 18, keel: Infinity }), berg = V3.navPose({ type: "berg", x: 200, y: 150, r: 15, keel: 22 }), ship = V3.navPose({ type: "ship", x: 300, y: 40, r: 9, keel: 6 });
-    ok("!! navPose puts an island as a column from the surface to the floor (keel Infinity: height 50, centre Y -25), an iceberg to its keel (22 m: centre Y -11) and a ship to its keel (6 m: centre Y -3), each at X = x, Z = y with its own radius",
-        JSON.stringify(isl.pos) === "[120,-25,80]" && isl.height === 50 && isl.radius === 18 && JSON.stringify(berg.pos) === "[200,-11,150]" && berg.height === 22 && JSON.stringify(ship.pos) === "[300,-3,40]" && ship.height === 6 && ship.type === "ship");
-    ok("!! a keel deeper than the floor is cut at the floor (80 m in a 50 m tank: height 50), a keel of 0 hangs nothing, and a keel that is not a number or is negative reads as 0 and never NaN in the scene; depthMax is honoured (a 30 m tank: an island is 30 m tall)",
-        V3.navPose({ type: "berg", x: 0, y: 0, r: 1, keel: 80 }).height === 50 && V3.navPose({ type: "berg", x: 0, y: 0, r: 1, keel: 0 }).height === 0 && V3.navPose({ type: "berg", x: 0, y: 0, r: 1, keel: NaN }).height === 0 && V3.navPose({ type: "berg", x: 0, y: 0, r: 1, keel: -5 }).height === 0 && V3.navPose({ type: "island", x: 0, y: 0, r: 1, keel: Infinity }, 30).height === 30 && V3.navPose({ type: "island", x: 0, y: 0, r: 1, keel: Infinity }, 30).pos[1] === -15 && ![isl, berg, ship].some((q) => q.pos.some((v) => Number.isNaN(v))));
-    const gA = V3.goalPose({ hue: 120, nav: { goal: { x: 300, y: 90, depth: 28 } } });
-    ok("!! goalPose maps a navigator's goal (x, y, depth) to the scene point (X = x, Y = -depth, Z = y) with the sub's hue, and answers null for a sub with no navigator, no goal, a goal with a missing or non-finite coordinate, and for null",
-        JSON.stringify(gA) === '{"pos":[300,-28,90],"hue":120}' && V3.goalPose({ hue: 1, nav: null }) === null && V3.goalPose({ hue: 1 }) === null && V3.goalPose({ hue: 1, nav: {} }) === null && V3.goalPose({ hue: 1, nav: { goal: { x: 1, y: 2 } } }) === null && V3.goalPose({ hue: 1, nav: { goal: { x: NaN, y: 2, depth: 3 } } }) === null && V3.goalPose(null) === null);
-    ok("!! the colours are the plan and side views' own (island 0x3d6b3a, iceberg 0xbfe3ff, ship 0xf6a623, taken from sub-aquarium.html's draw loop and frozen) and a goal buoy is 3.5 m on screen",
-        V3.NAV_COLOURS.island === 0x3d6b3a && V3.NAV_COLOURS.berg === 0xbfe3ff && V3.NAV_COLOURS.ship === 0xf6a623 && Object.isFrozen(V3.NAV_COLOURS) && V3.GOAL_RADIUS === 3.5);
-    const tk = createTank(); tk.setScene(7);
-    const rows = tk.sceneNow();
-    ok("!! every row of a real tank's sea (seed 7: two islands' discs, three icebergs, two ships) gets a finite pose inside the tank's box: X in 0..500, Z in 0..300, Y in -50..0 and a positive height only for a keel above 0",
-        rows.length > 0 && rows.every((o) => { const q = V3.navPose(o, 50); return q.pos.every(Number.isFinite) && q.pos[0] >= 0 && q.pos[0] <= 500 && q.pos[2] >= 0 && q.pos[2] <= 300 && q.pos[1] <= 0 && q.pos[1] >= -25 && q.height >= 0 && q.height <= 50; }) && rows.some((o) => o.type === "island") && rows.some((o) => o.type === "berg") && rows.some((o) => o.type === "ship"), rows.length + " objects");
-    const aq3 = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
-    ok("!! the page hands the 3D view the tank's sea from the same frame loop: view3d.render(snap, t, null, tank.sceneNow())", /view3d\.render\(snap, performance\.now\(\) \/ 1000, null, tank\.sceneNow\(\)\)/.test(aq3));
-    const { chromium: chr, from: pwf } = resolvePlaywright(require_), skip2 = browserSkipReason(chr, pwf, HEADLESS_SHELL);
-    if (skip2) { report("live half SKIPPED -- " + skip2); report("*** THAT IS A SKIP AND NOT A PASS: only a draw shows that the meshes are built and removed with the sea"); }
-    else {
-        const types = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript" };
-        const server = http.createServer((req, res) => {
-            const u = decodeURIComponent(req.url.split("?")[0]);
-            if (u === "/__v3n.html") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<!doctype html><meta charset=utf-8><body style='margin:0'><canvas id=c width=320 height=200></canvas></body>"); }
-            const fp = path.join(ENG, u);
-            if (fp.startsWith(ENG) && fs.existsSync(fp) && fs.statSync(fp).isFile()) { res.writeHead(200, { "Content-Type": types[path.extname(fp)] || "text/plain" }); return res.end(fs.readFileSync(fp)); }
-            res.writeHead(404); res.end("not found");
-        });
-        await new Promise((r) => server.listen(0, "127.0.0.1", r));
-        const base = "http://127.0.0.1:" + server.address().port, br = await chromium_launch(chr);
-        try {
-            const pg = await (await br.newContext()).newPage(); const errs = [];
-            pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
-            await pg.goto(base + "/__v3n.html", { waitUntil: "load" });
-            const r = await pg.evaluate(async () => {
-                const THREE = await import("/vendor/three/three.module.js"), V = await import("/render/subAquarium3d.mjs"), cv = document.getElementById("c");
-                const view = V.createView3d(THREE, cv, { length: 500, width: 300, depthMax: 50 }); view.resize(320, 200);
-                const subs = [{ id: "a", hue: 30, x: 100, y: 100, depth: 20, heading: 0, pitch: 0, nav: { goal: { x: 400, y: 100, depth: 25 } } }, { id: "b", hue: 200, x: 150, y: 200, depth: 30, heading: 0, pitch: 0 }];
-                const sea = [{ type: "island", x: 250, y: 150, r: 20, keel: Infinity }, { type: "berg", x: 300, y: 80, r: 15, keel: 22 }, { type: "ship", x: 200, y: 220, r: 9, keel: 6 }];
-                view.render(subs, 0); const none = view.navCount();
-                view.render(subs, 0, null, sea); const three = view.navCount();
-                const sc = view.scene, shipMesh = sc.children.find((m) => m.userData && m.userData.type === "ship"), isl = sc.children.find((m) => m.userData && m.userData.type === "island");
-                const before = shipMesh ? shipMesh.position.z : NaN; sea[2] = { ...sea[2], y: 250 }; view.render(subs, 1, null, sea); const moved = shipMesh ? shipMesh.position.z - before : NaN, same = !!shipMesh && sc.children.includes(shipMesh);
-                view.render(subs, 2, null, sea.slice(0, 1)); const one = view.navCount();
-                view.render(subs, 3, null, null); const zero = view.navCount();
-                view.render([subs[1]], 4, null, sea); const noGoal = view.navCount();
-                view.render(subs, 5, null, [{ type: "wreck", x: 1, y: 1, r: 1, keel: 1 }, null, sea[0]]); const unknown = view.navCount();
-                return { none, three, moved, same, one, zero, noGoal, unknown, islandScale: isl ? [isl.scale.x, isl.scale.y, isl.scale.z] : [NaN, NaN, NaN], islandPos: isl ? [isl.position.x, isl.position.y, isl.position.z] : [NaN, NaN, NaN] };
-            });
-            ok("!! with no sea the view holds no obstacles and one goal buoy (the sub with a navigator); with a three-object sea it holds three obstacles; a ship that moves is MOVED, not rebuilt (the same mesh, 30 m on in Z); a shorter sea drops the extra meshes, a null sea drops them all, a sub with no goal has no buoy, and a row of an unknown type or a null row is skipped",
-                r.none.obstacles === 0 && r.none.goals === 1 && r.three.obstacles === 3 && r.three.goals === 1 && Math.abs(r.moved - 30) < 1e-9 && r.same === true && r.one.obstacles === 1 && r.zero.obstacles === 0 && r.noGoal.goals === 0 && r.unknown.obstacles === 1, JSON.stringify(r));
-            ok("!! an island is drawn as a column of its radius and the full depth, centred at 25 m down", Math.abs(r.islandScale[0] - 20) < 1e-9 && Math.abs(r.islandScale[1] - 50) < 1e-9 && Math.abs(r.islandPos[1] + 25) < 1e-9 && r.islandPos[0] === 250 && r.islandPos[2] === 150);
-            ok("  and the page raised no error while drawing it", errs.length === 0, errs.join(" | "));
-        } finally { await br.close(); server.close(); }
-    }
+    ok("  the dark-compass mark is amber (DARK_COLOUR 0xf6a623), its ring is 0.9 of a hull (DARK_RING " + V3.DARK_RING + "), its ghost line GHOST 2.2 rings long",
+        V3.DARK_COLOUR === 0xf6a623 && Math.abs(V3.DARK_RING - V3.HULL_LENGTH * 0.9) < 1e-12 && V3.GHOST === 2.2);
+    const dm = V3.darkMark({ id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } });
+    ok("!! darkMark: a dark compass gives a ring centred on the sub (100, -20, 50) of radius DARK_RING and a ghost tip GHOST rings along its believed heading 0 (+X); a valid compass or none gives null; a non-finite belief draws the ring only",
+        dm && dm.centre.join() === "100,-20,50" && dm.r === V3.DARK_RING && Math.abs(dm.tip[0] - (100 + V3.DARK_RING * V3.GHOST)) < 1e-9 && dm.tip[1] === -20 && Math.abs(dm.tip[2] - 50) < 1e-9
+        && V3.darkMark({ x: 0, y: 0, depth: 0, compass: { valid: true, seen: 0 } }) === null && V3.darkMark({ x: 0, y: 0, depth: 0 }) === null
+        && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).tip === null && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).r === 2 * V3.DARK_RING, JSON.stringify(dm));
+    const ds = V3.darkStore(THREE), darkRow = { id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } };
+    const d1 = V3.syncDark(THREE, ds, [darkRow, { id: "s", survey: { finished: false, stations: [{ x: 1, y: 2, depth: 3, visited: false }] } }]), ring = ds.dark.get("d").ring, kids = ds.group.children.length, d2 = V3.syncDark(THREE, ds, []);
+    ok("!! syncDark: one ring and ghost line per dark sub (a survey draws nothing here now), the ring at the sub scaled to DARK_RING, and an empty snapshot clears them",
+        d1.dark === 1 && kids === 2 && ring.position.x === 100 && ring.position.y === -20 && ring.scale.x === V3.DARK_RING && ds.darkMat.color.getHex() === V3.DARK_COLOUR && d2.dark === 0 && ds.group.children.length === 0, JSON.stringify({ d1, kids, d2 }));
+    ok("!! main's survey buoys and navigation columns are GONE from this module (2026-11-20: the branch's render/subAquarium3dMarks.mjs draws them), so nothing is drawn twice",
+        !("stationMarks" in V3) && !("navColumns" in V3) && !("navStore" in V3) && !("syncNav" in V3) && !("marksStore" in V3) && !("syncMarks" in V3));
 }
-async function chromium_launch(chr) { return chr.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args }); }
 
 console.log("\n3. THE PAGE");
 {

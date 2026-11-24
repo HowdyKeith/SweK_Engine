@@ -45,13 +45,17 @@ const GATE_RE = /selfcheck.*\.mjs$/;
  * NO DEPTH LIMIT -- the suite has none, and the five gates a limit hid are the reason this file exists.
  */
 function walk(dir = ENGINE, out = []) {
+    // *** v4933 -- ONE readdir WITH FILE TYPES, NOT A readdir AND A stat PER ENTRY. *** The rig's verdict killed gatesBridge-selfcheck at the sweep's 20 s cap alone (21.0 s measured by hand on the win32 8 GB box): the bridge lists the gates on every
+    // request, each listing walked ~22,000 entries and statted every one (174,000 stats in the gate's eight listings), and a stat is the slow call on Windows. A Dirent already says whether an entry is a directory. A SYMLINK is the one case
+    // where a Dirent and a stat disagree (stat follows it), so a symlink is still statted: the set returned is the same as before.
     let entries;
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const f of entries) {
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+    for (const ent of entries) {
+        const f = ent.name;
         if (SKIP_DIRS.has(f)) continue;
         const p = path.join(dir, f);
-        let st;
-        try { st = fs.statSync(p); } catch { continue; }
+        let st = ent;
+        if (ent.isSymbolicLink()) { try { st = fs.statSync(p); } catch { continue; } }
         if (st.isDirectory()) walk(p, out);
         // *** v4584 -- AND THE SAME TRANSIENT-FIXTURE EXCLUSION THE SUITE NOW CARRIES. ***
         //

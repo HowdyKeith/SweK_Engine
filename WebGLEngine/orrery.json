@@ -250,15 +250,19 @@
    "name": "hemibrain",
    "arrived": "2026-10-24",
    "sha": "2418774882837c1702bb36d34f7536be4a043a3b",
-   "bytes": 115350,
+   "bytes": 250582,
    "files": [
     {
      "path": "hemibrain-cx-heading-loop.json",
      "bytes": 111824
     },
     {
+     "path": "hemibrain-cx-steering.json",
+     "bytes": 132510
+    },
+    {
      "path": "PROVENANCE.md",
-     "bytes": 3526
+     "bytes": 6248
     }
    ]
   },
@@ -1422,8 +1426,16 @@
    "name": "male-cns",
    "arrived": "2026-09-21",
    "sha": "46cc1d5c67c2adc6cd937124cb8f65eac41cfddc",
-   "bytes": 4337635,
+   "bytes": 5592183,
    "files": [
+    {
+     "path": "cx-steering-circuit.json",
+     "bytes": 14680
+    },
+    {
+     "path": "cx-steering-inputs-circuit.json",
+     "bytes": 164680
+    },
     {
      "path": "epg-compass-circuit.json",
      "bytes": 2643101
@@ -1433,8 +1445,64 @@
      "bytes": 1690281
     },
     {
+     "path": "giant-fiber-visual-circuit.json",
+     "bytes": 17890
+    },
+    {
+     "path": "giant-fiber-visual-retinotopy.json",
+     "bytes": 68865
+    },
+    {
+     "path": "lc10-positions.json",
+     "bytes": 26609
+    },
+    {
+     "path": "lc10-tracking-circuit.json",
+     "bytes": 139305
+    },
+    {
+     "path": "lc11-object-circuit.json",
+     "bytes": 147529
+    },
+    {
+     "path": "lc11-positions.json",
+     "bytes": 14459
+    },
+    {
+     "path": "lc16-loom-circuit.json",
+     "bytes": 155698
+    },
+    {
+     "path": "lc16-positions.json",
+     "bytes": 17847
+    },
+    {
+     "path": "lc4-loom-circuit.json",
+     "bytes": 105240
+    },
+    {
+     "path": "lc4-positions.json",
+     "bytes": 12925
+    },
+    {
+     "path": "lc6-loom-circuit.json",
+     "bytes": 70006
+    },
+    {
+     "path": "lc6-positions.json",
+     "bytes": 12484
+    },
+    {
+     "path": "lplc2-loom-circuit.json",
+     "bytes": 256170
+    },
+    {
+     "path": "lplc2-positions.json",
+     "bytes": 18447
+    },
+    {
      "path": "PROVENANCE.md",
-     "bytes": 4253
+     "bytes": 15967
     }
    ]
   },
@@ -1499,6 +1567,26 @@
     {
      "path": "PROVENANCE.txt",
      "bytes": 2752
+    }
+   ]
+  },
+  {
+   "name": "smaa",
+   "arrived": "2026-11-22",
+   "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a",
+   "bytes": 39424,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1293
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 1069
+    },
+    {
+     "path": "smaaLookup.mjs",
+     "bytes": 37062
     }
    ]
   },
@@ -2062,8 +2150,12 @@
    "name": "zebrafish",
    "arrived": "2026-10-23",
    "sha": "e998ee215638a8522087fe83cd596c9d12ac5361",
-   "bytes": 26027,
+   "bytes": 41872,
    "files": [
+    {
+     "path": "fish1-escape-top30.json",
+     "bytes": 15845
+    },
     {
      "path": "fish1-hmi-spn.json",
      "bytes": 11232

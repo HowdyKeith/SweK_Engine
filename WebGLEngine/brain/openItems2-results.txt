@@ -1,0 +1,25 @@
+== 1. receding and approaching ball (az 90) by polarity
+both: approach alarm frame 262 winner 4; receding alarm 4
+off: approach alarm frame 262 winner 4; receding alarm null
+
+== 2. Round 5 stimuli by polarity
+both r/v 0.2: plain alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames | static alarm frame 77, 17.6 deg, margin 1332 ms, 34 spike frames | moving alarm frame 28, 7.9 deg, margin 2966 ms, 62 spike frames
+both r/v 0.4: plain alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames | static alarm frame 166, 20.7 deg, margin 2265 ms, 53 spike frames | moving alarm frame 50, 7.6 deg, margin 6131 ms, 111 spike frames
+off r/v 0.2: plain alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames | static no alarm | moving alarm frame 68, 14.3 deg, margin 1632 ms, 35 spike frames
+off r/v 0.4: plain alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames | static alarm frame 187, 29.9 deg, margin 1565 ms, 23 spike frames | moving alarm frame 166, 20.7 deg, margin 2265 ms, 67 spike frames
+
+== 3. moving stripes fading in over the first N frames (blend of the plain and the moving sequence), polarity both and off
+both r/v 0.2 fade 30: alarm frame 28, 7.9 deg, margin 2966 ms, 57 spike frames  (plain: alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames)
+both r/v 0.2 fade 60: alarm frame 56, 11.5 deg, margin 2032 ms, 51 spike frames  (plain: alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames)
+both r/v 0.4 fade 30: alarm frame 19, 6.5 deg, margin 7165 ms, 130 spike frames  (plain: alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames)
+both r/v 0.4 fade 60: alarm frame 27, 6.8 deg, margin 6898 ms, 121 spike frames  (plain: alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames)
+off r/v 0.2 fade 30: alarm frame 68, 14.3 deg, margin 1632 ms, 33 spike frames  (plain: alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames)
+off r/v 0.2 fade 60: alarm frame 68, 14.3 deg, margin 1632 ms, 32 spike frames  (plain: alarm frame 64, 13.2 deg, margin 1766 ms, 47 spike frames)
+off r/v 0.4 fade 30: alarm frame 166, 20.7 deg, margin 2265 ms, 62 spike frames  (plain: alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames)
+off r/v 0.4 fade 60: alarm frame 166, 20.7 deg, margin 2265 ms, 59 spike frames  (plain: alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames)
+
+== 4. contrast sweep for the margins, polarity off, moving vs plain (r/v 0.4)
+wc 1: plain alarm frame 150, 16.7 deg, margin 2798 ms, 67 spike frames | moving alarm frame 166, 20.7 deg, margin 2265 ms, 67 spike frames
+wc 0.6: plain alarm frame 167, 21.0 deg, margin 2231 ms, 48 spike frames | moving alarm frame 166, 20.7 deg, margin 2265 ms, 70 spike frames
+wc 0.4: plain alarm frame 184, 28.1 deg, margin 1665 ms, 36 spike frames | moving alarm frame 166, 20.7 deg, margin 2265 ms, 79 spike frames
+wc 0.2: plain alarm frame 202, 43.9 deg, margin 1065 ms, 17 spike frames | moving alarm frame 166, 20.7 deg, margin 2265 ms, 72 spike frames

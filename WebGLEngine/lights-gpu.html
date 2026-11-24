@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · many lights (WebGPU)</title>
+<!--
+  MANY LIGHTS ON WEBGPU: CLUSTERED LIGHTING AND A SHADOW ATLAS (render/clusteredLights.mjs, createClusteredLightingGPU and clusteredWGSL; the WebGL2 page is lights-demo.html).
+  The same scene (render/lightsDemoScene.mjs): ?n=64 moving coloured point lights, two spot lights and a point light casting shadows from one depth32float atlas. ?brute=1 loops
+  over every light; ?shadows=0 draws none; ?t=3.5 holds the lights still. The ground and pillars are one instanced draw. The camera is render/cameraControls.mjs.
+  window.__lightsGpu reports { ready, frames, stats, lights, pillars, viewProj, eye, capture() } for tools/ship/clusteredLights-selfcheck.mjs.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #07090e; color: #cfd8e6; font: 13px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: absolute; left: 10px; top: 10px; z-index: 6; background: rgba(10,14,22,.78); border: 1px solid #22304a; border-radius: 8px; padding: 8px 10px; max-width: 560px; }
+  .dim { color: #8494ad; }
+</style></head>
+<body><canvas id="cv"></canvas><div id="hud"><b>Many lights · WebGPU</b> <span id="stats" class="dim">starting...</span></div>
+<script type="module">
+import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
+import { perspective, lookAt } from "./render/gpuDriven.mjs";
+import { createClusteredLightingGPU, clusteredWGSL, ZO, makeCookieAtlas } from "./render/clusteredLights.mjs";
+import { sceneOf } from "./render/lightsDemoScene.mjs";
+import { createFogGPU } from "./render/volumetricFog.mjs";   // ?fog=1: the moonlit haze, with shafts (&shafts=0 without)
+import { mat4Invert } from "./render/motionVectors.mjs";
+
+const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsGpu = { ready: false, frames: 0, error: null };
+const fail = (m) => { state.error = m; document.getElementById("stats").textContent = "· " + m; throw new Error(m); };
+if (!navigator.gpu) { const W = await import("./ui/webgpuProbe.mjs"), P = W.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location }); if (P.reason === "insecure-origin") W.showOriginBanner(P); fail(P.message); }   // the origin may be what withheld it (ui/webgpuProbe.mjs)
+const adapter = await navigator.gpu.requestAdapter(); if (!adapter) fail("no WebGPU adapter");
+const device = await adapter.requestDevice(), ctx = cv.getContext("webgpu"), FORMAT = "rgba8unorm";
+ctx.configure({ device, format: FORMAT, alphaMode: "opaque", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+device.addEventListener?.("uncapturederror", (e) => { state.error = "WebGPU: " + e.error.message; });
+const mul4 = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+
+const SCENE = sceneOf(Number(Q.get("n")) || 64, { canopy: Q.get("fog") === "1" || Q.get("canopy") === "1" }), { GROUND, pillars, boards, N, lightsAt } = SCENE; state.pillars = pillars; state.boards = boards;   // ?fog=1 (or ?canopy=1) adds the canopy
+const objects = [[GROUND, [0.55, 0.55, 0.58]], ...pillars.map((q) => [q, [0.7, 0.68, 0.64]]), ...boards.map((q) => [q, [0.5, 0.48, 0.46]])], objData = new Float32Array(objects.length * 12);
+objects.forEach(([b, alb], k) => objData.set([...b.position, 0, ...b.size, 0, ...alb, 0], k * 12));
+const objBuf = device.createBuffer({ size: objData.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); device.queue.writeBuffer(objBuf, 0, objData);
+const P = []; for (const [n, u, v] of [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]]]) {
+    const c = (a, b) => n.map((x, i) => 0.5 * x + 0.5 * a * u[i] + 0.5 * b * v[i]); for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) P.push(...c(a, b), ...n); }
+const vbuf = device.createBuffer({ size: P.length * 4, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }); device.queue.writeBuffer(vbuf, 0, new Float32Array(P));
+const VB = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }, { shaderLocation: 1, offset: 12, format: "float32x3" }] }];
+const OBJ = "struct Obj { pos: vec4f, size: vec4f, albedo: vec4f };";
+const litCode = `${OBJ}
+struct Cam { viewProj: mat4x4f, eye: vec4f };
+@group(0) @binding(0) var<uniform> cam: Cam;
+@group(0) @binding(1) var<storage, read> objs: array<Obj>;
+${clusteredWGSL({ group: 1, brute: Q.get("brute") === "1", shadows: Q.get("shadows") !== "0", soft: Q.get("soft") === "1" })}
+struct VO { @builtin(position) pos: vec4f, @location(0) w: vec3f, @location(1) n: vec3f, @location(2) @interpolate(flat) albedo: vec3f };
+@vertex fn vs(@location(0) p: vec3f, @location(1) n: vec3f, @builtin(instance_index) i: u32) -> VO { let o = objs[i]; let w = o.pos.xyz + p * o.size.xyz; var r: VO; r.pos = cam.viewProj * vec4f(w, 1.0); r.w = w; r.n = n; r.albedo = o.albedo.rgb; return r; }
+@fragment fn fs(v: VO) -> @location(0) vec4f { let n = normalize(v.n); let c = v.albedo * 0.04 + clusteredLight(v.w, n, normalize(cam.eye.xyz - v.w), v.albedo); return vec4f(c / (1.0 + c), 1.0); }`;
+const depthCode = `${OBJ}
+@group(0) @binding(0) var<uniform> face: mat4x4f;
+@group(0) @binding(1) var<storage, read> objs: array<Obj>;
+@vertex fn vs(@location(0) p: vec3f, @location(1) n: vec3f, @builtin(instance_index) i: u32) -> @builtin(position) vec4f { let o = objs[i]; return face * vec4f(o.pos.xyz + p * o.size.xyz, 1.0); }`;
+// ?fog=1: the scene is drawn into SCENE (and a depth the fog can read), then the fog pass writes it to the canvas; the moon's shadow cuts shafts in it unless &shafts=0
+const FOG = Q.get("fog") === "1", SHAFTS = FOG && Q.get("shafts") !== "0", DEPTH = FOG ? "depth32float" : "depth24plus";
+const FOG_PARAMS = state.fogParams = { density: 0.05, falloff: 0, albedo: 0.9, ambient: [0.01, 0.012, 0.018], lightDir: [0.45, 1, 0.35], lightColor: [1.2, 1.3, 1.7], g: 0.5, maxDistance: 40, steps: 48, jitter: true };
+const litMod = device.createShaderModule({ code: litCode }), depthMod = device.createShaderModule({ code: depthCode });
+const lit = device.createRenderPipeline({ layout: "auto", vertex: { module: litMod, entryPoint: "vs", buffers: VB }, fragment: { module: litMod, entryPoint: "fs", targets: [{ format: FORMAT }] }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: DEPTH, depthWriteEnabled: true, depthCompare: "less" } });
+const depthPipe = device.createRenderPipeline({ layout: "auto", vertex: { module: depthMod, entryPoint: "vs", buffers: VB }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
+const lighting = state.lighting = createClusteredLightingGPU(device, { maxLights: Math.max(80, N + 8), cells: [16, 6, 16], viewCells: [16, 9, 24], space: Q.get("clusters") === "world" ? "world" : "view", maxPerCell: 48, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 28 });
+const COOKIES = makeCookieAtlas(256), OPTS = { sun: Q.get("sun") !== "0", cookie: Q.get("cookie") !== "0" };
+const camBuf = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const litBG0 = device.createBindGroup({ layout: lit.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: camBuf } }, { binding: 1, resource: { buffer: objBuf } }] });
+let litBG1 = null, litBGVersion = -1;
+const faceBGs = lighting.faceBuffers.map((b) => device.createBindGroup({ layout: depthPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }, { binding: 1, resource: { buffer: objBuf } }] }));
+
+const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pitch: 0.55, distance: 13, target: [0, 0.4, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
+const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0, 0.5, 0], radius: 6 }) });
+state.capture = () => new Promise((res) => { state._want = res; });
+const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now();
+let last = performance.now(), depthTex = null, sceneTex = null;
+const fog = FOG ? createFogGPU(device, FORMAT, SHAFTS ? { lighting } : {}) : null;
+async function frame() {
+    const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
+    const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d) || !depthTex) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); if (depthTex) depthTex.destroy(); depthTex = device.createTexture({ size: [cv.width, cv.height], format: DEPTH, usage: GPUTextureUsage.RENDER_ATTACHMENT | (FOG ? GPUTextureUsage.TEXTURE_BINDING : 0) }); if (FOG) { if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [cv.width, cv.height], format: FORMAT, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING }); } }
+    const pose = controls.pose(), projGL = perspective(FOV, w / h, 0.05, 100), viewM = lookAt(pose.eye, pose.target), vpGL = mul4(projGL, viewM), vp = mul4(ZO, vpGL), camera = state.camera = { view: Array.from(viewM), proj: Array.from(projGL), near: 0.05, far: 100 };
+    const t = T0 ?? (now - start) / 1000, lights = state.lights = lightsAt(t, OPTS), stats = state.stats = lighting.update(lights, camera, COOKIES);
+    if (lighting.cookieVersion !== litBGVersion) { litBG1 = lighting.bindGroupFor(lit, 1); litBGVersion = lighting.cookieVersion; }
+    state.viewProj = Array.from(vpGL); state.eye = pose.eye;   // the GL-style matrix, as lights-demo.html reports it: the gate reads both pages one way
+    device.queue.writeBuffer(camBuf, 0, new Float32Array([...vp, ...pose.eye, 0]));
+    const enc = device.createCommandEncoder();
+    lighting.renderShadows(enc, (pass, face) => { pass.setPipeline(depthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, vbuf); pass.draw(36, objects.length); });
+    const tex = ctx.getCurrentTexture(), pass = enc.beginRenderPass({ colorAttachments: [{ view: FOG ? sceneTex.createView() : tex.createView(), loadOp: "clear", clearValue: [0.027, 0.035, 0.055, 1], storeOp: "store" }], depthStencilAttachment: { view: depthTex.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" } });
+    pass.setPipeline(lit); pass.setBindGroup(0, litBG0); pass.setBindGroup(1, litBG1); pass.setVertexBuffer(0, vbuf); pass.draw(36, objects.length); pass.end();
+    if (FOG) fog.encode(enc, tex.createView(), { colorView: sceneTex.createView(), depthView: depthTex.createView(), invViewProj: mat4Invert(vp), eye: pose.eye, params: FOG_PARAMS, zRange: "zo" });
+    let rb = null;
+    if (state._want) { const row = 256 * Math.ceil(cv.width * 4 / 256); rb = { buf: device.createBuffer({ size: row * cv.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), row, w: cv.width, h: cv.height, res: state._want }; state._want = null; enc.copyTextureToBuffer({ texture: tex }, { buffer: rb.buf, bytesPerRow: row }, [cv.width, cv.height]); }
+    device.queue.submit([enc.finish()]);
+    if (rb) { await rb.buf.mapAsync(GPUMapMode.READ); const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), px = new Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w * 4; x++) px[y * rb.w * 4 + x] = raw[y * rb.row + x]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, px, topDown: true }); }
+    if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights (${N} moving, ${lights.filter((l) => l.shadow).length} casting shadows) · ${stats.cells} cells · ${stats.faces} atlas tiles of 16 (the moon's ${stats.cascades} cascades among them) · ${stats.space === "view" ? "clusters fitted to the view" : "clusters over the lights"}${stats.unshadowed ? ` · ${stats.unshadowed} without a shadow` : ""}${stats.overflow ? ` · ${stats.overflow} over the cap` : ""}${Q.get("brute") === "1" ? " · every light, every pixel (brute)" : ""}`;
+    state.frames++; if (state.frames >= 2) state.ready = true;
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script><script type="module" src="/ui/originNotice.js"></script>   <!-- on a LAN address navigator.gpu is absent (not a secure context): say so, not "no WebGPU" -->
+</body></html>

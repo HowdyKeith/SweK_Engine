@@ -17,7 +17,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, holdFrames, heldFrames } from "./playwrightResolve.mjs";
 // rig run 13: section 3 draws through BOTH routes and diffs them, so it launches with PARITY_ARGS -- on Keith's rig ANGLE on
 // SwiftShader leaves WebGPU with no adapter at all (realGpuRun's GL table), and the page fell to its WebGL2 route
 import { PARITY_ARGS } from "./webgpuHarness.mjs";
@@ -265,6 +265,28 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         await new Promise((r) => srv2.listen(0, "127.0.0.1", r));
         const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
+        // *** v4920 -- THE CAUSE OF THE RIG'S TIMEOUT, FOUND WITH v4919's TIMINGS, AND IT IS A QUEUE. *** v4919 named and timed
+        // the captures; the rig (win32-x64-12c-32gb-b70b27) answered 7404 ms, 44314 ms, then the third past 120 s. Each one
+        // slower than the last is not a slow box, it is a backlog. orrery.html repaints its whole 1280 x 720 canvas on every
+        // animation frame, paused or not; its own callback costs 1 ms, so it asks for 60 a second, and a headless shell on a
+        // software GL cannot present them that fast. A screenshot waits its turn behind them. MEASURED on
+        // linux-x64-4c-16gb-142c0d, five captures each: as shipped 1561, 5674, 9773, 2028, 2070 ms; at 640 x 360 961, 2897,
+        // 7288, 1620, 1494 (smaller does not cure it); with the loop stopped outright, 11260 ms for the one that drains the
+        // queue and 329 after; held to a frame every 100 ms, 302, 273, 183, 244, 245.
+        // So this section holds the page's loop to FRAME_MS. It does not stop it and does not touch the page's file: the
+        // callback the page hands requestAnimationFrame runs unchanged, later. What that costs the section: nothing it
+        // measures. The page is paused for every capture and the rows ask what is on screen, not how often it was drawn.
+        // A browser with a GPU presents 60 a second and never builds the queue, which is why no person has seen this.
+        // NOT CLAIMED: that the rig passes -- the same queue is the explanation for its numbers, and one run there says.
+        // SABOTAGES (v4920): the hold never releasing a frame -> 7 red, stopped at "the attach" (nothing polls, nothing draws);
+        // the hold removed -> 1 red, the HELD row (789 frames where 411 fit), and the captures back at 1666, 7402, 11398,
+        // 10689, 2551 ms; one caller let through per frame, the first draft -> 7 red at "the attach" after 60 s.
+        const FRAME_MS = 100;
+        // EVERY callback asked for since the last held frame runs on the next one, together. The first draft let one caller
+        // through per frame and gave the page's loop all of them: Playwright's waitForFunction polls on animation frames
+        // too, never got one, and the attach wait timed out at 60 s on a page that had attached.
+        await holdFrames(pg, FRAME_MS);   // v4923: the same function, moved to tools/ship/playwrightResolve.mjs (frameHold) so every page gate shares one copy
+        const tHold = Date.now();
         const perr = [];
         pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv2.address().port}/`, { waitUntil: "load" });
@@ -285,7 +307,20 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             why: document.getElementById("fxwhy").textContent.trim(),
             disabled: document.getElementById("fxbtn").disabled,
         }));
-        const shot = async () => (await pg.screenshot({ type: "png" }));
+        // *** v4919 -- EVERY CAPTURE IS NAMED AND TIMED, AND HAS pageShot.mjs's CEILING, BECAUSE THE RIG'S v4917 VERIFY COULD NOT SAY
+        // WHICH ONE HUNG. *** On win32-x64-12c-32gb-b70b27 this section failed seven rows on one message, "TimeoutError:
+        // page.screenshot: Timeout 30000ms exceeded" -- Playwright's default -- with nothing to say whether it was the first
+        // capture or the fifth, or whether the box was slow or stuck. It passes on Linux in under a second a capture, and
+        // nothing in v4914 to v4917 touches this page. So the cause is NOT KNOWN, and this does not claim to fix it: the
+        // ceiling is the 120 s tools/ship/pageShot.mjs already gives the same call on the same box, the step in hand is
+        // carried into the error, and the timings are printed either way. One run on the rig then passes, or names the step.
+        // v4920: the rig's answer was 7404 ms, 44314 ms, then a timeout at 120 s on the third. See the note at newPage above.
+        // SABOTAGE (v4919): the "effect on" capture made to throw a timeout -> 7 red, every one opening `at "capture: effect
+        // on"`, and the timings line listing the three captures that did complete before it.
+        const SHOT_MS = 120000, shots = [];
+        let step = "before the first capture";
+        const shot = async (name) => { step = "capture: " + name; const t0 = Date.now();
+            const png = await pg.screenshot({ type: "png", timeout: SHOT_MS }); shots.push(`${name} ${Date.now() - t0} ms`); return png; };
         let r2;
         try {
             // *** THE ORRERY ANIMATES, SO TWO SCREENSHOTS DIFFER WHETHER OR NOT THE EFFECT IS ON. ***
@@ -296,11 +331,12 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             // MATCH, and only then attribute a difference to the effect.
             await pg.click("#play");
             await pg.waitForTimeout(400);
-            const still1 = await shot();
+            const still1 = await shot("paused, first");
             await pg.waitForTimeout(400);
-            const still2 = await shot();
+            const still2 = await shot("paused, second");
             const before = await state();
-            const imgOff = await shot();
+            const imgOff = await shot("effect off");
+            step = "the attach";
             await pg.click("#fxbtn");
             // v4896 -- WAIT FOR THE STATE, NOT FOR 900 ms. The rig's clone-verify read the label at "attaching..." with the overlay still hidden: the attach is an import plus a
             // device request, and on a busy Windows box that took longer than the fixed wait, so the row failed on the box's speed and not on the page. The button leaves "attaching"
@@ -309,19 +345,48 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             await pg.waitForFunction(() => !/attaching/.test(document.getElementById("fxbtn").textContent), null, { timeout: 60000 });
             await pg.waitForTimeout(150);
             const after = await state();
-            const imgOn = await shot();
+            const imgOn = await shot("effect on");
+            step = "turning it off";
             await pg.click("#fxbtn");
             await pg.waitForTimeout(300);
             const off = await state();
-            const imgOff2 = await shot();
+            const imgOff2 = await shot("effect off again");
             const same = (a, b) => a.length === b.length && a.equals(b);
             r2 = { before, after, off,
                    paused: same(still1, still2),
                    changed: !same(imgOff, imgOn),
                    restored: !same(imgOn, imgOff2),
                    bytesOff: imgOff.length, bytesOn: imgOn.length };
-        } catch (e) { r2 = { err: String(e).slice(0, 200) }; }
+        } catch (e) { r2 = { err: `at "${step}": ` + String(e).slice(0, 200) }; }
+        // v4923 -- THE PAGE REPAINTS WHEN ITS PICTURE CHANGES AND NOT OTHERWISE (orrery.html frame(), viewKey). The page is
+        // paused here. Idle, its loop still runs (the held frames climb) and the canvas is not repainted; each input that
+        // changes the picture repaints it; playing repaints every frame. paints is window.orrery's own count.
+        // SABOTAGES (v4923, against orrery.html's viewKey; restored byte for byte): the clock left out -> 2 red (time 0, playing
+        // 0); every frame painting -> 3 red (14 repaints idle); the canvas size left out -> 1 red; the surface mode -> 1 red;
+        // the zoom -> 1 red; the followed body -> 0 RED AT FIRST, because following also zooms, and 1 red once the unfollow
+        // step was added. NOT CHECKED: the hovered body, which a row could only change by aiming the pointer at one.
+        let rp;
+        try {
+            const P = () => pg.evaluate(() => [window.orrery.paints, window.__heldFrames]);
+            const [p0, h0] = await P(); await pg.waitForTimeout(1500); const [p1, h1] = await P();
+            const delta = async (go) => { const [a] = await P(); await go(); await pg.waitForTimeout(400); const [b] = await P(); return b - a; };
+            rp = { idle: p1 - p0, idleFrames: h1 - h0,
+                   time: await delta(() => pg.evaluate(() => window.orrery.setTime(123.4))),
+                   follow: await delta(() => pg.evaluate(() => window.orrery.follow(window.orrery.system.bodies[1].name))),
+                   zoom: await delta(() => pg.evaluate(() => window.orrery.zoomTo(300))),
+                   surface: await delta(() => pg.evaluate(() => window.orrery.setSurfMode(1))),
+                   size: await delta(() => pg.setViewportSize({ width: 1000, height: 640 })),
+                   // following a body ZOOMS to it too, so `follow` above repaints on the zoom alone: v4923's sabotage O2 (the
+                   // followed body left out of the key) went 0 red on it. Letting go changes the followed body and nothing else.
+                   unfollow: await delta(() => pg.evaluate(() => { const z = window.orrery.pxPerUnit; window.orrery.follow(null); return z === window.orrery.pxPerUnit; })),
+                   again: 0, playing: 0 };
+            const [q0] = await P(); await pg.waitForTimeout(800); const [q1] = await P(); rp.again = q1 - q0;
+            rp.playing = await delta(async () => { await pg.click("#play"); await pg.waitForTimeout(800); });
+            await pg.click("#play");
+        } catch (e) { rp = { err: String(e).slice(0, 160) }; }
+        const held = await heldFrames(pg), tEnd = Date.now();
         await br.close(); srv2.close();
+        console.log("  ----  captures: " + (shots.join(", ") || "none completed") + (r2.err ? ` -- stopped ${r2.err.slice(0, 60)}` : ""));
 
         ok("the page loads and the control starts OFF and hidden", !r2.err &&
             /off/.test(r2.before.label) && r2.before.shown === "none",
@@ -351,6 +416,21 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         ok("  clicking again turns it off and hides the overlay", !r2.err &&
             /off/.test(r2.off.label) && r2.off.shown === "none");
         const real = (perr || []).filter((e) => !/favicon/i.test(e));
+        // v4920 -- the hold above must slow the loop and must not stop it: a page that never drew would still load, and
+        // the capture rows cannot tell (see the note above on what a screenshot can and cannot see).
+        const heldS = (tEnd - tHold) / 1000, ceil = Math.ceil(heldS * 1000 / FRAME_MS) + 2;
+        ok(`  the page's frame loop was HELD to one frame per ${FRAME_MS} ms for this section, not stopped: ${held} frames in ${heldS.toFixed(1)} s`,
+            held >= 10 && held <= ceil, `at most ${ceil} fit; unheld it would be about ${Math.round(heldS * 60)}`);
+        if (rp.err) ok("*** the paused page's repaints could be counted ***", false, rp.err);
+        else {
+            ok(`*** PAUSED AND IDLE, THE PAGE DOES NOT REPAINT: ${rp.idle} repaints in 1.5 s while its loop ran ${rp.idleFrames} frames ***`,
+                rp.idle <= 1 && rp.idleFrames >= 5, "orrery.html repainted its whole canvas every frame before v4923, and that is what queued the rig's screenshots");
+            ok(`  and every input that changes the picture repaints it: time ${rp.time}, follow ${rp.follow}, zoom ${rp.zoom}, surface ${rp.surface}, window size ${rp.size}, letting go of the body (zoom unchanged) ${rp.unfollow}`,
+                [rp.time, rp.follow, rp.zoom, rp.surface, rp.size, rp.unfollow].every((n) => n >= 1),
+                "an input missing from the page's key would leave its picture stale until something else moved");
+            ok(`  and settles again after them (${rp.again} in 0.8 s), and PLAYING repaints every frame: ${rp.playing} in 0.8 s`,
+                rp.again <= 1 && rp.playing >= 4);
+        }
         ok("  and the page threw nothing on the way", real.length === 0, real.slice(0, 2).join(" | ") || "clean");
         report("this is the step v4273 named and did not take: the module existed, attached and drew, and " +
             "nothing on the page could ask it to. Now a person can.");

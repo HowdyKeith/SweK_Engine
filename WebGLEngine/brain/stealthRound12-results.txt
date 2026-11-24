@@ -1,0 +1,18 @@
+== loom 10 -> 90 deg: GF peak (mV), peak time to contact (ms), LC4 term peak (mV); plain | with stripe cue | relative GF change
+r/v 10 ms L: GF 3.272 mV at -2.3 ms, LC4 2.003 | with cue GF 3.292 at -2.3 ms, LC4 2.035 | GF change 0.61 %
+r/v 10 ms S: GF 4.114 mV at -4.8 ms, LC4 1.839 | with cue GF 4.125 at -4.8 ms, LC4 1.841 | GF change 0.28 %
+r/v 20 ms L: GF 2.860 mV at -29.6 ms, LC4 1.101 | with cue GF 2.878 at -29.6 ms, LC4 1.135 | GF change 0.62 %
+r/v 20 ms S: GF 3.651 mV at -25.1 ms, LC4 1.739 | with cue GF 3.688 at -25.6 ms, LC4 1.746 | GF change 1.00 %
+r/v 40 ms L: GF 2.653 mV at -81.2 ms, LC4 0.571 | with cue GF 2.670 at -81.2 ms, LC4 0.606 | GF change 0.65 %
+r/v 40 ms S: GF 2.994 mV at -69.2 ms, LC4 1.468 | with cue GF 3.074 at -69.7 ms, LC4 1.502 | GF change 2.68 %
+r/v 80 ms L: GF 2.536 mV at -183.9 ms, LC4 0.291 | with cue GF 2.553 at -183.4 ms, LC4 0.326 | GF change 0.67 %
+r/v 80 ms S: GF 2.505 mV at -174.4 ms, LC4 0.944 | with cue GF 2.591 at -171.9 ms, LC4 1.046 | GF change 3.45 %
+
+== stripes alone: a static 40 deg ellipse, only the stripe velocity as LC4 input (above each form's zero-velocity value)
+L: LC4 term peak with stripes 0.0159 mV, without 0.0000 mV; stripe speed 38.2 deg/s
+S: LC4 term peak with stripes 0.0000 mV, without 0.0000 mV; stripe speed 38.2 deg/s
+
+S at 0, 38, 86, 630, 5700 deg/s: -0.200, -0.184, -0.136, 0.849, 1.855 mV; L (weighted): 0.000, 0.016, 0.036, 0.262, 2.370 mV
+
+LC4 peak L vs S on the plain loom: r/v 10: L 2.00 S 1.84 | r/v 20: L 1.10 S 1.74 | r/v 40: L 0.57 S 1.47 | r/v 80: L 0.29 S 0.94
+GF peak time L vs S (ms): r/v 10: -2.3 vs -4.8 | r/v 20: -29.6 vs -25.1 | r/v 40: -81.2 vs -69.2 | r/v 80: -183.9 vs -174.4

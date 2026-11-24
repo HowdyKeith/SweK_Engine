@@ -1,0 +1,19 @@
+{"ls":5,"g":10,"movingOverGray":0.556,"grayLowOverHigh":0.278,"err":0.169,"spikes":[18,10,5]}
+{"ls":13,"g":3,"movingOverGray":0.905,"grayLowOverHigh":0.524,"err":0.18,"spikes":[21,19,11]}
+{"ls":8,"g":10,"movingOverGray":0.526,"grayLowOverHigh":0.421,"err":0.199,"spikes":[19,10,8]}
+{"ls":5,"g":3,"movingOverGray":0.944,"grayLowOverHigh":0.278,"err":0.219,"spikes":[18,17,5]}
+{"ls":8,"g":3,"movingOverGray":0.947,"grayLowOverHigh":0.421,"err":0.222,"spikes":[19,18,8]}
+{"ls":13,"g":10,"movingOverGray":0.476,"grayLowOverHigh":0.524,"err":0.249,"spikes":[21,10,11]}
+{"ls":21,"g":1,"movingOverGray":1.087,"grayLowOverHigh":0.739,"err":0.364,"spikes":[23,25,17]}
+{"ls":21,"g":3,"movingOverGray":0.826,"grayLowOverHigh":0.739,"err":0.364,"spikes":[23,19,17]}
+gray low/high by lumScale (g-independent since gray has D=0):
+  ls 1 0/5=0.00
+  ls 2 0/8=0.00
+  ls 3 0/13=0.00
+  ls 5 5/18=0.28
+  ls 8 8/19=0.42
+  ls 13 11/21=0.52
+  ls 21 17/23=0.74
+  ls 34 18/24=0.75
+  ls 55 21/26=0.81
+  ls 255 27/33=0.82

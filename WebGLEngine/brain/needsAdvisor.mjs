@@ -18,6 +18,13 @@ export function adviceOf(r) {
     return { surface: !!r.refills && r.frac < threshold, pump: r.flood > FLOOD_MIN && r.frac > PUMP_MIN_CHARGE, repair: r.depth < RETURN_DEPTH && r.damage > 0 && r.frac > PUMP_MIN_CHARGE, threshold };
 }
 
+/** The target a hull advised to surface flies: the surface itself for a hull that refills only there (refillDepth 1 m or less), else the snorkel band (`snorkelFraction` of its refill depth, never deeper than asked); the speed is the target's or `speed`.
+ * Shared with brain/subStations.mjs's energy station (2026-11-19), so the station and this wrapper cannot drift apart. */
+export function surfaceTarget(target, r, { speed = 1.5, snorkelFraction = 0.75 } = {}) {
+    const sp = target.speed === undefined ? speed : target.speed;
+    return r.refillDepth <= 1 ? { ...target, surface: true, speed: sp } : { ...target, depth: Math.min(target.depth, r.refillDepth * snorkelFraction), speed: sp };
+}
+
 /** wrap(inner, { read, speed }) -> pilot(state, target, current, aux) with `advice` (the last one, a getter) and `refilling` (it is on the refill trip now). `inner` is a pilot function; it must be brain/surfacePilot.mjs's wrapper for a battery hull (the target's `surface: true` is read there). */
 export function wrap(inner, { read, speed = 1.5, snorkelFraction = 0.75 } = {}) {
     if (typeof inner !== "function" || typeof read !== "function") throw new Error("needsAdvisor.wrap: a pilot function and a read() function are needed");
@@ -25,9 +32,7 @@ export function wrap(inner, { read, speed = 1.5, snorkelFraction = 0.75 } = {}) 
     const pilot = (state, target, current = [0, 0, 0], aux) => {
         const r = read(); last = adviceOf(r);
         if (!last.surface) return inner(state, target, current, aux);
-        const sp = target.speed === undefined ? speed : target.speed;
-        const t = r.refillDepth <= 1 ? { ...target, surface: true, speed: sp } : { ...target, depth: Math.min(target.depth, r.refillDepth * snorkelFraction), speed: sp };
-        return inner(state, t, current, aux);
+        return inner(state, surfaceTarget(target, r, { speed, snorkelFraction }), current, aux);
     };
     Object.defineProperty(pilot, "advice", { get: () => ({ ...last }) });
     Object.defineProperty(pilot, "refilling", { get: () => last.surface });

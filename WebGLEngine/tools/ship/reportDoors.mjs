@@ -156,6 +156,26 @@ export const FORMATTERS = Object.freeze([
     // v4905 -- THREE ARRIVALS, found by this gate reading 19 formatters against 16 registered and each confirmed by CALLING it bare (the section 3 loop): the rung 4a v4 and v5 study libraries and the piece 4 trainer, each reportLines(records ...) with no default.
     "tools/ship/subEstimatorStudyV4.mjs",
     "tools/ship/subEstimatorStudyV5.mjs",
+    "tools/ship/subEstimatorStudyV6.mjs",   // v4922: rung 4a v6's study, reportLines(records); refuses bare (records.find of undefined)
+    "tools/ship/lesionLeftSide.mjs",        // v4922: the left-side lesion round, reportLines(records, { plan, sha256 }); refuses bare
+    // v4927: the submarine duel's seventeen evade reads (claude/fish-vestibular-helper), each reportLines(rows, rules, name, ...); each refuses bare (SETS[undefined].first), measured by calling
+    "tools/ship/takeEvadeAbroad.mjs",
+    "tools/ship/takeEvadeAway.mjs",
+    "tools/ship/takeEvadeDose.mjs",
+    "tools/ship/takeEvadeGates.mjs",
+    "tools/ship/takeEvadeLadder.mjs",
+    "tools/ship/takeEvadeMove.mjs",
+    "tools/ship/takeEvadeOpponent.mjs",
+    "tools/ship/takeEvadePairs.mjs",
+    "tools/ship/takeEvadePing.mjs",
+    "tools/ship/takeEvadeReach.mjs",
+    "tools/ship/takeEvadeSeat.mjs",
+    "tools/ship/takeEvadeSpeed.mjs",
+    "tools/ship/takeEvadeSpeedFine.mjs",
+    "tools/ship/takeEvadeSplit.mjs",
+    "tools/ship/takeEvadeTop.mjs",
+    "tools/ship/takeEvadeTrack.mjs",
+    "tools/ship/takeEvadeTurn.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
     // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
     "tools/ship/advisorChipStudy.mjs",
@@ -165,6 +185,18 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/deciderAudit.mjs",
     "tools/ship/plainNetStudy.mjs",
     "tools/ship/takeTankDropout.mjs",
+    // 2026-11-08 -- SEVEN ARRIVALS FROM THIS BRANCH (the round-7 to round-11 readers and trainers), found by this gate reading 32 formatters against 25 registered; each is confirmed by CALLING it bare in the section 3 loop, which is what sorts it into the strict or the tolerant list below.
+    "tools/ship/plainNetVariants.mjs",
+    "tools/ship/takeAfterAction.mjs",
+    "tools/ship/takeCounterfactual.mjs",
+    "tools/ship/takeRighting.mjs",
+    "tools/ship/tankPairedReplicate.mjs",
+    "tools/ship/trainDecisionCircuit.mjs",
+    "tools/ship/trainStation.mjs",
+    // v4933 -- two more that take a SUBJECT, from the round since v4932: brain/peerFleet.mjs's reportLines(A, B, R) (the two folders and the fight's result) and
+    // tools/denoiseLayers.mjs's reportLines(r) (a timing run). Found by tools/ship/reportDoors-selfcheck.mjs at the ship, 53 measured against 51 registered.
+    "brain/peerFleet.mjs",
+    "tools/denoiseLayers.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -222,6 +254,26 @@ export const STRICT_FORMATTERS = Object.freeze([
     // v4905 -- the three arrivals of FORMATTERS' v4905 entry, each confirmed by CALLING it bare: they refuse.
     "tools/ship/subEstimatorStudyV4.mjs",
     "tools/ship/subEstimatorStudyV5.mjs",
+    "tools/ship/subEstimatorStudyV6.mjs",   // v4922: rung 4a v6's study, reportLines(records); refuses bare (records.find of undefined)
+    "tools/ship/lesionLeftSide.mjs",        // v4922: the left-side lesion round, reportLines(records, { plan, sha256 }); refuses bare
+    // v4927: the submarine duel's seventeen evade reads (claude/fish-vestibular-helper), each reportLines(rows, rules, name, ...); each refuses bare (SETS[undefined].first), measured by calling
+    "tools/ship/takeEvadeAbroad.mjs",
+    "tools/ship/takeEvadeAway.mjs",
+    "tools/ship/takeEvadeDose.mjs",
+    "tools/ship/takeEvadeGates.mjs",
+    "tools/ship/takeEvadeLadder.mjs",
+    "tools/ship/takeEvadeMove.mjs",
+    "tools/ship/takeEvadeOpponent.mjs",
+    "tools/ship/takeEvadePairs.mjs",
+    "tools/ship/takeEvadePing.mjs",
+    "tools/ship/takeEvadeReach.mjs",
+    "tools/ship/takeEvadeSeat.mjs",
+    "tools/ship/takeEvadeSpeed.mjs",
+    "tools/ship/takeEvadeSpeedFine.mjs",
+    "tools/ship/takeEvadeSplit.mjs",
+    "tools/ship/takeEvadeTop.mjs",
+    "tools/ship/takeEvadeTrack.mjs",
+    "tools/ship/takeEvadeTurn.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
     // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
     "tools/ship/advisorChipStudy.mjs",
@@ -231,6 +283,18 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/deciderAudit.mjs",
     "tools/ship/plainNetStudy.mjs",
     "tools/ship/takeTankDropout.mjs",
+    // 2026-11-08 -- the same seven, each confirmed by CALLING it bare (see the FORMATTERS entry above): they refuse.
+    "tools/ship/plainNetVariants.mjs",
+    "tools/ship/takeAfterAction.mjs",
+    "tools/ship/takeCounterfactual.mjs",
+    "tools/ship/takeRighting.mjs",
+    "tools/ship/tankPairedReplicate.mjs",
+    "tools/ship/trainDecisionCircuit.mjs",
+    "tools/ship/trainStation.mjs",
+    // v4933 -- both measured by CALLING them bare: brain/peerFleet.mjs refuses with "Cannot read properties of undefined (reading 'id')", tools/denoiseLayers.mjs with
+    // "Cannot read properties of undefined (reading 'software')". Neither fabricates a report out of nothing.
+    "brain/peerFleet.mjs",
+    "tools/denoiseLayers.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -290,6 +354,11 @@ export const CALL_COST_V4459 = Object.freeze({
             cheap: "MEASURED", cheapFlag: "{ live: false }", cheapArg: Object.freeze({ live: false }),
             cheapSeconds: 0.0, linesBare: 19, linesCheap: 18 }),
         Object.freeze({ rel: "physics/thermal/stefan.mjs", bare: 70.0,
+            cheap: "IMPOSSIBLE" }),
+        // v4933 -- brain/battleshipDuel.mjs (the round since v4932) sorts into the bounded sample's first fourteen and its report FLIES FIGHTS: 3.99 s bare on
+        // this box, which took reportDoors-selfcheck from 1.7 s to 7.1 s and out of the quick sweep with every row green. reportLines() takes no parameter, so
+        // there is no cheap path to measure -- IMPOSSIBLE, as for stefan.
+        Object.freeze({ rel: "brain/battleshipDuel.mjs", bare: 4.0,
             cheap: "IMPOSSIBLE" }),
         // *** THE ENTRY THAT LOOKED BEST-SUPPORTED IN v4458's TABLE WAS THE MOST WRONG ONE. *** It read
         // `cheapFlag: "{ live: false } -- HAS NO EFFECT", cheap: 72.3` -- a flag, a verdict and a number,
@@ -499,6 +568,8 @@ export const GATED_ELSEWHERE = Object.freeze({
     // v4905 -- the v4 and v5 study libraries, each imported by the gate of its reservoir library (tools/subReservoirV4-selfcheck.mjs and V5).
     "tools/ship/subEstimatorStudyV4.mjs": "tools/subReservoirV4-selfcheck.mjs",
     "tools/ship/subEstimatorStudyV5.mjs": "tools/subReservoirV5-selfcheck.mjs",
+    // v4922 -- the v6 study library, imported (by its default path, behind the sabotage hook) by tools/subReservoirV6-selfcheck.mjs.
+    "tools/ship/subEstimatorStudyV6.mjs": "tools/subReservoirV6-selfcheck.mjs",
 });
 /** v4901 -- the two study libraries of the merged rung 4a line (tools/ship/subEstimatorStudy.mjs and subEstimatorStudyV3.mjs): gated from tools/subHeadingEstimator-selfcheck.mjs and tools/subReservoirV3-selfcheck.mjs, which carry other names (see GATED_ELSEWHERE). */
 export const NO_GATE_V4901 = Object.freeze([
@@ -510,9 +581,13 @@ export const NO_GATE_V4905 = Object.freeze([
     "tools/ship/subEstimatorStudyV4.mjs",
     "tools/ship/subEstimatorStudyV5.mjs",
 ]);
+/** v4922 -- the rung 4a v6 study library, gated from the gate of its reservoir library (see GATED_ELSEWHERE). */
+export const NO_GATE_V4922 = Object.freeze([
+    "tools/ship/subEstimatorStudyV6.mjs",
+]);
 export const NO_GATE_ALL = Object.freeze([...new Set(
     [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587,
-     ...NO_GATE_V4778, ...NO_GATE_V4898, ...NO_GATE_V4901, ...NO_GATE_V4905])].sort());
+     ...NO_GATE_V4778, ...NO_GATE_V4898, ...NO_GATE_V4901, ...NO_GATE_V4905, ...NO_GATE_V4922])].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

@@ -7,14 +7,15 @@
 // Pure: no clock, no Math.random, no file, no DOM.
 "use strict";
 
-/** What is NOT on the board, said on the page (brain/BACKLOG_2026-11-04_BRAINS.md): the brains whose kinds are on another branch or not built. */
+/** What is NOT on the board, said on the page (brain/BACKLOG_2026-11-04_BRAINS.md): the brains whose kinds are on another branch or not built. The fish pilot (803 weights), the stateful and stateless fly (1,729; brain/lesionFlyCx.mjs) and the lesion toggle are on the board now (brain/lesion.mjs). */
 export const notOnBoard = Object.freeze([
-    "the fish pilot (803 weights): the tank flies only the fly's 963 until its kind is registered",
-    "the stateful fly heading loop (1,729 weights) and the stateless fly: their kind and weights are on another branch",
     "the plain-net control and the single leaky unit: not built into the board yet",
     "the trained needs circuit: no champion weights file in this tree",
     "the disturbance task (fish 4b): not built into the board yet",
+    "a lesion on a survey (decision-layer) arm: the lesion toggle silences neurons of a circuit pilot, so it is on the dropout task only",
 ]);
+/** What a lesion reading does and does not say, as the page prints it under the lesion lines (brain/lesion.mjs). */
+export const lesionCaveat = "A lesion's cost is the intact arm's score minus the lesioned arm's, paired on the same ids. The class is ranked among random sets of its size; the random sets are MATCHED on how many of the autopilot's eight hand-weight neurons they hold (in the fly's circuit those eight are all GFC2), so a cost that is only the loss of the autopilot's channels is not read as the class's; for the fly reservoir they are matched on cell role (input, output, both, neither), and a whole cell type, which is one role there, is drawn unmatched and its cost includes losing that role. With R draws the smallest rank p is 1/(R+1). A class that costs no more than its random sets has shown nothing about the class.";
 /** The reading of the pairs, as the page prints it: what a TIE and a BEATS do and do not say. */
 export const caveat = Object.freeze({
     survey: "Scores are the survey's (0.45 stations visited + 0.45 home + 0.1 hull; a crushed boat 0). A twin that TIES the rule at the same constants has not shown a gain on these dives; the series measured about +0.02 on 2,000 dives, which a handful of dives cannot see.",
@@ -50,7 +51,7 @@ export function viewOf(rd, taskName) {
     }));
     return { head: rd.lines[0], rows, caveat: caveat[taskName] || "" };
 }
-/** The result as plain text (what the page's copy button puts on the clipboard): the board's own lines, the caveat and what is not on the board. */
-export function textOf(rd, taskName) {
-    return [...rd.lines, "", caveat[taskName] || "", "", "NOT ON THE BOARD YET:", ...notOnBoard.map((l) => "  - " + l)].join("\n");
+/** The result as plain text (what the page's copy button puts on the clipboard): the board's own lines, the lesion lines (brain/lesion.mjs lesionReading) and their caveat when there are any, the caveat and what is not on the board. */
+export function textOf(rd, taskName, lesionLines = []) {
+    return [...rd.lines, ...(lesionLines.length ? ["", "LESIONS:", ...lesionLines, lesionCaveat] : []), "", caveat[taskName] || "", "", "NOT ON THE BOARD YET:", ...notOnBoard.map((l) => "  - " + l)].join("\n");
 }
