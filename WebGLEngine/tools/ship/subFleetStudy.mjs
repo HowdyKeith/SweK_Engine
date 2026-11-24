@@ -43,7 +43,7 @@ const pooled = (cells, arm, k) => F.SIZES.reduce((m, n) => m + ((cells[cellKey(n
  */
 export function judge(cells) {
     const rc = pooled(cells, F.REFERENCE, "subContacts"), dc = pooled(cells, F.DESIGNATED, "subContacts"), ra = pooled(cells, F.REFERENCE, "arrivals"), da = pooled(cells, F.DESIGNATED, "arrivals");
-    const flown = !!cells[cellKey(4, F.REFERENCE)] || !!cells[cellKey(8, F.REFERENCE)], gain = flown && !!cells[cellKey(4, F.DESIGNATED)] && dc <= THRESH.contactFraction * rc, moves = flown && ra > 0 && da >= THRESH.arrivalFraction * ra;
+    const flown = !!cells[cellKey(4, F.REFERENCE)] || !!cells[cellKey(8, F.REFERENCE)], gain = flown && (!!cells[cellKey(4, F.DESIGNATED)] || !!cells[cellKey(8, F.DESIGNATED)]) && dc <= THRESH.contactFraction * rc, moves = flown && ra > 0 && da >= THRESH.arrivalFraction * ra;
     const ratio = (n) => { const r = cells[cellKey(n, F.REFERENCE)], d = cells[cellKey(n, F.DESIGNATED)]; return r && d && r.subContacts > 0 ? d.subContacts / r.subContacts : NaN; };
     const r8 = cells[cellKey(8, F.REFERENCE)], d = (k) => pooled(cells, F.DESIGNATED, k);
     return { gain, moves, verdict: gain && moves ? "SUPPORTED" : gain || moves ? "PARTLY SUPPORTED" : "NOT SUPPORTED", f1: !!r8 && r8.medianContacts >= THRESH.medianContacts, f2: gain, f3: moves, f4: d("runs") > 0 && d("seaHits") <= THRESH.seaSlack * pooled(cells, F.REFERENCE, "seaHits"), f5: d("plans") > 0 && d("noRoutePlans") / d("plans") >= THRESH.noRoute, f6: Number.isFinite(ratio(4)) && Number.isFinite(ratio(8)) && ratio(4) < ratio(8), ratios: [ratio(4), ratio(8)] };
