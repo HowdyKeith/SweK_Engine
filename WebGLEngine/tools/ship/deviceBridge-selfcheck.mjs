@@ -153,5 +153,37 @@ async function runToEnd(body, maxMs = 30000) {
     ok("server.js: dispatches deviceBridge.owns(req.url)", /deviceBridge\.owns\(req\.url\)/.test(srv));
 }
 
+// 9. v4933 -- THE VAULT IS READ ONCE PER TTL, NOT ONCE PER CALL. On Windows each provider with no env key is a powershell.exe start (about 2.5 s on the 8 GB rig) and a /device/list asked for one provider's key at a time -- 16 starts a list, 10 s of this gate's 19.8 s there, which is
+// why the sweep killed it at its 20 s cap. THE SPAWN IS COUNTED HERE ON A FRESH aiCreds with child_process.execFileSync and process.platform stood in (restored in the finally), so the row holds on Linux too, where powershell.exe does not exist and the old code was fast.
+{
+    const cp = require("child_process"), realExec = cp.execFileSync, platDesc = Object.getOwnPropertyDescriptor(process, "platform"), realLog = console.log;
+    const keys = ["GROK_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"], savedEnv = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    const credsPath = require.resolve(path.join(ENG, "ai-bridge", "aiCreds.js")), savedModule = require.cache[credsPath];
+    let calls = 0, first = -1, afterThree = -1, afterForce = -1, res = null, again = null, ttl = null;
+    try {
+        for (const k of keys) delete process.env[k];
+        Object.defineProperty(process, "platform", { value: "win32" });
+        cp.execFileSync = () => { calls++; return ""; };
+        delete require.cache[credsPath];
+        console.log = () => {};
+        const creds = require(credsPath);
+        ttl = creds.KEY_TTL_MS;
+        res = creds.loadKeysIntoEnv(); first = calls;
+        res.grok = "tampered"; again = creds.loadKeysIntoEnv(); creds.loadKeysIntoEnv(); afterThree = calls;
+        creds.loadKeysIntoEnv({ force: true }); afterForce = calls;
+    } finally {
+        console.log = realLog;
+        cp.execFileSync = realExec;
+        if (platDesc) Object.defineProperty(process, "platform", platDesc);
+        for (const k of keys) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
+        if (savedModule) require.cache[credsPath] = savedModule; else delete require.cache[credsPath];
+    }
+    ok("aiCreds: a first read starts one vault read per provider with no env key (4 on Windows) and reports every provider", first === 4 && res && ["grok", "gemini", "openai", "claude"].every((p) => p in res), `calls ${first}`);
+    ok("aiCreds: two more reads inside the TTL start NO more (still 4), so a /device/list is 4 vault reads and not 16", afterThree === 4, `calls after three reads ${afterThree}`);
+    ok("aiCreds: the cached answer is a COPY (changing a returned result does not change the next one)", again && again.grok === "none");
+    ok("aiCreds: { force: true } re-reads (4 more), and the TTL is 30 s (a key saved to the vault is seen within it)", afterForce === 8 && ttl === 30000, `calls after force ${afterForce}, ttl ${ttl}`);
+    ok("aiCreds: the platform, the spawn function and the env keys are restored (nothing leaks into the sweep)", process.platform === (platDesc && platDesc.value) && cp.execFileSync === realExec && keys.every((k) => process.env[k] === savedEnv[k]));
+}
+
 console.log("deviceBridge-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);
