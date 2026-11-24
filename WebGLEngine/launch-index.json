@@ -1655,7 +1655,7 @@
    "id": "gizmo-demo.html",
    "display": "Gizmo Demo",
    "href": "/gizmo-demo.html",
-   "section": null,
+   "section": "Recent New Pages",
    "collision": false
   },
   {
@@ -2143,7 +2143,7 @@
    "id": "lights-demo.html",
    "display": "Lights Demo",
    "href": "/lights-demo.html",
-   "section": null,
+   "section": "Recent New Pages",
    "collision": false
   },
   {
@@ -2151,7 +2151,7 @@
    "id": "lights-gpu.html",
    "display": "Lights Gpu",
    "href": "/lights-gpu.html",
-   "section": null,
+   "section": "Recent New Pages",
    "collision": false
   },
   {
@@ -3439,7 +3439,7 @@
    "id": "splat-gpu.html",
    "display": "Splat Gpu",
    "href": "/splat-gpu.html",
-   "section": null,
+   "section": "Recent New Pages",
    "collision": false
   },
   {

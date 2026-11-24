@@ -1317,7 +1317,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4932 -- the merge, rounds 13-15 and the stealthFigure4 command: ES modules 5410 -> 5468, closures 5193 -> 5246, async/await 2255 -> 2256, typed arrays 1609 -> 1620, read off the gate.
     // v4933 -- the round since v4932 (the PlayCanvas line, the duel studies, the fly pathways, the pair pool): ES modules 5468 -> 5704, closures 5246 -> 5466, async/await 2256 -> 2429, typed arrays 1620 -> 1714, Promises 587 -> 619, read off the gate.
     // v4933, later the same day -- async/await 2429 -> 2435: six gates that had no await now import their module for the export-list row the ship added (tools/ship/definitionGates-selfcheck.mjs's naming).
-    esModules: 5704, closures: 5466, asyncAwait: 2435, typedArrays: 1714, promises: 619,
+    // v4933, the verdict after the hold -- async/await 2435 -> 2436: the commit after the last census re-take (94aa76bad, Recent New Pages: pageSections and its gate) added one file that awaits; no other row moved.
+    esModules: 5704, closures: 5466, asyncAwait: 2436, typedArrays: 1714, promises: 619,
     // v4920 -- tools/ship/orreryPost-selfcheck.mjs holds the orrery page's frame loop from an init script and so names requestAnimationFrame for the first time: 135 -> 136; the other rows held.
     // v4922 -- performance.now 282 -> 284 (the reservoir kernel's gate and its rig command time the device) and WebGPU 84 -> 86 (brain/reservoirGpu.mjs and its gate); the other rows held.
     // v4926 -- performance.now 284 -> 285 and WebGPU 86 -> 89 (brain/reservoirPilotGpu.mjs, render/subAquariumFlyCxGpu.mjs and the aquarium's GPU switch gate); the other rows held.
