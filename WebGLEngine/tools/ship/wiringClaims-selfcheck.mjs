@@ -1,12 +1,13 @@
 // WebGLEngine/tools/ship/wiringClaims-selfcheck.mjs -- v3370
 // *** A WIRING CLAIM IS A FACT ABOUT THE IMPORT GRAPH WRITTEN DOWN IN PROSE, WHERE NOTHING RE-DERIVES IT. ***
 // Twelve times this session a record outlived the code, and every one was the sentence "X is not wired".
-import { auditClaims, importedModules, CLAIM_PATTERNS } from "./wiringClaims.mjs";
+import { auditClaims, importedModules, newContext, CLAIM_PATTERNS } from "./wiringClaims.mjs";
 let failed = 0;
 const say = (m) => console.log("  ----  " + m);
 const ok = (l, c, n) => { console.log("  " + (c ? "PASS" : "FAIL") + "  " + l + (n ? "   " + n : "")); if (!c) failed++; };
 
-const reached = importedModules();
+const CTX = newContext();   // v4933 -- one context for the whole gate: each file is read once, not three times (see wiringClaims.mjs)
+const reached = importedModules(undefined, CTX);
 say(reached.size + " modules reached by a real import specifier");
 ok("!! reachability is by real specifier, never a substring",
     reached.size > 500 && reached.has("fluid/multigridGPU.js"),
@@ -16,7 +17,7 @@ ok("!! reachability is by real specifier, never a substring",
 ok("!! ...and a module reached ONLY by its own selfcheck does not count as wired",
     true, "orphanScan's own rule, inherited rather than re-invented");
 
-const claims = auditClaims();
+const claims = auditClaims(undefined, CTX);
 say("prose wiring-claims whose subject IS reachable: " + claims.length +
     (claims.length ? " -- " + claims.map((c) => c.subject).join(", ") : ""));
 
