@@ -1797,3 +1797,36 @@ brain/plannerCircuitSeat.mjs gains a look-ahead variant. It has the same base, c
 - tools/ship/lookaheadCircuitCmd.mjs, export-free.
 - tools/ship/lookaheadCircuit-selfcheck.mjs, with a mutation pass.
 - **Not in this round:** other net shapes, the planner's orders as features beyond their values, replacing the seat.
+
+## Round 43, RESULT (2026-11-25): THE LOOK-AHEAD CIRCUIT DOES NOT BEAT THE SEAT (V1 the hull under BIAS; V3 the score under BIAS; V4): NOTHING IS REPLACED
+
+**The training** ran on Keith's rig: four searches of 300 children, no resume. The ledger (`brain/rig-results/lookahead-circuit/`) was committed before any audit seed was flown.
+- Search 0 chose child 150 (held-out 0.9128 against the start's 0.9044); search 3 chose child 50 (0.9072); searches 1 and 2 chose child 0.
+- The champion is search 0, child 150. All four were eligible (pool crushed 0, the start's 0).
+- So, unlike Round 42, the look-ahead inputs DID let a search move above the start on held-out dives.
+
+**The audit** (seeds 57001-57300 `both`; read once; `brain/rig-results/lookahead-circuit-report.json`). All nine checks passed, including NEW'S START IS THE SHIPPED SEAT and THE GETTER IS PASSIVE (the seat reproduces Round 42's recorded SEAT-04 dives).
+
+| arm | REF score (crushed/stranded) | BIAS score (crushed/stranded) |
+|---|---|---|
+| NEW (search 0, child 150) | 0.8078 (3/0) | 0.8186 (14/1) |
+| SEAT-04 (the shipped seat) | 0.8113 (0/0) | 0.8585 (0/0) |
+
+- V1: NEW's hull is WORSE than the seat's under BIAS, 15 against 0.
+- V2: no worse at REF (3 against 0).
+- V3: NEW minus the seat is -0.0035 (se 0.0060) at REF, LOSES, clears; -0.0399 (se 0.0106) under BIAS, HURTS.
+- V4: no.
+- Reported, not weighed: station overrides on 1 of 300 dives at REF (20 ticks) and 3 of 300 under BIAS (35 ticks).
+- **Not reported, and said plainly:** section 7 registered the mean |output| of each residual on NEW's dives. The command does not print it. It is not computed after the read.
+
+**Against the expectations of section 8 (written first):**
+- The champion is the start, about 45: NO.
+- Some search beats the start on held-out, about 55: YES (two of four).
+- V1 about 85: FAILED. V2 about 95: held. V3 about 85: missed under BIAS.
+- V4 about 10, and the profile replaced about 10: no.
+
+**WHAT THIS MEANS.**
+- The held-out gain (+0.0084 over the start) did not survive a fresh audit. On new dives the trained net is below the seat at both gauges, and under the biased gauge it loses hulls the seat does not lose.
+- The likeliest reading is that a +0.008 gain chosen as the best of 28 checkpoints is selection noise, and the moves it bought cost robustness to the gauge fault. The training set includes BIAS dives, so this is not a condition the search never saw.
+- The aquarium's circuit profile stays Round 42's: the shipped seat. Nothing in the tree changes but the record.
+- The decision-circuit line has now tried three bases (rules, the seat, the seat plus its own look-ahead) and has not passed the seat. A further circuit round would need a reason beyond more inputs; that is Keith's call.
