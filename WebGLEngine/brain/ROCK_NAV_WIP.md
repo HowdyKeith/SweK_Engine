@@ -97,3 +97,45 @@ Pairs are (seed, kind), N against D.
 * tools/ship/rockNavStudy.mjs, holding the arms, the endpoints, the checks and the verdict; Round B will add an arm to it.
 * tools/ship/rockNavStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/rock-nav/).
 * tools/ship/rockNavStudy-selfcheck.mjs, with a mutation pass.
+
+## ROUND A, RESULT (2026-11-25): THE LAYER WINS THE APPROACH
+
+**DEV** (3101-3130, 120 pairs): all five checks passed.
+- The layer flew an aim on 651,915 of 916,359 pilot calls.
+- The hand-back was exact on all 243,169 calls inside the strafe range.
+- No aim lay in a blocked cell.
+- The DEV files and report were committed before any HELD seed was flown.
+
+**HELD** (3201-3290 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/held-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | D (doctrine) | N (the layer) |
+|---|---|---|
+| rock strikes before arriving | 260 | 26 |
+| arrived alive in the strafe range | 2590 | 2760 |
+| shot down before arriving | 30 | 87 |
+| rock strikes after arriving | 238 | 211 |
+| all rock strikes | 498 | 237 |
+| median arrival | 14.37 s | 15.90 s |
+| mean damage on the ship | 145.6 | 337.2 |
+| ship destroyed | 0 | 0 |
+
+- **V1 THE APPROACH:** LAYER BETTER. The layer was better in 173 fights, worse in 10, tied in 177; p < 0.0001.
+- **V2 ARRIVALS:** LAYER BETTER (161 against 53, p < 0.0001). So it is not DOCTRINE BETTER: the approach was not bought by not arriving.
+- **Reported:**
+  - Rock strikes after arriving: NO DIFFERENCE SHOWN (106 against 95, p 0.48).
+  - Aim fallbacks (null aims, so the doctrine was flown): 62,629 calls. NEAR aims: 152,621 calls.
+  - The ship's worst drift from its start: D 189.0, N 456.1.
+
+**Against the expectations (written first):**
+- V1 LAYER BETTER, about 75: YES.
+- V2 not DOCTRINE BETTER, about 85: YES, and in fact LAYER BETTER.
+- Strikes after arrival higher under N, about 70: NO. The survey's warning did not hold at scale: 211 against 238, no difference shown. The survey had 12 fights.
+- Total struck lower under N, about 40: YES, halved (237 against 498).
+
+**WHAT THIS MEANS.**
+- The navigation layer does what it is for. It removes 90% of the approach's rock losses and delivers more fighters, about 1.5 s later. The extra fighters, plus the losses no longer taken, more than double the damage on the ship (reported, not weighed).
+- It does not cost the combat phase anything measurable. It does not help it either: about 0.6 fighters a fight are still lost to rocks while strafing. That is Round B's question.
+- **Two things the round shows and does not weigh:**
+  - **The goal goes stale.** The field is built once, round where the ship STARTED, and under N the ship drifts up to 456 units, because it turns to face the fighters that now reach it. A fighter already inside the old goal sphere but more than 220 from the ship has a null aim and flies the doctrine: 62,629 calls.
+  - **More fighters die to the guns on the approach** (87 against 30). They spend longer in the gunners' reach.
+- Neither is corrected here. A re-centred field is a candidate for a later round, not Round B, so that Round B tests one thing.
