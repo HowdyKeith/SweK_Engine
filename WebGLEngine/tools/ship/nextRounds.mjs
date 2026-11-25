@@ -3012,8 +3012,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "aquarium-kind-fields-consolidate",
-        blocker: "OPEN",
-        what: "Since the v4932 merge the tank's snapshot carries both main's `waiting` (weights held for a kind not registered yet) and the branch's `kindWait` ('kind' or 'count'), and only kindWait is read by the page (render/subAquariumKinds.mjs pilotLabel). Keeping both was the merge's safe choice, said in its commit.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25: DONE. Nothing in the tree read the snapshot's `waiting` (server.html's and ai/PipelineManager.js's are a network queue's); it is dropped from render/subAquariumSim.mjs's snapshot and render/subAquariumSim-selfcheck.mjs's exact field list, whose row goes red if it comes back. kindWait says the same with the reason. WAS: Since the v4932 merge the tank's snapshot carries both main's `waiting` (weights held for a kind not registered yet) and the branch's `kindWait` ('kind' or 'count'), and only kindWait is read by the page (render/subAquariumKinds.mjs pilotLabel). Keeping both was the merge's safe choice, said in its commit.",
         how: "Check nothing else reads `waiting` (a peer page, a bridge, a gate), then drop it from render/subAquariumSim.mjs's snapshot and from render/subAquariumSim-selfcheck.mjs's field list, or keep it and say why in the snapshot's comment. Small; one gate run.",
         why: "Two fields for one fact drift apart; the merge left the decision for later on purpose.",
     },
