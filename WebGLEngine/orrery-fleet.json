@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "40d7d32392d891c8a6852071c290c4817175ef79",
+ "head": "8f89223c06818056a8b55f7e81c22b2bfda24f35",
  "bodies": {
   "box3d": [
    {
@@ -597,8 +597,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    }
   ],
   "male-cns": [
@@ -793,8 +793,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -1048,7 +1048,7 @@
    {
     "path": "main.js",
     "bytes": 3828074,
-    "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "mpm3d.html",
@@ -1247,8 +1247,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1721,8 +1721,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1780,8 +1780,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",
