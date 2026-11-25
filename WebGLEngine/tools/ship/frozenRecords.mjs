@@ -69,7 +69,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as TR from "./treeRead.mjs";
-import { stripComments } from "../../vba/runtimeGap.mjs";
+import { stripComments, strippedOnce } from "../../vba/runtimeGap.mjs";
 import { resolveSpec } from "./importClosure.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -191,7 +191,8 @@ const _stripCache = new Map();     // absolute path -> comment-stripped source
  */
 function strippedOf(f, read, cacheable) {
     if (cacheable) { const hit = _stripCache.get(f); if (hit !== undefined) return hit; }
-    const out = stripComments(read(f));
+    // v4934 -- through runtimeGap's shared memo when the read is the real one, so the census recordDrift runs beside this one strips each file once
+    const out = cacheable ? strippedOnce(f, read(f)) : stripComments(read(f));
     if (cacheable) _stripCache.set(f, out);
     return out;
 }

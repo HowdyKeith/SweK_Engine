@@ -121,13 +121,44 @@ export const CENSUS_FIELDS = Object.freeze({
 export const stripComments = (src) =>
     src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
 
+// v4934 -- ONE STRIP PER FILE PER PROCESS. recordDrift runs this census and frozenRecords' census in one process, and both strip the
+// same texts with this same function (the gates, about 2,600 of the files, twice). Keyed by path AND validated against the exact text
+// (an identical string compares by pointer, so a hit is O(1); a fixture with the same path and different text is a miss and is
+// stripped afresh), so a caller that injects its own text can never be handed another file's answer.
+const _stripMemo = new Map();
+export function strippedOnce(file, text) {
+    const e = _stripMemo.get(file);
+    if (e !== undefined && e.text === text) return e.out;
+    const out = stripComments(text);
+    _stripMemo.set(file, { text, out });
+    return out;
+}
+
 /** Count, per capability, how many of `files` ({path, text}) use it in CODE. */
+// v4934 -- A LITERAL PRE-TEST FOR THE FOUR PATTERNS THAT ARE PURE ALTERNATIONS OF FIXED STRINGS. A regex alternation of N literals
+// scans the text N ways per file; `includes` of each literal is the same necessary condition and cheaper, and the regex still
+// decides (the pre-test only skips files that cannot match). MEASURED over the 6,274 files: census 826 -> see the v4934 note in
+// recordDrift's cost (counts identical, every row). PREFILTER_LITERALS is HELD to PATTERNS by runtimeGap-selfcheck: each list must
+// rebuild its pattern's own source exactly, so editing one table without the other goes red there.
+export const PREFILTER_LITERALS = Object.freeze({
+    "typed arrays": Object.freeze(["Float32Array", "Float64Array", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "Int8Array", "Int16Array", "Int32Array", "BigInt64Array", "BigUint64Array", "ArrayBuffer", "DataView"]),
+    "fetch/XHR": Object.freeze(["fetch(", "XMLHttpRequest"]),
+    "WebGPU": Object.freeze(["navigator.gpu", "requestAdapter"]),
+    "workers/threads": Object.freeze(["new Worker", "SharedArrayBuffer", "Atomics.", "worker_threads"]),
+});
 export function census(files, patterns = PATTERNS) {
     const out = {};
-    for (const k of Object.keys(patterns)) out[k] = 0;
+    const keys = Object.keys(patterns);
+    for (const k of keys) out[k] = 0;
+    // the literal pre-test applies only to the real table: a caller passing its own patterns gets the plain regex test
+    const pre = patterns === PATTERNS ? PREFILTER_LITERALS : {};
     for (const f of files) {
-        const code = stripComments(f.text);
-        for (const [k, re] of Object.entries(patterns)) if (re.test(code)) out[k]++;
+        const code = patterns === PATTERNS && f.path ? strippedOnce(f.path, f.text) : stripComments(f.text);
+        for (const k of keys) {
+            const lits = pre[k];
+            if (lits && !lits.some((l) => code.includes(l))) continue;
+            if (patterns[k].test(code)) out[k]++;
+        }
     }
     return { files: files.length, counts: out };
 }

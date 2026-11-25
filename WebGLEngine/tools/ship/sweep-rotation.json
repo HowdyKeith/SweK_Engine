@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-24T20:39:00.548Z",
+ "at": "2026-11-25T03:42:03.976Z",
  "poolAt": "2026-11-24T19:56:26.257Z",
  "poolHorizon": "2026-11-16T18:53:40.326Z",
  "budgetMs": 3000,
@@ -4785,10 +4785,10 @@
   },
   {
    "gate": "tools/ship/frozenRecords-selfcheck.mjs",
-   "ms": 1564,
+   "ms": 1717,
    "code": 0,
-   "priorMs": 2126,
-   "at": "2026-09-22T15:06:36.138Z"
+   "priorMs": 1649,
+   "at": "2026-11-25T03:42:01.570Z"
   },
   {
    "gate": "tools/ship/fsr2Coverage-selfcheck.mjs",
@@ -6392,10 +6392,10 @@
   },
   {
    "gate": "tools/ship/recordDrift-selfcheck.mjs",
-   "ms": 2073,
+   "ms": 2216,
    "code": 0,
-   "priorMs": 2142,
-   "at": "2026-09-22T15:06:50.685Z"
+   "priorMs": 2240,
+   "at": "2026-11-25T03:42:03.976Z"
   },
   {
    "gate": "tools/ship/recordFloat-selfcheck.mjs",
