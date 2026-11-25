@@ -71,3 +71,35 @@ the sandbox. No walk is run.
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeGradientCourse.mjs run` -> `brain/flyHomeGradientCourseRound.jsonl`, committed byte for
 byte, whole, before it is read; `node tools/ship/takeFlyHomeGradientCourse.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at ba08a98a, then read once)
+One start, 38.6 minutes on four processes, 13 records (sha256 b1a5f0d821808df3...). **The checks hold**: the three
+committed files as committed and passing their own checks; 12 choices of HOME16's walks on HOMEBYC's lives, each the first
+best of its 60 scores; draw 1 the same twice.
+* **Q: THE 16-LIFE WALK CHOSEN BY ITS COURSE SCORE CANNOT BE TOLD APART FROM THE 16-LIFE WALK CHOSEN ON ITS 64 HOMING
+  LIVES AT FINDING HOME** (9 above, 3 below, p 0.15).
+* **K: THE 16-LIFE WALK CHOSEN BY ITS COURSE SCORE CANNOT BE TOLD APART FROM THE 4-LIFE WALK CHOSEN BY ITS COURSE SCORE AT
+  FINDING HOME** (5 above, 7 below, p 0.77).
+* **G: THE 16-LIFE WALK CHOSEN BY ITS COURSE SCORE CANNOT BE TOLD APART FROM THE FLY TRAINED TO HOLD A COURSE AT FINDING
+  HOME** (ranks 169, the middle 150, p 0.29).
+
+| arm | home: mean (least, most) | course |
+|---|---|---|
+| H16BYC | 0.5548 (0.5470, 0.5578) | 0.6687 |
+| HOME16 (the gradient round) | 0.5517 | 0.6555 |
+| HOMEBYC (the chooser round) | 0.5542 | 0.6686 |
+| COURSE64 (round 4) | 0.5541 | 0.6688 |
+
+**Every expectation came**: Q CANNOT (55), K CANNOT (80), G CANNOT (75). So, as section 4 put it, **with the course
+chooser, the walk's lives do not show**, and **the homing fly reaches the course-trained one and no further**. The two
+changes that each helped HOMEP do not add up detectably: once the point is chosen by the course score, a walk scored on
+16 lives chooses a fly no better at home than one scored on 4, and both come home as the fly trained on the course does.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** H16BYC is above HOME16 by
+0.0031 on average (below on draws 5, 6 and 7), above HOMEBYC by 0.0006 and above COURSE64 by 0.0006. Its course score is
+COURSE64's to within 0.0002: chosen by holding a course, the homing walks give a fly that holds a course as the
+course-trained one does, and comes home as well, no better.
+
+**What it does not mean.** Section 6 holds. CANNOT is not equal; 12 draws a side would miss a difference of 0.0006. It
+says that for this fly and trainer the homing score, as trained and chosen here, leads to the course-trained fly's
+homing and not past it; it does not say no other trainer or score could, nor how an animal learns to home.
