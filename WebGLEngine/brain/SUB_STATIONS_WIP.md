@@ -847,3 +847,20 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 **DEV (212001 to 212048), the non-degeneracy checks only:** all three pass -- V1 (HOLD against TRIAGE, high rider) differ on 18; V2 (the same, default vessel) on 31; V3 (HOLD on the two vessels) on 48. So all three go to HELD. Seen on DEV and recorded (not a result): on the high rider HOLD broached on all 48; on the default vessel HOLD kept all 48 against TRIAGE's 17. NEED on the default vessel flipped its command a median 38 times a dive (up to 136) and emptied its bottle on 29 of 48 -- section 32's finding holds on the default vessel too.
 
 **Nothing was tuned.** HELD: HOLD, TRIAGE and NEED on both vessels on 213001 to 213096, to `brain/holdHeld.<part>.jsonl`, committed unread, then read once.
+
+## 37. ROUND 16 RESULT (2026-11-25; `brain/holdHeld.{0,1,2}.jsonl`, 576 dives, committed unread at `bb816be16`, then read ONCE)
+
+**VERDICTS (registered):**
+* **V2, the default vessel: HOLD BEATS TRIAGE.** HOLD keeps a boat TRIAGE loses on 59 dives and the reverse on 0 (p = 2e-18). **HOLD keeps all 96 hard-leak boats**; TRIAGE keeps 37 (59 crushed).
+* **V1, the high rider: TRIAGE BEATS HOLD,** 41 to 0 (p = 5e-13). **HOLD broaches on all 96**: held at -1, a quarter of the weight's buoyancy lifts that hull clear of the water.
+* **V3, the hull: DEFAULT BEATS HIGH RIDER,** 96 to 0.
+* Reported: NEED on the default vessel keeps 42 against TRIAGE's 37 (5 to 0, p = 0.031) and on the high rider 47; HOLD's 96 is far above both.
+
+**CORRECTIONS, FIRST.** (1) Rounds 12 and 13 (sections 28 and 32) put the limit on the HULL: "on these leaks the main tank's 3 % is not enough to matter often". **That was wrong.** On the default vessel the 3 % tank, blown and HELD, keeps every hard-leak boat in 96. The limit was the helm's use of the tank: re-read every tick, the blow was flooded back between ticks (section 32), and a held blow is all it took. (2) Section 31's expectation put V2 at "NO DIFFERENCE or STOPPED AT DEV about 60 percent"; it is the largest effect of the series.
+
+**What it says.**
+* A held blow on the default boat turns the hard leaks, which rounds 2, 9, 12 and 13 lost half of, into no losses at all.
+* On the high rider the same rule is a disaster as scored: every dive broaches. Round 2's task counts any status but submerged as a loss, so a boat that pops up at the surface is scored lost. Whether a broached boat is really lost is a question about that scoring and the model, not about the captain; but a rule for a big tank would need to release the blow near the surface, which HOLD does not ("nothing releases it", as registered).
+* The bigger tank is not the fix the backlog thought it was (stations-bigger-ballast-hull, round 13): the default tank was enough.
+
+**Status: round 16 CLOSED as registered.**

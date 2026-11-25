@@ -2919,8 +2919,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-held-blow",
-        blocker: "OPEN",
-        what: "Round 13 (brain/SUB_STATIONS_WIP.md section 32) found that no captain uses a bigger tank: TRIAGE never commands the main ballast, and NEED's per-tick gate flickers so the helm floods the tank back between blows (the bottle spent in about 140 s, the tank above -0.1). Register a HELD BLOW: once the rule blows, the tank is held blown (a latch), and ask again on the high rider whether the hull then keeps the hard-leak boats.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25 as round 16 (brain/SUB_STATIONS_WIP.md sections 35-37): on the DEFAULT vessel HOLD BEATS TRIAGE 59 to 0 and keeps all 96 hard-leak boats (TRIAGE 37) -- rounds 12 and 13 were wrong that the limit was the hull; on the high rider every held blow BROACHES (TRIAGE BEATS HOLD 41 to 0), so a big tank would need a release near the surface. WAS: Round 13 (brain/SUB_STATIONS_WIP.md section 32) found that no captain uses a bigger tank: TRIAGE never commands the main ballast, and NEED's per-tick gate flickers so the helm floods the tank back between blows (the bottle spent in about 140 s, the tank above -0.1). Register a HELD BLOW: once the rule blows, the tank is held blown (a latch), and ask again on the high rider whether the hull then keeps the hard-leak boats.",
         how: "A knob on subStations.triageCaptain (a blow latch, off by default, gated bit for bit) and a crew in brain/stationsTask.mjs; fresh DEV and HELD seed blocks; the same sign-test verdicts as section 31's V1 and V2. Report whether round 12's NEED on the default vessel was losing its air the same way.",
         why: "Rounds 9, 12 and 13 all stopped at DEV; section 32 shows why, and a held blow is the smallest change that lets the tank be used at all.",
     },
