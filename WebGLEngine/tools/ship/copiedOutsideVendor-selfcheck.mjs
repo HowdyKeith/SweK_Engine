@@ -107,7 +107,7 @@ console.log("1. *** THE GAP IS STRUCTURAL, and both halves of it are asserted ag
 console.log("\n2. *** THE POPULATION, and every entry's evidence is greppable in the file it names ***");
 {
     ok("the register holds " + C.COPIED.length + " copies and " + C.DERIVED.length + " derived works",
-        C.COPIED.length === 2 && C.DERIVED.length === 10);   // v4301: ui/qrDecode.mjs joined DERIVED
+        C.COPIED.length === 2 && C.DERIVED.length === 11);   // v4301: ui/qrDecode.mjs joined DERIVED; v4935: render/splatSortGPU.mjs (PlayCanvas's WGSL, notice in file)
     for (const c of C.COPIED) {
         const src = read(c.path);
         ok("  " + c.path + " exists and contains the evidence recorded for it",
@@ -169,10 +169,12 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
     // and a world/vendoredLicences.mjs entry. The count moved because the vendor tree grew; nothing outside vendor/ gained one.
     // v4895 -- thirty: the snowflow LICENSE (Noniv/snowflow_demo, MIT, Copyright (c) 2026 Maksymilian Dendura) arrived with the snowflow lift, under vendor/ where a vendored copy's notice belongs, with its
     // PROVENANCE.txt and a world/vendoredLicences.mjs entry. The count moved because the vendor tree grew; nothing outside vendor/ gained one.
-    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319, vendor/three-webgpu-r185 at v4805, vendor/web-ocean at v4880 and vendor/snowflow at v4895), quoters and in-file copies aside",
-        preexisting.length === 30, preexisting.join(" ").slice(0, 120) + "...");
-    ok("*** and 29 of those 30 are under vendor/ -- the 30th is a packaged dependency, not engine code ***",
-        underVendor.length === 29 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
+    // v4935 -- thirty-one: vendor/smaa/LICENSE (the SMAA anti-aliasing shaders, MIT) arrived with main's PlayCanvas rendering line at v4933, under vendor/ where a vendored copy's notice belongs. The count
+    // moved because the vendor tree grew; nothing outside vendor/ gained an unregistered one (render/splatSortGPU.mjs, which carries PlayCanvas's notice in its header, is registered with noticeInFile).
+    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319, vendor/three-webgpu-r185 at v4805, vendor/web-ocean at v4880, vendor/snowflow at v4895 and vendor/smaa at v4933), quoters and in-file copies aside",
+        preexisting.length === 31, preexisting.join(" ").slice(0, 120) + "...");
+    ok("*** and 30 of those 31 are under vendor/ -- the 31st is a packaged dependency, not engine code ***",
+        underVendor.length === 30 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
     ok("  so NO engine-source copy outside vendor/ carried one",
