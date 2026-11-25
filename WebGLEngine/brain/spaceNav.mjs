@@ -15,12 +15,16 @@
 import * as SA from "./spaceArena.mjs";
 import * as AP from "./autopilot6dof.mjs";
 
-export const NAV_DEFAULTS = Object.freeze({ cell: 16, half: 560, margin: 20, every: 15 });
+export const NAV_DEFAULTS = Object.freeze({ cell: 16, half: 560, margin: 20, every: 15, lane: false });
 
-/** The field: { origin, cell, half, n, blocked (Uint8Array), dist (Float64Array), margin, goalR }. */
+/**
+ * The field: { origin, cell, half, n, blocked (Uint8Array), dist (Float64Array), margin, goalR, lane }. With `lane` (Round B, the clear lane), a goal cell
+ * must also have a clear line from its centre to the origin, so the layer routes each fighter to a point with a clear run at the ship. Default off:
+ * Round A's field, to the bit.
+ */
 export function buildField(rocks, origin, goalR, opts = {}) {
     const o = { ...NAV_DEFAULTS, ...opts }, n = Math.round(2 * o.half / o.cell), n3 = n * n * n;
-    const F = { origin: Object.freeze([...origin]), cell: o.cell, half: o.half, n, margin: o.margin, goalR, blocked: new Uint8Array(n3), dist: new Float64Array(n3).fill(Infinity) };
+    const F = { origin: Object.freeze([...origin]), cell: o.cell, half: o.half, n, margin: o.margin, goalR, lane: !!o.lane, blocked: new Uint8Array(n3), dist: new Float64Array(n3).fill(Infinity) };
     const cen = (i, ax) => origin[ax] - o.half + (i + 0.5) * o.cell;
     for (const q of rocks) {
         const r = q.radius + SA.FIGHTER.radius + o.margin, reach = r + o.cell * 0.87;
@@ -41,7 +45,7 @@ export function buildField(rocks, origin, goalR, opts = {}) {
     };
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) {
         const v = (i * n + j) * n + k;
-        if (!F.blocked[v] && Math.hypot(cen(i, 0) - origin[0], cen(j, 1) - origin[1], cen(k, 2) - origin[2]) <= goalR) { F.dist[v] = 0; push(0, v); }
+        if (!F.blocked[v] && Math.hypot(cen(i, 0) - origin[0], cen(j, 1) - origin[1], cen(k, 2) - origin[2]) <= goalR && (!o.lane || lineClear(F, [cen(i, 0), cen(j, 1), cen(k, 2)], origin))) { F.dist[v] = 0; push(0, v); }
     }
     const off = [];
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) if (a || b || c) off.push([a, b, c, Math.hypot(a, b, c)]);

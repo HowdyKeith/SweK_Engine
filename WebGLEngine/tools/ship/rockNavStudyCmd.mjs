@@ -6,6 +6,7 @@
 //   node tools/ship/rockNavStudyCmd.mjs dev-read              DEV's five checks; the totals are reported and move nothing (writes dev-report.json)
 //   node tools/ship/rockNavStudyCmd.mjs held --part 1/4       HELD, one quarter, both arms (writes held-1of4.json ONCE); refused until dev-report.json passes
 //   node tools/ship/rockNavStudyCmd.mjs held-read             the verdict (writes held-report.json)
+//   ROUND B (the clear lane; arms N and L): devB --part k/K, devB-read, heldB --part k/K (refused until devB-report.json passes), heldB-read
 // --dir DIR overrides brain/rig-results/rock-nav. A part file is written the moment it exists and is never flown again.
 "use strict";
 
@@ -32,23 +33,25 @@ function partArg() {
     return { k, K };
 }
 const partFiles = (set, K) => Array.from({ length: K }, (_, i) => `${set}-${i + 1}of${K}.json`);
-function fly(set, seeds) {
+function fly(set, seeds, arms = S.ARMS, round = "rock-nav A") {
     const { k, K } = partArg(), name = `${set}-${k}of${K}.json`; refuse(name);
     const t0 = Date.now(), rows = [];
-    S.scenariosOf(seeds).forEach(({ seed, kind }, i) => { if (i % K !== k - 1) return; for (const arm of S.ARMS) rows.push(S.flyOne({ seed, kind, arm })); });
-    write(name, { round: "rock-nav A", set, part: [k, K], seeds: [seeds[0], seeds.at(-1)], seconds: (Date.now() - t0) / 1000, rows });
+    S.scenariosOf(seeds).forEach(({ seed, kind }, i) => { if (i % K !== k - 1) return; for (const arm of arms) rows.push(S.flyOne({ seed, kind, arm })); });
+    write(name, { round, set, part: [k, K], arms, seeds: [seeds[0], seeds.at(-1)], seconds: (Date.now() - t0) / 1000, rows });
 }
+const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS };
+const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B };
 function gather(set) {
     const names = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => new RegExp(`^${set}-\\d+of\\d+\\.json$`).test(f)) : [];
     const Ks = new Set(names.map((f) => +/of(\d+)/.exec(f)[1]));
     if (Ks.size !== 1) { console.error(`[rock-nav] ${set} is missing or mixes part counts (${names.join(", ") || "none"})`); process.exit(2); }
     const K = [...Ks][0], missing = partFiles(set, K).filter((f) => !names.includes(f));
     if (missing.length) { console.error(`[rock-nav] ${set} is incomplete: ${missing.join(", ")}`); process.exit(2); }
-    const rows = partFiles(set, K).flatMap((f) => readJson(f).rows), order = new Map(S.scenariosOf(set === "dev" ? S.DEV_SEEDS : S.HELD_SEEDS).map((s, i) => [`${s.seed}/${s.kind}`, i]));
-    rows.sort((a, b) => order.get(`${a.seed}/${a.kind}`) - order.get(`${b.seed}/${b.kind}`) || S.ARMS.indexOf(a.arm) - S.ARMS.indexOf(b.arm));
+    const rows = partFiles(set, K).flatMap((f) => readJson(f).rows), order = new Map(S.scenariosOf(SEEDS_OF[set]).map((s, i) => [`${s.seed}/${s.kind}`, i]));
+    rows.sort((a, b) => order.get(`${a.seed}/${a.kind}`) - order.get(`${b.seed}/${b.kind}`) || ARMS_OF[set].indexOf(a.arm) - ARMS_OF[set].indexOf(b.arm));
     return rows;
 }
-const sameScenarios = (rows, seeds) => { const want = JSON.stringify(S.scenariosOf(seeds)); return S.ARMS.every((a) => JSON.stringify(rows.filter((r) => r.arm === a).map((r) => ({ seed: r.seed, kind: r.kind }))) === want); };
+const sameScenarios = (rows, seeds, arms = S.ARMS) => { const want = JSON.stringify(S.scenariosOf(seeds)); return arms.every((a) => JSON.stringify(rows.filter((r) => r.arm === a).map((r) => ({ seed: r.seed, kind: r.kind }))) === want); };
 
 if (mode === "dev") fly("dev", S.DEV_SEEDS);
 else if (mode === "dev-read") {
@@ -81,6 +84,37 @@ else if (mode === "dev-read") {
     const notWeighed = !scen || !allEnd;
     console.log(`[rock-nav] BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
     write("held-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
+} else if (mode === "devB") fly("devB", S.DEV_B_SEEDS, S.ARMS_B, "rock-nav B");
+else if (mode === "devB-read") {
+    const rows = gather("devB"), c = S.devChecksB(rows), scen = sameScenarios(rows, S.DEV_B_SEEDS, S.ARMS_B);
+    const line = (n, name, ok, detail) => console.log(`  check ${n} ${name}${detail ? " (" + detail + ")" : ""}: ${ok ? "PASS" : "FAIL"}`);
+    console.log(`[rock-nav] ROUND B DEV ${S.DEV_B_SEEDS[0]}-${S.DEV_B_SEEDS.at(-1)}: ${rows.length} fights; checks only`);
+    line(0, "EVERY SCENARIO IN BOTH ARMS", scen, "");
+    line(1, "SAME FIELD", c.sameField.ok, `${c.sameField.n} pairs`);
+    line(2, "THE HAND-BACK", c.handBack.ok, `${c.handBack.handBack} calls inside the strafe range, ${c.handBack.mismatches} mismatches`);
+    line(3, "THE LANE IS SOUND", c.laneSound.ok, `L: ${c.laneSound.laneGoalCells} goal cells, ${c.laneSound.laneBlocked} with the line blocked; N: ${c.laneSound.plainGoalCells}, ${c.laneSound.plainBlocked}`);
+    line(4, "THE FIELD IS SOUND", c.fieldSound.ok, `${c.fieldSound.aimBlocked} aims in a blocked cell`);
+    line(5, "EVERY FIGHT ENDS", c.allEnd.ok, `${c.allEnd.n} fights`);
+    const H = S.readHeldB(rows), a = (x) => `approach struck ${x.approachStruck}, arrived ${x.arrived}, combat struck ${x.combatStruck}, mean damage ${fmt(x.meanDamage, 1)}`;
+    console.log(`  reported, moving nothing: N ${a(H.reported.N)}; L ${a(H.reported.L)}`);
+    const allOk = scen && Object.values(c).every((x) => x.ok);
+    console.log(`[rock-nav] ROUND B DEV: ${allOk ? "ALL CHECKS PASS -- commit the DEV files and this report, then fly HELD once" : "A CHECK FAILED -- HELD stays unflown"}`);
+    write("devB-report.json", { checks: c, sameScenarios: scen, allOk, totals: H.reported });
+} else if (mode === "heldB") {
+    if (!fs.existsSync(out("devB-report.json")) || !readJson("devB-report.json").allOk) { console.error("[rock-nav] REFUSED: ROUND B's DEV has not passed its checks (devB-report.json)"); process.exit(2); }
+    fly("heldB", S.HELD_B_SEEDS, S.ARMS_B, "rock-nav B");
+} else if (mode === "heldB-read") {
+    const rows = gather("heldB"), scen = sameScenarios(rows, S.HELD_B_SEEDS, S.ARMS_B), allEnd = rows.every((r) => r.over && r.t <= S.SECONDS + 1e-9);
+    const H = S.readHeldB(rows), R = H.reported, v = (x) => `${x.verdict}: the lane better in ${x.wins}, worse in ${x.losses}, tied ${x.ties}; p ${fmt(x.p, 4)}`;
+    console.log(`[rock-nav] ROUND B HELD ${S.HELD_B_SEEDS[0]}-${S.HELD_B_SEEDS.at(-1)}: ${rows.length / 2} pairs; SAME SCENARIOS ${scen ? "PASS" : "FAIL"}; EVERY FIGHT ENDS ${allEnd ? "PASS" : "FAIL"}`);
+    console.log(`  V1 THE STRAFE (rock strikes after arriving: N ${R.N.combatStruck}, L ${R.L.combatStruck}) ${v(H.v1)}`);
+    console.log(`  V2 THE DAMAGE (mean on the ship: N ${fmt(R.N.meanDamage, 1)}, L ${fmt(R.L.meanDamage, 1)}) ${v(H.v2)}`);
+    console.log(`  reported: approach strikes N ${R.N.approachStruck}, L ${R.L.approachStruck} -- ${v(R.approachStruck)}`);
+    console.log(`  reported: arrived N ${R.N.arrived}, L ${R.L.arrived}; approach shot N ${R.N.approachShot}, L ${R.L.approachShot}; total struck N ${R.N.struck}, L ${R.L.struck}; median arrival N ${fmt(R.N.medianArrivalT, 2)} s, L ${fmt(R.L.medianArrivalT, 2)} s`);
+    console.log(`  reported: mean R N ${fmt(R.N.meanR, 1)}, L ${fmt(R.L.meanR, 1)}; ship dead N ${R.N.shipDead}, L ${R.L.shipDead}; fallbacks N ${R.N.fallbacks}, L ${R.L.fallbacks}; NEAR N ${R.N.near}, L ${R.L.near}; worst drift N ${fmt(R.N.maxDrift, 1)}, L ${fmt(R.L.maxDrift, 1)}`);
+    const notWeighed = !scen || !allEnd;
+    console.log(`[rock-nav] ROUND B BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
+    write("heldB-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
 } else {
     console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).join("\n"));
     process.exit(mode ? 2 : 0);

@@ -10,6 +10,8 @@
 //   N11 the aim flown with the target's velocity: 1 red (9). FIRST PASS: 0 red -- AP.decide reads the target's velocity only with a weapon speed,
 //      and row 9 flew without one; it now flies with weaponSpeed 60 and a moving target, and says the fixture tells the velocities apart.
 //   N12 the heap pops out of order: 10 red. FIRST PASS: 0 red and NO VERDICT (hung), fixed by the pop bound above.
+// ROUND B's clear lane (rows 14-16), sabotaged the same way: L1 the lane option never read: 2 red (14, 15). L2 the lane test inverted: 2 red (14, 15).
+//   L3 the lane on by default: 1 red (16).
 "use strict";
 
 import fs from "node:fs";
@@ -119,6 +121,20 @@ row("13 PURE: NO Math.random, NO CLOCK, NO I/O IN THE MODULE", () => {
     const src = fs.readFileSync(new URL("./spaceNav.mjs", import.meta.url), "utf8").replace(/\/\/.*$/gm, "");
     return !/Math\.random|Date\.now|performance\.now|new Date|from "node:/.test(src);
 });
+
+// Round B's clear lane: a rock inside the goal sphere hides the goal cells behind it
+const LROCK = { pos: [60, 0, 0], radius: 8 }, LSMALL = { cell: 16, half: 160, margin: 4 };
+let LP = null, LL = null, LD = null; try { LP = build([LROCK], [0, 0, 0], 140, { ...LSMALL, lane: false }); LL = build([LROCK], [0, 0, 0], 140, { ...LSMALL, lane: true }); LD = build([LROCK], [0, 0, 0], 140, LSMALL); } catch { /* rows fail by name */ }
+const goals = (G) => { const out = []; for (let v = 0; v < G.dist.length; v++) if (G.dist[v] === 0) out.push(NV.centreOf(G, Math.floor(v / (G.n * G.n)), Math.floor(v / G.n) % G.n, v % G.n)); return out; };
+row("14 THE LANE: every lane goal cell is free, within goalR, and has a clear line to the origin", () => {
+    const g = goals(LL), bad = g.filter((c) => LL.blocked[NV.indexOf(LL, c)] || dist3(c, [0, 0, 0]) > 140 || !NV.lineClear(LL, c, [0, 0, 0]));
+    return { ok: g.length > 0 && bad.length === 0, detail: `${g.length} lane goal cells, ${bad.length} bad` };
+});
+row("15 THE LANE REACHES THE FIELD: the plain field has goal cells with the line blocked, and the lane field drops exactly those", () => {
+    const gp = goals(LP), hidden = gp.filter((c) => !NV.lineClear(LP, c, [0, 0, 0])), gl = goals(LL);
+    return { ok: hidden.length > 0 && gl.length === gp.length - hidden.length, detail: `plain ${gp.length}, hidden ${hidden.length}, lane ${gl.length}` };
+});
+row("16 THE LANE IS OFF BY DEFAULT: Round A's field, to the bit", () => LD.lane === false && LD.dist.length === LP.dist.length && LD.dist.every((x, v) => x === LP.dist[v]) && LD.blocked.every((x, v) => x === LP.blocked[v]));
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;

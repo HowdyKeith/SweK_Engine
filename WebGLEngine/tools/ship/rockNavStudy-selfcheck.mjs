@@ -7,6 +7,9 @@
 //   S11 HELD overlaps Round B: 1 red (10).  S12 the command flies HELD without DEV: 1 red (11).
 //   S13 the field at the origin with half the goal radius: FIRST PASS 0 red (nothing read the field's goal); row 4b added, then 1 red (4b).
 //   S14 the field's origin offset by one unit: 1 red (4b).
+// ROUND B (rows 12-15): B1 arm L built without the lane: 1 red (12). B2 V1's sign flipped: 1 red (13; the first pattern also matched Round A's
+//   reported line and was refused by the harness, then re-run on Round B's own). B3 the bottom line ignores V2: 1 red (13). B4 the lane check ignores N:
+//   1 red (14). B5 Round B's HELD opened by Round A's DEV report: 1 red (15). B6 the verdicts not renamed: 1 red (13).
 "use strict";
 
 import fs from "node:fs";
@@ -96,6 +99,38 @@ row("11 THE COMMAND: export-free, refuses HELD before DEV passes, refuses a part
     const unknown = spawnSync(process.execPath, [cmd, "dev", "--bogus"], { encoding: "utf8" }).status;
     fs.rmSync(dir, { recursive: true, force: true });
     return { ok: !/^export\s/m.test(src) && held === 2 && twice === 2 && unknown === 2, detail: `held ${held}, twice ${twice}, unknown ${unknown}` };
+});
+
+// ROUND B: arm L (the clear lane) against N
+const L41 = fly(41, "bow", "L");
+row("12 ARM L FLIES THE LANE FIELD, N THE PLAIN ONE: L's goal cells all have a clear line, N's do not, same rocks and starts", () => {
+    const l = L41.probe && L41.probe.field, n = N41.probe && N41.probe.field;
+    return { ok: !!l && !!n && l.lane === true && l.goalCells > 0 && l.goalBlockedLine === 0 && n.lane === false && n.goalBlockedLine > 0 && L41.fieldKey === N41.fieldKey && L41.probe.handBackMismatch === 0,
+        detail: l && n ? `L ${l.goalCells} goal cells (${l.goalBlockedLine} blocked); N ${n.goalCells} (${n.goalBlockedLine} blocked)` : "no field" };
+});
+const synB = (arm, i, o) => ({ ...syn(arm === "L" ? "N" : arm, i, {}), arm, probe: { calls: 10, aimed: 5, fallback: 0, near: 0, handBack: 5, handBackMismatch: 0, aimBlocked: 0, rockCentresBlocked: true, field: { lane: arm === "L", goalCells: 100, goalBlockedLine: arm === "L" ? 0 : 7 } }, ...o });
+const setB = (n, fN, fL) => Array.from({ length: n }, (_, i) => [synB("N", i, fN(i)), synB("L", i, fL(i))]).flat();
+row("13 ROUND B'S BOTTOM LINE: WINS THE STRAFE / SAVES FIGHTERS AND HURTS THE SHIP LESS / DOES NOT WIN", () => {
+    const wins = S.readHeldB(setB(40, (i) => ({ combatStruck: i < 30 ? 1 : 0, struck: i < 30 ? 1 : 0 }), () => ({}))).bottom;
+    const less = S.readHeldB(setB(40, (i) => ({ combatStruck: i < 30 ? 1 : 0, damageOnShip: 100 }), () => ({ damageOnShip: 50 }))).bottom;
+    const not = S.readHeldB(setB(40, () => ({}), () => ({}))).bottom;
+    const nb = S.readHeldB(setB(40, () => ({}), (i) => ({ combatStruck: i < 30 ? 1 : 0 }))).v1.verdict;
+    return { ok: wins === "THE LANE WINS THE STRAFE" && less === "THE LANE SAVES FIGHTERS AND HURTS THE SHIP LESS" && not === "THE LANE DOES NOT WIN THE STRAFE (FLOOR)" && nb === "N BETTER", detail: [wins, less, not, nb].join(" / ") };
+});
+row("14 ROUND B'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT", () => {
+    const good = setB(4, () => ({}), () => ({})), c0 = S.devChecksB(good);
+    const fault = (k, edit) => { const rs = JSON.parse(JSON.stringify(good)); edit(rs); return S.devChecksB(rs)[k].ok; };
+    const f = [fault("sameField", (rs) => { rs[1].fieldKey = "x"; }), fault("handBack", (rs) => { rs[0].probe.handBackMismatch = 1; }),
+        fault("laneSound", (rs) => { rs[1].probe.field.goalBlockedLine = 1; }), fault("laneSound", (rs) => rs.filter((r) => r.arm === "N").forEach((r) => { r.probe.field.goalBlockedLine = 0; })),
+        fault("laneSound", (rs) => { rs[1].probe.field.lane = false; }), fault("fieldSound", (rs) => { rs[0].probe.aimBlocked = 1; }), fault("allEnd", (rs) => { rs[2].over = false; })];
+    return { ok: Object.values(c0).every((x) => x.ok) && f.every((x) => x === false), detail: `faults pass: ${f.join(",")}` };
+});
+row("15 THE COMMAND REFUSES ROUND B'S HELD BEFORE ITS DEV PASSES, AND THE ROUND B SETS ARE THE RESERVED ONES", () => {
+    const cmd = path.join(HERE, "rockNavStudyCmd.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "rocknavb-"));
+    fs.writeFileSync(path.join(dir, "dev-report.json"), JSON.stringify({ allOk: true }));   // Round A's pass must not open Round B
+    const st = spawnSync(process.execPath, [cmd, "heldB", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
+    fs.rmSync(dir, { recursive: true, force: true });
+    return { ok: st === 2 && S.DEV_B_SEEDS[0] === 3301 && S.DEV_B_SEEDS.length === 30 && S.HELD_B_SEEDS[0] === 3401 && S.HELD_B_SEEDS.length === 90, detail: `heldB exit ${st}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
