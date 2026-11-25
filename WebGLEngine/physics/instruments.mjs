@@ -2749,6 +2749,10 @@ export const INSTRUMENTS = [
       measures: "does a fighter that cuts its thrust whenever its closing speed to the capital ship reaches a cap beat today's full-throttle, no-brake approach, under each gunner preset? R = the damage on the ship if it survives, else 1500 + (120 - the time it died), paired by (seed, kind) with the exact sign test",
       key: "DEV (space seeds 1901-1930 x 4 kinds) fixes the cap from {6, 9, 12, 15, 20, 25}; HELD89 (2401-2460) is flown ONCE at it. v4930: DEV chose 12 and check 3 (the cap holds within +2) failed, 14.05 against 14, so the round is NOT WEIGHED and the command refuses to fly HELD89",
       gate: "tools/ship/spaceDoctrineStudy-selfcheck.mjs" },
+    { id: "rock-nav", page: "instrument-bench.html", name: "THE ROCK NAV ROUNDS (brain/ROCK_NAV_WIP.md)", area: "brain",
+      measures: "do fighters that fly the 3-D navigation layer (brain/spaceNav.mjs) through the rock field lose fewer of their number to the rocks than today's doctrine? Round A: the layer outside the strafe range only, the approach (rock strikes before a fighter first reaches the strafe range) scored on its own, paired by (seed, kind) with the exact sign test",
+      key: "DEV (space seeds 3101-3130 x 4 kinds) is checks only (same field, the layer steers, the hand-back is exact, the field is sound, every fight ends); HELD (3201-3290) is flown ONCE; V1 the approach, V2 arrivals must not be worse; strikes after arrival are reported (Round B's question)",
+      gate: "tools/ship/rockNavStudy-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

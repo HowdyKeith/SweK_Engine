@@ -31,6 +31,13 @@ The design survey flew throwaway space seeds 9990001-9990006 (in no set) with a 
   * Otherwise: return AP.decide(body, target, opts) exactly. This is THE HAND-BACK.
 * **The ship cruises**, so the field's goal is where the ship started, not where it is. That is disclosed and not corrected in Round A; the drift is reported.
 
+* **AMENDMENT (2026-11-25), made before any DEV or HELD seed was flown and found by the layer's own gate on a fixture:**
+  * A diagonal descent step can cut the corner of a blocked zone. From directly behind a rock, the line to EVERY cell on the walk can clip that corner, so the registered aim was null, and the pilot fell back to the doctrine, which flies straight at the rock.
+  * The prototype behind the survey had the same defect, so the survey's counts include it.
+  * **Amended rule:** when no cell on the walk is in sight, the aim is the walk's FIRST cell (the adjacent descent cell), counted as a NEAR aim.
+  * The aim is null, and the doctrine is flown, only when the fighter's cell has no lower neighbour (or is already a goal cell).
+  * NEAR aims are reported with the fallbacks. Nothing else in the round changes.
+
 ## The arms
 Both arms use battleshipFight.build(seed, kind, { gunners: "regular", rocks: 24 }): 8 fighters, 120 s, defaults otherwise.
 * **D, the doctrine:** no pilot.
@@ -76,7 +83,7 @@ Pairs are (seed, kind), N against D.
   * combatStruck, with its sign test;
   * the total struck;
   * R (spaceDoctrineStudy.rOf), damageOnShip and ship deaths;
-  * the aim fallbacks (null aims);
+  * the aim fallbacks (null aims) and the NEAR aims (see the amendment);
   * the ship's drift from its start at 120 s.
 
 ## Expectations, recorded before any code
