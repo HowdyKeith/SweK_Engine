@@ -167,6 +167,14 @@ guarded("section 6", () => {
     ok("round 14's DEV is 208001-208006 x the four kinds (24), HELD 209001-209024 x the four kinds (96)", T.R14_DEV_SET.length === 24 && T.R14_HELD_SET.length === 96 && T.R14_DEV_SET[0].seed === 208001 && T.R14_HELD_SET[95].seed === 209024 && kinds(T.R14_HELD_SET) === kinds(T.HELD_SET));
 });
 
+sec("7. ROUND 17 (section 35): round 14 in a fight of 600 s");
+guarded("section 7", () => {
+    const kinds = (set) => J([...new Set(set.map((d) => d.kind))]);
+    ok("the fight is 600 s, two and a half times the duel's 240; round 17's DEV is 216001-216006 x the four kinds (24), HELD 217001-217024 x the four kinds (96)", T.FIGHT17 === 600 && T.FIGHT17 === 2.5 * T.FIGHT && T.R17_DEV_SET.length === 24 && T.R17_DEV_SET[0].seed === 216001 && T.R17_HELD_SET.length === 96 && T.R17_HELD_SET[95].seed === 217024 && kinds(T.R17_HELD_SET) === kinds(T.HELD_SET));
+    const short = T.fight14({ seed: 990021, kind: "hunter" }, "COND-D", { seconds: 60 }), long = T.fight14({ seed: 990021, kind: "hunter" }, "COND-D", { seconds: 120 });
+    ok("fight14's length is the fight's: the same duel (seed 990021, outside every set) at 60 s and 120 s is not the same duel unless it ended inside 60 s", J(short) !== J(long) || short.winner !== "draw", J([short.score, long.score]));
+});
+
 finished = true;
 console.log(fails ? `\nduelStationsTask-selfcheck: ${fails} FAILED` : "\nduelStationsTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

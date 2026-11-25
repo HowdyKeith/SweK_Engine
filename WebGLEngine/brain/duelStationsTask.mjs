@@ -84,6 +84,8 @@ export function verdict(sonar, fixed, risk) {
 export const LEAK14 = Object.freeze({ leak: Object.freeze([0.03, 0.08]), at: Object.freeze([20, 120]), build: 5 });
 export const CREWS14 = Object.freeze(["DC", "TRIAGE-D", "COND-D"]);
 export const R14_DEV_SET = set(208001, 208006), R14_HELD_SET = set(209001, 209024);
+/** ROUND 17 (section 35): round 14 in a fight of 600 s; its sets. */
+export const FIGHT17 = 600, R17_DEV_SET = set(216001, 216006), R17_HELD_SET = set(217001, 217024);
 
 /** Side A's breach in a duel seed: { leak, at }, from its OWN generator (the duel's draws and the battery's do not move). */
 export function breach14(seed) {

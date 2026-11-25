@@ -2956,8 +2956,8 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-25 -- after v4932: the stations line's next suggestions (beside stations-held-blow above) and what the merge of claude/inspiring-mayer-9mdcut left open. Written so another chat can pick any one up; none is registered.
     {
         id: "stations-duel-surface-cost",
-        blocker: "OPEN",
-        what: "Round 14 (brain/SUB_STATIONS_WIP.md section 33) STOPPED AT DEV: COND-D and TRIAGE-D differed on 3 of 24 duels because round 3's 240 s duels are decided by the first salvo and the drones do not punish a boat at the surface. Ask the question again where the surface costs something: a longer fight, or a drone that hunts a surfaced boat.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25 as round 17 (brain/SUB_STATIONS_WIP.md sections 35 and 38): the duel at 600 s STOPPED AT DEV the same way round 14 did (COND-D and TRIAGE-D differ on 3 of 24; every crew keeps 21 boats; scores 1.23 to 1.31). The fight's length was not the limit; only a drone that hunts a surfaced boat (a new scripted kind in brain/subTactics.mjs) is left, and with two rounds stopped on the same picture it is a low-value question. WAS: Round 14 (brain/SUB_STATIONS_WIP.md section 33) STOPPED AT DEV: COND-D and TRIAGE-D differed on 3 of 24 duels because round 3's 240 s duels are decided by the first salvo and the drones do not punish a boat at the surface. Ask the question again where the surface costs something: a longer fight, or a drone that hunts a surfaced boat.",
         how: "A change to the duel, registered first: either brain/subDuel.mjs's seconds raised for this task only, or a drone kind in brain/subTactics.mjs that closes on a contact at the surface (a new SCRIPTED kind, gated, the existing kinds bit for bit). Fresh seed blocks; round 14's crews and verdict (brain/duelStationsTask.mjs fight14 / verdict14) reused; DEV non-degeneracy bar first.",
         why: "Round 7 showed rules can interfere on one boat; the sonar-and-damage pair is the last one whose interference has not been given a fair test. Worth doing only if combat with damage matters; otherwise close this line.",
     },

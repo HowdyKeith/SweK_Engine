@@ -864,3 +864,15 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 * The bigger tank is not the fix the backlog thought it was (stations-bigger-ballast-hull, round 13): the default tank was enough.
 
 **Status: round 16 CLOSED as registered.**
+
+## 38. ROUND 17: STOPPED AT DEV, AS REGISTERED (2026-11-25)
+
+**Built:** `duelStationsTask`'s `FIGHT17` (600 s) and round 17's sets, gated in `brain/duelStationsTask-selfcheck.mjs` section 7 (the fight's length and the sets; both mutants red). Round 14's crews and verdict unchanged.
+
+**The registered check failed:** on the 24 DEV duels (216001 to 216006 x the four kinds) COND-D and TRIAGE-D differ, in score or survival, on 3, under the 4 required. **HELD is not flown;** 217001 to 217024 stay unread.
+
+**What DEV showed, recorded because it was seen (DEV only, not a result):** every crew keeps 21 of 24 boats; mean scores DC 1.307, TRIAGE-D 1.228, COND-D 1.306; TRIAGE-D's latch closes on 18 duels and COND-D's on 3. Two and a half times the fight changed almost nothing round 14 saw: most duels are still settled by the first exchange, and a boat at the surface is not punished by round 3's drones.
+
+**What it suggests, for a later registration, not a result:** the length of the fight was not the limit. If the question is worth asking again, it needs a drone that HUNTS a surfaced boat (a new scripted kind), which is a change to the duel's opponents, not to its clock. With rounds 14 and 17 both stopped at DEV on the same picture, sonar and damage control do not interfere in this duel as it stands.
+
+**Status: round 17 CLOSED, STOPPED AT DEV as registered.**
