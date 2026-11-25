@@ -251,9 +251,50 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // for it, correctly, because nothing else ran its check. frozenRecords.stale() is now verify's step 1c, and
     // both roads come from RR.shipSteps(): a dynamic import of the module in verify's COMMENT-STRIPPED code,
     // and a call of the step function through that binding.
+    // v4934 -- THE ROAD IS CLASSIFIED FROM THE SAME READINGS THE MARGIN USES. `road` read the record's FILED timing (t.timings), which on a box
+    // that does not own the shared record is another box's: Keith's Windows rig filed 1,717 / 2,216 ms by the linux box that owns the record and
+    // measured 6,858 / 7,722 ms on its own ring, so the row called both detectors SWEPT (margin -4,722 ms) when on that box they are over the budget
+    // and verify runs them as steps -- the vacuous case v4778 described. The cost definitions moved up here, ahead of `road`, and a box with
+    // two readings of its own classifies by their median; with fewer it keeps the filed time, as before.
+    // SABOTAGE/REPRODUCTION (v4934): this box's per-box ring set to the rig's readings, frozenRecords [11387, 6858, 6478] and recordDrift [7892, 7030, 7722],
+    // with `road` reading t.timings as before -> RED, "worst margin -4722 ms", exactly the rig's line; with `road` reading the box's own median -> PASS and
+    // VACUOUS (both detectors a verify step). The ring file was restored byte-identical. On this box (own ring 1.7 / 2.2 s) the row still grades 828 ms of margin.
+    const RING = (t.serialRing || {});
+    const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; };
+    // *** v4781 -- WHOSE RING. *** This read the shared record's ring alone, and the shared record is host-claimed:
+    // on any box that does not own it, nothing that box does can refresh it. The owner of this one was a cloud
+    // container that no longer exists, so after recordDrift-selfcheck went from 2,236 ms to 1,800 the row stayed red
+    // here on the old box's readings -- the "ratchet with no reachable clear state" since475 named for coverage,
+    // in a cost row. On a FOREIGN box with at least two of its own alone readings (tools/ship/boxTimings.mjs's
+    // recordLocal), those are the margin; otherwise the shared ring, as before, and the detail says which.
+    // Gate SELECTION still reads the shared record -- task #87 -- because this row reports and does not choose.
+    // SABOTAGES (v4781): this box's own ring set to [2900, 2900, 2900] -> 1 red, margin 100; the own ring ignored, i.e.
+    // the row as it was -> 1 red on this box, margin 764 off the departed box's readings.
+    // *** RIG RUN 2 -- WHOSE RING IS WHO MEASURED IT, NOT WHO MAY WRITE NEXT. *** Part 2 asked ownerOf(host), so on the rig --
+    // the record's owner by the v4778 handover -- the shared ring read as the rig's own, and Keith's run printed the retired
+    // container's [1263, 1347, 2080] "on linux-x64-4c-16096mb-142c0d" as his box's margin. Ownership says who may WRITE the
+    // record; the readings in it are the measuring box's until the owner's own sweep replaces them. So, as v4781 had it: on
+    // any box that did not measure the shared ring, its own per-box ring when it has two readings.
+    const shared = t.host || null, here = boxId();
+    // v4778 SABOTAGE R1: this box's own ring for recordDrift-selfcheck set to [2900, 2900, 2900] in
+    // sweep-timings.linux-x64-4c-16095mb-142c0d.json -> 1 red, margin 100. Restored, md5 verified. The ownerOf()
+    // change of part 2 was reverted in rig run 2 (above): driving it red needed the rig, and the rig is where it was wrong.
+    const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
+    const costMs = (g) => {
+        const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
+        // v4800 -- this box's own ALONE readings win whenever there are two, owner or not. The shared record was re-hosted to
+        // this box from the local file it had been writing, and a foreign box's writes merged into the shared record's
+        // contents until v4800: its rings carried the departed box's readings ([2236, 2248] beside this box's 1971 for
+        // recordDrift), and owning the record made this row read them as this box's. They age out of a three-deep ring.
+        if (mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
+        const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
+        // `whose` is the box that MEASURED the shared ring -- the record's `host` -- not the box that may write it next
+        return r.length >= 2 ? { ms: median(r), n: r.length, whose: t.host || "the record" } : { ms: cost[g].ms, n: r.length, whose: t.host || "the record" };
+    };
     const steps = RR.shipSteps();
     const stepOf = (g) => steps.find((s) => s.detector === g && s.live) || null;
-    const road = (g) => (t.timings[g] != null && t.timings[g] <= live.budgetMs) ? "swept"
+    const roadMs = (g) => { const m = costMs(g); return m.whose === "this box" ? m.ms : t.timings[g]; };
+    const road = (g) => (roadMs(g) != null && roadMs(g) <= live.budgetMs) ? "swept"
                       : stepOf(g) ? "a verify step" : null;
     const stepNote = (g) => { const s = stepOf(g); return s ? `verify calls ${s.binding}.${s.call}()` : "NO VERIFY STEP"; };
     ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME, BY ONE ROAD OR THE OTHER ***",
@@ -339,38 +380,6 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // read live.serialRing, got undefined, and the row passed anyway on the single-reading fallback while
     // PRINTING "the ring has 0" -- a change that was inert and still green, which is the shape this session
     // has now caught four times. The row below is what makes the fallback visible instead of silent.
-    const RING = (t.serialRing || {});
-    const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; };
-    // *** v4781 -- WHOSE RING. *** This read the shared record's ring alone, and the shared record is host-claimed:
-    // on any box that does not own it, nothing that box does can refresh it. The owner of this one was a cloud
-    // container that no longer exists, so after recordDrift-selfcheck went from 2,236 ms to 1,800 the row stayed red
-    // here on the old box's readings -- the "ratchet with no reachable clear state" since475 named for coverage,
-    // in a cost row. On a FOREIGN box with at least two of its own alone readings (tools/ship/boxTimings.mjs's
-    // recordLocal), those are the margin; otherwise the shared ring, as before, and the detail says which.
-    // Gate SELECTION still reads the shared record -- task #87 -- because this row reports and does not choose.
-    // SABOTAGES (v4781): this box's own ring set to [2900, 2900, 2900] -> 1 red, margin 100; the own ring ignored, i.e.
-    // the row as it was -> 1 red on this box, margin 764 off the departed box's readings.
-    // *** RIG RUN 2 -- WHOSE RING IS WHO MEASURED IT, NOT WHO MAY WRITE NEXT. *** Part 2 asked ownerOf(host), so on the rig --
-    // the record's owner by the v4778 handover -- the shared ring read as the rig's own, and Keith's run printed the retired
-    // container's [1263, 1347, 2080] "on linux-x64-4c-16096mb-142c0d" as his box's margin. Ownership says who may WRITE the
-    // record; the readings in it are the measuring box's until the owner's own sweep replaces them. So, as v4781 had it: on
-    // any box that did not measure the shared ring, its own per-box ring when it has two readings.
-    const shared = t.host || null, here = boxId();
-    // v4778 SABOTAGE R1: this box's own ring for recordDrift-selfcheck set to [2900, 2900, 2900] in
-    // sweep-timings.linux-x64-4c-16095mb-142c0d.json -> 1 red, margin 100. Restored, md5 verified. The ownerOf()
-    // change of part 2 was reverted in rig run 2 (above): driving it red needed the rig, and the rig is where it was wrong.
-    const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
-    const costMs = (g) => {
-        const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
-        // v4800 -- this box's own ALONE readings win whenever there are two, owner or not. The shared record was re-hosted to
-        // this box from the local file it had been writing, and a foreign box's writes merged into the shared record's
-        // contents until v4800: its rings carried the departed box's readings ([2236, 2248] beside this box's 1971 for
-        // recordDrift), and owning the record made this row read them as this box's. They age out of a three-deep ring.
-        if (mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
-        const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
-        // `whose` is the box that MEASURED the shared ring -- the record's `host` -- not the box that may write it next
-        return r.length >= 2 ? { ms: median(r), n: r.length, whose: t.host || "the record" } : { ms: cost[g].ms, n: r.length, whose: t.host || "the record" };
-    };
     const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - costMs(g).ms)) : live.budgetMs;
     // *** v4778 -- `swept.length > 0` ASSERTED THAT SOME DETECTOR IS SWEPT, AND ON THE RIG NONE IS. ***
     // The note above already says a stepped detector "is not competing for that budget at all", and the row
