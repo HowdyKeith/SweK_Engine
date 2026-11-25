@@ -2970,8 +2970,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-learner-budget",
-        blocker: "OPEN",
-        what: "Rounds 11 and 15's learned couriers (brain/learnedCourier.mjs: 20 generations of a (mu, lambda) ES on 16 training runs) both fell short of COND (0.66 and 1.75 goals a run against 2.51). Whether that is the budget or the learner is not known.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25 as round 18 (brain/SUB_STATIONS_WIP.md sections 35 and 39): twice the generations and twice the training runs at round 15's price -- BUDGET against COND on the mission value is NO DIFFERENCE SHOWN (37 to 49, p = 0.12 the other way; mean value 2.11 against 2.26). BUDGET delivers COND's goals (2.64 against 2.52) but keeps 42 boats to COND's 73: it learned to spend boats for goals, which the price nearly pays for and does not beat. The budget moved the learner from well below COND to level with it; it did not pass it. Was: Rounds 11 and 15's learned couriers (brain/learnedCourier.mjs: 20 generations of a (mu, lambda) ES on 16 training runs) both fell short of COND (0.66 and 1.75 goals a run against 2.51). Whether that is the budget or the learner is not known.",
         how: "Register a larger budget before training (for example 60 generations, 48 training seeds, the round 15 mission price), fresh seed blocks, the same verdict against COND (learnedCourier.verdict15). tools/ship/trainLearnedCourier.mjs already takes the round by flag; it would need a budget option. Roughly 2 to 4 hours of compute on 4 workers.",
         why: "Section 34 says the shortfall is a result about this budget and this feature set, not about learning; this is the run that would tell them apart. Only if the learning question matters.",
     },

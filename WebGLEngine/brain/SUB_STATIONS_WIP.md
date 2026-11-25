@@ -876,3 +876,22 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 **What it suggests, for a later registration, not a result:** the length of the fight was not the limit. If the question is worth asking again, it needs a drone that HUNTS a surfaced boat (a new scripted kind), which is a change to the duel's opponents, not to its clock. With rounds 14 and 17 both stopped at DEV on the same picture, sonar and damage control do not interfere in this duel as it stands.
 
 **Status: round 17 CLOSED, STOPPED AT DEV as registered.**
+
+## 39. ROUND 18 RESULT (2026-11-25; `brain/budgetHeld.{0,1,2,3}.jsonl`, 96 seeds x BUDGET, COND, PRICED, committed unread at `8d7f18420`, then read ONCE)
+
+**Training, as registered:** 40 generations on 32 TRAIN seeds (215 s a generation on 4 workers); the best of the last 4 parents on 16 SELECTION seeds, frozen to `brain/learnedCourierBudget.json` at `e07c2fff1` before any HELD seed was flown (train fitness 80.94 on 32 seeds, selection fitness 40.09 on 16: about 2.5 a run on both). Gated in `brain/learnedCourier-selfcheck.mjs` section 7 (7 mutants, every one red).
+
+**THE VERDICT (registered, `verdict15` with BUDGET in PRICED's place): NO DIFFERENCE SHOWN** on the mission value. BUDGET has more value on 37 runs and COND on 49 (COND's side p = 0.12; mean value 2.11 against 2.26).
+* Goals, reported the same way: NO DIFFERENCE SHOWN (36 to 34; means 2.64 against 2.52).
+* Survival: **COND BEATS BUDGET**, 35 to 4 (p = 2e-7); BUDGET keeps 42 boats, COND 73 (BUDGET's losses: 50 crushed, 4 broached).
+
+**Reported, not registered:**
+* Round 15's PRICED, on these new seeds: COND BEATS PRICED on the value (57 to 28, p = 0.001) and goals; PRICED keeps more boats (81 against 73, 9 to 1, p = 0.011). Round 15's result reproduces on fresh seeds.
+* BUDGET against PRICED: BUDGET has more value (58 to 34, p = 0.008) and goals (2.64 against 1.68), and keeps far fewer boats (42 against 81).
+
+**What it says.**
+* The budget changed what the learner learned. Round 15's learner kept boats and delivered little; round 18's delivers as much as COND and spends boats to do it, and on the registered price that trade lands level with COND, not above it.
+* So section 34's open question has a partial answer: part of rounds 11 and 15's shortfall WAS the budget (the learner went from well below COND to level with it on value). Nothing here shows the learner can pass the hand rule; a learner that kept COND's survival while delivering BUDGET's goals would, and this ES on these ten features did not find one.
+* Expectation (section 35) put NO DIFFERENCE at about 30 percent; COND BEATS at about 60.
+
+**Status: round 18 CLOSED.** The backlog entry stations-learner-budget is closed with this result. A further round would change the learner (features, or survival priced higher than the mission's own rate), not the budget, and would be registered first.
