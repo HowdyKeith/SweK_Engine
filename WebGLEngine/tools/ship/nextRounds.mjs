@@ -2977,8 +2977,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stealth-gain-replication",
-        blocker: "OPEN",
-        what: "The merged stealth line (brain/STEALTH_ROUNDS_WIP.md) ended with its best mechanism -- the contrast-normalised downward-drift gain at g 300 on the crab network at 720 x 240 with the paper's 14 degree start -- NOT SUPPORTED by margins of 0.003 (Round 28, the UP-control line) and 0.021 (Round 29, the low-contrast ordering). Whether those near-misses are noise or real is open.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25 as stealth Round 30 (brain/STEALTH_ROUNDS_WIP.md): on held-out numbers with every line as registered, Round 28's design is SUPPORTED (P2 holds by 0.030 where Round 28 missed by 0.003: noise) and Round 29's is NOT SUPPORTED again, C2 by 0.078 (Round 29: 0.021) the same way -- the gain lowers moving stripes at low contrast but not static ones, where the animal lowers both: a real gap, not noise. WAS: The merged stealth line (brain/STEALTH_ROUNDS_WIP.md) ended with its best mechanism -- the contrast-normalised downward-drift gain at g 300 on the crab network at 720 x 240 with the paper's 14 degree start -- NOT SUPPORTED by margins of 0.003 (Round 28, the UP-control line) and 0.021 (Round 29, the low-contrast ordering). Whether those near-misses are noise or real is open.",
         how: "Register a fresh held-out replication BEFORE any run, with the criteria lines of Rounds 28 and 29 fixed as written (no new margins) and nothing tuned: new speeds, azimuths and contrasts, the same g 300 and start size, run with the branch's own scripts (brain/crabHeldOut.mjs, brain/crabOrder.mjs and their aggregators). Report each criterion with its margin.",
         why: "Fourteen rounds narrowed the question to one mechanism that misses by hairs on single criteria; one clean replication says whether it reproduces the animal or only nearly does.",
     },
