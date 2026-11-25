@@ -358,9 +358,12 @@ export function codeMask(src) {
 }
 
 /** Does `src` use `name` as a whole word, at least once, in CODE (codeMask)? `mask` may be passed in, cached. */
+const _useRe = new Map();   // v4934 -- one RegExp per name, not one per name per file (it is a global one, so lastIndex is reset below)
 export function usesInCode(src, name, mask = null) {
     if (!src.includes(name)) return false;
-    const re = new RegExp("(?<![\\w$])" + name + "(?![\\w$])", "g");
+    let re = _useRe.get(name);
+    if (!re) { re = new RegExp("(?<![\\w$])" + name + "(?![\\w$])", "g"); _useRe.set(name, re); }
+    re.lastIndex = 0;
     let mk = mask, r;
     while ((r = re.exec(src))) { mk = mk || codeMask(src); if (mk[r.index]) return true; }
     return false;
@@ -427,7 +430,14 @@ export function readSites(names, { root = ENG } = {}) {
             if (end > at) spans.push([at, end + 3]);
         }
         for (const [a, b] of spans) src = src.slice(0, a) + " ".repeat(b - a) + src.slice(b);
-        const mask = codeMask(src);
+        // v4934 -- NOTHING BLANKED MEANS THE SAME TEXT, SO THE SAME MASK. This lexed every matching file twice, and most
+        // matching files hold no record declaration and no name table (spans is empty): the second lex was the first
+        // one over again. Reused only when no span was blanked, so a file that did blank something is lexed afresh.
+        // MEASURED (v4934): readSites 1,030 -> 920 ms with this and the per-name RegExp below; the output over the 77
+        // names and census() hashes identical before and after (sha1 0139c0ca...). NOT SABOTAGE-PROVEN for the blanked
+        // branch: a mask reused there goes 0 red too, because a blanked span no longer holds the name, so usesInCode
+        // returns before it reads the mask -- the blanked branch is kept for the cases where the lexer state could differ.
+        const mask = spans.length ? codeMask(src) : declMask;
         for (const n of want) if (usesInCode(src, n, mask)) out.get(n).push(rel(f));
     }
     return out;
