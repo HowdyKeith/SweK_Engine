@@ -46,6 +46,7 @@ import * as GS from "../physics/mechanics/gunSeats.mjs";
 import * as CS from "../physics/mechanics/capitalShip.mjs";
 import * as AP from "./autopilot6dof.mjs";
 import * as SC from "./shipCollision6dof.mjs";
+import * as SR from "./spaceRocks.mjs";   // 2026-11-25: the rock field (option `rocks`, default none)
 
 export const DT = 1 / 30;
 /** The page's fighter, in this arena's numbers (es-box3d-6dof.html's HALF, SHIP_MASS, ENGINE_MOUNT, HP_MAX, SHOT_DAMAGE and RBW.WEAPON): `radius` is the hit sphere.
@@ -72,8 +73,11 @@ const unit = (a, fallback = [1, 0, 0]) => { const n = norm(a); return n > 1e-9 ?
  * A new arena. `crafts` are the definitions above; ids must be distinct positive integers. Returns { dt, seconds, t, i, crafts, rounds, events, done, over, autopilot }. A craft carries { id, team, name, kind, body, hp, hpMax, dead, status ("flying" | "destroyed" | "rammed"),
  * hits (damage it has dealt to the enemy), gun / seats / enginesRunning / partHp (Map part id -> hit points left) / charge / waves, last }.
  */
-export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false, wrecks = false, impact = 0, crew = false, shipCollisions = false } = {}) {
+export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false, wrecks = false, impact = 0, crew = false, shipCollisions = false, rocks = [] } = {}) {
     if (!Array.isArray(crafts) || crafts.length < 2) throw new Error("spaceArena.createSpaceArena: an arena needs at least two crafts");
+    // 2026-11-25 -- ROCKS (brain/spaceRocks.mjs): static spheres [{ pos, radius }]. Default none, and then the arena is the arena it was, field for field.
+    if (!Array.isArray(rocks) || !rocks.every((q) => q && Array.isArray(q.pos) && q.pos.length === 3 && q.pos.every(Number.isFinite) && Number.isFinite(q.radius) && q.radius > 0))
+        throw new Error("spaceArena.createSpaceArena: rocks are [{ pos: [x, y, z], radius > 0 }]");
     const ids = new Set();
     for (const c of crafts) {
         if (!Number.isInteger(c.id) || c.id < 1 || ids.has(c.id)) throw new Error(`spaceArena.createSpaceArena: craft ids are distinct positive integers (got ${c.id})`);
@@ -101,7 +105,8 @@ export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = A
         }
         return out;
     });
-    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire, wrecks: !!wrecks, impact, crew: !!crew, shipCollisions: !!shipCollisions };
+    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire, wrecks: !!wrecks, impact, crew: !!crew, shipCollisions: !!shipCollisions,
+        ...(rocks.length ? { rocks: Object.freeze(rocks.map((q) => Object.freeze({ pos: Object.freeze(q.pos.slice()), radius: q.radius }))), rockTouched: new Map(), roundsStopped: 0 } : {}) };
 }
 
 export const BEHAVIOURS = Object.freeze(["face", "hold", "station"]);
@@ -324,9 +329,10 @@ function* tickGen(arena) {
         return from.map((p, k) => ({ id: c.id, part: p.part, from: p.center, to: to[k].center, radius: p.radius }));
     });
     const all = [...arena.rounds, ...fresh], teams = [...new Set(all.map((r) => r.team))], survivors = [], hits = [];
+    const rockT = arena.rocks ? SR.rockTargets(arena.rocks) : [], keep = (res) => { if (!rockT.length) return res; const s = SR.stripRockHits(res); arena.roundsStopped += s.rockHits.length; return s; };   // rocks are cover: a round that reaches one stops there (counted)
     if (!arena.friendlyFire) {
         for (const tm of teams) {
-            const mine = all.filter((r) => r.team === tm), res = G.stepRounds(mine, dt, targetsOf(alive.filter((c) => c.team !== tm)), { g: 0, ground: null, life: 5 });
+            const mine = all.filter((r) => r.team === tm), res = keep(G.stepRounds(mine, dt, [...targetsOf(alive.filter((c) => c.team !== tm)), ...rockT], { g: 0, ground: null, life: 5 }));
             survivors.push(...res.rounds); hits.push(...res.hits);
         }
     } else {   // FRIENDLY FIRE: every craft is a target but the round's owner (a ship's own parts, but the ones it was fired from inside)
@@ -334,7 +340,7 @@ function* tickGen(arena) {
         for (const r of all) { const key = r.owner + ":" + (r.skip ? r.skip.join(",") : "-"); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(r); }
         for (const [, rs] of groups) {
             // flightGuns.stepRounds never lets a round hit a target with its owner's id, so the parts of the ship's own hull it may hit are handed to it under the id's negative and given back
-            const owner = rs[0].owner, skip = rs[0].skip || null, targets = everyone.filter((q) => q.id !== owner || (skip !== null && !skip.includes(q.part))).map((q) => (q.id === owner ? { ...q, id: -q.id } : q)), res = G.stepRounds(rs, dt, targets, { g: 0, ground: null, life: 5 });
+            const owner = rs[0].owner, skip = rs[0].skip || null, targets = everyone.filter((q) => q.id !== owner || (skip !== null && !skip.includes(q.part))).map((q) => (q.id === owner ? { ...q, id: -q.id } : q)), res = keep(G.stepRounds(rs, dt, [...targets, ...rockT], { g: 0, ground: null, life: 5 }));   // rock hits stripped BEFORE the own-part ids are given back
             survivors.push(...res.rounds); hits.push(...res.hits.map((h) => (h.target < 0 ? { ...h, target: -h.target } : h)));
         }
     }
@@ -374,6 +380,17 @@ function* tickGen(arena) {
             if (CS.partCentres(s.ship, s.body).some((p) => norm(sub(f.body.pos, p.center)) < p.radius + FIGHTER.radius)) {
                 f.hp = 0; f.status = "rammed"; s.hp -= RAM_DAMAGE; events.push({ type: "ram", t: tEnd, craft: f.id, with: s.id, damage: RAM_DAMAGE }); break;
             }
+        }
+    }
+    // ROCKS: a fighter that touches one is lost ("struck"); a capital ship that touches one takes ROCK_DAMAGE, once per rock
+    if (arena.rocks) for (const c of alive) {
+        if (c.dead || c.hp <= 0) continue;
+        if (c.kind === "fighter") {
+            const k = SR.touchedRock(arena.rocks, c.body.pos, FIGHTER.radius);
+            if (k >= 0) { c.hp = 0; c.status = "struck"; events.push({ type: "rock", t: tEnd, craft: c.id, rock: k }); }
+        } else {
+            const seen = arena.rockTouched.get(c.id) || new Set(); arena.rockTouched.set(c.id, seen);
+            for (const p of CS.partCentres(c.ship, c.body)) { const k = SR.touchedRock(arena.rocks, p.center, p.radius); if (k >= 0 && !seen.has(k)) { seen.add(k); c.hp -= SR.ROCK_DAMAGE; events.push({ type: "rock", t: tEnd, craft: c.id, rock: k, damage: SR.ROCK_DAMAGE }); } }
         }
     }
     arena.i += 1; arena.t = arena.i * dt;
