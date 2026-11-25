@@ -1,0 +1,64 @@
+{
+ "v1": {
+  "verdict": "LANE BETTER",
+  "wins": 128,
+  "losses": 48,
+  "ties": 184,
+  "n": 176,
+  "p": 1.361990759723719e-9
+ },
+ "v2": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 149,
+  "losses": 166,
+  "ties": 45,
+  "n": 315,
+  "p": 0.3673479605330277
+ },
+ "bottom": "THE LANE WINS THE STRAFE",
+ "reported": {
+  "L": {
+   "fights": 360,
+   "approachStruck": 24,
+   "approachShot": 86,
+   "arrived": 2762,
+   "combatStruck": 125,
+   "struck": 149,
+   "medianArrivalT": 15.9,
+   "meanR": 246.8339814814815,
+   "meanDamage": 246.59444444444443,
+   "shipDead": 1,
+   "maxDrift": 522.0896291451521,
+   "fallbacks": 78370,
+   "near": 121810
+  },
+  "N": {
+   "fights": 360,
+   "approachStruck": 18,
+   "approachShot": 95,
+   "arrived": 2762,
+   "combatStruck": 241,
+   "struck": 259,
+   "medianArrivalT": 15.866666666666667,
+   "meanR": 264.8388888888889,
+   "meanDamage": 264.8388888888889,
+   "shipDead": 0,
+   "maxDrift": 523.4480121068502,
+   "fallbacks": 69714,
+   "near": 120537
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 6,
+   "losses": 12,
+   "ties": 342,
+   "n": 18,
+   "p": 0.237884521484375
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

@@ -205,3 +205,45 @@ Keith asked for the layer "also steering during the strafing passes". The design
 * Arm "L" in tools/ship/rockNavStudy.mjs, with readHeldB and devChecksB.
 * The command's modes devB, devB-read, heldB and heldB-read (files devB-*, heldB-*).
 * Gate rows and sabotages in rockNavStudy-selfcheck.mjs.
+
+## ROUND B, RESULT (2026-11-25): THE LANE WINS THE STRAFE
+
+**DEV** (3301-3330, 120 pairs): all five checks passed.
+- The hand-back was exact on 494,130 calls.
+- L's 1,191,645 goal cells all had a clear line. N's field had 31,673 that did not.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (3401-3490 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/heldB-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | N (Round A's layer) | L (the clear lane) |
+|---|---|---|
+| rock strikes after arriving | 241 | 125 |
+| mean damage on the ship | 264.8 | 246.6 |
+| rock strikes before arriving | 18 | 24 |
+| arrived | 2762 | 2762 |
+| shot down before arriving | 95 | 86 |
+| all rock strikes | 259 | 149 |
+| median arrival | 15.87 s | 15.90 s |
+| ship destroyed | 0 | 1 |
+
+- **V1 THE STRAFE:** LANE BETTER. The lane was better in 128 fights, worse in 48, tied in 184; p < 0.0001.
+- **V2 THE DAMAGE:** NO DIFFERENCE SHOWN (149 against 166, p 0.37). So it is not N BETTER: the lane was not bought with the attack.
+- **Reported:**
+  - Approach strikes: FLOOR (6 against 12 non-tied pairs).
+  - Aim fallbacks: N 69,714, L 78,370. NEAR aims: N 120,537, L 121,810.
+  - Worst ship drift: about 523 in both arms.
+
+**Against the expectations (written first):**
+- V1 LANE BETTER, about 65: YES.
+- V2 not N BETTER, about 50: YES. The damage fell 7%, and that was not shown beyond chance.
+- Approach strikes not worse, about 80: not shown worse; too few to test (FLOOR).
+
+**WHAT THE TWO ROUNDS MEAN TOGETHER.**
+- Against today's doctrine, the layer with the clear lane loses about 149 fighters to rocks where the doctrine loses about 498. That is a cross-round reading on different seeds (Round A's D 498 against Round B's L 149); no round paired them, and it is not a verdict.
+- The two rounds' fix points are different:
+  - Round A: route the approach round the rocks.
+  - Round B: route it to a point with a clear run at the ship, because a strafing fighter cannot turn.
+- Steering during the strafing pass itself, the form Round B was first asked in, was surveyed and did nothing. The reason is the doctrine's thrust cut while strafing.
+- **Still open, not weighed:**
+  - The field is built once round the ship's start. The ship drifts about 520 units, and 70-78 thousand pilot calls a round fall back to the doctrine because a fighter sits inside the stale goal but more than 220 from the ship.
+  - A field re-centred on the ship as it moves is the next candidate round. It is not registered.
