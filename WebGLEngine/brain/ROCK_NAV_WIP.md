@@ -139,3 +139,69 @@ Pairs are (seed, kind), N against D.
   - **The goal goes stale.** The field is built once, round where the ship STARTED, and under N the ship drifts up to 456 units, because it turns to face the fighters that now reach it. A fighter already inside the old goal sphere but more than 220 from the ship has a null aim and flies the doctrine: 62,629 calls.
   - **More fighters die to the guns on the approach** (87 against 30). They spend longer in the gunners' reach.
 - Neither is corrected here. A re-centred field is a candidate for a later round, not Round B, so that Round B tests one thing.
+
+# ROUND B -- the clear lane: the layer routes each fighter to a point on the strafe sphere with a clear run at the ship (REGISTERED 2026-11-25, after Round A was read, before any code for it and before any of its seeds is flown)
+
+## What is already known, said first: the survey, and why Round B is not what was first asked
+Keith asked for the layer "also steering during the strafing passes". The design survey flew throwaway space seeds 9990007-9990012 (24 fights, in no set; scratch prototypes, never committed), Round A's layer N against variants:
+* **Steering during the passes does nothing.** Inside the strafe range, three rules were tried, each with the guns held while detouring:
+  * line of sight to the doctrine's target, detouring round the first rock in the way: strikes after arrival 12 against N's 11;
+  * the same with the thrust allowed: 12;
+  * a predictive rule (the velocity projected 2, 3 or 5 s ahead): 11-12.
+  * Every variant cost damage on the ship: 7,868-9,482 against N's 10,308.
+* **Why** (a diagnostic of the 11 strikes):
+  * 9 are in strafe mode, 147-194 from the ship, 1-2 s after arriving, coasting at 20-28 u/s.
+  * The doctrine strafes with the thrust cut (standoff 1e9), and rocks fill the band 150-220. So a fighter delivered to an arbitrary point on the strafe sphere often has a rock between it and the ship, and no time to turn its nose and thrust.
+* **What works is routing the approach to a clear lane:**
+  * **L1:** the field's goal is only those strafe-sphere cells with a clear line (on the blocked grid) to the ship's start. Strikes after arrival 5 against 11; damage on the ship 8,706 against 10,308; approach strikes 1 against 2.
+  * **L2:** L1, plus inside the strafe range the layer keeps flying until the line to the ship's CURRENT centre is clear. Strikes 4, but damage 4,564: fighters loiter outside the lanes.
+* **So Round B registers L1.** It is the layer carrying the strafe's needs into the route, not steering during the pass. L2 and the in-pass rules are not flown.
+
+## The arms (Round A's library and pilot; one option added)
+* brain/spaceNav.mjs buildField gains the option `lane` (default false, so Round A's field is unchanged to the bit). With it, a goal cell must also have a clear line from its centre to the origin, by lineClear on the blocked grid.
+* **N:** Round A's arm exactly.
+* **L:** the same, with the field built with lane: true.
+* Both use the same rocks, fighters, gunners ("regular"), 24 rocks, margin 20 and re-aim every 15 ticks. The hand-back is unchanged: AP.decide(body, target, opts) inside the strafe range.
+
+## Endpoints: Round A's per-fighter endpoints, unchanged
+
+## SETS
+* DEV: 3301-3330 x 4 kinds, checks only.
+* HELD: 3401-3490 x 4 kinds, flown once. Both were reserved by Round A.
+* Gate seeds 41-50. The survey's throwaway seeds: 9990007-9990012.
+
+## DEV: checks only (a failure stops the round)
+1. **SAME FIELD:** both arms fly identical rocks and starts.
+2. **THE HAND-BACK** is exact in both arms.
+3. **THE LANE IS SOUND:**
+   * In L, every goal cell has a clear line to the origin.
+   * In L there are goal cells at all.
+   * N's field has goal cells without a clear line, so the option reaches the field.
+4. **THE FIELD IS SOUND** (Round A's check 4) in both arms.
+5. **EVERY FIGHT ENDS.**
+
+## HELD: the verdict (pairs by (seed, kind), L against N; Round A's sign verdict)
+* **V1, THE STRAFE:** d = N.combatStruck - L.combatStruck.
+  * LANE BETTER: wins > losses, p <= 0.05, and L's total is lower.
+  * N BETTER is the mirror; FLOOR is under 20 non-tied pairs; otherwise NO DIFFERENCE SHOWN.
+* **V2, THE DAMAGE** (the lane is not bought with the attack): d = L.damageOnShip - N.damageOnShip. It must not be N BETTER.
+* **BOTTOM LINE:**
+  * V1 LANE BETTER and V2 not N BETTER: `THE LANE WINS THE STRAFE`.
+  * V1 LANE BETTER and V2 N BETTER: `THE LANE SAVES FIGHTERS AND HURTS THE SHIP LESS`.
+  * Otherwise: `THE LANE DOES NOT WIN THE STRAFE (<V1's verdict>)`.
+* **Reported, not weighed:**
+  * approach strikes, arrivals, approach shot, total struck, median arrival, R and ship deaths;
+  * aim fallbacks and NEAR aims;
+  * the ship's drift;
+  * the sign test on approach strikes, L against N.
+
+## Expectations, recorded before any code
+* V1 LANE BETTER: about 65% (the survey's 11 against 5 is 24 fights).
+* V2 not N BETTER: about 50%. The survey's damage fell 16%, and that may be real.
+* Approach strikes not worse under L: about 80%.
+
+## What will be built
+* `lane` in brain/spaceNav.mjs, with gate rows and sabotages.
+* Arm "L" in tools/ship/rockNavStudy.mjs, with readHeldB and devChecksB.
+* The command's modes devB, devB-read, heldB and heldB-read (files devB-*, heldB-*).
+* Gate rows and sabotages in rockNavStudy-selfcheck.mjs.
