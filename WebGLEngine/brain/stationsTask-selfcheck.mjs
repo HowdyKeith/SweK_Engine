@@ -22,6 +22,8 @@
 // 2026-11-20 -- THE HIGH RIDER (round 13, section 8): 7 mutants of stationsTask.mjs; 6 red by name, 1 EQUIVALENT (final pass): H1 the vessel not given to the state | H2 not given to the step | H3 the main ballast left at 3 % |
 //   H4 a second field changed | H5 the model rebuilt each call | H6 round 13's HELD from 207002 | H7 the crews given the default vessel. H7 WENT 0 RED FIRST and got a row (the vessel reaches the crew only as its surfaced
 //   depth, 0.30 m against 0.56 m). H1 is EQUIVALENT: createState reads the vessel's mass and inertia, and the two vessels differ only in the main ballast.
+// 2026-11-25 -- HOLD (round 16, section 9): 8 mutants of subStations.mjs and stationsTask.mjs, every one red by name (final pass): H1 never held | H2 held for every NEED | H3 the hold not applied | H4 held from the start |
+//   H5 TRIAGE_OFF holding | H6 HOLD_KNOBS without the hold | H7 the HOLD crew as NEED | H8 HELD from 213002. H7 WENT 0 RED FIRST (the crew was checked by its label) and got a row: seed 990005 outside every set.
 "use strict";
 import * as T from "./stationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -193,6 +195,32 @@ guarded("section 8", () => {
     ok("THE DEV FINDING, 1: TRIAGE on the high rider NEVER commands the main ballast (no tick at -1); its tank dips only under damage control's emergency blow and is flooded back -- at 0 again by 150 s", tr.blows === 0 && tr.switches === 0 && tr.lo < 0 && tr.after === 0, J(tr));
     ok("THE DEV FINDING, 2: NEED's command flips between blowing and not more than 50 times, the bottle (6 levels) is empty before 160 s, and the tank is above -0.1 at 150 s: between blows the helm floods it back", nd.switches > 50 && nd.airOut !== null && nd.airOut < 160 && nd.after > -0.1, J(nd));
     ok("round 13's sets are 206001-206048 (DEV) and 207001-207096 (HELD, never flown)", T.R13_DEV_SET.length === 48 && T.R13_DEV_SET[0] === 206001 && T.R13_HELD_SET.length === 96 && T.R13_HELD_SET[0] === 207001);
+});
+
+sec("9. HOLD (round 16, section 35): NEED's trigger with the blow held once it fires");
+guarded("section 9", () => {
+    const model = NT.model(), mission = { depth: 20, heading: 0, speed: 2 }, sink = S.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5;
+    // the NEED fixture of section 7: a breached boat, weight gone, at 30 m, the charge falling 0.01/s with 0.05 left (empty in 5 s, the climb at 0.05 m/s needs 540 s) -- so the trigger FIRES; then the same captain
+    //   is shown a boat climbing at 10 m/s with a steady charge, where the trigger does NOT fire: NEED stops blowing, HOLD keeps the blow
+    const run2 = (knobs) => { let i = 0, fr = Array.from({ length: 302 }, (_, k) => 0.15 - (0.10 * k) / 300), phase = 1;
+        const read = () => ({ cls: "battery", frac: phase === 1 ? fr[Math.min(i, fr.length - 1)] : 0.5, depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 });
+        const c = SS.triageCaptain({ pilot: A.pilot(), model, read, knobs }); c(sink, mission);
+        const st = S.createState({ depth: 30, speed: 2, model }); st.vel[2] = 0.05; st.tank = { ...(st.tank || {}), released: true };
+        let fired = null; for (i = 1; i < fr.length; i++) fired = c(st, mission);
+        phase = 2; const fast = S.createState({ depth: 30, speed: 2, model }); fast.vel[2] = 10; fast.tank = { ...(fast.tank || {}), released: true };
+        let after = null; for (let k = 0; k < 400; k++) after = c(fast, mission);
+        return { fired: fired.ballast, after: after.ballast, held: c.held }; };
+    const need = run2(T.NEED_KNOBS), hold = run2(T.HOLD_KNOBS);
+    ok("both blow when the trigger fires (ballast -1)", need.fired === -1 && hold.fired === -1, J({ need, hold }));
+    ok("!! THE HOLD: shown a fast climb and a steady charge afterwards (where the trigger does not fire), NEED stops blowing and HOLD keeps ballast at -1 and reads held", need.after > -1 && hold.after === -1 && hold.held === true && need.held === false, J({ need, hold }));
+    const quiet = SS.triageCaptain({ pilot: A.pilot(), model, read: () => ({ cls: "battery", frac: 0.5, depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 }), knobs: T.HOLD_KNOBS });
+    const cmd = quiet(S.createState({ depth: 20, speed: 2, model }), mission);
+    ok("...and a HOLD captain whose trigger never fired holds nothing (an unbreached boat at its mission depth flies its own ballast)", quiet.held === false && cmd.ballast > -1, J({ held: quiet.held, ballast: cmd.ballast }));
+    const hs = T.scenario(990005, T.HARD_LEAK), hHold = T.fly(hs, "HOLD", { model: T.highRiderModel() }), hNeed = T.fly(hs, "NEED", { model: T.highRiderModel() });
+    ok("THE HOLD CREW FLIES THE HOLD: on seed 990005 (outside every set, a hard leak, the high rider) HOLD's held blow broaches the boat where NEED's flickering one does not (round 2's task scores a broach as a loss: disclosed in section 36)", hHold.status === "broached" && hNeed.status === "submerged", J([hHold.status, hNeed.status]));
+    ok("HOLD_KNOBS is NEED_KNOBS with blowHold, frozen; TRIAGE_OFF holds nothing; the HOLD crew flies them; round 16's sets are 212001-212048 and 213001-213096",
+        J((({ blowHold, ...rest }) => rest)(T.HOLD_KNOBS)) === J(T.NEED_KNOBS) && T.HOLD_KNOBS.blowHold === true && Object.isFrozen(T.HOLD_KNOBS) && SS.TRIAGE_OFF.blowHold === false
+        && T.R16_DEV_SET.length === 48 && T.R16_DEV_SET[0] === 212001 && T.R16_HELD_SET.length === 96 && T.R16_HELD_SET[0] === 213001 && T.fly(T.scenario(990005, T.HARD_LEAK), "HOLD", { seconds: 60 }).crew === "HOLD");
 });
 
 finished = true;

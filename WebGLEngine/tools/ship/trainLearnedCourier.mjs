@@ -1,5 +1,6 @@
 // WebGLEngine/tools/ship/trainLearnedCourier.mjs -- UNNUMBERED (export-free on purpose: the command; the library is brain/learnedCourier.mjs, held by brain/learnedCourier-selfcheck.mjs)
-//   node tools/ship/trainLearnedCourier.mjs [--workers 4] [--round 15] [--write]
+//   node tools/ship/trainLearnedCourier.mjs [--workers 4] [--round 15|18] [--write]
+// 2026-11-25 -- `--round 18` trains ROUND 18 (section 35): round 15's mission value with ES18 (40 generations, seed 9018) on round 18's 32 TRAIN seeds, frozen to brain/learnedCourierBudget.json.
 // 2026-11-20 -- `--round 15` trains ROUND 15 (section 31): the mission value as the fitness, ES seed 9015, round 15's TRAIN and SELECTION sets, frozen to brain/learnedCourierPriced.json. Without it, round 11 as it was.
 // ROUND 11 OF THE SUBMARINE STATIONS (brain/SUB_STATIONS_WIP.md section 27): the registered training -- the (mu, lambda) ES on the TRAIN seeds, then the choice on the SELECTION seeds -- with each fitness split across worker
 // threads by seed (each worker returns the sum over its seeds; the total is the same number whatever order they answer in). With --write it freezes the chosen captain to brain/learnedCourier.json. It flies no HELD seed.
@@ -13,8 +14,8 @@ if (!isMainThread) {
 } else {
     const { parseOrExit } = await import("./cliArgs.mjs");
     const cli = parseOrExit("trainLearnedCourier", { values: { "--workers": "number", "--round": "number" }, flags: ["--write"] }), n = cli.values["--workers"] || 4, t0 = Date.now();
-    const round = cli.values["--round"] || 11; if (round !== 11 && round !== 15) { console.error(`[trainLearnedCourier] --round is 11 or 15, got ${round}`); process.exit(2); }
-    const priced = round === 15, ES = priced ? L.ES15 : L.ES, TRAIN = priced ? L.R15_TRAIN_SET : L.TRAIN_SET, SELECTION = priced ? L.R15_SELECTION_SET : L.SELECTION_SET;
+    const round = cli.values["--round"] || 11; if (![11, 15, 18].includes(round)) { console.error(`[trainLearnedCourier] --round is 11, 15 or 18, got ${round}`); process.exit(2); }
+    const priced = round !== 11, ES = round === 18 ? L.ES18 : priced ? L.ES15 : L.ES, TRAIN = round === 18 ? L.R18_TRAIN_SET : priced ? L.R15_TRAIN_SET : L.TRAIN_SET, SELECTION = round === 18 ? L.R18_SELECTION_SET : priced ? L.R15_SELECTION_SET : L.SELECTION_SET;
     const pool = Array.from({ length: n }, () => new Worker(new URL(import.meta.url))), waiting = new Map(); let next = 0;
     for (const w of pool) w.on("message", ({ id, f }) => { waiting.get(id)(f); waiting.delete(id); });
     const ask = (w, theta, seeds) => new Promise((res) => { const id = next++; waiting.set(id, res); w.postMessage({ id, theta, seeds, priced }); });
@@ -26,8 +27,8 @@ if (!isMainThread) {
     console.log(`[trainLearnedCourier] chosen on ${SELECTION.length} SELECTION runs: selection fitness ${chosen.selFit.toFixed(3)}, train fitness ${chosen.trainFit.toFixed(3)}`);
     console.log(`[trainLearnedCourier] theta ${JSON.stringify(chosen.theta.map((w) => +w.toFixed(4)))}`);
     if (cli.flags.has("--write")) {
-        const file = priced ? "learnedCourierPriced.json" : "learnedCourier.json";
-        fs.writeFileSync(new URL("../../brain/" + file, import.meta.url), JSON.stringify({ schema: 1, round, registered: priced ? "brain/SUB_STATIONS_WIP.md section 31" : "brain/SUB_STATIONS_WIP.md section 27", features: L.FEATURES, es: ES, ...(priced ? { price: L.PRICE } : {}), train: TRAIN.length, selection: SELECTION.length, theta: chosen.theta, trainFit: chosen.trainFit, selFit: chosen.selFit, history }, null, 1) + "\n");
+        const file = round === 18 ? "learnedCourierBudget.json" : priced ? "learnedCourierPriced.json" : "learnedCourier.json";
+        fs.writeFileSync(new URL("../../brain/" + file, import.meta.url), JSON.stringify({ schema: 1, round, registered: round === 18 ? "brain/SUB_STATIONS_WIP.md section 35" : priced ? "brain/SUB_STATIONS_WIP.md section 31" : "brain/SUB_STATIONS_WIP.md section 27", features: L.FEATURES, es: ES, ...(priced ? { price: L.PRICE } : {}), train: TRAIN.length, selection: SELECTION.length, theta: chosen.theta, trainFit: chosen.trainFit, selFit: chosen.selFit, history }, null, 1) + "\n");
         console.log(`[trainLearnedCourier] wrote brain/${file}`);
     }
     for (const w of pool) await w.terminate();
