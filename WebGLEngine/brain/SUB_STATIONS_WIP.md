@@ -785,3 +785,55 @@ Keith, 2026-11-20: "Let's do all, those as you suggested, and also item 5" -- th
 **What it says.** Rounds 11 and 15 together: the learner's answer follows the price on a boat. A price of 2 bought boats and lost deliveries; the mission's price bought deliveries back (1.75 a run against 0.66) at the cost of boats. Neither learner, on 20 generations of a (mu, lambda) ES with 16 training runs, matched the hand rule that reads the planned route. That is a result about this budget and this feature set, not about learning.
 
 **Status: round 15 CLOSED as registered.**
+
+## 35. ROUNDS 16 TO 18, REGISTRATIONS (2026-11-25, committed before any seed of their sets is flown and before their code)
+
+Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries of `tools/ship/nextRounds.mjs` written after v4932: stations-held-blow, stations-duel-surface-cost and stations-learner-budget are these three rounds.
+
+### ROUND 16: A HELD BLOW
+
+**THE QUESTION.** Section 32 found that no captain uses the main tank: TRIAGE never commands it, and NEED's gate is re-read every tick, so between blows the helm floods the tank back and the bottle is spent for no lift. If the blow, once started, is HELD, does the tank keep the hard-leak boats -- on the default vessel, and on the high rider (a quarter of the weight)?
+
+**THE RULE (HOLD), FIXED NOW.** TRIAGE (`FROZEN_TRIAGE`) plus NEED's trigger (round 12: breached, the weight gone, deeper than 3 m, and at the charge spent over the last 10 s the battery would be empty before the climb reaches 3 m), with ONE change: **once the trigger fires, ballast is held at -1 on every later tick** (a latch; nothing releases it). Nothing else changes.
+
+**THE TASK.** Round 12's: round 2's task with the leak U(0.06, 0.08) (`HARD_LEAK`), unchanged, flown on BOTH vessels (the needs-task vessel and `highRiderModel()`).
+
+**THE SETS.** DEV: 212001 to 212048. HELD: 213001 to 213096.
+
+**THE DEV CHECKS (non-degeneracy, nothing chosen).** Each verdict below goes to HELD iff its two crews differ in survival on at least 3 of the 48 DEV dives; a verdict whose check fails is STOPPED AT DEV.
+
+**THE VERDICTS (HELD, once; exact one-sided sign tests on the discordant dives, p at most 0.05).**
+* **V1:** HOLD against TRIAGE on the high rider: HOLD BEATS TRIAGE, TRIAGE BEATS HOLD, or NO DIFFERENCE SHOWN.
+* **V2:** the same on the default vessel.
+* **V3 (the hull, once the tank is used):** HOLD on the high rider against HOLD on the default vessel.
+* Reported, not in a verdict: NEED on the default vessel on the same dives, with how many times its command flips and when its bottle is empty (section 32's question about round 12).
+
+**EXPECTATION.** V1: HOLD BEATS TRIAGE about 70 percent (the high rider can lift a 6-8 % leak once blown). V2: NO DIFFERENCE or STOPPED AT DEV about 60 percent (the default tank's 3 % is under the leak). V3: the high rider keeps more about 70 percent.
+
+### ROUND 17: SONAR MEETS DAMAGE CONTROL, IN A FIGHT LONG ENOUGH FOR THE SURFACE TO COST
+
+**THE QUESTION.** Round 14 STOPPED AT DEV because a 240 s duel is decided by the first salvo. In a fight two and a half times as long (600 s), does COND's rule (fight on after the breach, go up only on a second sinking) beat TRIAGE's (go up for good)?
+
+**THE TASK.** Round 14's (`brain/duelStationsTask.mjs` fight14: side A breached on the needs-task vessel, the battery U(0.05, 0.30), the four drone kinds, the breach U(0.03, 0.08) of the weight from U(20, 120) s), with ONE change: **the fight lasts 600 s** (fight14's `seconds`). The crews are round 14's three, unchanged (DC, TRIAGE-D, COND-D).
+
+**THE SETS.** DEV: 216001 to 216006 per kind (24 duels), only to check that COND-D and TRIAGE-D differ (in score or survival) on at least 4. HELD: 217001 to 217024 per kind (96 duels).
+
+**THE VERDICT.** Round 14's (`verdict14`), unchanged: COND-D BEATS TRIAGE-D iff higher score on more duels by the test AND not shown worse on survival.
+
+**EXPECTATION.** A longer fight lets a boat that stays down keep shooting; but the battery (5-30 %) also runs out sooner relative to the fight. STOPPED AT DEV about 40 percent; COND-D BEATS TRIAGE-D about 35; NO DIFFERENCE about 25.
+
+### ROUND 18: THE LEARNER WITH A BIGGER BUDGET
+
+**THE QUESTION.** Rounds 11 and 15's learned couriers (20 generations, 16 training runs) fell short of COND. With twice the generations and twice the training runs, at round 15's mission price, does the learner reach COND?
+
+**THE LEARNER AND THE PRICE.** Round 15's, unchanged (`learnedCourierCaptain`, the mission value with R = 2.42 goals per 1,200 s).
+
+**THE TRAINING, FIXED NOW.** The same (mu, lambda) ES (mu 4, lambda 8, sigma 0.5) with **40 generations, sigma halving every 14**, **seed 9018**, from zeros, on **32 TRAIN seeds**; the best of the last 4 parents on 16 SELECTION seeds is frozen to `brain/learnedCourierBudget.json` and committed before HELD. (About 2 hours on 4 workers, measured from round 15's 76 s a generation at 16 seeds.)
+
+**THE SETS.** TRAIN: 214001 to 214032. SELECTION: 214501 to 214516. HELD: 215001 to 215096.
+
+**THE VERDICT (HELD, once).** Round 15's (`verdict15`): BUDGET against COND on the mission value; goals and survival reported the same way, and round 15's PRICED on the same seeds.
+
+**EXPECTATION.** COND BEATS BUDGET about 60 percent; NO DIFFERENCE about 30; BUDGET BEATS COND about 10.
+
+**No stations file uses a seed from 212000 to 217999** (grep of the stations tasks, captains, the duel and this note, 2026-11-25).
