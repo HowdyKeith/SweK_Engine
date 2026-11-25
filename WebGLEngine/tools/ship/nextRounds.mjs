@@ -2963,8 +2963,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-cond-default-courier",
-        blocker: "OPEN",
-        what: "COND has beaten every other captain flown on the breached courier (round 10: 2.42 goals and 76 of 96 boats; round 15: it beat the priced learner). Make it the captain a courier with needs starts under in the Sub Aquarium, in place of none.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-25: DONE. render/subAquariumSim.mjs seats COND on a sub that has needs AND is a courier (whichever came first), unless a captain (off included) or the advisor was chosen for it; the snapshot marks it byDefault and the list line says 'CAPTAIN cond (default)'. Starting the needs again clears the captain and the choice, so the default applies again; a captain already flying is never re-seated. Gated in render/subAquariumCaptain-selfcheck.mjs section 4d (11 mutants, all red). WAS: COND has beaten every other captain flown on the breached courier (round 10: 2.42 goals and 76 of 96 boats; round 15: it beat the priced learner). Make it the captain a courier with needs starts under in the Sub Aquarium, in place of none.",
         how: "render/subAquariumSim.mjs: when setNav makes a sub with needs a courier (or setNeeds is called on a courier), seat setCaptain(id, 'cond') unless a captain was chosen; the page's menu shows it. Gate rows in render/subAquariumCaptain-selfcheck.mjs (a new courier starts under COND; an explicit choice, including off, is kept; a non-courier is untouched) with mutants. A page change, no claim, no registration.",
         why: "The best captain on record should be what a person sees first.",
     },
