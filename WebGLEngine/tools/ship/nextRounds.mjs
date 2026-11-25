@@ -2997,11 +2997,18 @@ export const NEXT_ROUNDS = [
         why: "The fish's escape circuit is half-confirmed data; the tank's zebrafish pilot cannot use it as a Mauthner circuit until the identity is settled.",
     },
     {
-        id: "fly-lattice-calibration-lplc2-subunits",
-        blocker: "OPEN",
-        what: "brain/FLY_RETINOTOPY_RF_WIP.md gives every LC4 and LPLC2 cell a lattice position, but the lattice is not calibrated to visual angle (only a compatibility range), the layer-to-direction assignment of LPLC2's four sub-fields is open, and sub-field offsets were measured for 61 of 185 LPLC2 cells. The note proposes LPLC2 as four displaced subunits with the published rule.",
-        how: "Two separable pieces: (1) derive the lattice-to-degrees scale and axis from a published eye map, registered as a calibration with its source; (2) build the four-subunit LPLC2 model in brain/ beside flyEmdLplc2Gf.mjs and test it against Klapoetke's published LPLC2 responses (outward motion excites, inward inhibits), registered before it is fitted to anything.",
-        why: "The Giant Fiber model (brain/flyGfLoomModel.mjs) has no spatial term; a calibrated lattice and a subunit LPLC2 are what would let a loom anywhere on the eye reach it.",
+        id: "fly-lattice-calibration",
+        blocker: "UPSTREAM -- needs the published eye map's data (Zhao et al. 2025, Nature, doi 10.1038/s41586-025-09276-5; code and data github.com/reiserlab/eyemap_T4, Janelia DOI 10.25378/janelia.29111339.v1) and a match of male-cns columns to it",
+        what: "brain/FLY_RETINOTOPY_RF_WIP.md gives every LC4 and LPLC2 cell a lattice position, but the lattice is not calibrated to degrees. LOOKED INTO 2026-11-25 (a reading of Nern et al., PMC11042306, and Zhao et al., PMC12488493): Nern et al. state no degree mapping, no inter-ommatidial angle and no field of view; Zhao et al. built a one-to-one map of medulla columns to ommatidia directions (Mi1 columns of the FEMALE FAFB volume, a regular grid with +h toward the posterior medulla = anterior on the eye, +v along the central meridian), give the inter-ommatidial angle only as contour maps (smallest frontally near the equator), and put the eye's field at about 70 degrees below to directly above and from under 10 degrees across the front to about 155 degrees behind (read from a summary, not verified verbatim). The male-cns column ROIs (LO_R_col_x_y) were not tied to Zhao's grid in either text.",
+        how: "Download the eye map from Zhao's repository; match the male-cns lattice to FAFB's medulla grid by the landmarks both use (the equator and the central meridian rows); then each LC4 and LPLC2 centroid gets an azimuth and elevation. Record the source files' versions; nothing from memory (the note's own rule).",
+        why: "The Giant Fiber model (brain/flyGfLoomModel.mjs) has no spatial term; a calibrated lattice is what would let a loom anywhere on the eye reach it.",
+    },
+    {
+        id: "fly-lplc2-subunit-model",
+        blocker: "OPEN -- but needs Klapoetke et al. 2017's Figure 4 stimulus definitions read exactly (the note has the responses read off the plots, not the stimuli's geometry) before predictions can be registered",
+        what: "brain/FLY_RETINOTOPY_RF_WIP.md proposes LPLC2 as four displaced subunits (the measured layer offsets, two opposite pairs at a right angle) with the published rule: each arm excited by outward motion along its layer's direction and inhibited by inward motion, the arms summed nonlinearly. Klapoetke's numbers are in the note (outward cross 100 %, inward cross about 0, one outward and one inward arm about 45 %; bars 10/20/40/60 degrees about 30/45/25/5 %).",
+        how: "Read Klapoetke's Figure 4 and its Methods for each stimulus's geometry (arm length, width, speed, where the arms start) and write them into the note; THEN register the model's form and its qualitative predictions (looming above receding; inward cross near 0; one-in-one-out between; two outward arms above the sum of each alone; wide translation near 0) before building it beside brain/flyEmdLplc2Gf.mjs, and test it once.",
+        why: "A spatial LPLC2 is the piece between the retinotopy the data gives and the Giant Fiber model the paper gives; registering it on paraphrased stimuli would make its verdict mean little.",
     },
     {
         id: "fly-gf-input-signs",
