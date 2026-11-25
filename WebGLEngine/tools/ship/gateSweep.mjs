@@ -16817,6 +16817,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "this branch's first ship since it left main: H-series head-to-head rounds H71-H86 and the sub field navigation rounds (reacting traffic, current in the field, turning away, margin sweep, missions, depth, fleet), 79 gates each run alone and serially on the merged tree on 2026-11-24, all 79 exit 0 and none red on arrival; 20 of them are over the 3,000 ms quick-sweep line (the study gates re-fly their held sets) and are timed by the rotation, not hidden. Each study gate carries its own serial mutation pass in its header.",
     }),
+    since643: Object.freeze({
+        at: "v4935", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); submarine stations rounds 16 to 18 (brain/SUB_STATIONS_WIP.md sections 35-39, each registered before it was flown) and stealth Round 30 gained rows in existing gates: brain/stationsTask-selfcheck section 9 (8 mutants, all red), brain/duelStationsTask-selfcheck section 7, brain/learnedCourier-selfcheck section 7 (7 mutants, all red), render/subAquariumCaptain-selfcheck section 4d (11 mutants, all red)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

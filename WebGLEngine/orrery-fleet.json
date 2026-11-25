@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8f89223c06818056a8b55f7e81c22b2bfda24f35",
+ "head": "daf974d91bb4540f3142c2a18b9f3f7b0ba01fff",
  "bodies": {
   "box3d": [
    {
@@ -375,8 +375,8 @@
    },
    {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 57753,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "bytes": 57854,
+    "sha": "aff6734bb19ca97f583da9bfd8ca8dd1bc189e78"
    },
    {
     "path": "render/switchboardView-selfcheck.mjs",
@@ -1047,7 +1047,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3828074,
+    "bytes": 3830600,
     "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {

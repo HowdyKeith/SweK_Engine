@@ -879,7 +879,7 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 
 ## 39. ROUND 18 RESULT (2026-11-25; `brain/budgetHeld.{0,1,2,3}.jsonl`, 96 seeds x BUDGET, COND, PRICED, committed unread at `8d7f18420`, then read ONCE)
 
-**Training, as registered:** 40 generations on 32 TRAIN seeds (215 s a generation on 4 workers); the best of the last 4 parents on 16 SELECTION seeds, frozen to `brain/learnedCourierBudget.json` at `e07c2fff1` before any HELD seed was flown (train fitness 80.94 on 32 seeds, selection fitness 40.09 on 16: about 2.5 a run on both). Gated in `brain/learnedCourier-selfcheck.mjs` section 7 (7 mutants, every one red).
+**Training, as registered:** 40 generations on 32 TRAIN seeds (7,112 s, about 178 s a generation on 4 workers); the best of the last 4 parents on 16 SELECTION seeds, frozen to `brain/learnedCourierBudget.json` at `e07c2fff1` before any HELD seed was flown (train fitness 80.94 on 32 seeds, selection fitness 40.09 on 16: about 2.5 a run on both). Gated in `brain/learnedCourier-selfcheck.mjs` section 7 (7 mutants, every one red).
 
 **THE VERDICT (registered, `verdict15` with BUDGET in PRICED's place): NO DIFFERENCE SHOWN** on the mission value. BUDGET has more value on 37 runs and COND on 49 (COND's side p = 0.12; mean value 2.11 against 2.26).
 * Goals, reported the same way: NO DIFFERENCE SHOWN (36 to 34; means 2.64 against 2.52).
