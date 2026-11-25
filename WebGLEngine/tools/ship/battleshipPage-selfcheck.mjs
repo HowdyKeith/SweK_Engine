@@ -408,6 +408,23 @@ else {
             }
             // ==== HELM-END (browser)
 
+            // ==== ROCKS-BEGIN (browser): the rock field (2026-11-25, brain/spaceRocks.mjs) ----
+            {
+              globalThis.__swekStep = "the rock field";
+              const f6 = document.createElement("iframe"); f6.style.width = "1100px"; f6.style.height = "900px"; f6.src = "/space-battleship.html?rocks=1&kind=bow&seed=2"; document.body.appendChild(f6);
+              await new Promise((res) => { f6.onload = res; }); const t6 = performance.now(); while (performance.now() - t6 < 40000 && !f6.contentWindow.__battleship) await wait(200);
+              const B6 = f6.contentWindow.__battleship; await B6.ready; B6.hold(true); const s6 = B6.state(), d6 = f6.contentWindow.document;
+              out.rocks = { url: { rocks: s6.rocks, meshes: s6.rockMeshes, checked: d6.getElementById("rocks").checked, kind: s6.scenario.kind, seed: s6.scenario.seed } };
+              B6.step(3600, false); B6.step(0, true); const e6 = B6.state();   // one frame rendered, so the card shows the end of the fight
+              out.rocks.fight = { tally: B6.tally(), stopped: e6.roundsStopped, struckLog: e6.log.filter((l) => /STRUCK A ROCK/.test(l)).length, card: d6.getElementById("card1").textContent, done: e6.done };
+              f6.remove();
+              B.newFight({ ...base }); out.rocks.off = { rocks: B.state().rocks, meshes: B.state().rockMeshes, checked: sel("rocks").checked, struck: "struck" in B.tally() };
+              set("rocks", true); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true })); out.rocks.on = { tick: B.state().tick, rocks: B.state().rocks, meshes: B.state().rockMeshes };
+              set("rocks", false); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true })); out.rocks.back = { rocks: B.state().rocks, meshes: B.state().rockMeshes };
+              B.newFight({ ...base });
+            }
+            // ==== ROCKS-END (browser)
+
             // ==== PEER-BEGIN (browser): a peer's brain from a FILE, through the page's own file input ----
             {
               globalThis.__swekStep = "full fights: a peer's brain from a file";
@@ -741,6 +758,20 @@ else {
                 F.ctl.formation.tick === 0 && F.ctl.formation.formation === true && F.ctl.formation.sel === true && F.ctl.collide.tick === 0 && F.ctl.collide.shipCollisions === true && F.ctl.collide.sel === true && F.url.formation === true && F.url.shipCollisions === true && F.url.ships === 2 && F.url.sel.join() === "true,true,2");
         }
         // ==== SHIPFORM-END (node)
+
+        // ==== ROCKS-BEGIN (node): the rock field ----
+        // 2026-11-25 SABOTAGED, space-battleship.html restored byte-identical each time: the rock meshes not drawn -> 1 red (the field row); the struck-a-rock log line dropped -> 1 red (the
+        // engine-fight row). FOUND WRITING IT: the first fixture (bow, seed 3) strikes NO fighter in the engine either -- the row then failed on its own premise, not on the page; it flies bow, seed 2 (4 struck).
+        {
+            const K = r.rocks, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3, rocks: 24 }, ref = BS.fight(2, "bow", O);   // bow seed 2: 4 fighters struck (seed 3 strikes none, and the first draft of this row picked it)
+            ok("!! ?rocks=1 STARTS A FIGHT IN A ROCK FIELD AND DRAWS IT: 24 rocks in the arena, 24 rock meshes in the scene, the box ticked; without it there are none, and ticking the box starts a fight (tick 0) with the field, unticking ends it",
+                !!K && K.url.rocks === 24 && K.url.meshes === 24 && K.url.checked === true && K.off.rocks === 0 && K.off.meshes === 0 && K.off.checked === false && K.off.struck === false && K.on.tick === 0 && K.on.rocks === 24 && K.on.meshes === 24 && K.back.rocks === 0 && K.back.meshes === 0,
+                K ? JSON.stringify({ url: K.url, on: K.on, back: K.back }) : "no result");
+            ok("!! THE PAGE FLIES THE ENGINE'S ROCK FIGHT: bow, seed 2, the page's tally equals battleshipFight.fight() with rocks 24 in every count, the struck fighters are logged and carded, and rounds were stopped by rocks",
+                !!K && K.fight.done && same(K.fight.tally, ref) && ref.struck > 0 && K.fight.struckLog >= ref.struck && new RegExp(ref.struck + " struck a rock").test(K.fight.card) && K.fight.stopped > 0,
+                K ? `struck ${K.fight.tally.struck}, stopped ${K.fight.stopped}, logged ${K.fight.struckLog}` : "");
+        }
+        // ==== ROCKS-END (node)
 
         // ==== HELM-BEGIN (node): a network at the ships' helm ----
         {
