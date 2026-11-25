@@ -837,3 +837,13 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 **EXPECTATION.** COND BEATS BUDGET about 60 percent; NO DIFFERENCE about 30; BUDGET BEATS COND about 10.
 
 **No stations file uses a seed from 212000 to 217999** (grep of the stations tasks, captains, the duel and this note, 2026-11-25).
+
+## 36. ROUND 16, BUILT AND PAST DEV (2026-11-25)
+
+**Built:** `triageCaptain`'s `blowHold` (off by default), the HOLD crew and round 16's sets, gated in `brain/stationsTask-selfcheck.mjs` section 9 (8 mutants, every one red).
+
+**A disclosure before DEV:** to see the rule run, it was flown on ONE seed outside every set (990005, a hard leak) on both vessels; on the high rider HOLD ended the dive BROACHED -- the held blow lifts that hull clear of the water -- and round 2's task scores any status but submerged as a loss. The registered rule ("nothing releases it") and the registered task were left as written.
+
+**DEV (212001 to 212048), the non-degeneracy checks only:** all three pass -- V1 (HOLD against TRIAGE, high rider) differ on 18; V2 (the same, default vessel) on 31; V3 (HOLD on the two vessels) on 48. So all three go to HELD. Seen on DEV and recorded (not a result): on the high rider HOLD broached on all 48; on the default vessel HOLD kept all 48 against TRIAGE's 17. NEED on the default vessel flipped its command a median 38 times a dive (up to 136) and emptied its bottle on 29 of 48 -- section 32's finding holds on the default vessel too.
+
+**Nothing was tuned.** HELD: HOLD, TRIAGE and NEED on both vessels on 213001 to 213096, to `brain/holdHeld.<part>.jsonl`, committed unread, then read once.
