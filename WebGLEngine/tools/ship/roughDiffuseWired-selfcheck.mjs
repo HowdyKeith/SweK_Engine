@@ -11,6 +11,8 @@
 // The behaviour change is opt-in: a sphere with no `sigma` runs the statements it ran yesterday, in the same
 // order, consuming the same random numbers. That is checked here by rendering the SAME SCENE through the
 // committed v4281 tracer and the patched one and comparing hashes, not by reasoning about the diff.
+// 2026-11-26 -- THE QUESTION IS THE NET CHANGE (backlog history-gates-content-not-commits). PROVED ON A SCRATCH WORKTREE that re-made main's accident -- a commit deleting all 11,562 files and its byte-for-byte revert:
+//   the old query went red there as it did on Keith's rig, the new one is green; a REAL edit committed after it (brain/blobPolicyStore.js / a gate with a report) still goes red and names only that file.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -73,9 +75,10 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
     try {
         const revs = execFileSync("git", ["log", "--format=%H", "--", REL],
                                   { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 }).trim().split("\n").filter(Boolean);
+        // 2026-11-26 -- A REVISION WHERE THE FILE DOES NOT EXIST IS SKIPPED, not fatal (backlog history-gates-content-not-commits): `git log -- REL` lists the commit that DELETED it (aaaf2ec45 deleted the
+        //   whole tree and was reverted), and `git show <that>:REL` throws, which made this row "git could not supply it" on a tree that had every revision it needed further back.
         for (const r of revs) {
-            const t = execFileSync("git", ["show", `${r}:${REL}`],
-                                   { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 });
+            let t; try { t = execFileSync("git", ["show", `${r}:${REL}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6, stdio: ["ignore", "pipe", "pipe"] }); } catch { continue; }
             if (!/roughDiffuse\.mjs/.test(t)) { rev = r; beforeSrc = t; fromGit = true; break; }
         }
         if (!rev && shallow) { rev = FIX.rev; beforeSrc = FIX.source; }

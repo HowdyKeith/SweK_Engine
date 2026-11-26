@@ -23,6 +23,7 @@
 // artefact a page needs", and a gate is not a build step; widening its walk would put 1429 files through a
 // census built for 30 and would change what its rows mean. The blindness is MEASURED below instead, so the
 // next reader meets it as a number rather than as a clean-looking zero.
+// 2026-11-26 -- SABOTAGE (restored): staleReports with the netChanged test removed -> 1 red, the netChanged row.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -740,6 +741,10 @@ console.log("  ----  list of grievances -- the answer is that each wiring is one
     ok("!! staleReports: a commit after the date of its report is stale, an older one is not; an uncommitted edit newer than its report is stale, an older one is not",
         full.reports === 4 && full.judged === 4 && full.dirty === 2 && names(full) === "r/c.json@uncommitted, r/a.json@2026-10-07",
         names(full));
+    // 2026-11-26 -- netChanged: a gate the log dates after its report is stale only if its CONTENT moved (a delete-all commit and its revert touched every gate and moved none)
+    const reverted = staleReports({ ...io, boundary: [], netChanged: (gate) => gate !== "g/a-selfcheck.mjs" }), moved = staleReports({ ...io, boundary: [], netChanged: () => true });
+    ok("!! staleReports with netChanged: the same late commit is NOT stale when the gate's content did not move (a revert pair), and is when it did; the uncommitted edit is judged by file times either way",
+        names(reverted) === "r/c.json@uncommitted" && names(moved) === names(full), `${names(reverted)} | ${names(moved)}`);
     ok("  ...and in a shallow clone a gate whose only commit is past the boundary is UNJUDGED, not fresh -- the working-tree edits are judged anyway",
         shallow.unjudged === 1 && shallow.judged === 3 && names(shallow) === "r/c.json@uncommitted, r/a.json@2026-10-07",
         `unjudged ${shallow.unjudged}, stale ${names(shallow)}`);

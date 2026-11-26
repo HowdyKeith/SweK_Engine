@@ -16,6 +16,8 @@
 // So this gate is not about mutation testing. It is about whether a measured number can be trusted TOMORROW,
 // and the two ways it stops being trustworthy are both checked against git and against the live table rather
 // than asserted.
+// 2026-11-26 -- THE QUESTION IS THE NET CHANGE (backlog history-gates-content-not-commits). PROVED ON A SCRATCH WORKTREE that re-made main's accident -- a commit deleting all 11,562 files and its byte-for-byte revert:
+//   the old query went red there as it did on Keith's rig, the new one is green; a REAL edit committed after it (brain/blobPolicyStore.js / a gate with a report) still goes red and names only that file.
 "use strict";
 import { MUTATIONS } from "../mutate/mutate.mjs";
 import { SCORE, tally, tableFingerprint, targetsOf, staleReasons } from "../mutate/mutationScore.mjs";
@@ -98,7 +100,10 @@ console.log("\n4. *** AND IT KNOWS WHETHER THE CODE IT IS ABOUT HAS MOVED -- THE
     let changed = null;
     if (!shallow) try {
         const rel = targets.map((t) => path.join("WebGLEngine", t));
-        const out = execFileSync("git", ["log", "--name-only", "--format=", `${SCORE.commit}..HEAD`, "--", ...rel],
+        // 2026-11-26 -- THE NET CHANGE, NOT EVERY COMMIT THAT TOUCHED IT (backlog history-gates-content-not-commits). `git log --name-only <run>..HEAD` listed every file a commit touched, so a
+        //   commit that deleted the whole tree and the revert that restored it byte for byte (aaaf2ec45 and its revert, on main between v4935's verdict and its publish) made every file "changed"
+        //   and this row red on a tree identical to the one the run described. `git diff --name-only <run> HEAD` asks what the question means: does HEAD's content differ from the run's.
+        const out = execFileSync("git", ["diff", "--name-only", `${SCORE.commit}`, "HEAD", "--", ...rel],
                                  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         changed = [...new Set(out.split("\n").map((s) => s.trim()).filter(Boolean))];
     } catch { changed = null; }
