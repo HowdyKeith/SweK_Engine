@@ -3119,8 +3119,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-avoid-arc-edge",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 9 (brain/SUB_FIELD_NAV_WIP.md): tested along its real turn the turn-away rule hit nothing in 60 scenarios, but 13 flights left the region (against 5); its arrivals did not rise (47 against 44).",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as FOLLOW-UP 10 (brain/SUB_FIELD_NAV_WIP.md): EDGE BEATS ARC, 5 to 0 (p 0.031) -- 47 of 60 reached against 42, exits 15 to 7; collisions 3 to 6 (the rule is stuck twice as often and then flies the plan into the ship). Was: FOLLOW-UP 9 (brain/SUB_FIELD_NAV_WIP.md): tested along its real turn the turn-away rule hit nothing in 60 scenarios, but 13 flights left the region (against 5); its arrivals did not rise (47 against 44).",
         how: "Register first one change: the arc rule's candidates also refused when their arc leaves the region (or comes within the plan's edge margin of it) within the look, on fresh hard-traffic seeds, the arc arm as the reference.",
         why: "The arc rule removed the collisions; the exits are now the whole of its loss.",
     },

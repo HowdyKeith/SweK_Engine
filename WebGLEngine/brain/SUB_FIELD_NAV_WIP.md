@@ -1134,3 +1134,18 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **DEV sanity run (seeds 1 to 30, both arms):** the edge rule is NOT degenerate -- it refuses candidates (stuck 8,653 against the reference's 4,028) and still turns (16,250) -- so no amendment. The reference reproduces FOLLOW-UP 9's DEV counts exactly (23,333 fires, 19,305 turns, 4,028 stuck). Read for sanity, not tuned on: the reference reached 25 of 30 (4 exits, 1 collision); the edge arm 26 of 30 (2 exits, 2 collisions, 1 with a ship).
 
 **Nothing was tuned.** HELD10 (8901 to 8960) is flown once, both arms, to `brain/subAvoidHeld10.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 10: THE ARC RULE KEPT OFF THE EDGE (2026-11-26; `brain/subAvoidHeld10.{0,1,2,3}.jsonl`, HELD10 = seeds 8901 to 8960 of hard-traffic, 120 flights, committed unread at `45ec0b486`, then read ONCE): **EDGE BEATS ARC**
+
+| arm | reached | collided (with ships) | left | fires | stuck / fires |
+|---|---|---|---|---|---|
+| any+predict+edge+avoid-arc (reference, FOLLOW-UP 9's) | 42 / 60 | 3 (0) | 15 | 39,524 | 16.9 % |
+| **any+predict+edge+avoid-arc-edge** (designated) | **47 / 60** | 6 (4) | **7** | 46,851 | 35.6 % |
+
+**The verdict (registered):** the edge arm arrives where the reference does not on 5 seeds and never the reverse -- 5 to 0, p = 0.031: **EDGE BEATS ARC.**
+
+**Predictions scored (moving nothing).** **D1 held** (7 exits, at most half of 15). **D2 held** (6 collisions, the reference's 3 plus 3 -- on the line). **D3 held** (stuck 35.6 % against 16.9 %). **D4 MISSED** (the verdict was EDGE BEATS ARC, put at 35 %).
+
+**What this says.** The arc rule's exits were its whole loss, and keeping its candidates out of the plan's own edge band turns most of them into arrivals (15 exits to 7, 42 arrivals to 47). The price is visible: refusing edge-ward headings leaves the rule stuck twice as often, and when it is stuck it flies the plan's heading into the ship, so collisions rose from 3 to 6 (4 with ships, against none). Across FOLLOW-UPS 8 to 10 the turn-away rule has gone from 40 of 60 (instant turn) to 47 of 60, with a different seed set each time.
+
+**What this would not say.** FOLLOW-UP 9's list stands; the 20 m band is the plan's own, not swept; one set of 60.
