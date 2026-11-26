@@ -3091,10 +3091,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stealth-masking-principle",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as stealth Round 31 (brain/STEALTH_ROUNDS_WIP.md): with a logistic readout fixed from the plain ellipse alone, the model reproduces the low-contrast drop of BOTH stripe kinds almost exactly (0.190 / 0.237 against the animal's 0.191 / 0.237) -- the gap was the comparison, not the network. NOT SUPPORTED (C3 at 0.6), and the moving stripes are over-suppressed at every contrast (0.12-0.34 against 0.46-0.58): the g 300 gain is too strong on the probability scale. Followed by stealth-gain-on-probability.",
+        how: "None.",
+        why: "Closed.",
+    },
+    {
+        id: "stealth-gain-on-probability",
         blocker: "OPEN",
-        what: "READ 2026-11-26 from the raw data (vendor/santon2025/Treadmill_data.csv, brain/STEALTH_ROUNDS_WIP.md 'The low-contrast drop, read from the raw data'): the static-stripe drop at low contrast is REAL -- at WC 0.2 Grey 0.28, Static 0.09, Moving 0.04 (within crab: Grey above Static 6 to 0, p 0.031; Static and Moving level) -- and gone by 0.6. The paper gives no mechanism. The model's gap (C2, Rounds 29-30) is real.",
-        how: "Register first whether the gap is the network's or the READOUT's: the animal's numbers are response probabilities near threshold at 0.2, the model's r an alarm size with no threshold region. One candidate: a probabilistic readout of the alarm whose single constant is fixed from the PLAIN ellipse's contrast curve alone, then tested on both stripe kinds with Rounds 29-30's criteria word for word.",
-        why: "Before a new term in the network, check that the comparison itself is fair.",
+        what: "Round 31: read through a probability readout fixed on the plain ellipse, the drift gain g 300 (chosen on alarm sizes, Round 24) over-suppresses moving stripes at every contrast and static stripes at 0.6.",
+        how: "Register first: the gain's strength chosen on the PROBABILITY scale -- the readout fixed on the plain ellipse as Round 31, g chosen on one held-out geometry by the moving stripes' likelihood ONLY at high contrast (1.0), then tested once on another held-out geometry with C1-C4 and the full striped likelihood against the null. Choosing g on the very trials it is tested on would be a fit, not a test.",
+        why: "Round 31 shows the gap moved from the network's low-contrast behaviour to its gain's strength.",
     },
     {
         id: "ship-census-rederive",

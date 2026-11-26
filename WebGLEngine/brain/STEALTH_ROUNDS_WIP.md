@@ -688,3 +688,24 @@ Rounds 13, 29 and 30's C1 to C4, applied word for word to the ANIMAL's response 
 **The test.** The fitted readout turns the model's static and moving r into probabilities; **C1 to C4 are Round 29's, word for word, on these probabilities** (C1 and the plain curve are the fit's own and are reported, not a test). **Verdict: SUPPORTED iff C2, C3 and C4 all hold** on the predicted probabilities; otherwise NOT SUPPORTED, naming each failure.
 **Reported either way:** the fitted a and b; predicted against observed probabilities in all 15 cells; the striped trials' log-likelihood under the predictions against a null that gives each striped trial the plain ellipse's observed rate at its contrast.
 **Predictions (confidence).** C2 holds on the predicted probabilities (45 %: the readout's slope is set by the plain curve's rise between 0.2 and 0.6, and a striped r a few hundredths below the plain one at 0.2 becomes a large probability drop only if that slope is steep); C3 holds (60 %); C4 holds (55 %); SUPPORTED (30 %). The striped trials fit better than the null (55 %).
+
+## Round 31 RESULTS (`brain/crabReadout31Runs/` committed unread at `5ed8a642d`; `brain/crabReadout31Agg.mjs` written and committed before the runs were read, `3d7144a90`; read ONCE): NOT SUPPORTED (C3)
+**A correction to the registration first:** it said 258 plain trials; the file has **257** (54 + 53 + 51 + 53 + 46). The fit used all of them; nothing else differs.
+**The readout:** a = -11.742, b = 16.655 (P = 1 / (1 + exp(-(a + b r)))), fitted on the Grey trials only.
+
+| contrast | model r: grey / static / moving | predicted P: grey / static / moving | observed: grey / static / moving |
+|---|---|---|---|
+| 0.2 | 0.642 / 0.549 / 0.477 | 0.259 / **0.069** / **0.022** | 0.278 / **0.087** / **0.041** |
+| 0.4 | 0.725 / 0.722 / 0.585 | 0.583 / 0.571 / 0.119 | 0.528 / 0.340 / 0.480 |
+| 0.6 | 0.763 / 0.728 / 0.598 | 0.723 / 0.594 / 0.144 | 0.647 / 0.608 / 0.460 |
+| 0.8 | 0.765 / 0.767 / 0.632 | 0.730 / 0.737 / 0.228 | 0.811 / 0.784 / 0.566 |
+| 1.0 | 0.765 / 0.769 / 0.665 | 0.730 / 0.743 / 0.339 | 0.761 / 0.733 / 0.577 |
+
+**Criteria on the predicted probabilities:** C1 holds (the fit's own). **C2 HOLDS** (grey - static 0.190, grey - moving 0.237, static and moving 0.048 apart -- the animal's 0.191, 0.237 and 0.046). **C3 fails at 0.6** (grey - static 0.129 against the 0.1 line; 0.8 and 1.0 hold). C4 holds (by 0.58, 0.50, 0.39 -- far more than the animal's 0.19, 0.25, 0.18). **Verdict: NOT SUPPORTED (C3).**
+**The striped trials' likelihood:** -341.9 under the predictions against -316.8 under the null (the plain ellipse's rate at each contrast): **the null fits the stripes better**, by 25.1.
+**Predictions:** C2 holds (45 %) HELD; C3 (60 %) MISSED; C4 (55 %) HELD; SUPPORTED (30 %) MISSED; the stripes fit better than the null (55 %) MISSED.
+**What it says.**
+* **The low-contrast gap of Rounds 29 and 30 was the COMPARISON, not the network.** Read through a readout fixed on the plain ellipse alone, the model's few-hundredths dip in r for both stripe kinds at contrast 0.2 becomes the animal's drop almost exactly (0.190 and 0.237 against 0.191 and 0.237) -- the drop lives in the steep part of the response curve, where alarm size cannot show it.
+* **The same readout exposes what the network gets wrong instead: the moving stripes are suppressed far too much at every contrast above 0.2** (predicted 0.12 to 0.34 against the animal's 0.46 to 0.58), and the static stripes too much at 0.6 (C3's miss). The readout is steep (b 16.7), so the moving stripes' r deficit that looked modest on the alarm-size scale (0.10 to 0.14) is large in probability. On the scale the animal is measured on, the g 300 drift gain is too strong.
+* So the next question is the gain's STRENGTH, judged on probabilities: g 300 was chosen on alarm sizes (Round 24's fit), not on this scale.
+**Series position after Round 31.** With a probabilistic readout fixed from the plain ellipse alone, the crab network with the g 300 drift gain reproduces the animal's low-contrast drop of BOTH stripe kinds (C2, which alarm sizes had missed twice) and the ordering at high contrast (C4), but over-suppresses moving stripes at every contrast and static stripes at 0.6, so the striped trials as a whole are fitted worse than by the plain rate. NOT YET DONE: the gain's strength chosen on the probability scale (registered, held out); the "on" and light-control version; the receding alarm.
