@@ -301,3 +301,47 @@ HELD is space seeds 4401-4460 x 4 kinds x {ace, perfect}, flown once with arms D
 * tools/ship/strongGunnersStudy.mjs (the choice, the checks and the verdict, on spaceDoctrineStudy's flyOne).
 * tools/ship/strongGunnersStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/strong-gunners/).
 * tools/ship/strongGunnersStudy-selfcheck.mjs, with a mutation pass.
+
+## ROUND 3, RESULT (2026-11-26): CAP 20 BEATS THE DOCTRINE AGAINST STRONG GUNNERS -- AND A FIGHTER CAPPED AT 12 LOSES TO THEM
+
+**DEV** (4301-4330 x 4 kinds x ace and perfect, every grid cap; read once; `brain/rig-results/strong-gunners/dev-report.json`).
+
+| | doctrine | cap 12 | cap 16 | cap 20 | cap 25 | cap 30 |
+|---|---|---|---|---|---|---|
+| mean R | 4.35 | 1.80 | 11.03 | 17.93 | 10.35 | 5.25 |
+| mean strafe-seconds | -- | 0.20 | 1.21 | 2.41 | 3.49 | 3.88 |
+
+- **CAP_STRONG = 20.** It was committed with the report before any HELD seed was flown.
+- Checks passed: SAME FOE on 732,155 decisions; THE CAP IS APPLIED (187,201 decisions at or over 20, none with thrust; the doctrine's peak 33.4 > 25); EVERY FIGHT ENDS (1,440 fights).
+
+**HELD** (4401-4460 x 4 kinds x ace and perfect; the doctrine, cap 20 and cap 12; flown once, the files committed before the read; `brain/rig-results/strong-gunners/held-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| preset | arm | mean R | fights with R > 0 | strafe-seconds | passes | peak closing |
+|---|---|---|---|---|---|---|
+| ace | doctrine | 8.70 | 37 | 6.01 | 3.73 | 33.5 |
+| ace | cap 20 | 36.15 | 80 | 4.15 | 2.83 | 20.8 |
+| ace | cap 12 | 5.92 | 11 | 0.55 | 0.49 | 13.7 |
+| perfect | doctrine | 1.57 | 11 | 2.59 | 2.15 | 33.4 |
+| perfect | cap 20 | 5.78 | 21 | 1.22 | 1.18 | 20.7 |
+| perfect | cap 12 | 0.30 | 1 | 0.02 | 0.03 | 13.5 |
+
+- **V1, R:**
+  - ace CAP BETTER: the cap was better in 73 fights, worse in 12, tied in 155; p < 0.0001; median +54.
+  - perfect CAP BETTER: 20 against 6; p 0.0094; median +18.
+- **V2, strafe-seconds:** DOCTRINE BETTER under both: ace 23 against 215, perfect 11 against 191. Cap 20's fighters spend LESS time on their passes and do MORE damage. A slower pass is a better-aimed one.
+- **BOTTOM LINE: CAP 20 BEATS THE DOCTRINE AGAINST STRONG GUNNERS.**
+- **THE FIRST QUESTION: YES, A CAPPED FIGHTER AT 12 LOSES TO STRONG GUNNERS.**
+  - On R: ace DOCTRINE BETTER (10 against 32, p 0.0009); perfect FLOOR (1 against 10).
+  - On strafe-seconds: DOCTRINE BETTER under both (0 against 240; 0 against 201). At 12 the fighters die before they reach the ship.
+
+**Against the expectations (written first):**
+- CAP_STRONG 20 or 25, about 70: YES (20).
+- CAP BEATS THE DOCTRINE, about 25: YES. NO CAP SHOWN was my about-60% call, and perfect cleared its floor (26 non-tied pairs).
+- The first question YES, about 85: YES.
+
+**WHAT THIS MEANS -- NO ONE CAP IS BEST.**
+- Rounds 1-2 chose 12 against the whole preset mix, and it wins against regular and green by killing the ship. Round 1's DEV means put cap 12 near R 1,590 there, against about 1,100 for cap 20.
+- Against ace and perfect, 12 is the worst approach on the grid and 20 the best.
+- **The right approach speed rises with the gunners' skill.** Too slow, and the fighters die on the way in; too fast, and the passes are wasted.
+- Rock nav Round D and the page's cap box use 12. That is right for the regular gunners they fly against, and it would be wrong against strong ones.
+- A cap that adapts to what the fighters meet, for example one raised after the first losses, is the open question. It is filed as backlog space-cap-adaptive.

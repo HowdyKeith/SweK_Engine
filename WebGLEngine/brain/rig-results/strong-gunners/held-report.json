@@ -1,0 +1,154 @@
+{
+ "cap": 20,
+ "v1": {
+  "ace": {
+   "verdict": "CAP BETTER",
+   "wins": 73,
+   "losses": 12,
+   "ties": 155,
+   "n": 85,
+   "p": 8.090689460813064e-12,
+   "median": 54
+  },
+  "perfect": {
+   "verdict": "CAP BETTER",
+   "wins": 20,
+   "losses": 6,
+   "ties": 214,
+   "n": 26,
+   "p": 0.009355306625366211,
+   "median": 18
+  }
+ },
+ "v2": {
+  "ace": {
+   "verdict": "DOCTRINE BETTER",
+   "wins": 23,
+   "losses": 215,
+   "ties": 2,
+   "n": 238,
+   "p": 2.9945293416398534e-40,
+   "median": -1.75
+  },
+  "perfect": {
+   "verdict": "DOCTRINE BETTER",
+   "wins": 11,
+   "losses": 191,
+   "ties": 38,
+   "n": 202,
+   "p": 1.4315260679059834e-43,
+   "median": -1.366666666666667
+  }
+ },
+ "bottom": "CAP 20 BEATS THE DOCTRINE AGAINST STRONG GUNNERS",
+ "first": {
+  "ace": {
+   "R": {
+    "verdict": "DOCTRINE BETTER",
+    "wins": 10,
+    "losses": 32,
+    "ties": 198,
+    "n": 42,
+    "p": 0.0009406740282429382,
+    "median": -18
+   },
+   "strafeS": {
+    "verdict": "DOCTRINE BETTER",
+    "wins": 0,
+    "losses": 240,
+    "ties": 0,
+    "n": 240,
+    "p": 1.131959884853339e-72,
+    "median": -5
+   }
+  },
+  "perfect": {
+   "R": {
+    "verdict": "FLOOR",
+    "wins": 1,
+    "losses": 10,
+    "ties": 229,
+    "n": 11,
+    "p": 0.01171875,
+    "median": -18
+   },
+   "strafeS": {
+    "verdict": "DOCTRINE BETTER",
+    "wins": 0,
+    "losses": 201,
+    "ties": 39,
+    "n": 201,
+    "p": 6.223015277861142e-61,
+    "median": -2.066666666666667
+   }
+  }
+ },
+ "firstAnswer": "YES: A CAPPED FIGHTER AT 12 LOSES TO STRONG GUNNERS",
+ "means": {
+  "ace D": {
+   "n": 240,
+   "R": 8.7,
+   "damage": 8.7,
+   "strafeS": 6.0079166666666675,
+   "passes": 3.725,
+   "t": 18.393194444444443,
+   "peakClosing": 33.48230571782248,
+   "withR": 37
+  },
+  "ace 20": {
+   "n": 240,
+   "R": 36.15,
+   "damage": 36.15,
+   "strafeS": 4.153472222222221,
+   "passes": 2.8333333333333335,
+   "t": 19.53291666666667,
+   "peakClosing": 20.762303919390384,
+   "withR": 80
+  },
+  "ace 12": {
+   "n": 240,
+   "R": 5.925,
+   "damage": 5.925,
+   "strafeS": 0.5519444444444445,
+   "passes": 0.49166666666666664,
+   "t": 22.325416666666676,
+   "peakClosing": 13.74199331027438,
+   "withR": 11
+  },
+  "perfect D": {
+   "n": 240,
+   "R": 1.575,
+   "damage": 1.575,
+   "strafeS": 2.5872222222222216,
+   "passes": 2.15,
+   "t": 17.293611111111122,
+   "peakClosing": 33.4460953557871,
+   "withR": 11
+  },
+  "perfect 20": {
+   "n": 240,
+   "R": 5.775,
+   "damage": 5.775,
+   "strafeS": 1.2215277777777778,
+   "passes": 1.1791666666666667,
+   "t": 17.978055555555557,
+   "peakClosing": 20.68495336890679,
+   "withR": 21
+  },
+  "perfect 12": {
+   "n": 240,
+   "R": 0.3,
+   "damage": 0.3,
+   "strafeS": 0.023611111111111107,
+   "passes": 0.03333333333333333,
+   "t": 20.02555555555557,
+   "peakClosing": 13.46213013332177,
+   "withR": 1
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

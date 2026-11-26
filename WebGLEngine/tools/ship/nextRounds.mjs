@@ -3302,6 +3302,13 @@ export const NEXT_ROUNDS = [
         why: "A p of 0.047 on a result nobody expected is the shape that most often fails to replicate; the default layer should not move on it alone.",
     },
     {
+        id: "space-cap-adaptive",
+        blocker: "OPEN",
+        what: "OPENED 2026-11-26 from the space doctrine's ROUND 3: the best closing-speed cap rises with the gunners' skill -- 12 wins against regular and green (it kills the ship; R near 1,590 against about 1,100 for 20 in Round 1's DEV), 20 wins against ace and perfect (12 is the worst cap there: its fighters die before they strafe). The fighters do not know the gunners in advance.",
+        how: "Register a round on fresh space seeds across all four presets: arm FIXED (cap 12, Rounds 1-2's choice) against arm ADAPT, a cap that starts at 12 and moves to 20 once the team has lost a stated share of its fighters without a strafe pass landing (the rule fixed on throwaway seeds before registration, and said). Verdict per preset on R with the exact sign test; the bottom line asks whether ADAPT keeps 12's win against the weak gunners AND takes 20's against the strong.",
+        why: "One fixed cap leaves a large loss on one side of the gunner range; a fighter that reads what it is meeting could have both.",
+    },
+    {
         id: "space-battleship-nav-cap",
         blocker: "CLOSED -- 2026-11-26: space-battleship.html has a cap 12 box beside the nav layer box (and ?navcap=1), disabled and doing nothing without the layer; the cap is brain/spaceNav.mjs capThrust (gated, row 19, 4 sabotages red). The page gate's NAV block holds the page's capped fight to rockNavStudy's arm LC on bow seed 2 (damage 1072 both ways, against the uncapped lane's 226); 5 sabotages, all red by name.",
         what: "OPENED 2026-11-26 from rock nav Round D: space-battleship.html's nav layer box (2026-11-26, gated in tools/ship/battleshipPage-selfcheck.mjs, NAV block) flies Round B's clear lane without the cap; Round D found the lane WITH the doctrine's cap (12) saves half the strafing losses and kills the ship in 74 of 360 fights.",
@@ -3809,7 +3816,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-cap-strong-gunners",
-        blocker: "OPEN",
+        blocker: "CLOSED -- 2026-11-26, the space doctrine's ROUND 3 (brain/SPACE_DOCTRINE_WIP.md, registered first, read once): CAP 20 BEATS THE DOCTRINE AGAINST STRONG GUNNERS -- R CAP BETTER under ace (73 to 12, median +54) and perfect (20 to 6, p 0.0094), with fewer strafe-seconds (a slower pass is a better-aimed one); and YES, a fighter capped at 12 LOSES to them (ace R 10 to 32; strafe-seconds 0 to 240 under ace, 0 to 201 under perfect). No one cap is best: 12 wins against regular and green, 20 against ace and perfect. Follow-on filed: space-cap-adaptive.",
         what: "OPENED 2026-11-20 from the space approach doctrine's ROUND 2 table (brain/SPACE_DOCTRINE_WIP.md), as a question and not a result: against the ace gunners the capped approach did slightly WORSE where either approach reached the ship -- the doctrine won 35 of 42 discordant pairs (sign p < 0.0001) while 198 of 240 tied at 0 damage -- and against perfect 9 of 10. The registered rule (ties kept in the median) read both as no verdict. Does a capped fighter lose to strong gunners, and is there a cap that does not?",
         how: "A registered round on fresh space seeds under ace and perfect only, with an endpoint that does not tie at 0 (damage per fighter-second inside the gunners' reach, or the closest approach), and a cap grid that includes a higher cap.",
         why: "The doctrine round's verdict line hides a direction the table shows; the gunner training and the arena's balance depend on which approach strong gunners face.",
