@@ -1126,3 +1126,11 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 * **D4**: the verdict is NO DIFFERENCE SHOWN. 55 percent; EDGE BEATS ARC 35.
 
 **What a result would not say.** FOLLOW-UP 9's list stands. The edge is the region's rectangle, which the planner's field already treats as a wall; this only stops the turn-away from undoing that.
+
+### DEV NOTE TO FOLLOW-UP 10 [SERIES B] (2026-11-26; made BEFORE HELD10 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `conflictArc`'s `edge` test (candidates only, the 20 m band), `avoidHeadingArc`'s `edge` option and the `any+predict+edge+avoid-arc-edge` arm; FOLLOW-UP 8's and 9's arms untouched. Gated in `brain/subAvoidNav-selfcheck.mjs` section 6 (7 mutants, every one red; E1, a 0 m band, and E5, the edge on the wrong arm, went 0 red first and got rows).
+
+**DEV sanity run (seeds 1 to 30, both arms):** the edge rule is NOT degenerate -- it refuses candidates (stuck 8,653 against the reference's 4,028) and still turns (16,250) -- so no amendment. The reference reproduces FOLLOW-UP 9's DEV counts exactly (23,333 fires, 19,305 turns, 4,028 stuck). Read for sanity, not tuned on: the reference reached 25 of 30 (4 exits, 1 collision); the edge arm 26 of 30 (2 exits, 2 collisions, 1 with a ship).
+
+**Nothing was tuned.** HELD10 (8901 to 8960) is flown once, both arms, to `brain/subAvoidHeld10.<part>.jsonl`, committed unread, then read once.
