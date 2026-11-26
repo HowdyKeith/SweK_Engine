@@ -448,3 +448,63 @@ battleshipFight.build(seed, kind, { gunners: preset, pilot }), nothing in the ar
 - The rule lands between the two fixed caps under every preset, nearer the right one, but never at it.
 - **A useful adaptive cap needs a signal that tells the gunners' skill apart before the approach is spent.** Two candidates: the gunners' hit rate on the leading fighter at range, or the ship's turret count in reach. No such signal is known to work. It is filed as backlog space-cap-signal, to be found on throwaway seeds before any round.
 - **Until then, the choice stays a fixed cap per expected opposition:** 12 against regular and green, 20 against ace and perfect. The page's cap box (12) stays right for the regular gunners it flies against.
+
+# ROUND 5: A CAP CHOSEN BY A SIGNAL -- THE DAMAGE THE TEAM HAS TAKEN BY 4 s (backlog space-cap-signal; Keith 2026-11-26, "lets do the Next round"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## The survey that earned the round (backlog space-cap-signal said: no round until a signal separates the gunners in at least 90% of fights)
+The design survey flew throwaway space seeds 9990061-9990072 (48 fights a preset, in no set; a scratch script, never committed). Fighters flew cap 12, the rule's starting cap. It recorded the damage the team had taken from the ship's gunners at each second.
+
+| time | regular | green | ace | perfect | best threshold | called right | lead fighter out |
+|---|---|---|---|---|---|---|---|
+| 2 s | 0 | 0 | 13 | 25 | >= 10 | 88.0% | 359 |
+| 3 s | 1 | 0 | 40 | 64 | >= 10 | 94.8% | 355 |
+| 4 s | 3 | 0 | 68 | 97 | >= 20 | 98.4% | 349 |
+| 6 s | 7 | 0 | 132 | 181 | >= 40 | 99.0% | 332 |
+
+- Strong gunners hit at range and weak ones barely do. By 4 s the damage taken calls the opposition right in 98% of fights, while the lead fighter is still about 350 units out and the approach is barely begun.
+- **The rule's numbers are fixed from this survey:** DECIDE_T = 4 s (the earliest time at or above 98%) and THRESHOLD = 20 (that time's best threshold).
+
+## The rule (SIGNAL)
+- Every fighter flies Round 1's arm C with a cap that starts at 12.
+- At the first decision at or after 4 s, the team reads the damage its fighters have taken from hits up to the previous tick. At 20 or more, the cap is 20 for the rest of the fight; otherwise it stays 12.
+- The choice is made once and never revisited.
+
+## The arms
+FIXED12, FIXED20 (Round 4's) and SIGNAL. Nothing in the arena is edited.
+
+## SETS -- HELD DOUBLED, AND WHY
+* DEV: space seeds 4701-4730 x 4 kinds x 4 presets, checks only.
+* HELD: **4801-4920** (120 seeds) x 4 kinds x the four presets, flown once.
+* Round 4 failed its strong side under perfect on the floor (19 non-tied pairs against 20) at 60 seeds, because perfect's R ties at 0 in most fights. The HELD size is fixed larger NOW, before any of this round's seeds are flown. The verdict is not touched.
+* The survey: 9990061-9990072.
+
+## DEV: checks only (a failure stops the round)
+1. **THE SIGNAL DECIDES:**
+   * every SIGNAL fight that reached 4 s decided exactly once, at the first decision at or after 4 s;
+   * it chose 20 exactly when its recorded damage was at least 20;
+   * it chose 20 in some fights under ace and perfect, and 12 in some under regular and green.
+2. **THE CAP IS APPLIED:**
+   * at or over the cap in force, every decision flew with thrust 0;
+   * a SIGNAL fight that chose 12 IS the FIXED12 fight, R for R.
+3. **EVERY FIGHT ENDS.**
+
+## HELD: the verdict -- Round 4's, word for word, with SIGNAL read as ADAPT
+* **THE WEAK SIDE (regular, green):** SIGNAL against FIXED12; it fails under a preset where FIXED12 is better.
+* **THE STRONG SIDE (ace, perfect):** SIGNAL against FIXED20 (it fails where FIXED20 is better), AND SIGNAL against FIXED12 must be SIGNAL BETTER.
+* **BOTTOM LINE:** Round 4's four lines with "THE SIGNAL CAP" in place of "THE ADAPTIVE CAP": HAS BOTH / PAYS ON THE WEAK SIDE / MISSES THE STRONG SIDE / HAS NEITHER.
+* **Reported:**
+  * every pair, mean R and ships destroyed;
+  * how often the signal chose 20 under each preset (its accuracy on HELD);
+  * the damage at the decision.
+
+## Expectations, recorded before any code
+* The signal chooses right in at least 95% of HELD fights: about 85%.
+* The weak side holds under both: about 75%. The ~2% of weak-gunner fights it calls strong will cost little, if any.
+* The strong side holds under ace: about 50%. The 4 s flown at 12 may still cost some of 20's gain, as Round 4's ~7 s did more.
+* The strong side holds under perfect: about 45%. The floor is the risk even at 120 seeds.
+* THE SIGNAL CAP HAS BOTH: about 30%.
+
+## What will be built
+* tools/ship/signalCapStudy.mjs (the arms, the signal, the checks and the verdict).
+* tools/ship/signalCapStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/signal-cap/).
+* tools/ship/signalCapStudy-selfcheck.mjs, with a mutation pass.
