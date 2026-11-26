@@ -34,6 +34,10 @@ export const HELD_B_SEEDS = Object.freeze(range(RESERVED_B.held[0], RESERVED_B.h
 export const ARMS_C = Object.freeze(["L", "F"]);
 /** ROUND D (the lane with the doctrine's cap): L against LC, the same pilot with the thrust cut whenever the closing speed to the nearest foe is at or above CAP_D. */
 export const ARMS_D = Object.freeze(["L", "LC"]);
+/** ROUND E (Round C again, the empty-lane defect fixed in brain/spaceNav.mjs): L against FX, the following field on the fixed library. */
+export const ARMS_E = Object.freeze(["L", "FX"]);
+export const DEV_E_SEEDS = Object.freeze(range(3901, 3930));
+export const HELD_E_SEEDS = Object.freeze(range(4001, 4090));
 export const CAP_D = CAP_CHOSEN;   // 12: the space-doctrine round's own choice (brain/SPACE_DOCTRINE_WIP.md), not chosen here
 export const DEV_D_SEEDS = Object.freeze(range(3701, 3730));
 export const HELD_D_SEEDS = Object.freeze(range(3801, 3890));
@@ -56,7 +60,7 @@ export function fieldKey(arena) {
  * t, drift, fieldKey, probe (N only: calls, aimed, fallback, near, handBack, handBackMismatch, aimBlocked, rockCentresBlocked) }.
  */
 export function flyOne({ seed, kind, arm }) {
-    const ALL = [...new Set([...ARMS, ...ARMS_B, ...ARMS_C, ...ARMS_D])];
+    const ALL = [...new Set([...ARMS, ...ARMS_B, ...ARMS_C, ...ARMS_D, ...ARMS_E])];
     if (!ALL.includes(arm)) throw new Error(`rockNavStudy.flyOne: arm must be one of ${ALL.join(", ")} (got ${arm})`);
     const layered = arm !== "D";
     let arena = null, field = null, probe = null, pilot, follow = null, buildMs = 0;
@@ -84,8 +88,8 @@ export function flyOne({ seed, kind, arm }) {
     arena = b.arena;
     const ship = NV.shipOf(arena), start = [...ship.body.pos], key = fieldKey(arena);
     if (layered) {
-        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" || arm === "F" || arm === "LC" });
-        if (arm === "F") follow = NV.followingField(() => arena, arena.rocks, { every: FOLLOW_EVERY, lane: true });
+        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" || arm === "F" || arm === "LC" || arm === "FX" });
+        if (arm === "F" || arm === "FX") follow = NV.followingField(() => arena, arena.rocks, { every: FOLLOW_EVERY, lane: true });
         probe.rockCentresBlocked = arena.rocks.every((q) => field.blocked[NV.indexOf(field, q.pos)] === 1);
         let goalCells = 0, goalBlockedLine = 0;
         for (let v = 0; v < field.dist.length; v++) if (field.dist[v] === 0) {
@@ -116,6 +120,10 @@ export function flyOne({ seed, kind, arm }) {
         const fields = follow ? [...seen] : [field];
         const sound = rockCentresSound(fields, arena.rocks);
         probe.rockCentresBlockedAll = sound.ok; probe.fieldsChecked = fields.length; probe.rocksOffGrid = sound.offGrid;
+        // ROUND E: how many builds were an empty lane that fell back, and how many builds had no goal cell at all (the defect; 0 on the fixed library)
+        probe.laneEmptyBuilds = fields.filter((G) => G.laneEmpty === true).length;
+        probe.buildsWithoutGoal = goallessBuilds(fields);
+        probe.allLane = fields.every((G) => G.lane === true);
         probe.builds = follow ? follow.builds.length : 1;
         if (follow) {
             probe.buildMs = buildMs;
@@ -136,6 +144,9 @@ export function rockCentresSound(fields, rocks) {
     const ok = fields.length > 0 && fields.every((G) => rocks.every((q) => { if (!onGrid(G, q.pos)) { offGrid++; return true; } return G.blocked[NV.indexOf(G, q.pos)] === 1; }));
     return { ok, offGrid };
 }
+
+/** ROUND E: how many of these fields have no goal cell at all (every distance infinite) -- the empty-lane defect, which the fixed library never leaves. */
+export const goallessBuilds = (fields) => fields.filter((G) => { for (let v = 0; v < G.dist.length; v++) if (G.dist[v] === 0) return false; return true; }).length;
 
 export function median(xs) {
     if (!xs.length) return null;
@@ -273,6 +284,22 @@ export function devChecksD(rows) {
         fieldSound: { ok: both.length > 0 && tot(both, "aimBlocked") === 0 && both.every((r) => r.probe && r.probe.rockCentresBlockedAll === true), aimBlocked: tot(both, "aimBlocked") },
         allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
     };
+}
+
+/** ROUND E's HELD reading: Round C's reading word for word with FX in F's place, plus the empty-lane builds. */
+export function readHeldE(rows) {
+    const H = readHeldC(rows.map((r) => (r.arm === "FX" ? { ...r, arm: "F" } : r))), FX = rows.filter((r) => r.arm === "FX");
+    const tot = (k) => FX.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
+    const { F, ...rest } = H.reported;
+    const bottom = H.bottom.replace("THE FOLLOWING FIELD", "THE FIXED FOLLOWING FIELD");
+    return { ...H, bottom, reported: { ...rest, FX: { ...F, laneEmptyBuilds: tot("laneEmptyBuilds"), fightsWithEmpty: FX.filter((r) => r.probe && r.probe.laneEmptyBuilds > 0).length, buildsWithoutGoal: tot("buildsWithoutGoal") } } };
+}
+
+/** ROUND E's DEV checks: Round C's five with FX in F's place, and 6 THE FIX REACHES THE FIELD (every FX build has goal cells; at least one fell back from an empty lane). */
+export function devChecksE(rows) {
+    const c = devChecksC(rows.map((r) => (r.arm === "FX" ? { ...r, arm: "F" } : r))), FX = rows.filter((r) => r.arm === "FX");
+    const tot = (k) => FX.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
+    return { ...c, fixReaches: { ok: FX.length > 0 && FX.every((r) => r.probe && r.probe.buildsWithoutGoal === 0) && tot("laneEmptyBuilds") > 0, laneEmptyBuilds: tot("laneEmptyBuilds"), buildsWithoutGoal: tot("buildsWithoutGoal") } };
 }
 
 /** DEV's checks: SAME FIELD, THE LAYER STEERS, THE HAND-BACK, THE FIELD IS SOUND, EVERY FIGHT ENDS. */

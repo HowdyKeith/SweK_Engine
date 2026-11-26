@@ -15,6 +15,7 @@
 // ROUND C's following field (rows 17-18): F1 never rebuilt: 1 red (17). F2 rebuilt round the first origin: 1 red (17). F3 the aim cache ignores the field:
 //   1 red (18). F4 rebuilt at every call: 1 red (17). F5 the pilot ignores a field-giving function: 1 red (18).
 // THE CAP WRAPPER (row 19, 2026-11-26, for the page): K1 the cap strict (over, not at): 1 red. K2 the thrust not cut: 1 red. K3 the guns held too: 1 red. K4 the closing speed's sign flipped: 1 red.
+// ROUND E's empty-lane fix (row 20): E1 the fix removed: 1 red. E2 the fall-back not marked: 1 red. E3 the fall-back keeps the lane test (still empty): 1 red. E4 every lane marked empty: 1 red.
 "use strict";
 
 import fs from "node:fs";
@@ -167,6 +168,16 @@ row("19 THE CAP: the wrapped pilot's thrust is 0 at or over the cap's closing sp
     const alone = NV.capThrust(inner, () => ({ i: 0, crafts: [A.crafts[1]] }), 12)(body, target, opts);
     return { ok: !!foeOf && foeOf.id === 1 && atCap.thrust === 0 && below.thrust === 5 && over.thrust === 0 && same(over.torqueBody, [1, 2, 3]) && over.firing === true && alone.thrust === 5 && probe.overCap === 2 && probe.cut === 2,
         detail: `at ${atCap.thrust}, below ${below.thrust}, over ${over.thrust}, alone ${alone.thrust}, probe ${JSON.stringify(probe)}` };
+});
+
+// Round E: the empty-lane fix
+row("20 AN EMPTY LANE FALLS BACK TO THE PLAIN GOAL (the origin's own cell blocked) and says so; a lane that is not empty is untouched and does not say so", () => {
+    const rocks = [{ pos: [10, 0, 0], radius: 8 }], o = { cell: 16, half: 160, margin: 4 };   // the origin lies inside the rock's reach
+    const E = build(rocks, [0, 0, 0], 60, { ...o, lane: true }), P = build(rocks, [0, 0, 0], 60, { ...o, lane: false });
+    const goals = (G) => { let n = 0; for (let v = 0; v < G.dist.length; v++) if (G.dist[v] === 0) n++; return n; };
+    const originBlocked = E.blocked[NV.indexOf(E, [0, 0, 0])] === 1;
+    return { ok: originBlocked && E.laneEmpty === true && goals(E) > 0 && E.dist.every((x, v) => x === P.dist[v]) && LL.laneEmpty === false && goals(LL) < goals(LP) && P.laneEmpty === false,
+        detail: `origin blocked ${originBlocked}, laneEmpty ${E.laneEmpty}, goal cells ${goals(E)} (plain ${goals(P)}); the fixture of rows 14-16 laneEmpty ${LL.laneEmpty}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);

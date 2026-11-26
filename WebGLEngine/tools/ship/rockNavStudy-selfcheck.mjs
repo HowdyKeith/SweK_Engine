@@ -18,6 +18,10 @@
 // ROUND D (rows 20-23): D1 the cap never applied: 1 red (20). D2 the cap applied in L too: 1 red (20). D3 LC flown without the lane: 1 red (20). D4 the cap at 15: 1 red (20).
 //   D5 V1 reads all strikes: 1 red (21). D6 V2's sign flipped: 1 red (21). D7 the bottom line ignores V2: 1 red (21). D8 the cap check ignores L: 1 red (22).
 //   D9 Round D's HELD opened by Round C's DEV report: 1 red (23). D10 the verdicts not renamed: 1 red (21). D11 HELD D overlapping HELD C: 1 red (23).
+// ROUND E (rows 24-27): E5 FX not following: 1 red (24). E6 FX's START field without the lane: 0 red -- EQUIVALENT and declared: FX never flies its start field (it flies the following
+//   field), so the mutant changes nothing FX does; E6b, the following field without the lane, is the real one: 1 red (24, after an allLane row was added). E7 builds without a goal never
+//   counted: FIRST PASS 0 red (no gate fight has a goalless build); goallessBuilds lifted out and row 24b added on a dead field, then 1 red (24b). E8 the bottom line not of the fixed field:
+//   1 red (25). E9 check 6 ignores the empty-lane count: 1 red (26). E10 Round E's HELD opened by Round D's DEV report: 1 red (27). E11 the empty-lane builds not reported: 1 red (25).
 "use strict";
 
 import fs from "node:fs";
@@ -215,6 +219,43 @@ row("23 THE COMMAND REFUSES ROUND D'S HELD BEFORE ITS DEV PASSES; ROUND D'S SETS
     fs.rmSync(dir, { recursive: true, force: true });
     const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS, ...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS], mine = [...S.DEV_D_SEEDS, ...S.HELD_D_SEEDS];
     return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldD exit ${st}` };
+});
+
+// ROUND E: arm FX (the following field on the fixed library) against L
+const FX41 = fly(41, "bow", "FX");
+row("24 ARM FX IS ROUND C'S ARM F ON THE FIXED LIBRARY: it follows (builds >= 2, centred on the ship), no build is without a goal, every build is counted for an empty lane, the same field and starts as L", () => {
+    const p = FX41.probe;
+    return { ok: !!p && p.builds >= 2 && p.buildOriginDev === 0 && p.buildsWithoutGoal === 0 && p.allLane === true && Number.isInteger(p.laneEmptyBuilds) && p.fieldsChecked === p.builds && FX41.fieldKey === L41.fieldKey && L41.probe.laneEmptyBuilds === 0 && L41.probe.buildsWithoutGoal === 0
+        && JSON.stringify({ ...FX41, arm: "F", probe: 0 }) === JSON.stringify({ ...F41, probe: 0 }),
+        detail: p ? `${p.builds} builds, ${p.laneEmptyBuilds} empty-lane, ${p.buildsWithoutGoal} without a goal; the same fight as arm F on this fixture` : "no probe" };
+});
+row("24b A BUILD WITH NO GOAL IS COUNTED: goallessBuilds counts a field whose distances are all infinite, and not one with a goal", () => {
+    const G = NV.buildField([], [0, 0, 0], 40, { cell: 16, half: 64, margin: 4 }), dead = { ...G, dist: new Float64Array(G.dist.length).fill(Infinity) };
+    return { ok: S.goallessBuilds([G]) === 0 && S.goallessBuilds([G, dead, dead]) === 2 && S.goallessBuilds([]) === 0, detail: `${S.goallessBuilds([G, dead, dead])} of 3` };
+});
+const synE = (arm, i, o) => ({ ...synC(arm === "FX" ? "F" : arm, i, {}), arm, probe: { ...synC(arm === "FX" ? "F" : arm, i, {}).probe, laneEmptyBuilds: arm === "FX" ? 1 : 0, buildsWithoutGoal: 0 }, ...o });
+const setE = (n, fL, fX) => Array.from({ length: n }, (_, i) => [synE("L", i, fL(i)), synE("FX", i, fX(i))]).flat();
+row("25 ROUND E READS AS ROUND C, WORD FOR WORD, OF THE FIXED FIELD: the four bottom lines, FX's totals, the empty-lane builds counted", () => {
+    const wins = S.readHeldE(setE(40, (i) => ({ struck: i < 30 ? 1 : 0 }), () => ({}))), loses = S.readHeldE(setE(40, () => ({}), (i) => ({ struck: i < 30 ? 1 : 0 }))).bottom;
+    const less = S.readHeldE(setE(40, (i) => ({ struck: i < 30 ? 1 : 0, damageOnShip: 100 }), () => ({ damageOnShip: 50 }))).bottom, not = S.readHeldE(setE(40, () => ({}), () => ({}))).bottom;
+    return { ok: wins.bottom === "THE FIXED FOLLOWING FIELD WINS" && loses === "THE FIXED FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS" && less === "THE FIXED FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS" && not === "THE FIXED FOLLOWING FIELD DOES NOT WIN (FLOOR)"
+        && wins.reported.FX && wins.reported.FX.struck === 0 && wins.reported.L.struck === 30 && wins.reported.FX.laneEmptyBuilds === 40 && wins.reported.FX.fightsWithEmpty === 40 && !("F" in wins.reported),
+        detail: [wins.bottom, loses, less, not].join(" / ") };
+});
+row("26 ROUND E'S DEV CHECKS: Round C's five, and THE FIX REACHES THE FIELD fails when no build fell back from an empty lane or a build has no goal", () => {
+    const good = setE(4, () => ({}), () => ({})), c0 = S.devChecksE(good);
+    const fault = (k, edit) => { const rs = JSON.parse(JSON.stringify(good)); edit(rs); return S.devChecksE(rs)[k].ok; };
+    const f = [fault("fixReaches", (rs) => rs.filter((r) => r.arm === "FX").forEach((r) => { r.probe.laneEmptyBuilds = 0; })), fault("fixReaches", (rs) => { rs[1].probe.buildsWithoutGoal = 1; }),
+        fault("follows", (rs) => { rs[1].probe.builds = 1; }), fault("sameField", (rs) => { rs[1].fieldKey = "x"; })];
+    return { ok: Object.keys(c0).length === 6 && Object.values(c0).every((x) => x.ok) && f.every((x) => x === false), detail: `checks ${Object.keys(c0).join(",")}; faults pass: ${f.join(",")}` };
+});
+row("27 THE COMMAND REFUSES ROUND E'S HELD BEFORE ITS DEV PASSES; ROUND E'S SETS ARE NEW", () => {
+    const cmd = path.join(HERE, "rockNavStudyCmd.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "rocknave-"));
+    fs.writeFileSync(path.join(dir, "devD-report.json"), JSON.stringify({ allOk: true }));   // Round D's pass must not open Round E
+    const st = spawnSync(process.execPath, [cmd, "heldE", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
+    fs.rmSync(dir, { recursive: true, force: true });
+    const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS, ...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS, ...S.DEV_D_SEEDS, ...S.HELD_D_SEEDS], mine = [...S.DEV_E_SEEDS, ...S.HELD_E_SEEDS];
+    return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldE exit ${st}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);

@@ -47,6 +47,17 @@ export function buildField(rocks, origin, goalR, opts = {}) {
         const v = (i * n + j) * n + k;
         if (!F.blocked[v] && Math.hypot(cen(i, 0) - origin[0], cen(j, 1) - origin[1], cen(k, 2) - origin[2]) <= goalR && (!o.lane || lineClear(F, [cen(i, 0), cen(j, 1), cen(k, 2)], origin))) { F.dist[v] = 0; push(0, v); }
     }
+    // 2026-11-26 (rock nav Round E; the fallback DIAGNOSTIC of brain/ROCK_NAV_WIP.md): with `lane`, an EMPTY lane goal -- the origin's own cell blocked, so no cell has a clear
+    // line to it, which a field rebuilt round a ship drifting near a rock meets -- falls back to the plain goal and marks the build laneEmpty. A field built round the
+    // ship's start never meets it (rocks lie 150 or more out), so Rounds B-D's fields are unchanged to the bit.
+    F.laneEmpty = false;
+    if (o.lane && size === 0) {
+        F.laneEmpty = true;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) {
+            const v = (i * n + j) * n + k;
+            if (!F.blocked[v] && Math.hypot(cen(i, 0) - origin[0], cen(j, 1) - origin[1], cen(k, 2) - origin[2]) <= goalR) { F.dist[v] = 0; push(0, v); }
+        }
+    }
     const off = [];
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) if (a || b || c) off.push([a, b, c, Math.hypot(a, b, c)]);
     // A correct search pushes at most 26 entries per settled cell plus the goal cells, so it pops at most 27 per cell. Past that it is not
