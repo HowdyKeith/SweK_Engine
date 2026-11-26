@@ -21,7 +21,7 @@ Which brain can do what at each simulation level, and what the record says about
 
 Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fish circuits**, **Language model**. An 'amoeba brain' does not exist in the tree.
 
-16 tasks x 5 brains = 80 cells: 12 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 4 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 7 EXISTS, UNREAD, 44 -, 2 n/a.
+17 tasks x 5 brains = 85 cells: 12 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 5 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 7 EXISTS, UNREAD, 48 -, 2 n/a.
 
 ## Submarine
 
@@ -32,6 +32,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 | Survey run with a battery, a hull that feels pressure, a noisy gauge (needs and limits) | no | TUNED | NOT CONCLUDED | - | - | NO EFFECT |
 | Heading through a compass dropout (rung 4a: circuits as estimators) | no | SCRIPTED | NO EFFECT | - | NO EFFECT | - |
 | Navigate to goals among islands, gaps, currents, icebergs and other ships (2D and 3D) | no | SCRIPTED | EXISTS, UNREAD | - | - | - |
+| Captain a damaged boat's stations: damage control, energy, the main tank, a breached courier (submarine stations) | no | SCRIPTED | - | - | - | - |
 
 ### Hold depth, heading and speed (a 6-DOF boat, no weapons)
 
@@ -65,6 +66,11 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 - **Fly circuit: EXISTS, UNREAD.** the tank's navigation scene lets whatever pilot a sub has fly the plan, the fly pilot included; every registered nav study flew the PD autopilot, and the tank run is descriptive. Sources: brain/subTankNav.mjs.
 - **GPU Brain (MLP): -.** no learned navigator: the planner chooses the heading and the autopilot flies it.
 - **Fish circuits: -.** no learned navigator.
+
+### Captain a damaged boat's stations: damage control, energy, the main tank, a breached courier (submarine stations)
+
+- **Hand rule / PD autopilot: SCRIPTED.** hand rules chosen through registered rounds: on hard-leak dives a blow held once NEED's trigger fires keeps every boat on the default hull (HOLD 96 of 96, TRIAGE 37), and with a 10 m release the high rider's (HOLD-R 76 and 86 of 96 on two sets, where a plain hold broached all); on the breached courier COND (fight on, surface only on a second sinking) beats every hold tried on the mission value, at any boat price on the paired test. The Sub Aquarium seats COND on couriers and HOLD at a breach by default. Sources: brain/SUB_STATIONS_WIP.md ("HOLD keeps all 96 hard-leak boats"); brain/SUB_STATIONS_WIP.md ("HOLD-R BEATS TRIAGE"); brain/SUB_STATIONS_WIP.md ("COND BEATS HOLD-CR on the mission value"); brain/SUB_STATIONS_WIP.md ("No price makes a hold beat COND on the paired test").
+- **GPU Brain (MLP): -.** no MLP captain; the learned courier is a 20-weight ES captain over hand features (rounds 11, 15, 18), level with COND at best (round 18: NO DIFFERENCE SHOWN on the mission value).
 
 ## Sky
 

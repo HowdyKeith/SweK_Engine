@@ -3134,8 +3134,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "capability-map-stations",
-        blocker: "OPEN",
-        what: "docs/BRAIN-CAPABILITY-MAP.md (generated from brain/capabilityMap.mjs, every cell cited) does not carry stations rounds 16-22: the held blow per hull, the aquarium's defaults, COND against every courier hold at any boat price.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26: DONE -- a sub-stations row in brain/capabilityMap.mjs (the hand cell SCRIPTED, four cited quotes from brain/SUB_STATIONS_WIP.md; the learned courier noted in the gpu cell), docs/BRAIN-CAPABILITY-MAP.md regenerated, the gate's tallies moved (17 tasks, 85 cells); a wrong quote turns the gate red. Was: docs/BRAIN-CAPABILITY-MAP.md (generated from brain/capabilityMap.mjs, every cell cited) does not carry stations rounds 16-22: the held blow per hull, the aquarium's defaults, COND against every courier hold at any boat price.",
         how: "Add the rows to brain/capabilityMap.mjs with their citations (brain/SUB_STATIONS_WIP.md sections 37-49) and regenerate; the map's gate checks every quote is in its cited file.",
         why: "The stations line is largely settled; the map is where that is visible.",
     },
