@@ -13,7 +13,11 @@ export const AVOID_ARMS = Object.freeze(["any+predict+edge+yield", "any+predict+
 export const SHIP_CLEAR = 30, SHIP_LOOK_S = 25, AVOID_STEP = Math.PI / 12, AVOID_MAX = Math.PI / 2, STATIC_CLEAR = 12;
 export const HELD8 = Object.freeze(N.range(801, 860)), SETS = Object.freeze({ dev: H.HARD_SETS.dev, held8: HELD8 });
 // the arm's name in subHardNav's table, and whether the turn is on
-const BASE = Object.freeze({ "any+predict+edge+yield": ["any+predict+edge+yield", false], "any+predict+edge+avoid": ["any+predict+edge", true], "any+predict+edge+yield+avoid": ["any+predict+edge+yield", true] });
+const BASE = Object.freeze({ "any+predict+edge+yield": ["any+predict+edge+yield", false], "any+predict+edge+avoid": ["any+predict+edge", true], "any+predict+edge+yield+avoid": ["any+predict+edge+yield", true],
+    "any+predict+edge+avoid-arc": ["any+predict+edge", true, "arc"] });   // FOLLOW-UP 9: FOLLOW-UP 8's designated rule, every heading tested along the turning arc
+/** FOLLOW-UP 9 (registered first): the arc arm, its reference, the turning radius (subCurrentNav's R_TURN, 35 m) and HELD9. */
+export const ARC_ARMS = Object.freeze(["any+predict+edge+avoid", "any+predict+edge+avoid-arc"]), ARC_REFERENCE = "any+predict+edge+avoid", ARC_DESIGNATED = "any+predict+edge+avoid-arc";
+export const R_TURN = 35, HELD9 = Object.freeze(N.range(8801, 8860));
 let MODEL = null;
 const navModel = () => MODEL || (MODEL = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 })));
 
@@ -32,6 +36,34 @@ export function conflictHeading(x, y, t, h, obstacles, minDepth, { V = N.CRUISE,
     }
     return false;
 }
+/** FOLLOW-UP 9: where the vessel is `k` s on, turning from heading `hc` the shorter way to `h` on a circle of radius R_TURN at speed V, then straight on h. */
+export function arcPos(x, y, hc, h, k, V = N.CRUISE) {
+    let d = h - hc; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (d === 0) return [x + V * k * Math.cos(h), y - V * k * Math.sin(h)];
+    const sg = Math.sign(d), w = V / R_TURN, T = Math.abs(d) / w, r = V / (sg * w), at = (tt) => { const psi = hc + sg * w * tt; return [x + r * (Math.sin(psi) - Math.sin(hc)), y + r * (Math.cos(psi) - Math.cos(hc))]; };
+    if (k <= T) return at(k);
+    const [ex, ey] = at(T), rest = k - T; return [ex + V * rest * Math.cos(h), ey - V * rest * Math.sin(h)];
+}
+/** FOLLOW-UP 9: conflictHeading's test along the arc from the current heading `hc` (the same obstacles, clearances, depth rule and whole seconds 0..SHIP_LOOK_S). */
+export function conflictArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE, ships = true, statics = false } = {}) {
+    for (const o of obstacles) {
+        if (!(o.keel + H.VMARGIN > minDepth)) continue;
+        const isShip = o.type === "ship";
+        if (isShip ? !ships : !statics) continue;
+        const clear = o.r + N.HULL_HALF + (isShip ? SHIP_CLEAR : STATIC_CLEAR);
+        for (let k = 0; k <= SHIP_LOOK_S; k++) { const [ox, oy] = H.posAt(o, t + k), [px, py] = arcPos(x, y, hc, h, k, V); if (Math.hypot(px - ox, py - oy) < clear) return true; }
+    }
+    return false;
+}
+/** FOLLOW-UP 9: avoidHeading with every test along the arc from the current heading hc; the same offsets, order and stuck rule. */
+export function avoidHeadingArc(x, y, t, hc, h0, obstacles, minDepth) {
+    if (!conflictArc(x, y, t, hc, h0, obstacles, minDepth)) return { heading: h0, fired: false, turned: false, stuck: false };
+    for (const d of OFFSETS) {
+        const h = h0 + d;
+        if (!conflictArc(x, y, t, hc, h, obstacles, minDepth, { ships: true, statics: true })) return { heading: h, fired: true, turned: true, stuck: false };
+    }
+    return { heading: h0, fired: true, turned: false, stuck: true };
+}
 /** The heading to fly: { heading, fired (h0 conflicts with a ship), turned (a candidate was taken), stuck (fired and none qualified) }. */
 export function avoidHeading(x, y, t, h0, obstacles, minDepth) {
     if (!conflictHeading(x, y, t, h0, obstacles, minDepth)) return { heading: h0, fired: false, turned: false, stuck: false };
@@ -44,8 +76,8 @@ export function avoidHeading(x, y, t, h0, obstacles, minDepth) {
 
 /** Fly one hard-traffic scenario under an arm of AVOID_ARMS; the record of flyHard plus { fires, turns, stuck, hit }. */
 export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.DT, model = navModel(), ladder = H.MARGIN_LADDER, yieldSpeed = H.YIELD_SPEED, horizon = H.HORIZON_S } = {}) {
-    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${AVOID_ARMS.join(", ")})`);
-    const [arm, turn] = BASE[armName], spec = H.ARM_SPEC[arm], total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(H.REPLAN_S / dt)), mode = "predict";
+    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${[...AVOID_ARMS, ARC_DESIGNATED].join(", ")})`);
+    const [arm, turn, how] = BASE[armName], spec = H.ARM_SPEC[arm], total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(H.REPLAN_S / dt)), mode = "predict";
     let field = H.buildLadderField(H.planShapes(sc, 0, { mode, blind: false, horizon }), sc.goal, st, { ladder, edgeExtra: spec.edge }), replans = 0;
     const field0 = field, sc0 = N.cellOf(field, st.x, st.y), noRoute = !(sc0 && field.dist[sc0.i] < N.BIG);
     let s = S.createState({ pos: [st.x, st.y, -st.depth], speed: st.speed, heading: st.heading, pitch: st.pitch, bank: st.bank, gamma: 0, w: [0, 0, 0], model });
@@ -55,7 +87,7 @@ export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.
         if (i > 0 && i % every === 0) { field = H.buildLadderField(H.planShapes(sc, i * dt, { mode, blind: false, horizon }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder, own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); replans++; }
         let target = H.hardTarget(arm, s, field, sc.goal, { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: sc.minDepth, yieldSpeed });
         if (turn) {
-            const a = avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
+            const a = how === "arc" ? avoidHeadingArc(s.pos[0], s.pos[1], i * dt, S.attitude(s).heading, target.heading, sc.obstacles, sc.minDepth) : avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
             if (a.fired) fires++; if (a.turned) turns++; if (a.stuck) stuck++;
             target = { ...target, heading: a.heading };
         }

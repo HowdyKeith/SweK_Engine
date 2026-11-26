@@ -18,6 +18,7 @@ import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
 import * as AP from "./autopilotSub.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
+import * as CN from "./subCurrentNav.mjs";   // FOLLOW-UP 9: the turning radius the arc must share
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -95,6 +96,29 @@ console.log("\n4. THE FLIGHT");
     ok("!! a flight is deterministic", same(safe(() => A.flyAvoid(pilot, sc, A.DESIGNATED)), safe(() => A.flyAvoid(pilot, sc, A.DESIGNATED))));
     ok("!! a bad arm throws, naming the arms", (() => { try { A.flyAvoid(pilot, sc, "any+nothing"); return false; } catch (e) { return /any\+predict\+edge\+yield\+avoid/.test(e.message); } })());
     ok("!! a flight cut to 2 s ends 'timeout' with exactly 2 / DT ticks", (() => { const a = A.flyAvoid(pilot, sc, A.DESIGNATED, { seconds: 2 }); return a.status === "timeout" && a.ticks === Math.round(2 / S.DT); })());
+}
+console.log("\n5. FOLLOW-UP 9: EACH HEADING TESTED ALONG THE TURNING ARC");
+{
+    ok("!! the arc arm and its reference, R_TURN 35 m (subCurrentNav's own), HELD9 = 8801 to 8860, disjoint from HELD8; FOLLOW-UP 8's arm list unchanged",
+        same(A.ARC_ARMS, ["any+predict+edge+avoid", "any+predict+edge+avoid-arc"]) && A.ARC_REFERENCE === "any+predict+edge+avoid" && A.ARC_DESIGNATED === "any+predict+edge+avoid-arc" && A.R_TURN === 35 && A.R_TURN === CN.R_TURN
+        && A.HELD9.length === 60 && A.HELD9[0] === 8801 && A.HELD9[59] === 8860 && !A.HELD9.some((x) => A.HELD8.includes(x)) && same(A.AVOID_ARMS, ["any+predict+edge+yield", "any+predict+edge+avoid", "any+predict+edge+yield+avoid"]));
+    const near = (p, q, e = 1e-9) => Math.abs(p[0] - q[0]) < e && Math.abs(p[1] - q[1]) < e, T = (Math.PI / 2) * 35 / 3;
+    ok("!! arcPos: no turn is the straight line; a quarter turn RIGHT (0 to pi/2) ends at (35, -35) after (pi/2) 35 / 3 s and then runs straight toward -y; LEFT (0 to -pi/2) ends at (35, +35)",
+        near(A.arcPos(0, 0, 0.4, 0.4, 7), [21 * Math.cos(0.4), -21 * Math.sin(0.4)]) && near(A.arcPos(0, 0, 0, Math.PI / 2, T), [35, -35], 1e-9) && near(A.arcPos(0, 0, 0, Math.PI / 2, T + 10), [35, -65], 1e-9)
+        && near(A.arcPos(0, 0, 0, -Math.PI / 2, T), [35, 35], 1e-9), JSON.stringify(A.arcPos(0, 0, 0, Math.PI / 2, T)));
+    const sp = (k) => { const a = A.arcPos(0, 0, 0, Math.PI / 2, k), b = A.arcPos(0, 0, 0, Math.PI / 2, k + 1e-4); return Math.hypot(b[0] - a[0], b[1] - a[1]) / 1e-4; };
+    ok("...at the cruise speed throughout (3 m/s mid-turn and after), and the SHORTER way: from 0 to 3 pi/2 it turns LEFT a quarter, not right three", Math.abs(sp(5) - 3) < 1e-3 && Math.abs(sp(T + 3) - 3) < 1e-3 && near(A.arcPos(0, 0, 0, 1.5 * Math.PI, T), [35, 35], 1e-9));
+    const cA = (hc, h, obs, o) => safe(() => A.conflictArc(0, 0, 0, hc, h, obs, -Infinity, o), null), cH = (h, obs, o) => safe(() => A.conflictHeading(0, 0, 0, h, obs, -Infinity, o), null);
+    const fx = [[0, [ship(100, 0, 0, 0)]], [0, [ship(300, 0, 0, 0)]], [0, [ship(120, 0, -3, 0)]], [Math.PI / 2, [ship(0, -100, 0, 0)]]];
+    ok("with no turn (hc = h) the arc test IS the straight test, on four of section 2's fixtures", fx.every(([h, o]) => cA(h, h, o) === cH(h, o)));
+    const rock = [berg(40, -15, 5)];
+    ok("!! the arc MATTERS: from heading east, a candidate due 'south' (pi/2) clears an iceberg at (40, -15) on the instant-turn line but not on the 35 m turn, which swings out through about (25, -10)", cH(Math.PI / 2, rock, { statics: true }) === false && cA(0, Math.PI / 2, rock, { statics: true }) === true);
+    ok("avoidHeadingArc: nothing near is no fire; a ring of big ships is stuck with the plan's heading back", (() => { const q = A.avoidHeadingArc(0, 0, 0, 0, 0, [], -Infinity); return q.fired === false && q.heading === 0; })()
+        && (() => { const wall = []; for (let k = 0; k < 12; k++) wall.push(ship(150 * Math.cos(k * Math.PI / 6), -150 * Math.sin(k * Math.PI / 6), 0, 0, 120)); const q = A.avoidHeadingArc(0, 0, 0, 0, 0, wall, -Infinity); return q.stuck && q.fired && !q.turned && q.heading === 0; })());
+    const sc = H.hardScenario(1, "hard-traffic"), r1 = safe(() => A.flyAvoid(pilot, sc, A.ARC_DESIGNATED, { seconds: 60 })), r2 = safe(() => A.flyAvoid(pilot, sc, A.ARC_DESIGNATED, { seconds: 60 }));
+    ok("!! the arc arm flies (DEV seed 1, 60 s), names itself, is deterministic, and its turn counts are coherent", !!r1 && r1.arm === A.ARC_DESIGNATED && same(r1, r2) && r1.turns <= r1.fires && r1.stuck <= r1.fires, JSON.stringify(r1 && { s: r1.status, f: r1.fires, t: r1.turns, k: r1.stuck }));
+    const ra = safe(() => A.flyAvoid(pilot, sc, A.ARC_REFERENCE, { seconds: 60 }));
+    ok("...and it is not the reference: the two arms' turn counts or paths differ on that flight (the arc test is actually used)", !!ra && !!r1 && (ra.turns !== r1.turns || ra.stuck !== r1.stuck || ra.path !== r1.path), JSON.stringify(ra && { f: ra.fires, t: ra.turns, k: ra.stuck }));
 }
 console.log(fails === 0 ? "\nall checks pass" : `\n${fails} FAIL`);
 process.exit(fails === 0 ? 0 : 1);
