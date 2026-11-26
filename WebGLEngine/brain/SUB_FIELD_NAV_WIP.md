@@ -815,6 +815,42 @@ The DEV sanity run (`node tools/ship/subReconcileStudy.mjs --set dev --seeds 3`:
 
 The module's gate (`brain/subReconcileNav-selfcheck.mjs`) and the study's (`tools/ship/subReconcileStudy-selfcheck.mjs`) were written and a serial mutation pass run on each before HELD13 was flown; the log is in their headers. The one thing the DEV run could have moved, the bin window, moved by AMENDMENT 1 above and nothing else.
 
+## RESULT OF FOLLOW-UP 13 [SERIES B] (2026-11-26; `node tools/ship/subReconcileStudy.mjs --set held13 --write`, PART A on main's HELD83 and series B's HELD10 and PART B on HELD13 (four chord bins of 30, seeds 13,001 to 13,360), read once; 360 flights in `brain/subReconcileHeld13.jsonl`): **SUPPORTED -- the mission's length is what separates the two series' answers.**
+
+The module, the study command and their gates were committed and sabotaged first (`fd96aa6cc`: the module 29 mutants, 28 red and the survivor killed by a row; the study 156 mutants, 119 red on the first pass, 37 survivors, a section of rows added, 35 of the 37 red on the second pass, 2 declared: both in the gate's header, with the disclosure of a stray fake-flights file a mutant wrote into the held-set path before the real run, found by `git status` and deleted), the DEV note was written, and the set was flown once.
+
+| cell | n | completed | energy-out | collided | left | timeout | median MJ | median chord (m) |
+|---|---|---|---|---|---|---|---|---|
+| **A1** series B's flyer on main's 60 HELD83 missions (reference arm) | 60 | 5 | **43** | 9 | 3 | 0 | 3.00 | 981 |
+| (main's own flight of the same 60, stored) | 60 | 5 | 41 (flat) | 12 | 2 | 0 | | |
+| **A2** main's flyer on series B's 60 HELD10 missions | 60 | 42 | **1** | 14 | 3 | 0 | 2.28 | 731 |
+| (series B's own flight of the same 60, stored) | 60 | 43 | 1 | 14 | 2 | 0 | | |
+| **B1** reference, chord [600, 750) | 30 | 19 | **0** | 10 | 1 | 0 | 2.17 | 702 |
+| **B2** reference, chord [750, 900) | 30 | 13 | **5** | 11 | 1 | 0 | 2.68 | 828 |
+| **B3** reference, chord [900, 1,050) | 30 | 3 | **17** | 7 | 3 | 0 | 3.00 | 935 |
+| **B4** reference, chord [1,050, 1,200) | 30 | 0 | **24** | 6 | 0 | 0 | 3.00 | 1,060 |
+| B1 to B4, the 2.5 m/s arm | 30 each | 18, 10, 2, 0 | 0, 0, 0, 0 | 11, 11, 9, 7 | 0, 2, 3, 2 | 1, 7, 16, 21 | 1.61, 1.90, 2.05, 2.14 | as above |
+
+Every bin placed 30 missions; bin 4 skipped 18 seeds and its chords stand at 1,050 to 1,087 m, the most the generator reaches inside the bin. **The drift check passed: each flyer reproduced its own 5 stored reference flights** (10 flights, outcome, ticks and path).
+
+**The registered tests.**
+* **T1 HELD**: series B's flyer on main's missions ends energy-out on **43** of 60 (the bar 31 to 51; main's own flight of them: 41).
+* **T2 HELD**: main's flyer on series B's missions ends flat on **1** of 60 (the bar at most 6; series B's own: 1).
+* **T3 HELD**: bin 1 has 0 (at most 3), bin 3 has 17 (at least 15), bin 4 has 24 (at least 24), and the counts 0, 5, 17, 24 never fall.
+* **So SUPPORTED.**
+
+**Predictions scored (held or missed, moving nothing).** All eight held: **E1** (both flyers reproduce their stored flights), **E2** (T1; I had said 75 percent), **E3** (T2; 85), **E4** (the curve is monotone; 70), **E5** (bin 3 reaches 15: 17; 55), **E6** (the flyers agree on energy-out against not on 93 percent of A1 and 97 percent of A2; 65), **E7** (the 2.5 m/s arm has no energy-out in bins 1 to 3, or in 4; 70) and **E8** (the verdict is SUPPORTED; I had said 50 percent). The 24 of 30 in bin 4 was the bar to the unit, and sits on it.
+
+**What it says.** The two series are both right about their own missions, and the disagreement was the missions. Main's HELD83 missions have a median chord of 981 m, and a 3 MJ battery flies about 927 m of chord at cruise; series B's HELD10 missions have a median of 731 m and almost never reach it. Flown by the other series' flyer, **main's missions end energy-out on 43 of 60 and series B's on 1 of 60**, almost the same as when each series flew its own. On a fresh set the energy-out rate rises with the chord exactly as the battery arithmetic says: **0 of 30 at a median of 702 m, 5 at 828 m, 17 at 935 m, 24 at 1,060 m**, and it crosses a half at 935 m, next to the 927 m the needs model's 2,675 J a metre gives. "Energy decides the mission" is true above about 900 m of chord on this battery at cruise and false below about 800 m. FOLLOW-UP 10's NOT SUPPORTED (energy did not decide which arm to fly on 600 to 850 m missions) and main's PART 2 SUPPORTED (it did, on 850 to 1,112 m missions) stand as written, each for its own missions.
+
+**Post hoc, labelled; none of it registered and none of it moves the verdict (`node tools/ship/subReconcilePostHoc.mjs`).**
+* **One curve.** Every reference flight of the round pooled (A1, A2 and the bins: 240 flights) by chord band: energy-out **1 percent** of 68 flights at [600, 750) (1 flight), **7 percent** of 43 at [750, 850) (3), **44 percent** of 45 at [850, 950) (20), **78 percent** of 50 at [950, 1,050) (39), **79 percent** of 34 at [1,050, 1,200) (27); missions completed: 47, 22, 13, 0 and 0. In the band where both sources overlap, main's missions end energy-out 8 of 17 at [850, 950) and 32 of 39 at [950, 1,050), series B's generator 12 of 28 and 7 of 11.
+* **The energy a metre cost is the same in all three places**: the median joules a metre of path for the reference were 2,747 (A1), 2,772 (A2) and 2,741 (the bins), against 2,675 at a steady cruise.
+* **The flyers are NOT identical.** Their five-way outcomes agreed on 55 of 60 (A1) and 57 of 60 (A2), so on **112 of 120 missions, and 8 differ**. A1: seeds 7962, 7964 and 7993 (main's collided, series B's flyer ran out of energy), 7990 (main's ran out, series B's collided), 7998 (main's collided, series B's left the region). A2: seed 1046 (series B's ran out, main's completed), 1054 (series B's completed, main's ran out), 1058 (series B's completed, main's left). All eight are at the margin of the battery or the ships; the differences the registration listed (the minimum-depth rule, the time caps, the order of the energy and arrival tests) were NOT bisected, because the verdict did not call for it, and so which of them moves these eight is not known.
+* **The slow arm and the time cap.** The 2.5 m/s arm ended energy-out on none of its 120 missions (the 1,980 J a metre carries about 1,230 m of chord), but its **timeouts at series B's 450 s mission limit rise 1, 7, 16, 21 of 30 by bin**, and the median time of those that finished was 381, 418 and 449 s in bins 1 to 3: past about 850 m of chord the limit, not the battery, is what stops it. Main's eco arm (2.0 m/s) flew with a 390 s limit a leg and 780 s a mission and **completed 49 of 60** of main's missions, where the reference at cruise completed 5. So "which arm to fly" depends on the time limit as well as the chord, and the two series' designated arms were flown under different limits; that is NOT reconciled here.
+
+**What this does not say.** (1) Both flyers fly the same vessel, plan and energy per metre, so SUPPORTED reads "the gap is the mission's length (and the flyers agree to 93 percent of missions)", not "the world is explained": a longer mission also meets more ships and sees them sail out of the region, and the bins confound the two (not separated here). (2) The cross-flown seeds were read once already; the fresh evidence is HELD13. (3) Bin 4's chords are 1,050 to 1,087 m, so the curve's last point is 1,060 m. (4) One battery class, no recharge. (5) The depth rounds (main's HELD77 and series B's HELD11) and the fleet rounds (main's fleet avoidance and series B's HELD12) are NOT reconciled by this round; each would be a registration of its own. (6) The published v4934 changelog still says main's reference "ran out of energy 5 of 60 times"; it completed 5 and ran flat on 41 (the correction is at the head of this follow-up).
+
 ## FOLLOW-UP 6: GIVE WAY, AND A WAY OUT OF THE EDGE BAND (Keith, 2026-11-16: "lets do all 3 next steps", the third being `nav-traffic-avoid-not-slow`; REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
 
 **Why.** HELD5 left two failures in the traffic kind: 14 collisions with ships that a 2 m/s slow-down did not prevent, and 4 exits, which the diagnosis above traced to a vessel standing inside the blocked edge band with no route from its own cell. This round adds one fix for each and flies them alone and together.
