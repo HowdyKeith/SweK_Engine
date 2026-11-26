@@ -90,6 +90,7 @@ import * as PB from "../../brain/peerBrain.mjs";
 import * as P6 from "../../brain/pilot6dofPolicy.mjs";
 import * as AP from "../../brain/autopilot6dof.mjs";
 import * as BS from "../../brain/battleshipFight.mjs";
+import * as RN from "./rockNavStudy.mjs";   // 2026-11-26: the NAV block holds the page to the study's arm L
 import * as SA from "../../brain/spaceArena.mjs";
 import * as CS from "../../physics/mechanics/capitalShip.mjs";
 import * as GS from "../../physics/mechanics/gunSeats.mjs";
@@ -424,6 +425,25 @@ else {
               B.newFight({ ...base });
             }
             // ==== ROCKS-END (browser)
+            // ==== NAV-BEGIN (browser): the navigation layer (2026-11-26, brain/spaceNav.mjs; brain/ROCK_NAV_WIP.md Round B's lane) ----
+            {
+              globalThis.__swekStep = "the navigation layer";
+              const f7 = document.createElement("iframe"); f7.style.width = "1100px"; f7.style.height = "900px"; f7.src = "/space-battleship.html?rocks=1&nav=1&kind=bow&seed=2"; document.body.appendChild(f7);
+              await new Promise((res) => { f7.onload = res; }); const t7 = performance.now(); while (performance.now() - t7 < 40000 && !f7.contentWindow.__battleship) await wait(200);
+              const B7 = f7.contentWindow.__battleship; await B7.ready; B7.hold(true); const s7 = B7.state(), d7 = f7.contentWindow.document;
+              out.nav = { url: { nav: s7.nav, field: s7.navField, checked: d7.getElementById("rocknav").checked, pilotDisabled: d7.getElementById("pilotF").disabled, logged: s7.log.some((l) => /NAVIGATION LAYER/.test(l)), rocks: s7.rocks } };
+              B7.step(3600, false); const e7 = B7.state();
+              out.nav.fight = { tally: B7.tally(), aimed: e7.navAimed, handBack: e7.navHandBack, done: e7.done };
+              f7.remove();
+              B.newFight({ ...base }); set("rocknav", true); sel("rocknav").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.noRocks = { nav: B.state().nav, checked: sel("rocknav").checked, pilotDisabled: sel("pilotF").disabled };
+              set("rocks", true); set("rocknav", true); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.withRocks = { nav: B.state().nav, field: B.state().navField, tick: B.state().tick, pilotDisabled: sel("pilotF").disabled };
+              set("rocknav", false); sel("rocknav").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.off = { nav: B.state().nav, field: B.state().navField, pilotDisabled: sel("pilotF").disabled };
+              set("rocks", false); B.newFight({ ...base });
+            }
+            // ==== NAV-END (browser)
 
             // ==== PEER-BEGIN (browser): a peer's brain from a FILE, through the page's own file input ----
             {
@@ -772,6 +792,23 @@ else {
                 K ? `struck ${K.fight.tally.struck}, stopped ${K.fight.stopped}, logged ${K.fight.struckLog}` : "");
         }
         // ==== ROCKS-END (node)
+        // ==== NAV-BEGIN (node): the navigation layer ----
+        // 2026-11-26 SABOTAGED, space-battleship.html restored byte-identical each time: P1 the layer never flown (the pilot choice kept) -> 1 red (the lane-fight row); P2 the field built
+        // without the lane -> 1 red (the lane-fight row: the damage moves); P3 the layer on without rocks -> 2 red (the toggle row, and a page error on the empty field); P4 the pilot choice not set
+        // aside -> 1 red (the toggle row); P5 the log line dropped -> 1 red (the toggle row); P6 the box not wired to a new fight -> 1 red (the toggle row). The fixture strikes no fighter in either
+        // run (struck 0 = 0), so the lane-fight row's teeth are the damage on the ship (226) and the layer's own counts.
+        {
+            const N = r.nav, ref = RN.flyOne({ seed: 2, kind: "bow", arm: "L" });   // the study's arm L: Round B's lane layer on the same fight (8 fighters, regular gunners, 24 rocks, the defaults)
+            ok("!! ?rocks=1&nav=1 FLIES THE NAVIGATION LAYER: the box ticked, the field built, the pilot choice set aside and the log saying so; ticking it WITHOUT rocks does nothing; with rocks it starts a fight (tick 0) with the field; unticking it gives the pilot choice back",
+                !!N && N.url.nav === true && N.url.field === true && N.url.checked === true && N.url.pilotDisabled === true && N.url.logged === true && N.url.rocks === 24
+                && N.noRocks.nav === false && N.noRocks.checked === false && N.noRocks.pilotDisabled === false && N.withRocks.nav === true && N.withRocks.field === true && N.withRocks.tick === 0 && N.withRocks.pilotDisabled === true
+                && N.off.nav === false && N.off.field === false && N.off.pilotDisabled === false,
+                N ? JSON.stringify({ url: N.url, noRocks: N.noRocks, withRocks: N.withRocks, off: N.off }) : "no result");
+            ok("!! THE PAGE FLIES THE STUDY'S LANE FIGHT: bow, seed 2 with the layer -- the page's struck fighters and damage on the ship equal rockNavStudy's arm L on the same fight, and the layer both steered and handed back",
+                !!N && N.fight.done && N.fight.tally.struck === ref.struck && N.fight.tally.damageOnShip === ref.damageOnShip && N.fight.aimed > 0 && N.fight.handBack > 0,
+                N ? `page struck ${N.fight.tally.struck}, damage ${N.fight.tally.damageOnShip}; study struck ${ref.struck}, damage ${ref.damageOnShip}; aimed ${N.fight.aimed}, hand-back ${N.fight.handBack}` : "");
+        }
+        // ==== NAV-END (node)
 
         // ==== HELM-BEGIN (node): a network at the ships' helm ----
         {

@@ -70,6 +70,7 @@
   <label title="with friendly fire on: a fighter holds its trigger while a team-mate is in its line, a seat holds its fire while its line crosses the ship's own hull or a team-mate (the interlock)"><input id="hold" type="checkbox" checked> hold fire</label>
   <label title="a destroyed craft keeps its momentum and spin and goes on drifting and tumbling (it is still no target)"><input id="wrecks" type="checkbox"> wrecks</label>
   <label title="a ROCK FIELD (brain/spaceRocks.mjs): 24 static rocks across the attack's bearing, between the fighters and the ship. A fighter that touches one is lost, the ship pays 100 hit points once per rock, and rounds stop at them -- the autopilot does not know they are there"><input id="rocks" type="checkbox"> rocks</label>
+  <label title="the NAVIGATION LAYER (brain/spaceNav.mjs, brain/ROCK_NAV_WIP.md): with rocks on, every fighter flies Round B's measured winner -- a 3-D field toward the cells of the strafe sphere that have a clear run at the ship, built once at the start; outside the strafe range it steers for the farthest cell in sight, inside it hands back to the doctrine. On 360 held-out fights it cut rock losses on the approach from 260 to 26 (Round A) and after arriving from 241 to 125 (Round B). It replaces the fighters' pilot choice with the PD autopilot it was measured on; it does nothing without rocks"><input id="rocknav" type="checkbox"> nav layer</label>
   <label title="a hit gives the victim the round's momentum at the hit point (a round of 0.002): a hit off its centre spins a fighter"><input id="impact" type="checkbox"> impacts</label>
   <label title="the bridge has a crew and each seat a gunner, who dies at half the hit points of his mount: a dead gunner's turret stands and does not fire, a dead bridge crew leaves the ship with no helm and no cannon"><input id="crew" type="checkbox"> crew</label>
   <label title="the spheres a round has to reach"><input id="spheres" type="checkbox"> hit spheres</label>
@@ -98,6 +99,7 @@ import * as AP from "/brain/autopilot6dof.mjs";
 import * as P6 from "/brain/pilot6dofPolicy.mjs";
 import * as SA from "/brain/spaceArena.mjs";
 import * as BS from "/brain/battleshipFight.mjs";
+import * as NV from "/brain/spaceNav.mjs";
 import * as PB from "/brain/peerBrain.mjs";
 import * as SG from "/brain/seatGunnerPolicy.mjs";
 import * as MG from "/brain/seatGunnerMlp.mjs";
@@ -301,6 +303,7 @@ function makeMarkers(n) {
 }
 
 // ---- the fight ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+let navOn = false, navField = null, navProbe = null;   // 2026-11-26: the navigation layer (Round B's lane field), on with rocks only
 let rockMeshes = [];   // 2026-11-25: the rock field, drawn apart from the crafts (meshes stay one per craft)
 let fight = null, arena = null, pilots = null, handNow = null, handsNow = null, helmNow = null, meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false, beamAges = new Map(), lastShipHitLog = new Map(), lastFriendlyLog = new Map();
 const el = (id) => document.getElementById(id);
@@ -318,18 +321,23 @@ const clearFight = () => {
 };
 const ROCK_MAT = new THREE.MeshStandardMaterial({ color: 0x6b6258, roughness: 0.95, metalness: 0.05, flatShading: true });
 const makeRocks = (rocks) => rocks.map((q) => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(q.radius, 1), ROCK_MAT); m.position.set(...q.pos); scene.add(m); return m; });
-function newFight({ rocks = el("rocks").checked, kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked, hand = el("hand").value, handMain = el("handMain").value, handPd = el("handPd").value, handSeats = el("handSeats").value, helm = el("helm").value, ships = Number(el("nships").value) || 1, escorts = Number(el("nesc").value) || 0, formation = el("formation").checked, shipCollisions = el("collide").checked } = {}) {
+function newFight({ nav = el("rocknav").checked, rocks = el("rocks").checked, kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked, hand = el("hand").value, handMain = el("handMain").value, handPd = el("handPd").value, handSeats = el("handSeats").value, helm = el("helm").value, ships = Number(el("nships").value) || 1, escorts = Number(el("nesc").value) || 0, formation = el("formation").checked, shipCollisions = el("collide").checked } = {}) {
   clearFight();
   fighters = Math.max(1, Math.min(MAX_FIGHTERS, Math.round(fighters))); seed = Math.max(1, Math.round(seed)); ships = ships >= 2 ? 2 : 1; escorts = Math.max(0, Math.min(BS.MAX_ESCORTS, Math.round(escorts) || 0)); cruise = Math.max(0, Math.min(1, Number.isFinite(cruise) ? cruise : 0.3));
   pilots = resolvePilot(f); handsNow = resolveHands({ hand, main: handMain, pd: handPd, seats: handSeats }); handNow = handsNow.base; helmNow = resolveHelm(helm);
-  fight = BS.build(seed, kind, { rocks: rocks ? 24 : 0, fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew, network: handNow.net, seatNetworks: handsNow.seatNetworks, helm: helmNow.net, formation: !!formation && ships === 2, shipCollisions: !!shipCollisions, ships, escorts });
+  navOn = !!nav && !!rocks; navField = null; navProbe = { calls: 0, aimed: 0, fallback: 0, near: 0, handBack: 0, last: null };
+  const navFn = NV.navPilot(() => arena, () => navField, { probe: navProbe });
+  fight = BS.build(seed, kind, { rocks: rocks ? 24 : 0, fighters, gunners, pilot: navOn ? navFn : pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew, network: handNow.net, seatNetworks: handsNow.seatNetworks, helm: helmNow.net, formation: !!formation && ships === 2, shipCollisions: !!shipCollisions, ships, escorts });
   arena = fight.arena;
   el("rocks").checked = !!rocks; rockMeshes = makeRocks(arena.rocks || []);
+  el("rocknav").checked = navOn; el("pilotF").disabled = navOn;
+  if (navOn) { navField = NV.buildField(arena.rocks, [...NV.shipOf(arena).body.pos], SA.STRAFE_RANGE, { lane: true }); }
   const escortN = new Map(arena.crafts.filter(isEscort).map((c, k) => [c.id, k]));
   meshes = arena.crafts.map((c, i) => (c.kind === "capital" ? makeShip(c.ship) : isEscort(c) ? makeFighter(escortN.get(c.id), ESCORT_COLORS) : makeFighter(i - 1)));
   trails = arena.crafts.map((c, i) => trailLine(c.kind === "capital" ? 0x6fd6c0 : isEscort(c) ? ESCORT_COLORS[escortN.get(c.id) % ESCORT_COLORS.length] : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
   markers = makeMarkers(arena.crafts.length);
   beamAges = new Map(); lastShipHitLog = new Map(); lastFriendlyLog = new Map(); log = [];
+  if (navOn) log.push(`the fighters fly the NAVIGATION LAYER (the clear lane, ${NV.NAV_DEFAULTS.cell}-unit cells, margin ${NV.NAV_DEFAULTS.margin}); the pilot choice is set aside`);
   el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("hand").value = handNow.id; el("handMain").value = handMain && [...el("handMain").options].some((o) => o.value === handMain && !o.disabled) ? handMain : ""; el("handPd").value = handPd && [...el("handPd").options].some((o) => o.value === handPd && !o.disabled) ? handPd : ""; el("handSeats").value = handSeats; el("helm").value = helmNow.id; el("handNote").textContent = handsNow.problems.length ? " " + handsNow.problems.join("; ") : ""; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew; el("nships").value = String(ships); el("nesc").value = String(escorts); el("formation").checked = !!formation; el("collide").checked = !!shipCollisions;
   buildWindows(); camPos.set(...arena.crafts[0].body.pos).add(new THREE.Vector3(-120, -160, 70)); camLook.set(...arena.crafts[0].body.pos);
   renderNote(); renderFrame(0, true);
@@ -583,7 +591,7 @@ backdropBtn.onclick = () => {
   backdropBtn.textContent = "Backdrop: baking..."; backdropBtn.disabled = true;   // paint the word, then the half second of work
   requestAnimationFrame(() => setTimeout(() => { backdrop.set(true); backdropBtn.disabled = false; backdropLabel(); renderFrame(0); }, 0));
 };
-for (const id of ["kind", "pilotF", "hand", "handMain", "handPd", "handSeats", "gunners", "nfight", "helm", "nships", "nesc", "formation", "collide", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew", "rocks"]) el(id).onchange = () => newFight();
+for (const id of ["kind", "pilotF", "hand", "handMain", "handPd", "handSeats", "gunners", "nfight", "helm", "nships", "nesc", "formation", "collide", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew", "rocks", "rocknav"]) el(id).onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
 el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
 addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
@@ -628,7 +636,7 @@ const params = new URLSearchParams(location.search);
 const ready = Promise.allSettled([...CHOICES.filter((c) => c.file && c.file[0] === "/").map((c) => loadChoice(c)), ...HANDS.filter((h) => h.file && h.file[0] === "/").map((h) => loadHand(h))]).then(() => {
   fillRosters();
   const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; }, pickHand = (v) => (HANDS.some((h) => h.id === v && handAvailable(h)) ? v : "rule"), pickGroupHand = (v) => (HANDS.some((h) => h.id === v && handAvailable(h)) ? v : "");
-  newFight({ rocks: params.get("rocks") === "1", kind: BS.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || BS.FIGHTERS, gunners: BS.GUNNERS[params.get("gunners")] ? params.get("gunners") : BS.DEFAULT_GUNNERS,
+  newFight({ nav: params.get("nav") === "1", rocks: params.get("rocks") === "1", kind: BS.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || BS.FIGHTERS, gunners: BS.GUNNERS[params.get("gunners")] ? params.get("gunners") : BS.DEFAULT_GUNNERS,
     f: pick("f", "pd"), hand: pickHand(params.get("hand")), handMain: pickGroupHand(params.get("main")), handPd: pickGroupHand(params.get("pd")), handSeats: params.get("seats") || "", helm: HELMS.some((h) => h.id === params.get("helm")) ? params.get("helm") : "rule", ships: Number(params.get("ships")) === 2 ? 2 : 1, escorts: Number(params.get("escorts")) || 0, formation: params.get("formation") === "1", shipCollisions: params.get("collide") === "1", behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
   requestAnimationFrame(frame);
 });
@@ -649,7 +657,7 @@ const overlayInk = (i) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov
 const shipMesh = (ship) => arena.crafts.indexOf(arena.crafts.filter((q) => q.kind === "capital")[ship]);
 window.__battleship = {
   ready,
-  state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: fight.scenario.kind, seed: fight.scenario.seed }, rounds: arena.rounds.length, rocks: arena.rocks ? arena.rocks.length : 0, rockMeshes: rockMeshes.length, roundsStopped: arena.roundsStopped || 0,
+  state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: fight.scenario.kind, seed: fight.scenario.seed }, rounds: arena.rounds.length, rocks: arena.rocks ? arena.rocks.length : 0, rockMeshes: rockMeshes.length, roundsStopped: arena.roundsStopped || 0, nav: navOn, navField: !!navField, navAimed: navProbe ? navProbe.aimed : 0, navHandBack: navProbe ? navProbe.handBack : 0,
     crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, name: c.name, kind: c.kind, status: c.status, pos: c.body.pos.slice(), vel: c.body.vel.slice(), q: c.body.q.slice(), w: c.body.w.slice(), hp: c.hp, hpMax: c.hpMax, hits: c.hits, mode: c.mode, enginesRunning: c.enginesRunning, charge: c.charge, waves: c.waves,
       fired: c.gun ? c.gun.fired : null, partsOut: [...c.partHp].filter(([, hp]) => hp <= 0).map(([id]) => c.ship.parts[id].name), friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held, holdFire: c.holdFire, helm: c.helm, crewDead: c.crew ? [...c.crew.dead] : [], crewBridge: c.crew ? c.crew.bridge : null,
       seats: c.seats.map((s) => ({ id: s.seat.id, name: s.seat.name, yaw: s.state.yaw, pitch: s.state.pitch, fired: s.state.gun.fired, ammo: s.state.gun.ammo, works: SA.seatWorks(c, s), held: s.held, blocked: s.blocked, last: s.last && { fire: s.last.fire, target: s.last.target } })), last: c.last && { foe: c.last.foe, fire: c.last.fire, thrust: c.last.thrust, mode: c.last.mode, held: c.last.held } })),
