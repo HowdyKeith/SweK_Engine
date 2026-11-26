@@ -3012,8 +3012,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-oriented-arms",
-        blocker: "OPEN",
-        what: "The LPLC2 subunit round (brain/FLY_RETINOTOPY_RF_WIP.md Part 6) reproduced every cross result but not the orientation tuning: its four subunits are large round overlapping disks, so a 60 degree bar expanding between the cardinal axes excites all four (510 % of the cross against the 10 degree bar's 56 %), where the paper's clover (Figure 3f, 4e,f) shows the wide bar falling there.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 (brain/FLY_RETINOTOPY_RF_WIP.md Parts 7-8): the signed squared cosine (T4/T5's ~90 degree tuning) halves the diagonal wide bar (510 to 255 % of the cross) but NOT SUPPORTED (P7, P8): the cardinal wide bar is 221.5 %, so no clover, and a 60 degree bar still drives the cell 7-9x a 10 degree one in either orientation -- the model has no suppressive periphery. Was: The LPLC2 subunit round (brain/FLY_RETINOTOPY_RF_WIP.md Part 6) reproduced every cross result but not the orientation tuning: its four subunits are large round overlapping disks, so a 60 degree bar expanding between the cardinal axes excites all four (510 % of the cross against the 10 degree bar's 56 %), where the paper's clover (Figure 3f, 4e,f) shows the wide bar falling there.",
         how: "Register first ONE change to the subunit's shape: narrow arms elongated along their own axis (the measured dendrite is a cross of two orthogonal axes, Part 2), or T4/T5's own direction tuning (about 90 degrees wide) in place of the plain x and y components. Keep Part 5's stimuli and P1-P6 as they are, add the clover as a prediction (a 60 degree bar at the cardinal axes above the same bar between them), run once with brain/lplc2Subunits.mjs as the template.",
         why: "The orientation tuning is the one published property the subunit cell misses; it is the test of whether the dendrite's geometry, not just its opponency, is needed.",
     },
@@ -3038,6 +3038,13 @@ export const NEXT_ROUNDS = [
         what: "Round 19 (section 42): on the breached courier the held blow keeps boats (92 against COND's 73) but halves the goals (1.14 against 2.29 a run), because nothing releases it; COND won on the mission value. The flight did not record how often the hold fired.",
         how: "Register first one release (for example: let go once the charge is back above a stated level, or once the boat is within the surface band), COND with it against COND on round 15's mission value, fresh seeds, and record the hold's firings and releases in the HELD records.",
         why: "It asks whether a courier can keep the hold's survival without paying its goals.",
+    },
+    {
+        id: "fly-lplc2-wide-suppression",
+        blocker: "OPEN",
+        what: "Parts 6 and 8 of brain/FLY_RETINOTOPY_RF_WIP.md: in both tunings a 60 degree bar drives the subunit cell 7 to 9 times a 10 degree bar, where the paper's wide bars give less (Figure 3f; 'wide stimuli reduce the response through motion at the periphery of the field'). The four subunits reach 25 degrees and nothing beyond inhibits.",
+        how: "Register first ONE change: a suppressive surround -- motion energy (of any direction) in a ring outside the subunits (25 to 30 degrees, inside the paper's 60 degree field), subtracted before the rectification with one weight fixed before the run -- on Part 7's cell, with Part 7's stimuli and P1 to P8 unchanged; run once.",
+        why: "It is the one property both subunit rounds miss, and the paper names its cause.",
     },
     {
         id: "fly-lplc2-population",

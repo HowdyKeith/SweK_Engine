@@ -177,3 +177,22 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `fly-lplc2-o
 **THE VERDICT.** SUPPORTED iff all eight hold; otherwise NOT SUPPORTED, naming each failure. Reported, not in the verdict: Part 5's model on S11 (whether it had the clover at all), and Zhao et al.'s unit on S11.
 
 **EXPECTATION.** P7 and P8 are the question: four arms at half drive against two at full is a near tie by the arithmetic above, and layer 1's detectors are separable x and y, so a diagonal edge's local vector is not exactly diagonal -- P7 and P8 hold about 40 percent; P1 to P6 should still hold (the change only weakens off-axis drive) about 85 percent; SUPPORTED about 35.
+
+## Part 8. THE ORIENTED-ARMS ROUND, RESULT (2026-11-26; `brain/lplc2OrientedRun.json`, run once, committed unread at `507de50a8`, then read ONCE)
+
+**THE VERDICT (registered): NOT SUPPORTED (P7, P8).** P1 to P6 hold as in Part 6 (the cross results are unchanged to a tenth of a percent: they are motion along the axes, which both tunings read the same).
+
+| | Part 5 (component) | Part 7 (signed cos^2) |
+|---|---|---|
+| S9, the 10 degree bar on the diagonal | 56 % of S1 | 29 % |
+| S10, the 60 degree bar on the diagonal | 510 % | 255 % |
+| S11, the 60 degree bar on a cardinal axis | 221.5 % (reported) | 221.5 % |
+| P7 (S10 < S9) / P8 (S11 > S10) | fails / fails | fails / fails |
+
+**Reported:** Zhao et al.'s unit is active on no frame of S11.
+
+**What it says.**
+* The squared cosine does what Part 7 said it would to the diagonal: it halves the wide bar's drive there (510 to 255 %), and leaves axis-aligned motion alone. It is not enough for the clover -- four arms at half drive still edge out two at full (255 against 221.5 %), the near tie Part 7's arithmetic named.
+* The larger miss is the one both rounds share: **a 60 degree bar drives this cell 7 to 9 times harder than a 10 degree bar, in either orientation**, where the paper's wide bars give LESS (Figure 3f's clover is a fall between the axes; Part 2 records "wide stimuli reduce the response through motion at the periphery of the field"). The model has no periphery: its four subunits reach 25 degrees and nothing outside them inhibits. The direction tuning was not the missing piece; a suppressive surround is the next candidate.
+
+**Status: round CLOSED.** Backlog `fly-lplc2-oriented-arms` is closed; the next question is entered as `fly-lplc2-wide-suppression`. The population round (`fly-lplc2-population`) waits on it: the single cell is not yet settled, which that entry required.
