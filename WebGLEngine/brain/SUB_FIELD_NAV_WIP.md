@@ -1081,3 +1081,11 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 * **B4**: the arc arm reaches at least as many as the reference. 45 percent.
 
 **What a result would not say.** FOLLOW-UP 8's list stands, except the instant turn, which this round removes from the TEST only: the vessel still flies its autopilot's own turn, and the arc is the planner's model of it (a circle at cruise speed), not the hull's measured turn. The 90 degree limit, the 15 degree step and the clearances are not swept.
+
+### DEV NOTE TO FOLLOW-UP 9 [SERIES B] (2026-11-26; made BEFORE HELD9 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `arcPos`, `conflictArc`, `avoidHeadingArc` and the `any+predict+edge+avoid-arc` arm in `brain/subAvoidNav.mjs` (FOLLOW-UP 8's arms and `avoidHeading` unedited), gated in `brain/subAvoidNav-selfcheck.mjs` section 5 (9 mutants, every one red; V8, candidates not tested against statics, went 0 red first and got a row).
+
+**DEV sanity run (seeds 1 to 30, both arms, 60 flights):** the arc rule is NOT degenerate -- it fires in 23,333 ticks and turns in 19,305 (stuck in 4,028, 17 percent) -- so the one amendment the registration allowed is not used. The reference arm reproduces FOLLOW-UP 8's own DEV counts exactly (26,472 fires, 18,794 turns, 7,678 stuck), so it is the same rule. Read for sanity, not tuned on: the reference reached 20 of 30 (8 collisions, 4 with ships, 2 exits); the arc arm 25 of 30 (1 collision, none with ships, 4 exits).
+
+**Nothing was tuned.** HELD9 (8801 to 8860) is flown once, both arms, to `brain/subAvoidHeld9.<part>.jsonl`, committed unread, then read once.
