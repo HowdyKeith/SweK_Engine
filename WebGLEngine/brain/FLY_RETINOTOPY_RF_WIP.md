@@ -230,3 +230,17 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- the LPLC2 population
 * A cost: S5 fell to 0, because its inward-moving arms START in the surround (they are full at the start). P4 still holds, but by the surround, not by the orthogonal arms' inhibition Part 5 registered.
 
 **Status: round CLOSED.** Backlog `fly-lplc2-wide-suppression` is closed. The population round still waits: the single cell misses the paper's wide-bar tuning in every form tried (component, squared cosine, a surround).
+
+## Part 11. THE GEOMETRY CHECK, AND A CORRECTION TO PART 10 (2026-11-26; reported, not a verdict)
+
+Backlog `fly-lplc2-geometry-sensitivity`. The three registered forms (Part 5's component, Part 7's signed cos^2, Part 9's surround) re-run on Part 7's stimuli with the arms' and bars' REACH -- assumed at 30 degrees -- at 20 and 40 degrees (`lplc2Subunits.stimulus`'s `reach`, default unchanged, two rows in its gate's section 8).
+
+| form | reach 20 | reach 40 | S9 / S10 / S11, % of S1, both reaches |
+|---|---|---|---|
+| component | NOT SUPPORTED (P7, P8) | NOT SUPPORTED (P7, P8) | 56 / 510 / 222 |
+| cos^2 | NOT SUPPORTED (P7, P8) | NOT SUPPORTED (P7, P8) | 29 / 255 / 222 |
+| surround | NOT SUPPORTED (P7, P8) | NOT SUPPORTED (P7, P8) | 29 / 78 / 66 |
+
+**The miss is the model, not the assumed reach:** the wide-bar responses do not move at all with the reach (the cells peak early, while the edges cross the subunits, so how far the arms run later does not reach the peak window). Only S5 moves (0 % at reach 20, 25 % at 40; 15 % at 30 in Part 6), because its inward arms START at the reach.
+
+**CORRECTION TO PART 10.** Part 10 said the surround "acts after the peak" -- the bars' ends crossing the disks before reaching it. Its own table says otherwise: the surround energy AT the peak window is 217,626 for S10 and 188,021 for S11, not zero. The surround is active at the peak; at w = 1 the arms' drive outweighs it. **The miss is the balance between drive and surround, not timing**, so the "leading surround" the backlog entered on Part 10's word rests on a misreading and is not run. A next form needs a principled balance (for example divisive normalization by the surround rather than subtraction), chosen on a principle stated before any run -- now harder, since w = 1's outcome has been read.

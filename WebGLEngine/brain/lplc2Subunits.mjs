@@ -49,9 +49,10 @@ function moving(shape, T) {
 }
 
 /** The registered stimuli by name (Part 5). Returns { name, frames, motionS }. */
-export function stimulus(name) {
-    const v = STIM.edgeSpeed, reachT = (STIM.reach - half) / v;          // the arms' edges run from the square's edge (5) to the reach (30): 1.25 s at 20 degrees/s
-    const grow = (t) => half + v * t, shrink = (t) => STIM.reach - v * t;
+export function stimulus(name, { reach = STIM.reach } = {}) {   // reach: 2026-11-26 (fly-lplc2-geometry-sensitivity) -- the arms' and bars' reach, Part 5's ASSUMED 30 by default; another value is a reported check, never a registered stimulus
+    if (!(reach > half && reach <= 44)) throw new Error(`lplc2Subunits.stimulus: a reach is above ${half} and at most 44 degrees (the frame), got ${JSON.stringify(reach)}`);
+    const v = STIM.edgeSpeed, reachT = (reach - half) / v;          // the arms' edges run from the square's edge (5) to the reach (30): 1.25 s at 20 degrees/s
+    const grow = (t) => half + v * t, shrink = (t) => reach - v * t;
     const cross = (dirs, rOf, inDirs = [], rIn = null) => (t) => { const a = dirs.map((d) => arm(d, rOf(t))), b = inDirs.map((d) => arm(d, rIn(t))); return (x, y) => inSquare(x, y) || a.some((f) => f(x, y)) || b.some((f) => f(x, y)); };
     const all = ["+x", "-x", "+y", "-y"];
     switch (name) {

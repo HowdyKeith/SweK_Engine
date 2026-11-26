@@ -165,6 +165,16 @@ guarded("section 7", () => {
     ok("respond carries the surround through: with a square driving the +x disk and another moving through the surround, the surround's energy is read and the peak is lower with it than without", r1.eTrace.some((e) => e > 0) && r0.peak > 0 && r1.peak < r0.peak && r0.eTrace.every((e) => e === 0), J({ without: r0.peak, with: r1.peak }));
 });
 
+sec("8. the reach override (fly-lplc2-geometry-sensitivity, a reported check)");
+guarded("section 8", () => {
+    const darkPx = (f) => f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0);
+    const d = (r) => darkPx(L.stimulus("S1", { reach: r }).frames.at(-1));
+    ok("S1 ends with four 10 degree arms reaching 20, 30 (the default) or 40 degrees: 100 + 4 x 10 x (reach - 5) px; the default is unchanged", Math.abs(d(20) - 700) <= 1 && Math.abs(d(30) - 1100) <= 1 && Math.abs(d(40) - 1500) <= 1
+        && Math.abs(darkPx(L.stimulus("S1").frames.at(-1)) - 1100) <= 1 && L.stimulus("S1", { reach: 40 }).motionS === 1.75, J([d(20), d(30), d(40)]));
+    let bad = null; try { L.stimulus("S1", { reach: 50 }); } catch (e) { bad = e.message; }
+    ok("a reach past the frame is refused by name", /a reach is above 5 and at most 44 degrees/.test(bad || ""), bad);
+});
+
 finished = true;
 console.log(fails ? `\nlplc2Subunits-selfcheck: ${fails} FAILED` : "\nlplc2Subunits-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
