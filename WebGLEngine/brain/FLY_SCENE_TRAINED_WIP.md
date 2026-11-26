@@ -58,3 +58,32 @@ type sees is invented here, as in the scene-types round. Nothing here is of the 
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlySceneTrained.mjs run` -> `brain/flySceneTrainedRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlySceneTrained.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at 0c6ac730, then read once)
+One start, 72.8 minutes on four processes, 13 records (sha256 116ab243838357674...). **The checks hold**: the
+scene-types round's file as committed and passing its own checks; 12 HOMET draws, each once, HOMEP's recipe on its own
+battery; draw 1 audited the same twice.
+* **R26: TRAINED IN THE 26-TYPE SCENE THE FLY CANNOT BE TOLD APART THERE AT FINDING HOME** (10 above, 2 below, p 0.039;
+  by 0.0089 on average).
+* **RP: TRAINED IN THE 26-TYPE SCENE THE FLY CANNOT BE TOLD APART IN THE PLAIN AT FINDING HOME** (4 above, 8 below,
+  p 0.39; by -0.0027 on average).
+
+| arm | home: 26-type scene / plain scene | course: 26-type scene |
+|---|---|---|
+| HOMET (trained in the 26-type scene) | 0.6000 / 0.5474 | 0.7135 |
+| HOMEP (trained in the plain scene) | 0.5911 / 0.5501 | 0.7130 |
+
+**Both expectations came**: R26 CANNOT (60) and RP CANNOT (70). So, as section 5 put it, **the scene's gain is the
+scene's**: training there adds nothing this trainer can tell in 12 draws at alpha 0.01, and it costs nothing that can
+be told in the plain scene.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** **the scene's lift widens.**
+Each draw's home in the 26-type scene less its home in the plain one is larger for HOMET than for HOMEP in 11 of 12
+draws (p 0.0063, by 0.0116 on average: 0.0526 against 0.0410). HOMET's landmark gain p_c is above HOMEP's in 9 of 12
+(p 0.15; mean 2.13 against 1.77). Trained where its ring sees more, the fly leans a little more on what it sees: a
+little better there and a little worse in the plain scene, each too small to tell alone.
+
+**What it does not mean.** Section 7 holds. The lift is a difference of the two registered readings, chosen after
+seeing them, so its p is not a test this round made; a round registered to ask it would have to ask it again. CANNOT is
+what this trainer finds in 12 draws: three weights steered by a noisy walk on 4 lives a try. Which landmarks each ring
+type sees is invented here. Nothing here is of the animal.

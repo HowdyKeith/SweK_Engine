@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flySceneTrained-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/flySceneTrained-selfcheck.mjs      (under a minute; IT NEVER RUNS THE ROUND -- its trainings are of 2 iterations on draws 901 and 902, on 2 battery lives, audited on 2
+// Run: node tools/ship/flySceneTrained-selfcheck.mjs      (about two minutes; IT NEVER RUNS THE ROUND -- its trainings are of 2 iterations on draws 901 and 902, on 2 battery lives, audited on 2
 // homing lives and 1 course life, and it starts no process)
 //
 // THE GATE OF THE SCENE-TRAINED ROUND (registered in brain/FLY_SCENE_TRAINED_WIP.md before brain/rl/typedHomeTrainEnv.mjs, tools/ship/flySceneTrained.mjs and tools/ship/takeFlySceneTrained.mjs
@@ -11,6 +11,7 @@
 //   3  THE TRAINING             a training in the 26-type scene, the same twice, not the plain one's; in the plain scene HOMEP's training to the bit; its audits the scene-types round's measures
 //   4  THE RECORDS              12 draws and a second audit, made here; R26, RP
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the committed results file by its hash; its checks, R26 and RP, the means, what was described after the reading; draw 12 re-audited to the bit; the note says it
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone, but K5 through tools/ship/voxelHome-selfcheck.mjs (which
 // probes the command as a process); every one red by name but ONE (the number is the rows red):
 //   THE LIFE: E1 paid every tick 3 | E2 its dist never moves 3 | E3 the plain life 3
@@ -22,6 +23,9 @@
 //   THE NOTE: M1 its draws 8 1 | M2 its expectations moved 1
 //   THE FINDING: at 2 iterations the battery chose the same point whichever lives it was, so the plain-scene row matched HOMEP's training on another battery; the row now compares the battery's
 //   score at each iteration as well (the record's history), and L15 was run again: 1 red.
+//   THE VERDICT (after the reading, the same runner, this gate alone): V1 the results file's hash another 1 | V2 alpha 0.05 2 | V3 R26 against the plain home 4 | V4 RP against the 26-type
+//   home 5 | V5 HOMET's plain mean its 26-type home 1 | V6 the note's lift in 10 of 12 1 | V7 an expectation in section 10 moved 1 | V8 the backlog row BETTER 1 | V9 another scene salt (the
+//   re-audit of draw 12) 1 | V10 a mean in the note's table 1 -- all red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -36,6 +40,7 @@ import { TypedHomeTrainEnv } from "../../brain/rl/typedHomeTrainEnv.mjs";
 import { TypedHomeEnv } from "../../brain/rl/typedSceneEnv.mjs";
 import { HomeTrainEnv } from "../../brain/rl/homeTrainEnv.mjs";
 import { packWeights, unpackWeights } from "./paintingFly.mjs";
+import { signTest } from "./voxelHome.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -139,6 +144,32 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is of 2 iterations on draw 901 or 902, audited on lives not the round's; it starts no process; the file's size and time are what they were",
         calls.length === 5 && calls.every((c) => /^90[12], TINY, TWO, \[TWO\[0\]\]/.test(c)) && TINY.iters === 2 && !TWO.some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) &&
         !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the results file committed unread at 0c6ac730, then read once; draw 12's home in the 26-type scene audited again here, about half a minute)");
+section(() => {
+    const RS = "116ab243838357674e7f33f7fdaf695ede878cbf34b3a93c291b3b344a59429d", L = P.fileOf(fs.readFileSync(path.join(ENG, P.RESULTS))), R = P.reading(L.lines, F), f4 = (x) => x.toFixed(4);
+    ok("!! THE RESULTS FILE IS THE ONE COMMITTED UNREAD (sha256 116ab243...), 13 records, and its checks hold", L.sha256 === RS && L.lines.length === 13 && R.checks.length === 0, R.checks.join("; "));
+    ok("!! R26: CANNOT BE TOLD APART THERE (10 above, 2 below, no ties, p 0.039 -- not at 0.01); RP: CANNOT BE TOLD APART IN THE PLAIN (4 above, 8 below)",
+        R.R26.word === P.WORDS.R26[2] && R.R26.above === 10 && R.R26.below === 2 && R.R26.ties === 0 && f4(R.R26.p) === "0.0386" && R.RP.word === P.WORDS.RP[2] && R.RP.above === 4 && R.RP.below === 8 && R.RP.ties === 0);
+    const m = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    ok("the means the note prints: HOMET 0.6000 / 0.5474 / 0.7135, HOMEP 0.5911 / 0.5501 / 0.7130; R26 by 0.0089, RP by -0.0027",
+        [R.means.homet.type, R.means.homet.plain, R.means.homet.course, R.means.homep.type, R.means.homep.plain, R.means.homep.course].map(f4).join(" ") === "0.6000 0.5474 0.7135 0.5911 0.5501 0.7130" &&
+        f4(m(R.R26.diffs)) === "0.0089" && f4(m(R.RP.diffs)) === "-0.0027");
+    const d = (s) => L.lines.find((r) => r.kind === "draw" && r.s === s), typed = (s) => F.types.lines.find((r) => r.kind === "fly" && r.arm === "HOMEP" && r.s === s), com = (s) => N.committedOf("HOMEP", s, F);
+    const lT = P.SEEDS.map((s) => d(s).home - d(s).plain), lP = P.SEEDS.map((s) => typed(s).type.home - com(s).home), lift = signTest(lT.map((x, i) => x - lP[i]), 0);
+    const pT = P.SEEDS.map((s) => unpackWeights(d(s).weights)[2]), pP = P.SEEDS.map((s) => com(s).weights[2]), pc = signTest(pT.map((x, i) => x - pP[i]), 0);
+    ok("!! DESCRIBED AFTER THE READING: the scene's lift (home in the 26-type scene less in the plain) wider for HOMET in 11 of 12 (p 0.0063; 0.0526 against 0.0410, by 0.0116); p_c above HOMEP's in 9 of 12 (p 0.15; 2.13 against 1.77)",
+        lift.above === 11 && lift.below === 1 && f4(lift.p) === "0.0063" && f4(m(lT)) === "0.0526" && f4(m(lP)) === "0.0410" && f4(m(lT) - m(lP)) === "0.0116" && pc.above === 9 && pc.below === 3 && f4(pc.p) === "0.1460" &&
+        m(pT).toFixed(2) === "2.13" && m(pP).toFixed(2) === "1.77");
+    const r12 = d(12);
+    ok("!! draw 12 audited again here: its home in the 26-type scene over the homing round's 200 audit lives is the record's to the bit", S.homeIn(T.flyOf("HOMEP", 12, unpackWeights(r12.weights)), P.AUDIT, "type") === r12.home);
+    const note = src("brain/FLY_SCENE_TRAINED_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 10 says it: the file and its hash, both words, the means, both expectations came, the lift described and what it does not mean; the backlog row DONE",
+        /## 10\. The result \(the whole results file committed unread at 0c6ac730, then read once\)/.test(note) && /sha256 116ab243838357674/.test(note) && note.includes("**R26: " + P.WORDS.R26[2] + "**") && note.includes("**RP: " + P.WORDS.RP[2] + "**") &&
+        /\| HOMET \(trained in the 26-type scene\) \| 0\.6000 \/ 0\.5474 \| 0\.7135 \|/.test(note) && /\| HOMEP \(trained in the plain scene\) \| 0\.5911 \/ 0\.5501 \| 0\.7130 \|/.test(note) && /\*\*Both expectations came\*\*: R26 CANNOT \(60\) and RP CANNOT \(70\)/.test(note) &&
+        note.includes("**Described after the reading, not registered (the gate recomputes it from the records):**") && /in 11 of 12 draws \(p 0\.0063, by 0\.0116 on average: 0\.0526 against 0\.0410\)/.test(note) && /9 of 12 \(p 0\.15; mean 2\.13 against 1\.77\)/.test(note) &&
+        note.includes("**What it does not mean.**") && /\| `fly-scene-trained` \|[^\n]*\*\*DONE 2026-11-26 \(`brain\/FLY_SCENE_TRAINED_WIP\.md`\): R26 CANNOT -- 10 of 12[^\n]*RP CANNOT[^\n]*11 of 12 \(p 0\.0063\)\*\*/.test(back));
 });
 
 console.log(`\nflySceneTrained-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
