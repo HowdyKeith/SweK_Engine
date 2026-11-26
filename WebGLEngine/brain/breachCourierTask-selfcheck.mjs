@@ -11,6 +11,8 @@
 // v4930 -- COND (round 10, section 7): 9 mutants, every one red by name (final pass): C1 the same episode latching | C2 latching at the first breach | C3 never latching | C4 the test judged against a target 100 m deeper |
 //   C5 a recovery before the weight goes counting | C6 COND_KNOBS without the latch | C7 COND without the legs station | C8 the verdict ignoring survival | C9 HELD from 199002. C5 WENT 0 RED FIRST (every fixture began at the
 //   first breach); a calm tick before it is asked now.
+// 2026-11-26 -- ROUND 19 (section 9): 6 mutants of breachCourierTask.mjs, every one red by name (final pass): C1 NEED-C's 5 m | C2 HOLD-C with holdBelow | C3 HELD on round 10's | C4 HOLD-C flown with NEED-C's knobs |
+//   C5 NEED-C built on TRIAGE, not COND | C6 NEED-C flown with HOLD-C's. C4 WENT 0 RED FIRST (no row flew the crew past its name); the crews are driven by name through the latch fixture now.
 "use strict";
 import * as T from "./breachCourierTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -18,6 +20,7 @@ import * as CT from "./courierTask.mjs";
 import * as AS from "./autopilotSub.mjs";
 import * as NT from "./needsTask.mjs";
 import { FROZEN_TRIAGE } from "./stationsTask.mjs";
+import * as S6 from "../physics/mechanics/subModel6dof.mjs";   // round 19's latch fixture (section 9)
 import * as N from "../physics/mechanics/subNeeds.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 
@@ -133,6 +136,33 @@ guarded("section 7", () => {
 
 sec("8. the constants");
 guarded("section 8", () => { ok("SURFACE_BAND is 3 m (the band that counts as on the surface after the breach), and signTest is courierTask's own (P(X >= 5 | 5) = 1/32)", T.SURFACE_BAND === 3 && T.signTest === CT.signTest && Math.abs(T.signTest(5, 0) - 1 / 32) < 1e-15); });
+
+sec("9. HOLD-C and NEED-C (round 19, section 40): COND with NEED's trigger, and with the blow held");
+guarded("section 9", () => {
+    ok("NEEDC_KNOBS is COND_KNOBS with round 12's trigger (blowNeed, 3 m, 10 s) and nothing else; HOLDC_KNOBS is NEEDC_KNOBS with blowHold and nothing else; both frozen",
+        J((({ blowNeed, blowAbove, needWindowS, ...rest }) => rest)(T.NEEDC_KNOBS)) === J(T.COND_KNOBS) && T.NEEDC_KNOBS.blowNeed === true && T.NEEDC_KNOBS.blowAbove === 3 && T.NEEDC_KNOBS.needWindowS === 10
+        && J((({ blowHold, ...rest }) => rest)(T.HOLDC_KNOBS)) === J(T.NEEDC_KNOBS) && T.HOLDC_KNOBS.blowHold === true && T.HOLDC_KNOBS.holdBelow === undefined && Object.isFrozen(T.NEEDC_KNOBS) && Object.isFrozen(T.HOLDC_KNOBS), J(T.HOLDC_KNOBS));
+    ok("round 19's sets: DEV 218001-218024, HELD 219001-219096, consecutive and disjoint from rounds 7 and 10's",
+        T.R19_DEV_SET.length === 24 && T.R19_DEV_SET[0] === 218001 && T.R19_DEV_SET[23] === 218024 && T.R19_HELD_SET.length === 96 && T.R19_HELD_SET[0] === 219001 && T.R19_HELD_SET[95] === 219096
+        && ![...T.R19_DEV_SET, ...T.R19_HELD_SET].some((x) => [...T.DEV_SET, ...T.HELD_SET, ...T.R10_DEV_SET, ...T.R10_HELD_SET].includes(x)));
+    // THE CREWS BY NAME (breachCourierTask.crew), driven through stationsTask-selfcheck section 9's latch fixture: a breached boat at 30 m, weight gone, its charge falling (the trigger fires); then 400 ticks at 25 m
+    //   rising slowly with the charge at 0.5 (NEED's own trigger quiet). A stub navigator with no goal keeps the legs station out of it.
+    const model = NT.model(), mission = { depth: 20, heading: 0, speed: 2 };
+    const latchThen = (name) => { let i = 0, phase = 1; const fr = Array.from({ length: 302 }, (_, k) => 0.15 - (0.10 * k) / 300);
+        const read = () => ({ cls: "battery", frac: phase === 1 ? fr[Math.min(i, fr.length - 1)] : 0.5, depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 });
+        const nav = { snapshot: () => ({ arrivals: 0, goal: null, travel: 0 }), routeLength: () => null }, c = T.crew(name, { read, nav, pos: () => [0, 0], model });
+        const sink = S6.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5; c(sink, mission);
+        const st = S6.createState({ depth: 30, speed: 2, model }); st.vel[2] = 0.05; st.tank = { ...(st.tank || {}), released: true };
+        for (i = 1; i < fr.length; i++) c(st, mission);
+        phase = 2; const there = S6.createState({ depth: 25, speed: 2, model }); there.vel[2] = 0.05; there.tank = { ...(there.tank || {}), released: true };
+        let cmd = null; for (let k = 0; k < 400; k++) cmd = c(there, mission);
+        return { ballast: cmd.ballast, held: c.held }; };
+    const hc = latchThen("HOLD-C"), nc = latchThen("NEED-C"), cc = latchThen("COND");
+    ok("!! THE CREWS BY NAME: after the trigger fired, HOLD-C keeps ballast at -1 and reads held; NEED-C (the trigger quiet) and COND (no trigger) fly the helm's ballast and hold nothing",
+        hc.held === true && hc.ballast === -1 && nc.held === false && nc.ballast > -1 && cc.held === false && cc.ballast > -1, J({ hc, nc, cc }));
+    const h = T.run(990005, "HOLD-C", { seconds: 60 }), n = T.run(990005, "NEED-C", { seconds: 60 });
+    ok("both crews fly by name (seed 990005, outside every set, 60 s), and neither is in round 7's registered CREWS", h.crew === "HOLD-C" && n.crew === "NEED-C" && !T.CREWS.includes("HOLD-C") && !T.CREWS.includes("NEED-C"), J([h.status, n.status]));
+});
 
 finished = true;
 console.log(fails ? `\nbreachCourierTask-selfcheck: ${fails} FAILED` : "\nbreachCourierTask-selfcheck: all checks pass");

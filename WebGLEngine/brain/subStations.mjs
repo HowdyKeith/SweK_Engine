@@ -113,9 +113,11 @@ export function captain({ helm, stations = [] } = {}) {
 //   gone -- a leak bigger than the weight. Damage control itself is silent once the weight is gone (its stage reads 'gone'), so the latch asks the same test. Off by default.
 // v4930 (round 12) -- T5 by NEED, blowNeed: blow when, at the charge spent per second over the last needWindowS seconds, the battery would be empty before the current climb reaches blowAbove (a climb of 0 or less never
 //   arrives), on a breached boat whose weight is gone, deeper than blowAbove. Off by default.
+// 2026-11-26 (round 20, section 40) -- holdBelow: with blowHold, the held blow is forced only while the boat is DEEPER than holdBelow m; shallower, the helm's own ballast stands. The latch is never cleared. null (the
+//   default) forces it at every depth, as round 16 registered.
 // 2026-11-25 (round 16, brain/SUB_STATIONS_WIP.md section 35) -- blowHold: once NEED's trigger (blowNeed) fires, ballast is HELD at -1 on every later tick; nothing releases it. Off by default (section 32: re-read every tick, the gate
 //   flickered and the helm flooded the tank back between blows).
-export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false, blowNeed: false, needWindowS: 10, blowHold: false });
+export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false, blowNeed: false, needWindowS: 10, blowHold: false, holdBelow: null });
 // v4930 (round 7) -- `more`: extra target stations asked FIRST (round 7's COMBINED puts ROUTE's legs station here); `energyAllow`: a gate on the energy station's surface claim (null: none; ROUTE shuts it). Both default to v4929's captain.
 export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {}, more = [], energyAllow = null } = {}) {
     if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
@@ -157,7 +159,7 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
                 if (tEmpty < tArrive) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; if (k.blowHold) held = true; }
             }
         }
-        if (held && cmd.ballast > -1) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
+        if (held && cmd.ballast > -1 && (k.holdBelow === null || -state.pos[2] > k.holdBelow)) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
         return cmd;
     };
     Object.defineProperty(out, "log", { get: () => run.log });

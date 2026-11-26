@@ -20,6 +20,9 @@ export const DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 189001
 /** ROUND 10 (section 27): COND -- COMBINED with the breach latch made conditional (latchOnSecond); its sets. */
 export const COND_KNOBS = Object.freeze({ ...FROZEN_TRIAGE, latchOnSecond: true });
 export const R10_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 198001 + i)), R10_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 199001 + i));
+/** ROUND 19 (section 40): COND with round 12's NEED trigger (NEED-C) and with round 16's held blow on it (HOLD-C); their sets. */
+export const NEEDC_KNOBS = Object.freeze({ ...COND_KNOBS, blowNeed: true, blowAbove: 3, needWindowS: 10 }), HOLDC_KNOBS = Object.freeze({ ...NEEDC_KNOBS, blowHold: true });
+export const R19_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 218001 + i)), R19_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 219001 + i));
 const MODEL = NT.model();
 
 /** The breach of a seed: { leak, at }. The battery is round 4's (courierTask.chargeOf). */
@@ -38,6 +41,7 @@ export function crew(name, ctx) {
     if (name === "TRIAGE") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE });
     if (name === "COMBINED") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });
     if (name === "COND") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: COND_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 10; not in CREWS (round 7's registered four)
+    if (name === "NEED-C" || name === "HOLD-C") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: name === "HOLD-C" ? HOLDC_KNOBS : NEEDC_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 19; not in CREWS
     throw new Error(`breachCourierTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
 }
 
