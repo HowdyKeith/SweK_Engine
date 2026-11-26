@@ -3041,14 +3041,14 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-wide-suppression",
-        blocker: "OPEN",
-        what: "Parts 6 and 8 of brain/FLY_RETINOTOPY_RF_WIP.md: in both tunings a 60 degree bar drives the subunit cell 7 to 9 times a 10 degree bar, where the paper's wide bars give less (Figure 3f; 'wide stimuli reduce the response through motion at the periphery of the field'). The four subunits reach 25 degrees and nothing beyond inhibits.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 (brain/FLY_RETINOTOPY_RF_WIP.md Parts 9-10): the surround (the field outside the disks, w = 1) cut the wide bars threefold (S10 255 to 78 %, S11 221 to 66 % of the cross) and left every narrow stimulus untouched, but NOT SUPPORTED (P7, P8): both are still above the 10 degree bar and the clover is still reversed. The surround acts after the peak (the bars' ends cross the disks before they reach it). Next form, untried: a surround that leads. Was: Parts 6 and 8 of brain/FLY_RETINOTOPY_RF_WIP.md: in both tunings a 60 degree bar drives the subunit cell 7 to 9 times a 10 degree bar, where the paper's wide bars give less (Figure 3f; 'wide stimuli reduce the response through motion at the periphery of the field'). The four subunits reach 25 degrees and nothing beyond inhibits.",
         how: "Register first ONE change: a suppressive surround -- motion energy (of any direction) in a ring outside the subunits (25 to 30 degrees, inside the paper's 60 degree field), subtracted before the rectification with one weight fixed before the run -- on Part 7's cell, with Part 7's stimuli and P1 to P8 unchanged; run once.",
         why: "It is the one property both subunit rounds miss, and the paper names its cause.",
     },
     {
         id: "fly-lplc2-population",
-        blocker: "OPEN -- after fly-lplc2-oriented-arms settles the single cell",
+        blocker: "OPEN -- after the single cell is settled: three forms tried (Parts 5-10 of brain/FLY_RETINOTOPY_RF_WIP.md) and each misses the wide-bar tuning (P7, P8); a population of cells that miss it would carry the miss",
         what: "brain/lplc2Subunits.mjs is one cell in its own axes. Part 1 of brain/FLY_RETINOTOPY_RF_WIP.md gives every LPLC2 a lattice position (uncalibrated to degrees, fly-lattice-calibration).",
         how: "Register first: the subunit cells placed on Part 1's lattice at the 5 degrees a column the code assumes, each in its measured axes, their summed output driving the Giant Fiber model (brain/flyGfLoomModel.mjs or flyEmdLplc2Gf's gfSimulate), with the published looming predictions (peak time against r/v) as the test.",
         why: "It joins the map the data gives to the escape model the papers give.",

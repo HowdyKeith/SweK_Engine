@@ -210,3 +210,23 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- the LPLC2 population
 **THE VERDICT.** SUPPORTED iff all eight hold; otherwise NOT SUPPORTED, naming each failure.
 
 **EXPECTATION.** P7 and P8 are the question and the surround acts on both: a wide bar's off-axis ends land in it. The risk is the rest: the cross's arm tips (25 to 30 degrees) and the looming disc's edge past about 21 degrees on the diagonals also land in it, so P1 and P6 could fall, and with w = 1 the surround may silence the wide bars entirely (S10 and S11 both 0, which fails P8). P7 holds about 70 percent, P8 about 35, P1 to P6 about 70 together; SUPPORTED about 25 percent.
+
+## Part 10. THE WIDE-SUPPRESSION ROUND, RESULT (2026-11-26; `brain/lplc2SurroundRun.json`, run once, committed unread at `202a99ab8`, then read ONCE)
+
+**THE VERDICT (registered): NOT SUPPORTED (P7, P8).**
+
+| | Part 7 (no surround) | Part 9 (the surround, w = 1) | surround energy at the peak window |
+|---|---|---|---|
+| S1 to S4, S6, S8, S9 | unchanged | unchanged, to the digit | 0 |
+| S5 (one axis out, the other in) | 15.1 % of S1 | **0.0 %** | 0 at its (empty) peak |
+| S7, the looming disc | 299.5 % | 299.5 % | 43 |
+| S9, the 10 degree diagonal bar | 29.4 % | 29.4 % | 0 |
+| S10, the 60 degree diagonal bar | 255 % | **78 %** | 217,626 |
+| S11, the 60 degree cardinal bar | 221.5 % | **65.6 %** | 188,021 |
+
+**What it says.**
+* The surround does what the paper names, and only there: it cuts the two wide bars about threefold and leaves every narrow or axis-aligned stimulus as it was. It does not cut them ENOUGH: both are still above the 10 degree bar (P7), and the cardinal one is still below the diagonal one (P8, the clover). Both rounds now fail P7 and P8; the surround moved them the right way by a large factor.
+* The surround's own timing is visible in the energy column: the cells peak while the bars' ends cross the disks, BEFORE the ends reach the periphery, so the suppression arrives after the response it was meant to cut. A surround that leads (or a field whose periphery a wide stimulus enters first) would be the next form -- not tried here.
+* A cost: S5 fell to 0, because its inward-moving arms START in the surround (they are full at the start). P4 still holds, but by the surround, not by the orthogonal arms' inhibition Part 5 registered.
+
+**Status: round CLOSED.** Backlog `fly-lplc2-wide-suppression` is closed. The population round still waits: the single cell misses the paper's wide-bar tuning in every form tried (component, squared cosine, a surround).
