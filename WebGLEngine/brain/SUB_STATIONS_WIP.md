@@ -998,3 +998,13 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-re
 * Reported, not in a verdict: HOLD-RR against TRIAGE on the high rider; every lost dive's status; and how many dives each crew's hold fired on (the `held` reading, recorded this time).
 
 **EXPECTATION.** V1: HOLD-RR BEATS HOLD-R about 45 percent (a fast rise near the surface is the broach), NO DIFFERENCE about 35, HOLD-R BEATS HOLD-RR about 20 (releasing mid-water may let the boat sink back past the crush depth). V2: HOLD BEATS HOLD-RR about 70 percent (round 20's release already cost the default vessel 30 boats; this releases more often).
+
+## 44. ROUND 21, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `triageCaptain`'s `releaseRise` (null by default), `stationsTask.mjs`'s HOLD-RR crew (`HOLDRR_KNOBS`) and round 21's sets, gated in `brain/stationsTask-selfcheck.mjs` section 11 (8 mutants, every one red). The hold's firing is read through `fly`'s `make`, so round 2's registered record keeps its fields.
+
+**DEV (222001 to 222048), the non-degeneracy checks only (both pass):** V1, HOLD-RR against HOLD-R on the high rider, differ in survival on 20 of 48; V2, HOLD-RR against HOLD on the default vessel, on 22 (3 needed each).
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result):** on the high rider HOLD-RR ended 34 submerged and 14 crushed (HOLD-R: 42 submerged, 6 broached); on the default vessel HOLD-RR lost 22 crushed (HOLD-R 14, HOLD none). Every HOLD crew's hold fired on all 48 dives of both vessels.
+
+**Nothing was tuned.** HELD: HOLD-RR, HOLD-R, HOLD and TRIAGE on both vessels on 223001 to 223096 to `brain/releaseRiseHeld.<part>.jsonl` (with each dive's `held`), committed unread, then read once.
