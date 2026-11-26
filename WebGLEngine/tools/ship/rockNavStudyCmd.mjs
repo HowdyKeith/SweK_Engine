@@ -8,6 +8,7 @@
 //   node tools/ship/rockNavStudyCmd.mjs held-read             the verdict (writes held-report.json)
 //   ROUND B (the clear lane; arms N and L): devB --part k/K, devB-read, heldB --part k/K (refused until devB-report.json passes), heldB-read
 //   ROUND C (the field that follows the ship; arms L and F): devC --part k/K, devC-read, heldC --part k/K (refused until devC-report.json passes), heldC-read
+//   ROUND D (the lane with the doctrine's cap; arms L and LC): devD --part k/K, devD-read, heldD --part k/K (refused until devD-report.json passes), heldD-read
 // --dir DIR overrides brain/rig-results/rock-nav. A part file is written the moment it exists and is never flown again.
 "use strict";
 
@@ -40,8 +41,8 @@ function fly(set, seeds, arms = S.ARMS, round = "rock-nav A") {
     S.scenariosOf(seeds).forEach(({ seed, kind }, i) => { if (i % K !== k - 1) return; for (const arm of arms) rows.push(S.flyOne({ seed, kind, arm })); });
     write(name, { round, set, part: [k, K], arms, seeds: [seeds[0], seeds.at(-1)], seconds: (Date.now() - t0) / 1000, rows });
 }
-const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS, devC: S.DEV_C_SEEDS, heldC: S.HELD_C_SEEDS };
-const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B, devC: S.ARMS_C, heldC: S.ARMS_C };
+const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS, devC: S.DEV_C_SEEDS, heldC: S.HELD_C_SEEDS, devD: S.DEV_D_SEEDS, heldD: S.HELD_D_SEEDS };
+const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B, devC: S.ARMS_C, heldC: S.ARMS_C, devD: S.ARMS_D, heldD: S.ARMS_D };
 function gather(set) {
     const names = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => new RegExp(`^${set}-\\d+of\\d+\\.json$`).test(f)) : [];
     const Ks = new Set(names.map((f) => +/of(\d+)/.exec(f)[1]));
@@ -148,7 +149,40 @@ else if (mode === "devC-read") {
     const notWeighed = !scen || !allEnd;
     console.log(`[rock-nav] ROUND C BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
     write("heldC-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
+} else if (mode === "devD") fly("devD", S.DEV_D_SEEDS, S.ARMS_D, "rock-nav D");
+else if (mode === "devD-read") {
+    const rows = gather("devD"), c = S.devChecksD(rows), scen = sameScenarios(rows, S.DEV_D_SEEDS, S.ARMS_D);
+    const line = (n, name, ok, detail) => console.log(`  check ${n} ${name}${detail ? " (" + detail + ")" : ""}: ${ok ? "PASS" : "FAIL"}`);
+    console.log(`[rock-nav] ROUND D DEV ${S.DEV_D_SEEDS[0]}-${S.DEV_D_SEEDS.at(-1)}: ${rows.length} fights; checks only`);
+    line(0, "EVERY SCENARIO IN BOTH ARMS", scen, "");
+    line(1, "SAME FIELD", c.sameField.ok, `${c.sameField.n} pairs`);
+    line(2, "THE HAND-BACK", c.handBack.ok, `${c.handBack.handBack} calls inside the strafe range, ${c.handBack.mismatches} mismatches, read before the cap`);
+    line(3, "THE CAP IS APPLIED", c.capApplied.ok, `LC: ${c.capApplied.overCap} calls at or over ${S.CAP_D}, ${c.capApplied.cut} cut, ${c.capApplied.notCut} with thrust; L: ${c.capApplied.lCut} cut, ${c.capApplied.lOverWithThrust} over the cap with thrust`);
+    line(4, "THE FIELD IS SOUND", c.fieldSound.ok, `${c.fieldSound.aimBlocked} aims in a blocked cell`);
+    line(5, "EVERY FIGHT ENDS", c.allEnd.ok, `${c.allEnd.n} fights`);
+    const H = S.readHeldD(rows), a = (x) => `after arriving ${x.combatStruck}, before ${x.approachStruck}, shot before ${x.approachShot}, mean R ${fmt(x.meanR, 1)}, ships destroyed ${x.shipDead}`;
+    console.log(`  reported, moving nothing: L ${a(H.reported.L)}; LC ${a(H.reported.LC)}`);
+    const allOk = scen && Object.values(c).every((x) => x.ok);
+    console.log(`[rock-nav] ROUND D DEV: ${allOk ? "ALL CHECKS PASS -- commit the DEV files and this report, then fly HELD once" : "A CHECK FAILED -- HELD stays unflown"}`);
+    write("devD-report.json", { checks: c, sameScenarios: scen, allOk, totals: H.reported });
+} else if (mode === "heldD") {
+    if (!fs.existsSync(out("devD-report.json")) || !readJson("devD-report.json").allOk) { console.error("[rock-nav] REFUSED: ROUND D's DEV has not passed its checks (devD-report.json)"); process.exit(2); }
+    fly("heldD", S.HELD_D_SEEDS, S.ARMS_D, "rock-nav D");
+} else if (mode === "heldD-read") {
+    const rows = gather("heldD"), scen = sameScenarios(rows, S.HELD_D_SEEDS, S.ARMS_D), allEnd = rows.every((r) => r.over && r.t <= S.SECONDS + 1e-9);
+    const H = S.readHeldD(rows), R = H.reported, v = (x) => `${x.verdict}: the cap better in ${x.wins}, worse in ${x.losses}, tied ${x.ties}; p ${fmt(x.p, 4)}`;
+    console.log(`[rock-nav] ROUND D HELD ${S.HELD_D_SEEDS[0]}-${S.HELD_D_SEEDS.at(-1)}: ${rows.length / 2} pairs; SAME SCENARIOS ${scen ? "PASS" : "FAIL"}; EVERY FIGHT ENDS ${allEnd ? "PASS" : "FAIL"}`);
+    console.log(`  V1 THE STRAFE (rock strikes after arriving: L ${R.L.combatStruck}, LC ${R.LC.combatStruck}) ${v(H.v1)}`);
+    console.log(`  V2 THE ATTACK (mean R: L ${fmt(R.L.meanR, 1)}, LC ${fmt(R.LC.meanR, 1)}) ${v(H.v2)}`);
+    console.log(`  reported: strikes before arriving L ${R.L.approachStruck}, LC ${R.LC.approachStruck} -- ${v(R.approachStruck)}`);
+    console.log(`  reported: shot before arriving L ${R.L.approachShot}, LC ${R.LC.approachShot} -- ${v(R.approachShot)}`);
+    console.log(`  reported: all rock strikes L ${R.L.struck}, LC ${R.LC.struck} -- ${v(R.struck)}`);
+    console.log(`  reported: ships destroyed L ${R.L.shipDead}, LC ${R.LC.shipDead}; mean damage L ${fmt(R.L.meanDamage, 1)}, LC ${fmt(R.LC.meanDamage, 1)}; arrived L ${R.L.arrived}, LC ${R.LC.arrived}; median arrival L ${fmt(R.L.medianArrivalT, 2)} s, LC ${fmt(R.LC.medianArrivalT, 2)} s`);
+    console.log(`  reported: the cap in LC ${R.LC.capCut} calls cut of ${R.LC.overCap} over it (${R.LC.capNotCut} with thrust); fallbacks L ${R.L.fallbacks}, LC ${R.LC.fallbacks}; NEAR L ${R.L.near}, LC ${R.LC.near}`);
+    const notWeighed = !scen || !allEnd;
+    console.log(`[rock-nav] ROUND D BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
+    write("heldD-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
 } else {
-    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 11).join("\n"));
+    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 12).join("\n"));
     process.exit(mode ? 2 : 0);
 }

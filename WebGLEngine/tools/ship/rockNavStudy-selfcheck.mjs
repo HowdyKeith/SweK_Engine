@@ -15,6 +15,9 @@
 //   Round B's DEV report: 1 red (19). C7 the verdicts not renamed: 1 red (17). C8 aims checked against the start field only: FIRST PASS 0 red (nothing
 //   counted the builds checked); row 16 now requires fieldsChecked = builds, then 1 red (16). C9 off-grid rocks held to the grid: FIRST PASS 0 red (the
 //   gate's fight puts no rock off a grid); row 16b added on a field with a rock beyond its cube, then 1 red (16b). C10 the off-grid count dropped: 1 red (16b).
+// ROUND D (rows 20-23): D1 the cap never applied: 1 red (20). D2 the cap applied in L too: 1 red (20). D3 LC flown without the lane: 1 red (20). D4 the cap at 15: 1 red (20).
+//   D5 V1 reads all strikes: 1 red (21). D6 V2's sign flipped: 1 red (21). D7 the bottom line ignores V2: 1 red (21). D8 the cap check ignores L: 1 red (22).
+//   D9 Round D's HELD opened by Round C's DEV report: 1 red (23). D10 the verdicts not renamed: 1 red (21). D11 HELD D overlapping HELD C: 1 red (23).
 "use strict";
 
 import fs from "node:fs";
@@ -177,6 +180,41 @@ row("19 THE COMMAND REFUSES ROUND C'S HELD BEFORE ITS DEV PASSES; ROUND C'S SETS
     fs.rmSync(dir, { recursive: true, force: true });
     const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS], mine = [...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS];
     return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldC exit ${st}` };
+});
+
+// ROUND D: arm LC (the lane with the doctrine's cap) against L
+const LC41 = fly(41, "bow", "LC");
+row("20 ARM LC IS L WITH THE CAP: the same field and starts; the hand-back exact before the cap; calls over 12 cut and none left with thrust; L cuts nothing and has over-cap calls with thrust", () => {
+    const p = LC41.probe, q = L41.probe;
+    return { ok: S.CAP_D === 12 && !!p && p.overCap > 0 && p.capCut > 0 && p.capNotCut === 0 && q.capCut === 0 && q.capNotCut > 0 && p.handBackMismatch === 0 && LC41.fieldKey === L41.fieldKey && p.field.lane === true && JSON.stringify(LC41) !== JSON.stringify(L41),
+        detail: p ? `LC ${p.overCap} over, ${p.capCut} cut, ${p.capNotCut} with thrust; L ${q.capCut} cut, ${q.capNotCut} over with thrust` : "no probe" };
+});
+const synD = (arm, i, o) => ({ ...syn("N", i, {}), arm, probe: { calls: 10, aimed: 5, fallback: 0, near: 0, handBack: 5, handBackMismatch: 0, aimBlocked: 0, rockCentresBlocked: true, rockCentresBlockedAll: true, overCap: 4, capCut: arm === "LC" ? 3 : 0, capNotCut: arm === "LC" ? 0 : 3 }, ...o });
+const setD = (n, fL, fC) => Array.from({ length: n }, (_, i) => [synD("L", i, fL(i)), synD("LC", i, fC(i))]).flat();
+row("21 ROUND D'S BOTTOM LINE (V1 strikes after arriving, V2 R with higher better): SAVES FIGHTERS / SAVES FIGHTERS BUT HITS LESS / LOSES MORE / DOES NOT WIN", () => {
+    const saves = S.readHeldD(setD(40, (i) => ({ combatStruck: i < 30 ? 1 : 0 }), () => ({}))).bottom;
+    const less = S.readHeldD(setD(40, (i) => ({ combatStruck: i < 30 ? 1 : 0, R: 500 }), () => ({ R: 100 }))).bottom;
+    const loses = S.readHeldD(setD(40, () => ({}), (i) => ({ combatStruck: i < 30 ? 1 : 0 }))).bottom;
+    const approachOnly = S.readHeldD(setD(40, (i) => ({ approachStruck: i < 30 ? 1 : 0, struck: i < 30 ? 1 : 0 }), () => ({}))).bottom;   // V1 reads strikes AFTER arriving only
+    return { ok: saves === "THE CAP SAVES FIGHTERS IN THE STRAFE" && less === "THE CAP SAVES FIGHTERS BUT HITS THE SHIP LESS" && loses === "THE CAP LOSES MORE FIGHTERS TO THE ROCKS" && approachOnly === "THE CAP DOES NOT WIN THE STRAFE (FLOOR)",
+        detail: [saves, less, loses, approachOnly].join(" / ") };
+});
+row("22 ROUND D'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT", () => {
+    const good = setD(4, () => ({}), () => ({})), c0 = S.devChecksD(good);
+    const fault = (k, edit) => { const rs = JSON.parse(JSON.stringify(good)); edit(rs); return S.devChecksD(rs)[k].ok; };
+    const f = [fault("sameField", (rs) => { rs[1].fieldKey = "x"; }), fault("handBack", (rs) => { rs[1].probe.handBackMismatch = 1; }),
+        fault("capApplied", (rs) => { rs[1].probe.capNotCut = 1; }), fault("capApplied", (rs) => rs.filter((r) => r.arm === "LC").forEach((r) => { r.probe.overCap = 0; r.probe.capCut = 0; })),
+        fault("capApplied", (rs) => { rs[0].probe.capCut = 1; }), fault("capApplied", (rs) => rs.filter((r) => r.arm === "L").forEach((r) => { r.probe.capNotCut = 0; })),
+        fault("fieldSound", (rs) => { rs[1].probe.aimBlocked = 1; }), fault("allEnd", (rs) => { rs[2].t = 200; })];
+    return { ok: Object.values(c0).every((x) => x.ok) && f.every((x) => x === false), detail: `faults pass: ${f.join(",")}` };
+});
+row("23 THE COMMAND REFUSES ROUND D'S HELD BEFORE ITS DEV PASSES; ROUND D'S SETS ARE NEW", () => {
+    const cmd = path.join(HERE, "rockNavStudyCmd.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "rocknavd-"));
+    fs.writeFileSync(path.join(dir, "devC-report.json"), JSON.stringify({ allOk: true }));   // Round C's pass must not open Round D
+    const st = spawnSync(process.execPath, [cmd, "heldD", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
+    fs.rmSync(dir, { recursive: true, force: true });
+    const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS, ...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS], mine = [...S.DEV_D_SEEDS, ...S.HELD_D_SEEDS];
+    return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldD exit ${st}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);

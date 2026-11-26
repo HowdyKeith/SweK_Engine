@@ -15,7 +15,7 @@ import * as SA from "../../brain/spaceArena.mjs";
 import * as AP from "../../brain/autopilot6dof.mjs";
 import * as NV from "../../brain/spaceNav.mjs";
 import { signTest } from "./subGiveWayStudy.mjs";
-import { rOf } from "./spaceDoctrineStudy.mjs";
+import { rOf, closingSpeed, CAP_CHOSEN } from "./spaceDoctrineStudy.mjs";
 
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 export const KINDS = BF.KINDS;
@@ -32,6 +32,11 @@ export const DEV_B_SEEDS = Object.freeze(range(RESERVED_B.dev[0], RESERVED_B.dev
 export const HELD_B_SEEDS = Object.freeze(range(RESERVED_B.held[0], RESERVED_B.held[1]));
 /** ROUND C (the field that follows the ship): L, Round B's lane field built once, against F, the same field rebuilt round the ship every FOLLOW_EVERY ticks. */
 export const ARMS_C = Object.freeze(["L", "F"]);
+/** ROUND D (the lane with the doctrine's cap): L against LC, the same pilot with the thrust cut whenever the closing speed to the nearest foe is at or above CAP_D. */
+export const ARMS_D = Object.freeze(["L", "LC"]);
+export const CAP_D = CAP_CHOSEN;   // 12: the space-doctrine round's own choice (brain/SPACE_DOCTRINE_WIP.md), not chosen here
+export const DEV_D_SEEDS = Object.freeze(range(3701, 3730));
+export const HELD_D_SEEDS = Object.freeze(range(3801, 3890));
 export const FOLLOW_EVERY = 60;   // 2 s; fixed from the survey on throwaway seeds 9990013-9990018 (brain/ROCK_NAV_WIP.md, Round C)
 export const DEV_C_SEEDS = Object.freeze(range(3501, 3530));
 export const HELD_C_SEEDS = Object.freeze(range(3601, 3690));
@@ -51,13 +56,13 @@ export function fieldKey(arena) {
  * t, drift, fieldKey, probe (N only: calls, aimed, fallback, near, handBack, handBackMismatch, aimBlocked, rockCentresBlocked) }.
  */
 export function flyOne({ seed, kind, arm }) {
-    const ALL = [...new Set([...ARMS, ...ARMS_B, ...ARMS_C])];
+    const ALL = [...new Set([...ARMS, ...ARMS_B, ...ARMS_C, ...ARMS_D])];
     if (!ALL.includes(arm)) throw new Error(`rockNavStudy.flyOne: arm must be one of ${ALL.join(", ")} (got ${arm})`);
     const layered = arm !== "D";
     let arena = null, field = null, probe = null, pilot, follow = null, buildMs = 0;
     const seen = new Set();   // every field object an aim was drawn from (Round C: each build)
     if (layered) {
-        probe = { calls: 0, aimed: 0, fallback: 0, near: 0, handBack: 0, handBackMismatch: 0, aimBlocked: 0, last: null };
+        probe = { calls: 0, aimed: 0, fallback: 0, near: 0, handBack: 0, handBackMismatch: 0, aimBlocked: 0, overCap: 0, capCut: 0, capNotCut: 0, last: null };
         let nav = null;
         pilot = (body, target, opts) => {
             if (!nav) nav = NV.navPilot(() => arena, follow ? () => { const n = follow.builds.length, t0 = Date.now(), F = follow(); if (follow.builds.length > n) buildMs += Date.now() - t0; return F; } : field, { probe });
@@ -65,6 +70,13 @@ export function flyOne({ seed, kind, arm }) {
             seen.add(F);
             if (probe.last.inside) { if (JSON.stringify(out) !== JSON.stringify(AP.decide(body, target, opts))) probe.handBackMismatch++; }
             else if (probe.last.aim && F.blocked[NV.indexOf(F, probe.last.aim)]) probe.aimBlocked++;
+            // ROUND D: the cap, on the layer's output (the hand-back above is read before it). Counted in every layered arm; applied only in LC.
+            const c = arena.crafts.find((x) => x.body === body), foe = c ? SA.nearestFoe(arena, c) : null;
+            if (foe && closingSpeed(body, foe.body) >= CAP_D) {
+                probe.overCap++;
+                if (arm === "LC") { if (out.thrust > 0) probe.capCut++; return { ...out, thrust: 0 }; }
+                if (out.thrust > 0) probe.capNotCut++;
+            }
             return out;
         };
     }
@@ -72,7 +84,7 @@ export function flyOne({ seed, kind, arm }) {
     arena = b.arena;
     const ship = NV.shipOf(arena), start = [...ship.body.pos], key = fieldKey(arena);
     if (layered) {
-        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" || arm === "F" });
+        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" || arm === "F" || arm === "LC" });
         if (arm === "F") follow = NV.followingField(() => arena, arena.rocks, { every: FOLLOW_EVERY, lane: true });
         probe.rockCentresBlocked = arena.rocks.every((q) => field.blocked[NV.indexOf(field, q.pos)] === 1);
         let goalCells = 0, goalBlockedLine = 0;
@@ -226,6 +238,38 @@ export function devChecksC(rows) {
         handBack: { ok: both.length > 0 && [F, L].every((rs) => tot(rs, "handBack") > 0) && tot(both, "handBackMismatch") === 0, handBack: tot(both, "handBack"), mismatches: tot(both, "handBackMismatch") },
         follows: { ok: F.length > 0 && long.length > 0 && long.every((r) => r.probe && r.probe.builds >= 2) && F.every((r) => r.probe && r.probe.buildOriginDev === 0) && L.every((r) => r.probe && r.probe.builds === 1),
             builds: tot(F, "builds"), worstDev: Math.max(0, ...F.map((r) => (r.probe && Number.isFinite(r.probe.buildOriginDev) ? r.probe.buildOriginDev : Infinity))) },
+        fieldSound: { ok: both.length > 0 && tot(both, "aimBlocked") === 0 && both.every((r) => r.probe && r.probe.rockCentresBlockedAll === true), aimBlocked: tot(both, "aimBlocked") },
+        allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
+    };
+}
+
+const renameD = (v) => ({ ...v, verdict: v.verdict === "LAYER BETTER" ? "CAP BETTER" : v.verdict === "DOCTRINE BETTER" ? "L BETTER" : v.verdict });
+/** ROUND D's HELD reading: V1 (strikes after arriving), V2 (R, higher is better for the fighters), the bottom line, and the reported readings. */
+export function readHeldD(rows) {
+    const C = rows.filter((r) => r.arm === "LC"), L = rows.filter((r) => r.arm === "L"), pairs = pairsOf(C, L);   // pairsOf(n, d): here n is LC, d is L
+    const fewer = (k) => renameD(signVerdict(pairs.map((p) => p.d[k] - p.n[k]), sum(C, k) < sum(L, k), sum(C, k) > sum(L, k)));
+    const v1 = fewer("combatStruck");
+    const v2 = renameD(signVerdict(pairs.map((p) => p.n.R - p.d.R), sum(C, "R") > sum(L, "R"), sum(C, "R") < sum(L, "R")));
+    const bottom = v1.verdict === "CAP BETTER" ? (v2.verdict === "L BETTER" ? "THE CAP SAVES FIGHTERS BUT HITS THE SHIP LESS" : "THE CAP SAVES FIGHTERS IN THE STRAFE")
+        : v1.verdict === "L BETTER" ? "THE CAP LOSES MORE FIGHTERS TO THE ROCKS" : `THE CAP DOES NOT WIN THE STRAFE (${v1.verdict})`;
+    const tot = (rs, k) => rs.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
+    const arm = (rs) => ({ fights: rs.length, approachStruck: sum(rs, "approachStruck"), approachShot: sum(rs, "approachShot"), arrived: sum(rs, "arrived"), combatStruck: sum(rs, "combatStruck"),
+        struck: sum(rs, "struck"), medianArrivalT: median(rs.flatMap((r) => r.arrivalT)), meanR: sum(rs, "R") / rs.length, meanDamage: sum(rs, "damageOnShip") / rs.length,
+        shipDead: rs.filter((r) => r.shipDead).length, fallbacks: tot(rs, "fallback"), near: tot(rs, "near"), overCap: tot(rs, "overCap"), capCut: tot(rs, "capCut"), capNotCut: tot(rs, "capNotCut") });
+    return { v1, v2, bottom, reported: { LC: arm(C), L: arm(L), approachStruck: fewer("approachStruck"), approachShot: fewer("approachShot"), struck: fewer("struck") } };
+}
+
+/** ROUND D's DEV checks: SAME FIELD, THE HAND-BACK (both arms, before the cap), THE CAP IS APPLIED, THE FIELD IS SOUND, EVERY FIGHT ENDS. */
+export function devChecksD(rows) {
+    const C = rows.filter((r) => r.arm === "LC"), L = rows.filter((r) => r.arm === "L"), both = [...C, ...L];
+    let same = C.length > 0 && C.length === L.length;
+    if (same) { try { same = pairsOf(C, L).every((p) => p.n.fieldKey === p.d.fieldKey); } catch { same = false; } }
+    const tot = (rs, k) => rs.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
+    return {
+        sameField: { ok: same, n: C.length },
+        handBack: { ok: both.length > 0 && [C, L].every((rs) => tot(rs, "handBack") > 0) && tot(both, "handBackMismatch") === 0, handBack: tot(both, "handBack"), mismatches: tot(both, "handBackMismatch") },
+        capApplied: { ok: C.length > 0 && tot(C, "overCap") > 0 && tot(C, "capCut") > 0 && tot(C, "capNotCut") === 0 && tot(L, "capCut") === 0 && tot(L, "capNotCut") > 0,
+            overCap: tot(C, "overCap"), cut: tot(C, "capCut"), notCut: tot(C, "capNotCut"), lCut: tot(L, "capCut"), lOverWithThrust: tot(L, "capNotCut") },
         fieldSound: { ok: both.length > 0 && tot(both, "aimBlocked") === 0 && both.every((r) => r.probe && r.probe.rockCentresBlockedAll === true), aimBlocked: tot(both, "aimBlocked") },
         allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
     };
