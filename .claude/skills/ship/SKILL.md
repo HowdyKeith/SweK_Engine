@@ -58,6 +58,12 @@ or the `[knowledge]` line from step 3).
 
 ## 3. Derived files
 
+    node tools/ship/recordDrift.mjs                    # FIRST: every derived record this round moved, in milliseconds --
+                                                       # the census rows (runtimeGap, assertionShape), closings, the
+                                                       # knowledge index, timings. It REPORTS and never writes, on purpose
+                                                       # (v3698: a loop that writes a record and grades it can pass its own
+                                                       # work); the edits stay by hand, read off its lines.
+
     node tools/ship/orreryFleetScan.mjs --write        # AFTER the version bump, not before -- see below
     node tools/ship/orreryReachedScan.mjs --write     # same rule, same reason
     node tools/ship/buildKnowledgeIndex.mjs --write    # prints "[knowledge] NNNN gates" -- this is the count

@@ -3091,8 +3091,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "ship-census-rederive",
-        blocker: "OPEN",
-        what: "Every ship where a round added files or gates hand-edits three census records (vba/runtimeGap.mjs MEASURED_AT_V4462, tools/ship/assertionShape.mjs SHAPE_AT_V4480, and recordDrift's view of them), reading the numbers off the gates' own red rows.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26: it EXISTS -- tools/ship/recordDrift.mjs (v4482) re-derives every one of these records in milliseconds and REFUSES to write them by design (v3698: a loop that writes a record and grades it can mark its own work passed). Automating the write would undo that rule; instead the ship skill's step 3 now runs it first. Was: Every ship where a round added files or gates hand-edits three census records (vba/runtimeGap.mjs MEASURED_AT_V4462, tools/ship/assertionShape.mjs SHAPE_AT_V4480, and recordDrift's view of them), reading the numbers off the gates' own red rows.",
         how: "Check first whether a tool already re-derives them; if not, a command that prints (and with --write applies) the re-derived rows with a version note line, gated, with the gates' own rows unchanged.",
         why: "Every shipping chat repeats the same edits.",
     },
