@@ -1,0 +1,232 @@
+{
+ "pairs": {
+  "regular": {
+   "vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 16,
+    "losses": 76,
+    "ties": 148,
+    "n": 92,
+    "p": 1.5997152991106217e-10,
+    "median": -404.30000000000007
+   },
+   "vs20": {
+    "verdict": "ADAPT BETTER",
+    "wins": 198,
+    "losses": 42,
+    "ties": 0,
+    "n": 240,
+    "p": 2.0921723962534985e-25,
+    "median": 297.51666666666665
+   },
+   "f20vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 7,
+    "losses": 233,
+    "ties": 0,
+    "n": 240,
+    "p": 9.719876297393106e-60,
+    "median": -441.65
+   }
+  },
+  "green": {
+   "vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 12,
+    "losses": 34,
+    "ties": 194,
+    "n": 46,
+    "p": 0.0016414913408482334,
+    "median": -153.1833333333334
+   },
+   "vs20": {
+    "verdict": "ADAPT BETTER",
+    "wins": 213,
+    "losses": 26,
+    "ties": 1,
+    "n": 239,
+    "p": 1.0733058665072517e-37,
+    "median": 301.9000000000001
+   },
+   "f20vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 21,
+    "losses": 219,
+    "ties": 0,
+    "n": 240,
+    "p": 9.592475544853487e-43,
+    "median": -352.2833333333333
+   }
+  },
+  "ace": {
+   "vs12": {
+    "verdict": "ADAPT BETTER",
+    "wins": 64,
+    "losses": 4,
+    "ties": 172,
+    "n": 68,
+    "p": 5.873990530091966e-15,
+    "median": 36
+   },
+   "vs20": {
+    "verdict": "FIXED20 BETTER",
+    "wins": 19,
+    "losses": 53,
+    "ties": 168,
+    "n": 72,
+    "p": 0.00007555811484431396,
+    "median": -27
+   },
+   "f20vs12": {
+    "verdict": "FIXED20 BETTER",
+    "wins": 87,
+    "losses": 4,
+    "ties": 149,
+    "n": 91,
+    "p": 2.260482665715688e-21,
+    "median": 54
+   }
+  },
+  "perfect": {
+   "vs12": {
+    "verdict": "FLOOR",
+    "wins": 19,
+    "losses": 0,
+    "ties": 221,
+    "n": 19,
+    "p": 0.000003814697265625,
+    "median": 36
+   },
+   "vs20": {
+    "verdict": "FLOOR",
+    "wins": 7,
+    "losses": 6,
+    "ties": 227,
+    "n": 13,
+    "p": 1,
+    "median": 18
+   },
+   "f20vs12": {
+    "verdict": "FLOOR",
+    "wins": 18,
+    "losses": 0,
+    "ties": 222,
+    "n": 18,
+    "p": 0.00000762939453125,
+    "median": 45
+   }
+  }
+ },
+ "weakFails": [
+  "regular",
+  "green"
+ ],
+ "strongFails": [
+  "ace",
+  "perfect"
+ ],
+ "bottom": "THE ADAPTIVE CAP HAS NEITHER (regular, green, ace, perfect)",
+ "means": {
+  "regular FIXED12": {
+   "n": 240,
+   "R": 1589.991388888889,
+   "shipDead": 236,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "regular FIXED20": {
+   "n": 240,
+   "R": 1121.631666666667,
+   "shipDead": 7,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "regular ADAPT": {
+   "n": 240,
+   "R": 1440.0373611111113,
+   "shipDead": 166,
+   "latched": 93,
+   "latchT": 14.870250896057348,
+   "latchLost": 1
+  },
+  "green FIXED12": {
+   "n": 240,
+   "R": 1594.8993055555557,
+   "shipDead": 240,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "green FIXED20": {
+   "n": 240,
+   "R": 1213.6420833333334,
+   "shipDead": 22,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "green ADAPT": {
+   "n": 240,
+   "R": 1559.8547222222223,
+   "shipDead": 213,
+   "latched": 48,
+   "latchT": 14.903472222222224,
+   "latchLost": 1
+  },
+  "ace FIXED12": {
+   "n": 240,
+   "R": 2.7,
+   "shipDead": 0,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "ace FIXED20": {
+   "n": 240,
+   "R": 31.125,
+   "shipDead": 0,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "ace ADAPT": {
+   "n": 240,
+   "R": 21.225,
+   "shipDead": 0,
+   "latched": 240,
+   "latchT": 6.780277777777778,
+   "latchLost": 1.0041666666666667
+  },
+  "perfect FIXED12": {
+   "n": 240,
+   "R": 0.225,
+   "shipDead": 0,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "perfect FIXED20": {
+   "n": 240,
+   "R": 4.35,
+   "shipDead": 0,
+   "latched": 0,
+   "latchT": null,
+   "latchLost": null
+  },
+  "perfect ADAPT": {
+   "n": 240,
+   "R": 4.425,
+   "shipDead": 0,
+   "latched": 240,
+   "latchT": 5.5095833333333335,
+   "latchLost": 1.0041666666666667
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

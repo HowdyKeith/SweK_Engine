@@ -3303,10 +3303,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-cap-adaptive",
-        blocker: "OPEN",
+        blocker: "CLOSED -- 2026-11-26, the space doctrine's ROUND 4 (brain/SPACE_DOCTRINE_WIP.md, registered first, read once): THE ADAPTIVE CAP HAS NEITHER. Latching from 12 to 20 at the first loss with the ship unhurt paid on the weak side (FIXED12 BETTER under regular, 16 to 76, and green, 12 to 34) and missed the strong side (FIXED20 BETTER under ace, 19 to 53; perfect at the floor). It lands between the fixed caps everywhere. The signal is too blunt; follow-on filed: space-cap-signal.",
         what: "OPENED 2026-11-26 from the space doctrine's ROUND 3: the best closing-speed cap rises with the gunners' skill -- 12 wins against regular and green (it kills the ship; R near 1,590 against about 1,100 for 20 in Round 1's DEV), 20 wins against ace and perfect (12 is the worst cap there: its fighters die before they strafe). The fighters do not know the gunners in advance.",
         how: "Register a round on fresh space seeds across all four presets: arm FIXED (cap 12, Rounds 1-2's choice) against arm ADAPT, a cap that starts at 12 and moves to 20 once the team has lost a stated share of its fighters without a strafe pass landing (the rule fixed on throwaway seeds before registration, and said). Verdict per preset on R with the exact sign test; the bottom line asks whether ADAPT keeps 12's win against the weak gunners AND takes 20's against the strong.",
         why: "One fixed cap leaves a large loss on one side of the gunner range; a fighter that reads what it is meeting could have both.",
+    },
+    {
+        id: "space-cap-signal",
+        blocker: "OPEN -- a survey first: no round until a signal is found on throwaway seeds",
+        what: "OPENED 2026-11-26 from the space doctrine's ROUND 4: a cap that latches from 12 to 20 at the first loss with the ship unhurt lands between the fixed caps under every preset, because weak gunners still kill a fighter before the first hit in 20-40% of fights and strong gunners need the faster approach from the start.",
+        how: "On throwaway space seeds, measure candidate signals the fighters could read before or early in the approach -- the gunners' hit rate on the leading fighter at range, the rounds per second the ship puts out, the turret count in reach -- and how cleanly each separates {regular, green} from {ace, perfect} by the time the leading fighter is 400 units out. Register a round only for a signal that separates them in at least 90% of fights.",
+        why: "Round 3 showed the best cap differs by the opposition by a factor of several in R; a fighter that read its opposition early could have both.",
     },
     {
         id: "space-battleship-nav-cap",

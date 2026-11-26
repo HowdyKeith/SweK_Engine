@@ -415,3 +415,36 @@ battleshipFight.build(seed, kind, { gunners: preset, pilot }), nothing in the ar
 * tools/ship/adaptiveCapStudy.mjs (the arms, the latch, the checks and the verdict).
 * tools/ship/adaptiveCapStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/adaptive-cap/).
 * tools/ship/adaptiveCapStudy-selfcheck.mjs, with a mutation pass.
+
+## ROUND 4, RESULT (2026-11-26): THE ADAPTIVE CAP HAS NEITHER (regular, green, ace, perfect)
+
+**DEV** (4501-4530 x 4 kinds x 4 presets x 3 arms, checks only; read once): all three checks passed.
+- THE LATCH FIRES: under ace and perfect in all 120 fights each, and 0 latches against the rule.
+- THE CAP IS APPLIED: 3,177,816 decisions at or over the cap in force, none with thrust. The 163 unlatched ADAPT fights equal FIXED12's, fight for fight.
+- EVERY FIGHT ENDS.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (4601-4660 x 4 kinds x 4 presets x 3 arms; flown once, the files committed before the read; `brain/rig-results/adaptive-cap/held-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| preset | mean R FIXED12 / FIXED20 / ADAPT | ships destroyed | ADAPT latched (mean time) | ADAPT vs FIXED12 | ADAPT vs FIXED20 |
+|---|---|---|---|---|---|
+| regular | 1590.0 / 1121.6 / 1440.0 | 236 / 7 / 166 | 93 of 240 (14.9 s) | FIXED12 BETTER (16 to 76) | ADAPT BETTER (198 to 42) |
+| green | 1594.9 / 1213.6 / 1559.9 | 240 / 22 / 213 | 48 of 240 (14.9 s) | FIXED12 BETTER (12 to 34, p 0.0016) | ADAPT BETTER (213 to 26) |
+| ace | 2.7 / 31.1 / 21.2 | 0 / 0 / 0 | 240 of 240 (6.8 s) | ADAPT BETTER (64 to 4) | FIXED20 BETTER (19 to 53, p 0.0001) |
+| perfect | 0.2 / 4.3 / 4.4 | 0 / 0 / 0 | 240 of 240 (5.5 s) | FLOOR (19 to 0) | FLOOR (7 to 6) |
+
+- **THE WEAK SIDE FAILS** under regular and green. Against regular gunners, 93 of 240 teams lost a fighter before the first hit landed, latched, and then failed to kill the ship in 70 fights that fixed 12 won.
+- **THE STRONG SIDE FAILS:**
+  - Under ace, FIXED20 is better: the ~7 s flown at 12 before the latch cost about a third of 20's gain.
+  - Under perfect, ADAPT matches FIXED20 (4.4 against 4.3), but its win over FIXED12 is 19 to 0. That is one pair under the registered floor of 20, so the side fails on the floor, as written.
+
+**Against the expectations (written first):**
+- The strong side holds under both, about 70: NO.
+- The weak side holds under green, about 80: NO. Under regular, about 45: NO.
+- HAS BOTH, about 35: NO. PAYS ON THE WEAK SIDE, about 40: NO. The truth was worse than either: it has neither.
+
+**WHAT THIS MEANS.**
+- A first loss with the ship unhurt is too blunt a signal. Weak gunners still kill a fighter before the first hit in 20-40% of fights, and strong gunners need the faster approach from the start, not after the first loss.
+- The rule lands between the two fixed caps under every preset, nearer the right one, but never at it.
+- **A useful adaptive cap needs a signal that tells the gunners' skill apart before the approach is spent.** Two candidates: the gunners' hit rate on the leading fighter at range, or the ship's turret count in reach. No such signal is known to work. It is filed as backlog space-cap-signal, to be found on throwaway seeds before any round.
+- **Until then, the choice stays a fixed cap per expected opposition:** 12 against regular and green, 20 against ace and perfect. The page's cap box (12) stays right for the regular gunners it flies against.
