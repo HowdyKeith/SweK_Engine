@@ -3296,7 +3296,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-battleship-nav-cap",
-        blocker: "OPEN",
+        blocker: "CLOSED -- 2026-11-26: space-battleship.html has a cap 12 box beside the nav layer box (and ?navcap=1), disabled and doing nothing without the layer; the cap is brain/spaceNav.mjs capThrust (gated, row 19, 4 sabotages red). The page gate's NAV block holds the page's capped fight to rockNavStudy's arm LC on bow seed 2 (damage 1072 both ways, against the uncapped lane's 226); 5 sabotages, all red by name.",
         what: "OPENED 2026-11-26 from rock nav Round D: space-battleship.html's nav layer box (2026-11-26, gated in tools/ship/battleshipPage-selfcheck.mjs, NAV block) flies Round B's clear lane without the cap; Round D found the lane WITH the doctrine's cap (12) saves half the strafing losses and kills the ship in 74 of 360 fights.",
         how: "A third state for the box (off / lane / lane + cap 12), or a cap box beside it, the cap applied as rockNavStudy's arm LC does (on the layer's output, thrust 0 at or over the cap to the nearest foe); the page gate's NAV block extended to hold the page to arm LC on a fixture where the cap changes the fight.",
         why: "The page should be able to show what the measured best does; today it shows the second best and says so in no word.",

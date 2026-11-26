@@ -154,6 +154,22 @@ export function followingField(arenaOf, rocks, { every = 60, lane = false, goalR
     return fieldOf;
 }
 
+/**
+ * The space doctrine's closing-speed cap (brain/SPACE_DOCTRINE_WIP.md; rock nav Round D in brain/ROCK_NAV_WIP.md) on any pilot: its output with the thrust set to 0 whenever
+ * the closing speed of the body on its nearest foe's centre (SA.nearestFoe, -d(range)/dt) is at or above `cap`. The rule of rockNavStudy's arm LC, as a wrapper the page can use.
+ * `probe`, when given, counts { overCap, cut }.
+ */
+export function capThrust(pilot, arenaOf, cap = 12, probe = null) {
+    return (body, target, opts) => {
+        const out = pilot(body, target, opts), arena = arenaOf(), c = arena.crafts.find((x) => x.body === body), foe = c ? SA.nearestFoe(arena, c) : null;
+        if (!foe) return out;
+        const r = [0, 1, 2].map((k) => foe.body.pos[k] - body.pos[k]), v = [0, 1, 2].map((k) => foe.body.vel[k] - body.vel[k]), d = Math.max(Math.hypot(r[0], r[1], r[2]), 1e-9);
+        if (-(r[0] * v[0] + r[1] * v[1] + r[2] * v[2]) / d < cap) return out;
+        if (probe) { probe.overCap = (probe.overCap || 0) + 1; if (out.thrust > 0) probe.cut = (probe.cut || 0) + 1; }
+        return { ...out, thrust: 0 };
+    };
+}
+
 export function reportLines() {
     return ["[spaceNav] the navigation layer for the rock field: a 3-D Dijkstra field toward the strafe sphere, the aim the farthest descent cell in sight, flown outside the strafe range only (brain/ROCK_NAV_WIP.md)",
         `  cell ${NAV_DEFAULTS.cell}, half-width ${NAV_DEFAULTS.half}, margin ${NAV_DEFAULTS.margin}, re-aim every ${NAV_DEFAULTS.every} ticks`];

@@ -14,6 +14,7 @@
 //   L3 the lane on by default: 1 red (16).
 // ROUND C's following field (rows 17-18): F1 never rebuilt: 1 red (17). F2 rebuilt round the first origin: 1 red (17). F3 the aim cache ignores the field:
 //   1 red (18). F4 rebuilt at every call: 1 red (17). F5 the pilot ignores a field-giving function: 1 red (18).
+// THE CAP WRAPPER (row 19, 2026-11-26, for the page): K1 the cap strict (over, not at): 1 red. K2 the thrust not cut: 1 red. K3 the guns held too: 1 red. K4 the closing speed's sign flipped: 1 red.
 "use strict";
 
 import fs from "node:fs";
@@ -152,6 +153,20 @@ row("18 THE PILOT TAKES A FIELD-GIVING FUNCTION, AND NEVER REUSES AN AIM CACHED 
     pilot(body, target, opts); const first = probe.last.aim, f1 = probe.last.field;
     cur = dead; A.i = 1; pilot(body, target, opts); const second = probe.last.aim, f2 = probe.last.field;
     return { ok: !!first && f1 === F && f2 === dead && second === null && probe.fallback === 1, detail: `first ${!!first}, second ${second}` };
+});
+
+// the cap wrapper (2026-11-26, for the page; rockNavStudy's arm LC rule)
+row("19 THE CAP: the wrapped pilot's thrust is 0 at or over the cap's closing speed to the nearest foe, untouched below it and with no foe, and nothing else changes", () => {
+    const body = { ...at([150, 0, 0]) }, ship = { pos: [0, 0, 0], vel: [0, 0, 0] };
+    const A = { i: 0, crafts: [{ id: 1, team: 1, kind: "capital", body: ship, hp: 1, status: "flying" }, { id: 7, team: 2, kind: "fighter", body, hp: 1, status: "flying" }] };
+    const inner = () => ({ torqueBody: [1, 2, 3], thrust: 5, firing: true }), probe = {}, p = NV.capThrust(inner, () => A, 12, probe);
+    const foeOf = SA.nearestFoe(A, A.crafts[1]);
+    body.vel = [-12, 0, 0]; const atCap = p(body, target, opts);          // closing exactly 12
+    body.vel = [-11.999, 0, 0]; const below = p(body, target, opts);
+    body.vel = [-30, 5, 0]; const over = p(body, target, opts);
+    const alone = NV.capThrust(inner, () => ({ i: 0, crafts: [A.crafts[1]] }), 12)(body, target, opts);
+    return { ok: !!foeOf && foeOf.id === 1 && atCap.thrust === 0 && below.thrust === 5 && over.thrust === 0 && same(over.torqueBody, [1, 2, 3]) && over.firing === true && alone.thrust === 5 && probe.overCap === 2 && probe.cut === 2,
+        detail: `at ${atCap.thrust}, below ${below.thrust}, over ${over.thrust}, alone ${alone.thrust}, probe ${JSON.stringify(probe)}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);

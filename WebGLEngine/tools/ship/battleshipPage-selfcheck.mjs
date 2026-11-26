@@ -442,6 +442,16 @@ else {
               set("rocknav", false); sel("rocknav").dispatchEvent(new win.Event("change", { bubbles: true }));
               out.nav.off = { nav: B.state().nav, field: B.state().navField, pilotDisabled: sel("pilotF").disabled };
               set("rocks", false); B.newFight({ ...base });
+              // the cap on the layer (2026-11-26, rock nav Round D)
+              const f8 = document.createElement("iframe"); f8.style.width = "1100px"; f8.style.height = "900px"; f8.src = "/space-battleship.html?rocks=1&nav=1&navcap=1&kind=bow&seed=2"; document.body.appendChild(f8);
+              await new Promise((res) => { f8.onload = res; }); const t8 = performance.now(); while (performance.now() - t8 < 40000 && !f8.contentWindow.__battleship) await wait(200);
+              const B8 = f8.contentWindow.__battleship; await B8.ready; B8.hold(true); const s8 = B8.state(), d8 = f8.contentWindow.document;
+              out.nav.cap = { url: { cap: s8.navCap, checked: d8.getElementById("navcap").checked, logged: s8.log.some((l) => /CAPPED at a closing speed of 12/.test(l)) } };
+              B8.step(3600, false); const e8 = B8.state(); out.nav.cap.fight = { tally: B8.tally(), cut: e8.navCapCut, done: e8.done };
+              f8.remove();
+              set("rocknav", false); set("navcap", true); sel("navcap").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.cap.noNav = { cap: B.state().navCap, checked: sel("navcap").checked, disabled: sel("navcap").disabled };
+              set("navcap", false); B.newFight({ ...base });
             }
             // ==== NAV-END (browser)
 
@@ -797,6 +807,8 @@ else {
         // without the lane -> 1 red (the lane-fight row: the damage moves); P3 the layer on without rocks -> 2 red (the toggle row, and a page error on the empty field); P4 the pilot choice not set
         // aside -> 1 red (the toggle row); P5 the log line dropped -> 1 red (the toggle row); P6 the box not wired to a new fight -> 1 red (the toggle row). The fixture strikes no fighter in either
         // run (struck 0 = 0), so the lane-fight row's teeth are the damage on the ship (226) and the layer's own counts.
+        // THE CAP (2026-11-26, rock nav Round D on the page), sabotaged the same way: P7 the cap never applied -> 1 red (the capped-fight row); P8 the cap at 15 -> 1 red (the capped-fight row);
+        // P9 the cap on without the layer -> 1 red (the cap-box row); P10 the cap box not wired -> 1 red (the cap-box row); P11 the cap's log words dropped -> 1 red (the cap-box row).
         {
             const N = r.nav, ref = RN.flyOne({ seed: 2, kind: "bow", arm: "L" });   // the study's arm L: Round B's lane layer on the same fight (8 fighters, regular gunners, 24 rocks, the defaults)
             ok("!! ?rocks=1&nav=1 FLIES THE NAVIGATION LAYER: the box ticked, the field built, the pilot choice set aside and the log saying so; ticking it WITHOUT rocks does nothing; with rocks it starts a fight (tick 0) with the field; unticking it gives the pilot choice back",
@@ -807,6 +819,15 @@ else {
             ok("!! THE PAGE FLIES THE STUDY'S LANE FIGHT: bow, seed 2 with the layer -- the page's struck fighters and damage on the ship equal rockNavStudy's arm L on the same fight, and the layer both steered and handed back",
                 !!N && N.fight.done && N.fight.tally.struck === ref.struck && N.fight.tally.damageOnShip === ref.damageOnShip && N.fight.aimed > 0 && N.fight.handBack > 0,
                 N ? `page struck ${N.fight.tally.struck}, damage ${N.fight.tally.damageOnShip}; study struck ${ref.struck}, damage ${ref.damageOnShip}; aimed ${N.fight.aimed}, hand-back ${N.fight.handBack}` : "");
+        }
+        {
+            const C = r.nav && r.nav.cap, refC = RN.flyOne({ seed: 2, kind: "bow", arm: "LC" });   // the study's arm LC: the lane with the doctrine's cap, on the same fight
+            ok("!! ?nav=1&navcap=1 CAPS THE LAYER: the box ticked and the log saying so; the cap box does nothing (unticked, disabled) without the nav layer",
+                !!C && C.url.cap === true && C.url.checked === true && C.url.logged === true && C.noNav.cap === false && C.noNav.checked === false && C.noNav.disabled === true,
+                C ? JSON.stringify({ url: C.url, noNav: C.noNav }) : "no result");
+            ok("!! THE PAGE FLIES THE STUDY'S CAPPED LANE FIGHT: bow, seed 2 -- the page's struck fighters and damage on the ship equal rockNavStudy's arm LC, the cap cut thrust, and the cap moved the fight (the damage differs from the uncapped lane's)",
+                !!C && C.fight.done && C.fight.tally.struck === refC.struck && C.fight.tally.damageOnShip === refC.damageOnShip && C.fight.cut > 0 && !!r.nav && C.fight.tally.damageOnShip !== r.nav.fight.tally.damageOnShip,
+                C ? `page struck ${C.fight.tally.struck}, damage ${C.fight.tally.damageOnShip}; study ${refC.struck}, ${refC.damageOnShip}; cut ${C.fight.cut}; uncapped damage ${r.nav ? r.nav.fight.tally.damageOnShip : "-"}` : "");
         }
         // ==== NAV-END (node)
 
