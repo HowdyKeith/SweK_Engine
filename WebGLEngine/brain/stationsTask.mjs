@@ -31,6 +31,9 @@ export const HOLD_KNOBS = Object.freeze({ ...NEED_KNOBS, blowHold: true });
 /** ROUND 20 (section 40): HOLD with the held blow forced only deeper than 10 m (holdBelow); its sets. */
 export const HOLDR_KNOBS = Object.freeze({ ...HOLD_KNOBS, holdBelow: 10 });
 export const R20_DEV_SET = Object.freeze(Array.from({ length: 48 }, (_, i) => 220001 + i)), R20_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 221001 + i));
+/** ROUND 21 (section 43): HOLD-R with the held blow also released while rising faster than 0.5 m/s; its sets. */
+export const HOLDRR_KNOBS = Object.freeze({ ...HOLDR_KNOBS, releaseRise: 0.5 });
+export const R21_DEV_SET = Object.freeze(Array.from({ length: 48 }, (_, i) => 222001 + i)), R21_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 223001 + i));
 export const R16_DEV_SET = Object.freeze(Array.from({ length: 48 }, (_, i) => 212001 + i)), R16_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 213001 + i));
 const MODEL = NT.model();
 /** ROUND 13 (section 31): the needs-task vessel with subHulls' HIGH RIDER main ballast (a quarter of the weight, against 3 %) -- the hull rounds 9 and 12 said the hard leaks need. Everything else is the needs-task vessel's. */
@@ -60,7 +63,8 @@ export function crew(name, ctx, knobs = FROZEN_TRIAGE) {
         case "BLOW": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: BLOW_KNOBS });
         case "NEED": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: NEED_KNOBS });
         case "HOLD": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: HOLD_KNOBS });
-        case "HOLD-R": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: HOLDR_KNOBS });   // round 20; not in CREWS   // round 16; not in CREWS   // round 12; not in CREWS   // round 9; not in CREWS (round 2's registered five)
+        case "HOLD-R": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: HOLDR_KNOBS });   // round 20; not in CREWS
+        case "HOLD-RR": return SS.triageCaptain({ pilot, model: ctx.model, read: ctx.read, knobs: HOLDRR_KNOBS });   // round 21; not in CREWS   // round 16; not in CREWS   // round 12; not in CREWS   // round 9; not in CREWS (round 2's registered five)
         default: throw new Error(`stationsTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
     }
 }
