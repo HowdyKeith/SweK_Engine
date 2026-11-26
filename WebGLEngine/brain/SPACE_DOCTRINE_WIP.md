@@ -240,3 +240,64 @@ Peak closing: C 13.5-14.1 against D 33.5-33.6.
 * Nothing about which cap is best beyond Round 1's grid.
 * Nothing about real gunners: the presets are hand rules.
 * Nothing about whether the shipped seat networks would do better retrained against slow fighters. They were trained against the doctrine, and C kills the ship in every scenario with them.
+
+# ROUND 3: DOES A CAPPED FIGHTER LOSE TO STRONG GUNNERS, AND IS THERE A CAP THAT DOES NOT? (backlog space-cap-strong-gunners; Keith 2026-11-26, "lets do the next suggested round"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## Why
+- Round 2's table showed a direction its verdict line hid. Against ace, where either approach reached the ship, the doctrine won 35 of 42 discordant pairs; against perfect, 9 of 10.
+- R tied at 0 in most fights, and the rule read both presets as no verdict.
+- This round asks the question under ace and perfect only, with an endpoint that does not tie at 0, and a cap grid that includes higher caps.
+
+## What is already known, said first
+The design survey flew throwaway space seeds 9990037-9990048 (48 fights a preset, in no set; a scratch script, never committed) through spaceDoctrineStudy.flyOne:
+* **Every fighter dies in every arm** under both presets (losses 8 of 8 everywhere). Losses cannot be the endpoint, and the ship was never destroyed.
+* **R ties between the doctrine and a cap in 30-46 of 48 fights.** Strafe-seconds (fighter-seconds in strafe mode: the time the fighters spend on their passes at the ship) tied in 0-20 of 48.
+
+| preset | arm | fights with R > 0 | mean R | mean strafe-seconds |
+|---|---|---|---|---|
+| ace | doctrine | 9 | 9.0 | 6.0 |
+| ace | cap 12 | 1 | 2.6 | 0.5 |
+| ace | cap 20 | 18 | 35.3 | 4.5 |
+| ace | cap 30 | 10 | 12.4 | 6.0 |
+| perfect | doctrine | 4 | 2.6 | 2.6 |
+| perfect | cap 12 | 0 | 0.0 | 0.0 |
+| perfect | cap 20 | 5 | 6.4 | 1.3 |
+| perfect | cap 30 | 5 | 4.1 | 2.6 |
+
+* **Cap 12** (Round 2's CAP_CHOSEN) is slower, so its fighters die before they ever strafe.
+* **Cap 30** is near the doctrine, whose peak closing speed is about 31.
+* **Cap 20 under ace** did the most damage, with fewer strafe-seconds than the doctrine. So strafe-seconds and damage need not agree, and the round weighs both.
+
+## The arms
+spaceDoctrineStudy.flyOne exactly, with nothing edited: arm D (no pilot) and arm C (cappedPilot at a cap).
+
+## The grid, DEV and the choice
+* **Grid:** 12, 16, 20, 25, 30.
+* **DEV:** space seeds 4301-4330 x 4 kinds x {ace, perfect}. Every arm is flown.
+* **CAP_STRONG** is the grid cap with the highest mean R, pooled over both presets. Ties go to the larger cap.
+* R is chosen on, not strafe-seconds, because R is what the fighters are for. DEV's strafe-seconds are reported.
+* **DEV checks** (a failure stops the round): Round 2's SAME FOE, THE CAP IS APPLIED (at CAP_STRONG) and EVERY FIGHT ENDS.
+
+## HELD: the verdict
+HELD is space seeds 4401-4460 x 4 kinds x {ace, perfect}, flown once with arms D, C at CAP_STRONG, and C at 12 (reported). Pairs are (seed, kind), within a preset. The sign test is Round 1's: FLOOR_MIN 20 non-tied pairs, alpha 0.05.
+* **V1, per preset, R:** d = R_C - R_D (C at CAP_STRONG).
+  * CAP BETTER: wins > losses, p <= 0.05, and the median difference over the non-tied pairs > 0.
+  * DOCTRINE BETTER is the mirror; FLOOR is under 20 non-tied pairs; otherwise NO DIFFERENCE SHOWN.
+* **V2, per preset, strafe-seconds:** the same test on d = strafeS_C - strafeS_D, reported as the mechanism.
+* **BOTTOM LINE:**
+  * V1 CAP BETTER under both presets: `CAP <CAP_STRONG> BEATS THE DOCTRINE AGAINST STRONG GUNNERS`.
+  * V1 DOCTRINE BETTER under either: `THE DOCTRINE BEATS CAP <CAP_STRONG> AGAINST STRONG GUNNERS (<preset(s)>)`.
+  * Otherwise: `NO CAP SHOWN BETTER OR WORSE THAN THE DOCTRINE AGAINST STRONG GUNNERS (<per-preset verdicts>)`.
+* **THE FIRST QUESTION, REPORTED:** cap 12 against the doctrine, per preset, by the same R test and the strafe-seconds test.
+  * Answer YES (a capped fighter at 12 loses to strong gunners) if the doctrine is better on R under either preset, or the cap-12 fighters strafe less (DOCTRINE BETTER on strafe-seconds) under both.
+* **Reported, not weighed:** mean R, damage, strafe-seconds, passes, time to the fight's end and peak closing, per arm and preset.
+
+## Expectations, recorded before any code
+* CAP_STRONG is 20 or 25: about 70%.
+* The bottom line is CAP BEATS THE DOCTRINE: about 25%. DOCTRINE BEATS: about 15%. NO CAP SHOWN: about 60% (R ties a lot even at 240 pairs a preset, so FLOOR under perfect is likely).
+* The first question answers YES: about 85% (cap 12 fighters strafe far less).
+
+## What will be built
+* tools/ship/strongGunnersStudy.mjs (the choice, the checks and the verdict, on spaceDoctrineStudy's flyOne).
+* tools/ship/strongGunnersStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/strong-gunners/).
+* tools/ship/strongGunnersStudy-selfcheck.mjs, with a mutation pass.
