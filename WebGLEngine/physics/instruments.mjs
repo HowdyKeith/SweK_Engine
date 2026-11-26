@@ -2827,6 +2827,10 @@ export const INSTRUMENTS = [
       measures: "can one rule keep cap 12's win against weak gunners (regular, green) and take cap 20's against strong ones (ace, perfect)? ADAPT starts at 12 and latches the team to 20 once a fighter is lost with the ship unhurt; R per preset by the exact sign test on (seed, kind) pairs against fixed 12 (the weak side) and fixed 20 (the strong side)",
       key: "K = 1 fixed from a survey on throwaway seeds; DEV (space seeds 4501-4530 x 4 kinds x 4 presets) is checks only; HELD (4601-4660) is flown ONCE",
       gate: "tools/ship/adaptiveCapStudy-selfcheck.mjs" },
+    { id: "signal-cap", page: "instrument-bench.html", name: "THE SIGNAL CAP (brain/SPACE_DOCTRINE_WIP.md, ROUND 5)", area: "brain",
+      measures: "does a cap chosen at 4 s by the damage the team has taken (20 or more: cap 20, else 12) keep cap 12's win against weak gunners and take cap 20's against strong ones? R per preset by the exact sign test, Round 4's verdict word for word",
+      key: "the signal's numbers fixed from a survey on throwaway seeds (98.4% right at 4 s); DEV (space seeds 4701-4730 x 4 kinds x 4 presets) is checks only; HELD (4801-4920, doubled after Round 4's floor) is flown ONCE",
+      gate: "tools/ship/signalCapStudy-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
