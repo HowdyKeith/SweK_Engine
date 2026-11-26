@@ -1045,3 +1045,13 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-co
 **THE VERDICT (HELD, once).** Round 15's (`learnedCourier.verdict15`) with HOLD-CR in PRICED's place: HOLD-CR against COND on the mission value, goals and survival reported the same way. Reported beside it: HOLD-C on the same runs; for each run, how many times the hold fired and how many times it was let go (recorded in the HELD records this time).
 
 **EXPECTATION.** NO DIFFERENCE SHOWN about 45 percent (a released boat is again a boat in trouble); HOLD-CR BEATS COND about 30; COND BEATS HOLD-CR about 25.
+
+## 47. ROUND 22, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `triageCaptain`'s `holdUntilFrac` (null by default) and its `.holds` reading ({ on, off }: latches and releases), `breachCourierTask.mjs`'s HOLD-CR crew (`HOLDCR_KNOBS`) and round 22's sets, gated in `brain/breachCourierTask-selfcheck.mjs` section 10 (8 mutants, every one red).
+
+**DEV (224001 to 224024), the non-degeneracy check only:** HOLD-CR and COND differ in goals or survival on 16 of 24 (4 needed): to HELD.
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result), BEFORE HELD:** COND kept 19 of 24 and delivered 51 goals; HOLD-CR kept 22 and delivered 44. **HOLD-CR's hold CHATTERS:** 46,500 latches and 46,482 releases over the 24 runs. With the charge at or above half, NEED's trigger can still fire (the battery would run out before the climb at the current rate), so the hold latches and is let go on the next tick, over and over. That is the rule as registered ("cleared ... and re-armed"); it is left as written and flown as registered. A release that is not re-armed at once would be a different rule and a different registration.
+
+**Nothing was tuned.** HELD: COND, HOLD-CR and HOLD-C on 225001 to 225096 to `brain/courierReleaseHeld.<part>.jsonl` (with each run's latches and releases), committed unread, then read once.
