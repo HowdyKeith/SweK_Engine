@@ -3017,6 +3017,35 @@ export const NEXT_ROUNDS = [
         how: "Register first ONE change to the subunit's shape: narrow arms elongated along their own axis (the measured dendrite is a cross of two orthogonal axes, Part 2), or T4/T5's own direction tuning (about 90 degrees wide) in place of the plain x and y components. Keep Part 5's stimuli and P1-P6 as they are, add the clover as a prediction (a 60 degree bar at the cardinal axes above the same bar between them), run once with brain/lplc2Subunits.mjs as the template.",
         why: "The orientation tuning is the one published property the subunit cell misses; it is the test of whether the dendrite's geometry, not just its opponency, is needed.",
     },
+    // ---- 2026-11-26 -- after stations rounds 19-20 and the LPLC2 subunit round: four more, so another chat can pick any one up.
+    {
+        id: "aquarium-hold-by-hull",
+        blocker: "OPEN",
+        what: "Rounds 16 and 20 (brain/SUB_STATIONS_WIP.md sections 37 and 42) found the best rule per hull on hard-leak dives: HOLD on the default vessel (96 of 96), HOLD-R on the high rider (76 of 96). The Sub Aquarium seats COND only on couriers; a breached sub that is not a courier gets no default captain.",
+        how: "render/subAquariumSim.mjs: a sub with needs that is NOT a courier gets HOLD (or HOLD-R on a high-rider hull) seated by default, by the same rule as defaultCaptain (never over a choice, off included, or the advisor); the list line says (default). Gate rows in render/subAquariumCaptain-selfcheck.mjs, mutants.",
+        why: "The largest result of the stations series, in what a person sees.",
+    },
+    {
+        id: "stations-release-on-rise",
+        blocker: "OPEN",
+        what: "HOLD-R still broached 20 of 96 on the high rider (round 20): the boat's upward speed carries it through the 10 m release line.",
+        how: "Register first one change: release the held blow also when the boat is rising faster than a stated rate (fixed before DEV), on round 20's task with fresh seed blocks; against HOLD-R on the high rider, and against HOLD on the default vessel as round 20 did.",
+        why: "It is the remaining loss of the best high-rider rule.",
+    },
+    {
+        id: "stations-courier-hold-release",
+        blocker: "OPEN",
+        what: "Round 19 (section 42): on the breached courier the held blow keeps boats (92 against COND's 73) but halves the goals (1.14 against 2.29 a run), because nothing releases it; COND won on the mission value. The flight did not record how often the hold fired.",
+        how: "Register first one release (for example: let go once the charge is back above a stated level, or once the boat is within the surface band), COND with it against COND on round 15's mission value, fresh seeds, and record the hold's firings and releases in the HELD records.",
+        why: "It asks whether a courier can keep the hold's survival without paying its goals.",
+    },
+    {
+        id: "fly-lplc2-population",
+        blocker: "OPEN -- after fly-lplc2-oriented-arms settles the single cell",
+        what: "brain/lplc2Subunits.mjs is one cell in its own axes. Part 1 of brain/FLY_RETINOTOPY_RF_WIP.md gives every LPLC2 a lattice position (uncalibrated to degrees, fly-lattice-calibration).",
+        how: "Register first: the subunit cells placed on Part 1's lattice at the 5 degrees a column the code assumes, each in its measured axes, their summed output driving the Giant Fiber model (brain/flyGfLoomModel.mjs or flyEmdLplc2Gf's gfSimulate), with the published looming predictions (peak time against r/v) as the test.",
+        why: "It joins the map the data gives to the escape model the papers give.",
+    },
     {
         id: "fly-gf-input-signs",
         blocker: "UPSTREAM -- needs the neuPrint male-cns service (neuprint.janelia.org, and a token)",
