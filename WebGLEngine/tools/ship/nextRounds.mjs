@@ -3028,15 +3028,15 @@ export const NEXT_ROUNDS = [
     //      with them are already entries: fly-lplc2-subunit-model and nav-avoid-turn-radius.)
     {
         id: "stations-hold-breached-courier",
-        blocker: "OPEN",
-        what: "Round 16 (brain/SUB_STATIONS_WIP.md section 37) held the blow on the plain hard-leak dives only, where it kept all 96 boats on the default vessel. Whether a held blow helps the breached COURIER (round 7's task, COND the best captain at 2.42 goals per 1,200 s) is not known: holding the boat up may cost the goals that COND delivers.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as round 19 (brain/SUB_STATIONS_WIP.md sections 40-42): COND BEATS HOLD-C on the mission value (68 to 21, p = 3e-7) and on goals (2.29 against 1.14 a run), while HOLD-C keeps more boats (92 against 73, p = 3e-5). A boat held up delivers half as much; COND stays the aquarium's default. Was: Round 16 (brain/SUB_STATIONS_WIP.md section 37) held the blow on the plain hard-leak dives only, where it kept all 96 boats on the default vessel. Whether a held blow helps the breached COURIER (round 7's task, COND the best captain at 2.42 goals per 1,200 s) is not known: holding the boat up may cost the goals that COND delivers.",
         how: "Register first: COND with blowHold (brain/subStations.mjs's latch) against COND on the breached courier (brain/breachCourierTask.mjs), the mission value as round 15 priced it (learnedCourier.verdict15's test with HOLD in PRICED's place), a DEV non-degeneracy check, fresh seed blocks, HELD once. If it wins, the Sub Aquarium's default courier captain (render/subAquariumSim.mjs defaultCaptain) is the next change.",
         why: "Round 16 was the largest effect of the series; this is where it would change what a person sees in the aquarium.",
     },
     {
         id: "stations-hold-surface-release",
-        blocker: "OPEN",
-        what: "On the high rider every held blow BROACHED (round 16, V1: TRIAGE BEATS HOLD 41 to 0), because nothing releases the blow as the hull nears the surface. A release rule was named in section 37 and not tested.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as round 20 (sections 40-42): HOLD-R BEATS TRIAGE on the high rider (47 to 17, p = 1e-4; 76 of 96 kept where HOLD broached all 96), and HOLD BEATS HOLD-R on the default vessel (30 to 0): the 10 m release costs the small tank 30 boats. No single rule is best on both hulls. Was: On the high rider every held blow BROACHED (round 16, V1: TRIAGE BEATS HOLD 41 to 0), because nothing releases the blow as the hull nears the surface. A release rule was named in section 37 and not tested.",
         how: "Register first: HOLD with one release rule (for example: flood back when the depth is above a stated line and the boat is rising), its constants fixed before DEV, against TRIAGE and against HOLD on both vessels on fresh seeds; the registered task's scoring unchanged (any status but submerged is a loss). DEV non-degeneracy, freeze, HELD once, read once.",
         why: "It says whether the big-tank hull, which section 37 found unnecessary on the default vessel, can be made to work at all.",
     },

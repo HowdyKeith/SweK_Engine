@@ -949,3 +949,29 @@ Keith, 2026-11-26: "Let's do 2, then 1" -- the backlog entries stations-hold-bre
 **Seen on DEV and recorded because it was seen (DEV only, not a result):** round 19 -- COND kept 20 of 24 boats and delivered 65 goals, HOLD-C kept 22 and delivered 35. Round 20 -- on the high rider HOLD-R ended 40 submerged and 8 broached (HOLD: all 48 broached; TRIAGE: 27 submerged, 21 crushed); on the default vessel HOLD-R lost 12 crushed where HOLD lost none.
 
 **Nothing was tuned.** HELD: COND, HOLD-C and NEED-C on 219001 to 219096 to `brain/holdCourierHeld.<part>.jsonl`; HOLD-R, TRIAGE and HOLD on both vessels on 221001 to 221096 to `brain/holdReleaseHeld.<part>.jsonl`; each committed unread, then read once.
+
+## 42. ROUNDS 19 AND 20 RESULTS (2026-11-26; `brain/holdCourierHeld.{0,1,2}.jsonl` and `brain/holdReleaseHeld.0.jsonl`, committed unread at `a35e654d2`, then read ONCE)
+
+### ROUND 19: THE HELD BLOW ON THE BREACHED COURIER
+
+**THE VERDICT (registered, `verdict15` with HOLD-C in PRICED's place): COND BEATS HOLD-C on the mission value,** 68 runs to 21 (p = 3e-7; mean value 2.02 against 1.06).
+* Goals: **COND BEATS HOLD-C** (70 to 11, p = 6e-12; 2.29 a run against 1.14).
+* Survival: **HOLD-C BEATS COND** (21 to 2, p = 3e-5): HOLD-C keeps 92 boats (3 broached, 1 crushed), COND 73 (23 crushed).
+
+**Reported:** NEED-C (the trigger without the hold) loses to COND on value, goals AND survival (61 boats kept, 35 crushed). **Not recorded, said plainly:** how often the hold fired -- the HELD records carry no `held` field; the registration asked for it and the flyer did not write it.
+
+**What it says.** The held blow does what round 16 found -- it keeps the boat -- but a boat held up delivers half as much, and at the registered price (2.42 goals per 1,200 s of a lost boat's time) the goals cost more than the boats are worth. COND stays the Sub Aquarium's default courier captain; nothing changes there. A courier that wanted the hold would need it released once the boat is safe (round 20's question on the dives), or a price on a lost boat well above the mission's own rate.
+
+### ROUND 20: THE HELD BLOW WITH A 10 m RELEASE
+
+**THE VERDICTS (registered):**
+* **V1, the high rider: HOLD-R BEATS TRIAGE,** 47 to 17 (p = 1e-4). HOLD-R keeps 76 of 96 (20 still broach); TRIAGE 46 (50 crushed); HOLD (round 16's, no release) broached all 96.
+* **V2, the default vessel: HOLD BEATS HOLD-R,** 30 to 0 (p = 9e-10). The release costs the default vessel 30 boats, all crushed: above 10 m the helm floods the tank back, and the small tank cannot catch the boat once it sinks below the line again.
+* Reported: HOLD-R on the high rider against HOLD-R on the default vessel, NO DIFFERENCE SHOWN (30 to 20, p = 0.10).
+
+**What it says.**
+* The release works where it was meant to: on the high rider it turns round 16's 96 broaches into 76 boats kept, more than TRIAGE keeps. 20 still broach -- the boat's momentum carries it through the 10 m line.
+* On the default vessel the same release is a loss: round 16's plain hold is the best rule there (96 of 96), and freeing the tank above 10 m undoes it.
+* No single rule of these is best on both hulls. Per vessel, the best on record: the default vessel, HOLD (96/96); the high rider, HOLD-R (76/96).
+
+**Status: rounds 19 and 20 CLOSED.** Backlog stations-hold-breached-courier and stations-hold-surface-release are closed with these results.
