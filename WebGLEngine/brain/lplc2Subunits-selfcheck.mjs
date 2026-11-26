@@ -10,6 +10,8 @@
 // 2026-11-26 -- PART 7 (section 6): 8 mutants of lplc2Subunits.mjs, every one red by name (final pass): O1 cos alone (no |m|) | O2 the sign lost | O3 a y arm against the wrong second component | O4 cos2 never used |
 //   O5 S11 10 degrees wide | O6 P8 always true | O7 respond dropping the tuning | O8 no S11. O1, O3 and O7 WENT 0 RED FIRST: unit-sized motion makes cos and |m| cos^2 coincide, equal x and y components hide a
 //   wrong second component, and nothing ran respond with cos2 -- rows for each now (twice the motion, motion (2, 1), a diagonally moving square under both tunings).
+// 2026-11-26 -- PART 9 (section 7): 6 mutants, every one red by name: S1 weight 0.5 | S2 a 40 degree field | S3 the disks in the surround | S4 only x motion counted | S5 the surround ADDED | S6 respond dropping it.
+//   (A seventh I wrote multiplied its change by zero -- no mutant at all; discarded.) The respond row's first fixture drove no disk, so it read 0 either way; it has a square in the +x disk now.
 "use strict";
 import * as L from "./lplc2Subunits.mjs";
 
@@ -135,6 +137,32 @@ guarded("section 6", () => {
     ok("...P8 fails alone when the cardinal bar is not above the diagonal one; P7 still counts", L.predictions7({ ...good, S11: 10 }).verdict === "NOT SUPPORTED (P8)" && L.predictions7({ ...good, S10: 35, S11: 40 }).verdict === "NOT SUPPORTED (P7)");
     let miss = null; try { L.predictions7({ ...good, S11: undefined }); } catch (e) { miss = e.message; }
     ok("...and a missing S11 is refused by name", /no finite response for S11/.test(miss || ""), miss);
+});
+
+sec("7. PART 9 (the wide-suppression round): the surround, on hand-made maps");
+guarded("section 7", () => {
+    ok("the surround as registered: the 30 degree field (the paper's 60 degree diameter), weight 1", L.SURROUND.field === 30 && L.SURROUND.weight === 1 && Object.isFrozen(L.SURROUND));
+    const M = L.masks(), sur = L.surroundMask(M), n = 8100, X0 = 44.5, inDisk = new Set([...M["+x"], ...M["-x"], ...M["+y"], ...M["-y"]]);
+    const rOf = (i) => Math.hypot((i % 90) - X0, Math.floor(i / 90) - X0);
+    ok("the surround is every pixel within 30 degrees of the centre and in no disk: none of it in a disk, all of it inside 30, and with the disks it covers the field", sur.idx.length > 0 && sur.idx.every((i) => !inDisk.has(i) && rOf(i) <= 30)
+        && (() => { let field = 0; for (let i = 0; i < n; i++) if (rOf(i) <= 30) field++; return field === sur.idx.length + [...inDisk].filter((i) => rOf(i) <= 30).length; })(), `${sur.idx.length} px`);
+    const at = (x, y) => Math.round(y + X0) * 90 + Math.round(x + X0), set = new Set(sur.idx);
+    ok("...a pixel 28 degrees out on the diagonal is surround; one 20 degrees out on +x is a disk's, and one 40 degrees out is neither", set.has(at(20, 20)) && !set.has(at(20, 0)) && !set.has(at(40, 0)), J([set.has(at(20, 20)), set.has(at(20, 0)), set.has(at(40, 0))]));
+    const onlyX = new Float64Array(n); for (const i of M["+x"]) onlyX[i] = 1;
+    const zero = new Float64Array(n), plain = L.cellFromMaps(onlyX, zero, M, { tuning: "cos2", surround: sur });
+    ok("motion only inside a disk meets no surround: E = 0 and R as without one", plain.E === 0 && plain.R === L.cellFromMaps(onlyX, zero, M, { tuning: "cos2" }).R);
+    const out = new Float64Array(n); for (const i of sur.idx) out[i] = 0.001; for (const i of M["+x"]) out[i] = 1;
+    const withS = L.cellFromMaps(out, zero, M, { tuning: "cos2", surround: sur }), sumD = Object.values(withS.drives).reduce((a, b) => a + b, 0);
+    ok("!! THE SURROUND SUBTRACTS before the square: E is the surround's |m| summed, and R = (the drives' sum - E)^2", Math.abs(withS.E - 0.001 * sur.idx.length) < 1e-9 && Math.abs(withS.R - (sumD - withS.E) ** 2) < 1e-6, J({ E: withS.E, R: withS.R }));
+    const ydir = new Float64Array(n); for (const i of sur.idx) ydir[i] = 3; const e2 = L.cellFromMaps(zero, ydir, M, { tuning: "cos2", surround: sur }).E, e3 = L.cellFromMaps(ydir, ydir, M, { tuning: "cos2", surround: sur }).E;
+    ok("...of ANY direction: motion along y counts as along x, and (3, 3) as its length 3 sqrt 2", Math.abs(e2 - 3 * sur.idx.length) < 1e-9 && Math.abs(e3 - 3 * Math.SQRT2 * sur.idx.length) < 1e-9, J([e2, e3]));
+    const flood = new Float64Array(n); for (const i of sur.idx) flood[i] = 10; for (const i of M["+x"]) flood[i] = 1;
+    ok("...and enough surround motion silences the cell (rectified at 0)", L.cellFromMaps(flood, zero, M, { tuning: "cos2", surround: sur }).R === 0);
+    // two small squares (no registered stimulus): one moving out along +x through the +x disk (drive), one moving out along the diagonal through the surround (suppression). The first fixture had only the second,
+    //   which drives no disk, so the cell read 0 with or without the surround and the row said nothing.
+    const sq = Array.from({ length: 120 }, (_, k) => L.draw((x, y) => (Math.abs(x - 8 - 0.1 * k) <= 3 && Math.abs(y) <= 3) || (Math.abs(x - 18 - 0.1 * k) <= 3 && Math.abs(y - 18 - 0.1 * k) <= 3)));
+    const r0 = L.respond(sq, M, { tuning: "cos2" }), r1 = L.respond(sq, M, { tuning: "cos2", surround: sur });
+    ok("respond carries the surround through: with a square driving the +x disk and another moving through the surround, the surround's energy is read and the peak is lower with it than without", r1.eTrace.some((e) => e > 0) && r0.peak > 0 && r1.peak < r0.peak && r0.eTrace.every((e) => e === 0), J({ without: r0.peak, with: r1.peak }));
 });
 
 finished = true;

@@ -5,6 +5,7 @@
 // layer 1 is brain/flyEmdLplc2Gf.mjs's motion detectors unchanged; four disks of radius 15 degrees at 10 degrees from the centre along +x, -x, +y, -y; each disk's drive is the outward motion along its
 // axis summed over the disk, less the inward; the cell is [sum of the four drives]+ squared; a stimulus's response is the largest 300 ms mean.
 // The stimuli are Part 4's, read from the text, with the arms' reach (30 degrees from the centre) ASSUMED where only the figure gives it. Edges are drawn with fractional coverage (4 x 4 supersampling).
+// 2026-11-26 -- PART 9 (registered first): `surround` subtracts w x the motion energy of the field outside the four disks before the rectification (SURROUND, surroundMask).
 // 2026-11-26 -- PART 7 (registered first): `tuning: "cos2"` reads each arm's motion through a signed squared cosine; S11 the 60 degree bar on a cardinal axis; predictions7 adds the clover (P8).
 // Pure: no DOM, no clock, no Math.random, no file.
 "use strict";
@@ -75,6 +76,14 @@ export function stimulus(name) {
     }
 }
 
+/** PART 9: the surround -- every pixel within `field` degrees of the centre that lies in none of the four disks; its weight is registered as 1. */
+export const SURROUND = Object.freeze({ field: 30, weight: 1 });
+export function surroundMask(M = masks(), { field = SURROUND.field } = {}) {
+    const inDisk = new Set([...M["+x"], ...M["-x"], ...M["+y"], ...M["-y"]]), idx = [], { w, h } = FRAME;
+    for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) { const x = px - X0, y = py - Y0, i = py * w + px; if (x * x + y * y <= field * field && !inDisk.has(i)) idx.push(i); }
+    return { idx, weight: SURROUND.weight };
+}
+
 /** The four subunits' pixel masks: { "+x": [indices], ... } -- disks of SUBUNITS.radius at SUBUNITS.offset from the centre. */
 export function masks({ offset = SUBUNITS.offset, radius = SUBUNITS.radius } = {}) {
     const out = {}, { w, h } = FRAME;
@@ -90,14 +99,16 @@ export function masks({ offset = SUBUNITS.offset, radius = SUBUNITS.radius } = {
  * The cell from one frame's motion maps (dh: + is motion toward +x; dv: + is motion toward +y, as flyEmdLplc2Gf's maps): each subunit's drive is the outward motion along its axis summed over its disk
  * (the inward motion counts negative, one weight for both signs), and R = [the four drives summed]+ squared. Returns { drives, R }.
  */
-export function cellFromMaps(dh, dv, M = masks(), { tuning = "component" } = {}) {
+export function cellFromMaps(dh, dv, M = masks(), { tuning = "component", surround = null } = {}) {
     if (!TUNINGS.includes(tuning)) throw new Error(`lplc2Subunits.cellFromMaps: a tuning is ${TUNINGS.join(" or ")}, got ${JSON.stringify(tuning)}`);
     // component: the arm takes |m| cos(theta) = the component itself. cos2 (Part 7): |m| cos(theta) |cos(theta)| = c |c| / |m| for the component c -- the same sign, half the drive at 45 degrees, none at 90.
     const along = tuning === "component" ? (a) => a : null;
     const sum = (a, b, idx) => { let s = 0; for (const i of idx) { const c = a[i]; if (along) s += c; else { const m = Math.hypot(a[i], b[i]); if (m > 0) s += (c * Math.abs(c)) / m; } } return s; };
     const drives = { "+x": sum(dh, dv, M["+x"]), "-x": -sum(dh, dv, M["-x"]), "+y": sum(dv, dh, M["+y"]), "-y": -sum(dv, dh, M["-y"]) };
-    const s = drives["+x"] + drives["-x"] + drives["+y"] + drives["-y"];
-    return { drives, R: s > 0 ? s * s : 0 };
+    // PART 9: the surround's motion energy (|m| over its pixels, any direction), times its weight, subtracted before the rectification
+    let E = 0; if (surround) { for (const i of surround.idx) E += Math.hypot(dh[i], dv[i]); }
+    const s = drives["+x"] + drives["-x"] + drives["+y"] + drives["-y"] - (surround ? surround.weight * E : 0);
+    return { drives, E, R: s > 0 ? s * s : 0 };
 }
 
 /** The largest mean of `trace` over a window of `n` samples. */
@@ -109,10 +120,10 @@ export function peakWindow(trace, n = Math.round(PEAK_WINDOW_S / FRAME.step)) {
 }
 
 /** One stimulus through layer 1 and the subunit cell: { name, peak, trace }. */
-export function respond(frames, M = masks(), { tuning = "component" } = {}) {
-    const m = FE.createModel({ w: FRAME.w, h: FRAME.h, units: [{ x: Math.round(X0), y: Math.round(Y0) }], keepMaps: true }), trace = [];
-    for (const f of frames) { const r = m.step(f); trace.push(r.maps ? cellFromMaps(r.maps.dh, r.maps.dv, M, { tuning }).R : 0); }
-    return { peak: peakWindow(trace), trace };
+export function respond(frames, M = masks(), { tuning = "component", surround = null } = {}) {
+    const m = FE.createModel({ w: FRAME.w, h: FRAME.h, units: [{ x: Math.round(X0), y: Math.round(Y0) }], keepMaps: true }), trace = [], eTrace = [];
+    for (const f of frames) { const r = m.step(f); const c = r.maps ? cellFromMaps(r.maps.dh, r.maps.dv, M, { tuning, surround }) : { R: 0, E: 0 }; trace.push(c.R); eTrace.push(c.E); }
+    return { peak: peakWindow(trace), trace, eTrace };
 }
 
 /** The comparison, reported only: Zhao et al.'s multiplicative cross unit (flyEmdLplc2Gf, its own rule) on the same frames, its receptive field the paper's 60 degree bound: the frames it is active on. */
