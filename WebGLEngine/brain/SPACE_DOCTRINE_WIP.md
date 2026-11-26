@@ -545,3 +545,33 @@ FIXED12, FIXED20 (Round 4's) and SIGNAL. Nothing in the arena is edited.
   - a higher threshold.
 - That is filed as backlog space-cap-signal-tune, to be chosen on throwaway seeds against regular's miscalls specifically.
 - **Nothing is replaced:** the page's cap box stays 12, which is right for the regular gunners it flies against.
+
+## THE SIGNAL'S TUNING SURVEY (2026-11-26; backlog space-cap-signal-tune) -- NO SETTING MEETS THE BAR, AND NO ROUND IS FLOWN
+
+Throwaway space seeds 9990073-9990096 (96 fights a preset, in no set; a scratch script, never committed).
+- **The weak side's miscalls** were counted on the cap-12 damage curves. The signal reads exactly these curves before it decides.
+- **The strong side's cost** was measured by flying the signal rule at each setting.
+
+| setting | regular miscalls | green miscalls | ace mean R (fixed 20: 37.9) | perfect mean R (fixed 20: 2.8) |
+|---|---|---|---|---|
+| 4 s, >= 20 (Round 5's) | 5 of 96 | 0 | 35.8 (94%) | 2.8 |
+| 4 s, >= 30 | 1 of 96 | 0 | 31.3 (83%) | 2.8 |
+| 4 s, >= 40 | 1 of 96 | 0 | 20.8 (55%) | 2.8 |
+| 5 s, >= 20 | 6 of 96 | 0 | 37.9 (100%) | 2.8 |
+| 5 s, >= 30 | 2 of 96 | 0 | 35.3 (93%) | 2.8 |
+| 5 s, >= 40 | 2 of 96 | 0 | 34.5 (91%) | 2.8 |
+| 6 s, >= 30 | 3 of 96 | 0 | 36.0 (95%) | 2.8 |
+| 6 s, >= 40 | 2 of 96 | 0 | 35.3 (93%) | 2.8 |
+
+- **The backlog's bar** was regular's miscalls under about 1% with ace within 10% of fixed 20. **No pair meets it.**
+  - 4 s at >= 30 reaches 1 in 96 and costs ace 17%.
+  - Every pair that keeps ace within 10% miscalls 2-6 regular fights in 96.
+- A regular fight with enough early damage to read as strong is, it seems, a fight the regular gunners happened to aim well in. The miscall floor comes from the gunners, not from the setting.
+- **WHY A ROUND WOULD NOT PASS:**
+  - Against weak gunners every miscall is a pure loss, and the rule gives nothing back.
+  - So Round 4's verdict (the sign test, 480 pairs) reads about 6 miscalls with no wins as FIXED12 BETTER.
+  - Any setting above about 1% miscalls would end PAYS ON THE WEAK SIDE again.
+- So the round the backlog entry named is not flown. Five rounds have now measured the approach cap:
+  - the best rule found is Round 5's signal: within 2% of the best fixed cap against weak gunners, within 6% against strong;
+  - the registered all-or-nothing test cannot be met by any signal with a non-zero miscall rate.
+- **Whether to ask a different question** (a margin of non-inferiority on mean R, stated before any seed, rather than "no pair worse beyond chance") is Keith's call. It would be a new question, not this one retried.

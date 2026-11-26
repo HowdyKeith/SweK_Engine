@@ -3317,7 +3317,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-cap-signal-tune",
-        blocker: "OPEN -- a survey first, on throwaway seeds",
+        blocker: "CLOSED -- 2026-11-26, the tuning survey (brain/SPACE_DOCTRINE_WIP.md, throwaway seeds 9990073-9990096, no round): NO decision time (4-6 s) and threshold (20-60) brings regular's miscalls under about 1% while keeping ace within 10% of fixed 20 -- the pairs that keep ace miscall 2-6 regular fights in 96, and 4 s at >= 30 (1 in 96) costs ace 17%. Every weak-side miscall is a pure loss, so Round 4's verdict reads about 6 in 480 as FIXED12 BETTER; the round would not pass, and is not flown. Round 5's signal stays the best rule measured. A non-inferiority question on mean R would be a new question, and is Keith's call.",
         what: "OPENED 2026-11-26 from the space doctrine's ROUND 5: the signal cap (cap 20 at 4 s if the team has taken 20 or more damage, else 12) failed its weak side only by its miscalls against regular gunners -- 22 of 480 fights, 4.6%, each a pure loss of about 530 R. The strong side held.",
         how: "On throwaway space seeds, measure the miscall rate under regular and the cost under ace for a grid of decision times (4-6 s) and thresholds; choose the pair that brings regular's miscalls under about 1% while keeping ace's mean R within 10% of fixed 20's; then register Round 5 again with that pair, its verdict word for word, on fresh seeds.",
         why: "One tuned number may turn the best rule measured into one that has both; the cost of finding out is one survey and one round.",
