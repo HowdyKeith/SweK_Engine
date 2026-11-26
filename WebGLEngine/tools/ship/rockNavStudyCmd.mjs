@@ -10,6 +10,7 @@
 //   ROUND C (the field that follows the ship; arms L and F): devC --part k/K, devC-read, heldC --part k/K (refused until devC-report.json passes), heldC-read
 //   ROUND D (the lane with the doctrine's cap; arms L and LC): devD --part k/K, devD-read, heldD --part k/K (refused until devD-report.json passes), heldD-read
 //   ROUND E (Round C again, the empty lane fixed; arms L and FX): devE --part k/K, devE-read, heldE --part k/K (refused until devE-report.json passes), heldE-read
+//   ROUND F (Round E's replication, word for word): devF --part k/K, devF-read, heldF --part k/K (refused until devF-report.json passes), heldF-read
 // --dir DIR overrides brain/rig-results/rock-nav. A part file is written the moment it exists and is never flown again.
 "use strict";
 
@@ -42,8 +43,8 @@ function fly(set, seeds, arms = S.ARMS, round = "rock-nav A") {
     S.scenariosOf(seeds).forEach(({ seed, kind }, i) => { if (i % K !== k - 1) return; for (const arm of arms) rows.push(S.flyOne({ seed, kind, arm })); });
     write(name, { round, set, part: [k, K], arms, seeds: [seeds[0], seeds.at(-1)], seconds: (Date.now() - t0) / 1000, rows });
 }
-const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS, devC: S.DEV_C_SEEDS, heldC: S.HELD_C_SEEDS, devD: S.DEV_D_SEEDS, heldD: S.HELD_D_SEEDS, devE: S.DEV_E_SEEDS, heldE: S.HELD_E_SEEDS };
-const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B, devC: S.ARMS_C, heldC: S.ARMS_C, devD: S.ARMS_D, heldD: S.ARMS_D, devE: S.ARMS_E, heldE: S.ARMS_E };
+const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS, devC: S.DEV_C_SEEDS, heldC: S.HELD_C_SEEDS, devD: S.DEV_D_SEEDS, heldD: S.HELD_D_SEEDS, devE: S.DEV_E_SEEDS, heldE: S.HELD_E_SEEDS, devF: S.DEV_F_SEEDS, heldF: S.HELD_F_SEEDS };
+const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B, devC: S.ARMS_C, heldC: S.ARMS_C, devD: S.ARMS_D, heldD: S.ARMS_D, devE: S.ARMS_E, heldE: S.ARMS_E, devF: S.ARMS_F, heldF: S.ARMS_F };
 function gather(set) {
     const names = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => new RegExp(`^${set}-\\d+of\\d+\\.json$`).test(f)) : [];
     const Ks = new Set(names.map((f) => +/of(\d+)/.exec(f)[1]));
@@ -216,7 +217,41 @@ else if (mode === "devE-read") {
     const notWeighed = !scen || !allEnd;
     console.log(`[rock-nav] ROUND E BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
     write("heldE-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
+} else if (mode === "devF") fly("devF", S.DEV_F_SEEDS, S.ARMS_F, "rock-nav F");
+else if (mode === "devF-read") {
+    const rows = gather("devF"), c = S.devChecksE(rows), scen = sameScenarios(rows, S.DEV_F_SEEDS, S.ARMS_F);
+    const line = (n, name, ok, detail) => console.log(`  check ${n} ${name}${detail ? " (" + detail + ")" : ""}: ${ok ? "PASS" : "FAIL"}`);
+    console.log(`[rock-nav] ROUND F DEV ${S.DEV_F_SEEDS[0]}-${S.DEV_F_SEEDS.at(-1)}: ${rows.length} fights; checks only`);
+    line(0, "EVERY SCENARIO IN BOTH ARMS", scen, "");
+    line(1, "SAME FIELD", c.sameField.ok, `${c.sameField.n} pairs`);
+    line(2, "THE HAND-BACK", c.handBack.ok, `${c.handBack.handBack} calls inside the strafe range, ${c.handBack.mismatches} mismatches`);
+    line(3, "IT FOLLOWS", c.follows.ok, `${c.follows.builds} builds in FX, worst distance from the ship ${fmt(c.follows.worstDev, 6)}`);
+    line(4, "THE FIELD IS SOUND", c.fieldSound.ok, `${c.fieldSound.aimBlocked} aims in a blocked cell`);
+    line(5, "EVERY FIGHT ENDS", c.allEnd.ok, `${c.allEnd.n} fights`);
+    line(6, "THE FIX REACHES THE FIELD", c.fixReaches.ok, `${c.fixReaches.laneEmptyBuilds} empty-lane builds fell back, ${c.fixReaches.buildsWithoutGoal} builds without a goal`);
+    const H = S.readHeldF(rows), a = (x) => `struck ${x.struck} (before ${x.approachStruck}, after ${x.combatStruck}), mean damage ${fmt(x.meanDamage, 1)}, fallbacks ${x.fallbacks}`;
+    console.log(`  reported, moving nothing: L ${a(H.reported.L)}; FX ${a(H.reported.FX)}`);
+    const allOk = scen && Object.values(c).every((x) => x.ok);
+    console.log(`[rock-nav] ROUND F DEV: ${allOk ? "ALL CHECKS PASS -- commit the DEV files and this report, then fly HELD once" : "A CHECK FAILED -- HELD stays unflown"}`);
+    write("devF-report.json", { checks: c, sameScenarios: scen, allOk, totals: H.reported });
+} else if (mode === "heldF") {
+    if (!fs.existsSync(out("devF-report.json")) || !readJson("devF-report.json").allOk) { console.error("[rock-nav] REFUSED: ROUND F's DEV has not passed its checks (devF-report.json)"); process.exit(2); }
+    fly("heldF", S.HELD_F_SEEDS, S.ARMS_F, "rock-nav F");
+} else if (mode === "heldF-read") {
+    const rows = gather("heldF"), scen = sameScenarios(rows, S.HELD_F_SEEDS, S.ARMS_F), allEnd = rows.every((r) => r.over && r.t <= S.SECONDS + 1e-9);
+    const H = S.readHeldF(rows), R = H.reported, v = (x) => `${x.verdict}: following better in ${x.wins}, worse in ${x.losses}, tied ${x.ties}; p ${fmt(x.p, 4)}`;
+    console.log(`[rock-nav] ROUND F HELD ${S.HELD_F_SEEDS[0]}-${S.HELD_F_SEEDS.at(-1)}: ${rows.length / 2} pairs; SAME SCENARIOS ${scen ? "PASS" : "FAIL"}; EVERY FIGHT ENDS ${allEnd ? "PASS" : "FAIL"}`);
+    console.log(`  V1 THE ROCKS (all rock strikes: L ${R.L.struck}, FX ${R.FX.struck}) ${v(H.v1)}`);
+    console.log(`  V2 THE DAMAGE (mean on the ship: L ${fmt(R.L.meanDamage, 1)}, FX ${fmt(R.FX.meanDamage, 1)}) ${v(H.v2)}`);
+    console.log(`  reported: strikes before arriving L ${R.L.approachStruck}, FX ${R.FX.approachStruck} -- ${v(R.approachStruck)}`);
+    console.log(`  reported: strikes after arriving L ${R.L.combatStruck}, FX ${R.FX.combatStruck} -- ${v(R.combatStruck)}`);
+    console.log(`  reported: arrived L ${R.L.arrived}, FX ${R.FX.arrived}; approach shot L ${R.L.approachShot}, FX ${R.FX.approachShot}; median arrival L ${fmt(R.L.medianArrivalT, 2)} s, FX ${fmt(R.FX.medianArrivalT, 2)} s; ship dead L ${R.L.shipDead}, FX ${R.FX.shipDead}`);
+    console.log(`  reported: fallbacks L ${R.L.fallbacks}, FX ${R.FX.fallbacks}; empty-lane builds ${R.FX.laneEmptyBuilds} in ${R.FX.fightsWithEmpty} fights (${R.FX.buildsWithoutGoal} builds without a goal); builds a fight FX ${fmt(R.FX.meanBuilds, 1)}`);
+    const notWeighed = !scen || !allEnd;
+    console.log(`[rock-nav] ROUND F BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
+    console.log(`[rock-nav] ROUND F, THE REPLICATION: ${notWeighed ? "NOT WEIGHED" : H.replication}`);
+    write("heldF-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
 } else {
-    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 13).join("\n"));
+    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 14).join("\n"));
     process.exit(mode ? 2 : 0);
 }

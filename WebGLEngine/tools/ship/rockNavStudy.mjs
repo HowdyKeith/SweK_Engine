@@ -38,6 +38,10 @@ export const ARMS_D = Object.freeze(["L", "LC"]);
 export const ARMS_E = Object.freeze(["L", "FX"]);
 export const DEV_E_SEEDS = Object.freeze(range(3901, 3930));
 export const HELD_E_SEEDS = Object.freeze(range(4001, 4090));
+/** ROUND F: the replication of Round E, word for word (its arms, checks and verdict), on fresh seeds. */
+export const ARMS_F = ARMS_E;
+export const DEV_F_SEEDS = Object.freeze(range(4101, 4130));
+export const HELD_F_SEEDS = Object.freeze(range(4201, 4290));
 export const CAP_D = CAP_CHOSEN;   // 12: the space-doctrine round's own choice (brain/SPACE_DOCTRINE_WIP.md), not chosen here
 export const DEV_D_SEEDS = Object.freeze(range(3701, 3730));
 export const HELD_D_SEEDS = Object.freeze(range(3801, 3890));
@@ -300,6 +304,13 @@ export function devChecksE(rows) {
     const c = devChecksC(rows.map((r) => (r.arm === "FX" ? { ...r, arm: "F" } : r))), FX = rows.filter((r) => r.arm === "FX");
     const tot = (k) => FX.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
     return { ...c, fixReaches: { ok: FX.length > 0 && FX.every((r) => r.probe && r.probe.buildsWithoutGoal === 0) && tot("laneEmptyBuilds") > 0, laneEmptyBuilds: tot("laneEmptyBuilds"), buildsWithoutGoal: tot("buildsWithoutGoal") } };
+}
+
+/** ROUND F's HELD reading: Round E's, word for word, plus the replication line (it moves nothing in Round E's verdict). */
+export function readHeldF(rows) {
+    const H = readHeldE(rows);
+    const replication = H.v1.verdict === "FOLLOW BETTER" && H.v2.verdict !== "L BETTER" ? "ROUND E REPLICATES" : `ROUND E DOES NOT REPLICATE (${H.v1.verdict})`;
+    return { ...H, replication };
 }
 
 /** DEV's checks: SAME FIELD, THE LAYER STEERS, THE HAND-BACK, THE FIELD IS SOUND, EVERY FIGHT ENDS. */

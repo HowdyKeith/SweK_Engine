@@ -22,6 +22,7 @@
 //   field), so the mutant changes nothing FX does; E6b, the following field without the lane, is the real one: 1 red (24, after an allLane row was added). E7 builds without a goal never
 //   counted: FIRST PASS 0 red (no gate fight has a goalless build); goallessBuilds lifted out and row 24b added on a dead field, then 1 red (24b). E8 the bottom line not of the fixed field:
 //   1 red (25). E9 check 6 ignores the empty-lane count: 1 red (26). E10 Round E's HELD opened by Round D's DEV report: 1 red (27). E11 the empty-lane builds not reported: 1 red (25).
+// ROUND F (rows 28-29): F1 the replication ignores V2: 1 red (28). F2 the replication on any lower total: 1 red (28). F3 Round F's HELD opened by Round E's DEV report: 1 red (29). F4 HELD F overlapping HELD E: 1 red (29).
 "use strict";
 
 import fs from "node:fs";
@@ -256,6 +257,23 @@ row("27 THE COMMAND REFUSES ROUND E'S HELD BEFORE ITS DEV PASSES; ROUND E'S SETS
     fs.rmSync(dir, { recursive: true, force: true });
     const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS, ...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS, ...S.DEV_D_SEEDS, ...S.HELD_D_SEEDS], mine = [...S.DEV_E_SEEDS, ...S.HELD_E_SEEDS];
     return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldE exit ${st}` };
+});
+
+// ROUND F: the replication of Round E
+row("28 ROUND F READS AS ROUND E, WORD FOR WORD, AND ADDS THE REPLICATION LINE: REPLICATES only on FOLLOW BETTER with V2 not L BETTER", () => {
+    const rep = S.readHeldF(setE(40, (i) => ({ struck: i < 30 ? 1 : 0 }), () => ({}))), e = S.readHeldE(setE(40, (i) => ({ struck: i < 30 ? 1 : 0 }), () => ({})));
+    const hurt = S.readHeldF(setE(40, (i) => ({ struck: i < 30 ? 1 : 0, damageOnShip: 100 }), () => ({ damageOnShip: 50 }))).replication;
+    const none = S.readHeldF(setE(40, () => ({}), () => ({}))).replication, worse = S.readHeldF(setE(40, () => ({}), (i) => ({ struck: i < 30 ? 1 : 0 }))).replication;
+    return { ok: rep.replication === "ROUND E REPLICATES" && rep.bottom === e.bottom && JSON.stringify(rep.v1) === JSON.stringify(e.v1) && hurt === "ROUND E DOES NOT REPLICATE (FOLLOW BETTER)" && none === "ROUND E DOES NOT REPLICATE (FLOOR)" && worse === "ROUND E DOES NOT REPLICATE (L BETTER)"
+        && S.ARMS_F === S.ARMS_E, detail: [rep.replication, hurt, none, worse].join(" / ") };
+});
+row("29 THE COMMAND REFUSES ROUND F'S HELD BEFORE ITS DEV PASSES; ROUND F'S SETS ARE NEW", () => {
+    const cmd = path.join(HERE, "rockNavStudyCmd.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "rocknavf-"));
+    fs.writeFileSync(path.join(dir, "devE-report.json"), JSON.stringify({ allOk: true }));   // Round E's pass must not open Round F
+    const st = spawnSync(process.execPath, [cmd, "heldF", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
+    fs.rmSync(dir, { recursive: true, force: true });
+    const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS, ...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS, ...S.DEV_D_SEEDS, ...S.HELD_D_SEEDS, ...S.DEV_E_SEEDS, ...S.HELD_E_SEEDS], mine = [...S.DEV_F_SEEDS, ...S.HELD_F_SEEDS];
+    return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldF exit ${st}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
