@@ -361,7 +361,7 @@ Round A's per-fighter endpoints, plus each fight's total rock strikes (struck).
 
 **WHAT THIS MEANS.**
 - Re-centring the field on the drifting ship changes nothing measurable in rock losses or damage, and it costs about 35 builds a fight. The stale goal was a real defect in the plan's bookkeeping. It was not a cause of losses: a fighter that falls back to the doctrine near the ship is mostly already past the rocks.
-- **What remains unexplained, and is said plainly:** fallbacks fell only 14% even with a fresh field every 2 s. So most fallbacks are not the stale goal after all; the cause is unsettled.
+- **What remains unexplained, and is said plainly:** fallbacks fell only 14% even with a fresh field every 2 s. So most fallbacks are not the stale goal after all; the cause is unsettled. **CORRECTED 2026-11-26 by the DIAGNOSTIC below: on the static field 81% ARE the stale goal; the following field traded them for empty-goal spells.**
   - The survey's diagnostic counted 4,085 of 4,817 as stale, on three seeds and the start-centred field.
   - A likelier cause under F is the goal sphere's edge (a goal cell whose centre is inside 220 holds a fighter up to about 14 units outside it), plus the ship's motion between rebuilds.
   - This is not measured here.
@@ -480,3 +480,31 @@ Round A's per-fighter endpoints, R (spaceDoctrineStudy.rOf), and the cap's own c
 - **The page (space-battleship.html) flies the layer without the cap**, as Round B left it.
   - A cap option on the page is a small follow-on, filed with this result.
   - The layer's own default does not change: the cap is the doctrine's choice, not the layer's.
+
+## DIAGNOSTIC (2026-11-26): WHAT THE FALLBACKS ARE -- a correction to Round C's result, and no round flown
+
+This is backlog space-nav-fallback-cause. It is a diagnostic, not a registered round: throwaway space seeds 9990025-9990030 (24 fights, in no set), scratch scripts never committed, regular gunners, 24 rocks.
+
+**On the lane field as shipped (built once):**
+- 4,431 fallback calls out of 182,919 pilot calls (2.4%), every one in approach mode.
+- By cause:
+  - 3,599 (81%) STALE GOAL: the fighter is in a goal cell inside the start-centred sphere but more than 220 from the ship's current centre.
+  - 303 (7%) EDGE ROUNDING: the cell centre is inside the sphere and the fighter is just outside it.
+  - 228 (5%) cells with no lower neighbour.
+  - 301 (7%) cells with no reachable goal.
+- 281 of the 4,431 calls were within 30 of a rock's surface.
+- 2 of the 9 rock strikes came within 3 s after a fallback by the same fighter.
+
+**On Round C's following field (every 60 ticks):**
+- The stale goal is gone (76 calls). But 5,258 calls are "no reachable goal", from a defect this diagnostic found:
+  - When the drifting ship's centre lies in a blocked cell (the ship near a rock), no cell has a clear line to it.
+  - The LANE GOAL IS EMPTY, and every fighter outside 220 flies the doctrine until the next rebuild.
+- 70 of 795 builds (9%) had no goal cell, every one with the ship's own cell blocked, in 3 of 24 fights.
+
+**THE CORRECTION.**
+- Round C's result says "most fallbacks are not the stale goal". That was an inference from the 14% drop, and it is WRONG for the static field, where 81% are the stale goal.
+- The following field removed them and added the empty-goal spells in their place, which is why the total fell so little.
+- Round C's null result stands as flown, but its arm F carried this defect. A re-run with the defect fixed is filed, not flown (backlog rock-nav-follow-fix). The reasons, said plainly:
+  - The harm the fallbacks can do is small: at most 2 of 9 strikes, about 0.08 a fight.
+  - A paired round on 360 fights would most likely end at FLOOR.
+  - The shipped layer is the static field.

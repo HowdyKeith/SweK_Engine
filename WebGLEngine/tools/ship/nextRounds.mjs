@@ -3288,6 +3288,13 @@ export const NEXT_ROUNDS = [
         why: "Round B left about 0.35 rock losses a fight after arriving, all momentum strikes: the doctrine strafes with the thrust cut and cannot turn. A capped fighter arrives slower.",
     },
     {
+        id: "rock-nav-follow-fix",
+        blocker: "OPEN -- not recommended yet: the harm is small (at most about 0.08 rock strikes a fight follow a fallback) and a paired round would most likely end at FLOOR; fly it only for a reason beyond the fallbacks",
+        what: "OPENED 2026-11-26 from the fallback DIAGNOSTIC (brain/ROCK_NAV_WIP.md): brain/spaceNav.mjs's lane goal tests each cell's line to the field's ORIGIN, so when the following field is rebuilt round a ship whose centre lies in a blocked cell (near a rock) no cell passes and the goal is empty -- 70 of 795 builds in the diagnostic. Round C's arm F carried this.",
+        how: "Test the lane against the nearest unblocked point on the way to the ship (end the line where it enters the origin's own blocked zone), or fall back to the plain goal for a build whose lane goal is empty; gate it in brain/spaceNav-selfcheck.mjs on a fixture with the origin inside a rock's reach; then, if flown, Round C again (L against the fixed F) on fresh seeds with Round C's verdict.",
+        why: "Round C's null was measured with a defect in the arm it tested; a fixed re-run is the honest form of the question, if the question is still wanted.",
+    },
+    {
         id: "space-battleship-nav-cap",
         blocker: "OPEN",
         what: "OPENED 2026-11-26 from rock nav Round D: space-battleship.html's nav layer box (2026-11-26, gated in tools/ship/battleshipPage-selfcheck.mjs, NAV block) flies Round B's clear lane without the cap; Round D found the lane WITH the doctrine's cap (12) saves half the strafing losses and kills the ship in 74 of 360 fights.",
@@ -3296,10 +3303,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-nav-fallback-cause",
-        blocker: "OPEN",
-        what: "OPENED 2026-11-26 from rock nav Round C (brain/ROCK_NAV_WIP.md): about 75,000 pilot calls a round fall back to the doctrine (a null aim outside the strafe range) even when the field is rebuilt round the ship every 2 s, so most are NOT the stale goal the Round A and C notes blamed. The cause is unmeasured.",
-        how: "A diagnostic first, on throwaway space seeds: classify each fallback call by the fighter's cell (a goal cell whose centre is inside 220 while the fighter is up to 14 units outside it; no lower neighbour; outside the grid) and by the distance to the CURRENT ship. A registered round only if a fix suggests itself (a goal radius shrunk by one cell's reach), scored on rock strikes with R as the guard.",
-        why: "A fallback flies the doctrine, which does not see rocks; Round C showed the fallbacks cost nothing measurable as they stand, so this is worth a round only if the diagnostic finds them where rocks are.",
+        blocker: "CLOSED -- 2026-11-26, the DIAGNOSTIC section of brain/ROCK_NAV_WIP.md (throwaway seeds 9990025-9990030, no round): on the lane field as shipped, 81% of the fallbacks ARE the stale goal (a fighter inside the start-centred sphere but beyond 220 of the drifted ship), 7% edge rounding, 5% no lower neighbour, 7% no reachable goal; 2.4% of pilot calls; 2 of 9 rock strikes followed one within 3 s. On Round C's following field the stale goal is gone, but when the ship's centre lies in a blocked cell the lane goal is EMPTY (70 of 795 builds, 3 of 24 fights), and every fighter flies the doctrine until the next rebuild. Round C's sentence blaming something other than the stale goal is corrected in the note. The fix is filed as rock-nav-follow-fix, not flown.",
+        what: "Rock nav Round C found about 75,000 doctrine fallbacks a round even with a field rebuilt every 2 s; the cause was unmeasured.",
+        how: "Done: a scratch diagnostic classifying every fallback call by its cell and the distance to the current ship, and counting the following field's builds with no goal cell.",
+        why: "A fallback flies the doctrine, which does not see rocks.",
     },
     {
         id: "rig-study-replay-first",
