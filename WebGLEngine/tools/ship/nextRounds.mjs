@@ -3178,11 +3178,12 @@ export const NEXT_ROUNDS = [
         what: "FOLLOW-UP 6 found that the best way to plan around a ship depends on whether the ship keeps its schedule: prediction wins by 12 flights when ships hold course (44 against 32 of 60) and loses by 21 when they wait (38 against 59). The planner does not know which world it is in.",
         how: "An arm that watches the ships it has been told about (each ship's observed position against the position its schedule gives, over the last EST_S seconds) and plans from where the ship IS when the two disagree by more than a margin and from where it will be when they agree; a registration with its own fresh seeds, the three behaviours of subReactNav and a mixed one (some ships keep the schedule, some do not), designated arm against the best fixed arm in each.",
         why: "No fixed arm of FOLLOW-UP 6 is best in every behaviour, so an arm that picks is the obvious next thing; whether it can pick from the evidence a vessel has is the question.",
+        note: "2026-11-27: FOLLOW-UP 14 (HELD14) gave this entry its numbers: the nominal arm reaches 51 of 60 where ships hold course and 47 where they stop; the Kalman filter at 3 m reaches 45 and 57; the plain replan 29 and 59. An arm that trusts the schedule while the observations agree and switches to the filter when they do not could reach about 51 and 57. The test of agreement needs the noisy observations of FOLLOW-UP 14 (a chi-square of the innovation, or a residual of the position against the schedule)."
     },
     {
         id: "nav-estimate-with-noise",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-27 (FOLLOW-UP 14 of brain/SUB_FIELD_NAV_WIP.md, HELD14, PARTLY SUPPORTED): ships observed once a second with an error of 1.5, 3 and 6 m, a constant-velocity Kalman filter against the naive two-point difference. The filter keeps the exact estimate's gain where ships stop (57 against the nominal arm's 47 of 60 at 3 m) and the naive difference does not (49); the filter costs 6 flights where ships hold course (45 against 51) and the naive difference 11. WAS: FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
         how: "Add noise to the observed positions (a standard deviation of a few metres) and replace the difference by a filter (an alpha-beta or a constant-velocity Kalman filter); read the same three behaviours on fresh seeds. The gate's identity (react-none is flyHard, and the estimating arm equals the nominal one with no reaction and no noise) is the control.",
         why: "A noiseless difference is the best case; the result is a ceiling for estimation, and a noisy one could be worse than the schedule.",
         note: "2026-11-26: REGISTERED as FOLLOW-UP 14 of brain/SUB_FIELD_NAV_WIP.md (before any code): the observation once a second with an error of 1.5, 3 and 6 m, a constant-velocity Kalman filter against the two-point difference, three ship behaviours, 10 arms, HELD14 = seeds 14001 to 14060, tests C1 to C3 and predictions E1 to E9 written first. Nothing built or flown yet.",
@@ -3296,6 +3297,13 @@ export const NEXT_ROUNDS = [
         what: "H64 to H86 are built and gated and none has been flown by a rig or a peer, so none has a RESULT section in brain/SUB_FIELD_NAV_WIP.md or its own WIP note. The earlier rig runs of H64 were deleted with their folder and need no merge.",
         how: "As each rig or peer zip comes back, write its RESULT section and the paired post hoc statistics, as the series does. Two things to say plainly in the write-up: H66's miscount (16 against 17) and that H70 replicates H46 at 800 ids. Do not queue a round by hand while its peer job is queued; the queue cannot see manual runs and the round would be flown twice.",
         why: "The series records a result only after it is flown; this is the largest block of built rounds without one.",
+    },
+    {
+        id: "nav-estimate-filter-variants",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 14 flew one filter: a constant-velocity Kalman filter at one observation interval (1 s) with a process noise taken from the stopping ship's greatest acceleration (0.5 m/s squared), neither tuned. At 3 m of noise it kept the exact estimate's gain where ships stop (57 against 47 of 60) and cost 6 flights where they hold course (45 against 51); where ships turn nothing separated any belief from the schedule.",
+        how: "On fresh seeds and the same three behaviours and the same noise (1.5, 3 and 6 m): the observation interval 0.25, 1 and 4 s; the process noise 0.3 and 3 times; and a turn-aware filter (an interacting multiple model, or a constant-turn-rate model) for the turning ships, read for the price (react-none) and the gain (react-stop and react-turn). The control is FOLLOW-UP 14's arms on the same seeds.",
+        why: "One filter at one rate is one point; whether the price falls with a faster rate or a better model, and whether a turn-aware filter finds the gain in the turn world, decides whether estimation is worth its cost.",
     },
     {
         id: "nav-match-consumes-layer",

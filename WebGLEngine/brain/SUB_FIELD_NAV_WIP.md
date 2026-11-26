@@ -903,6 +903,49 @@ The DEV sanity run (`node tools/ship/subNoiseStudy.mjs --set dev`: seeds 1 to 30
 
 The module's gate (`brain/subNoiseNav-selfcheck.mjs`) and the study's (`tools/ship/subNoiseStudy-selfcheck.mjs`) were written and a serial mutation pass run on each before this DEV run (the module 202 mutants, 148 red on the first pass and 21 left declared, 14 equivalent and 7 not reached; the study 116 mutants, 114 red and 1 left declared; both logged in the gate headers, commit `48bf5518d`).
 
+## RESULT OF FOLLOW-UP 14 [SERIES B] (2026-11-27; `node tools/ship/subNoiseStudy.mjs --set held14 --write`, HELD14 = seeds 14,001 to 14,060 of hard-traffic in each of three ship behaviours, read once; every flight is in `brain/subNoiseHeld14.jsonl`, 1,800 records): **PARTLY SUPPORTED** -- the filter keeps the exact estimate's gain in the stop world (C1: **+10**, 57 against 47) and the naive difference does not (C3: 49, **8 below** the filter), but the filter costs **6** flights in the world where ships hold course (C2: 45 against 51, the bar a loss of at most 3).
+
+The module, the study command and their gates were committed and sabotaged first (`48bf5518d`: the module 202 mutants, 148 red on the first pass, 54 survivors, rows added, 21 left declared; the study 116 mutants, 114 red, 1 left declared; both logged in the gate headers), the DEV note was written (`539422ed3`) and the set was flown once. **The controls held** (30 flights: the noiseless arms are the nominal arm's, which are `flyHard`'s, and `exact` is `subReactNav`'s estimating arm, in every behaviour).
+
+| behaviour | arm | reached | collided (ships) | left | median time (s) | velocity error median / p90 (m/s) |
+|---|---|---|---|---|---|---|
+| react-none | any+replan (reference) | 29 / 60 | 28 (28) | 3 | 136.3 | |
+| react-none | replan@3 | 31 / 60 | 26 (26) | 3 | 132.7 | |
+| react-none | **nominal** (the schedule) | **51 / 60** | 9 (9) | 0 | 178.4 | |
+| react-none | exact (= nominal here) | 51 / 60 | 9 (9) | 0 | 178.4 | 0.00 / 0.00 |
+| react-none | diff@1.5, @3, @6 | 48, 40, 34 | 11, 19, 26 | 1, 1, 0 | 160.9, 153.7, 150.5 | 0.85/1.50, 1.72/2.99, 3.43/5.93 |
+| react-none | kf@1.5, **@3**, @6 | 50, **45**, 45 | 9, 13, 13 | 1, 2, 2 | 167.0, 164.1, 164.6 | 0.46/0.82, 0.54/0.98, 0.65/1.16 |
+| react-turn | any+replan | 49 / 60 | 11 (10) | 0 | 133.2 | |
+| react-turn | replan@3 | 46 / 60 | 13 (11) | 1 | 132.8 | |
+| react-turn | nominal | 47 / 60 | 13 (13) | 0 | 167.6 | |
+| react-turn | exact | 51 / 60 | 9 (8) | 0 | 150.6 | 0.00 / 0.00 |
+| react-turn | diff@1.5, @3, @6 | 43, 42, 37 | 13, 18, 23 | 4, 0, 0 | 149.8, 146.8, 143.6 | |
+| react-turn | kf@1.5, **@3**, @6 | 51, **47**, 48 | 8, 12, 10 | 1, 1, 2 | 151.2, 148.8, 150.9 | |
+| react-stop | any+replan | **59 / 60** | 1 (0) | 0 | 126.2 | |
+| react-stop | replan@3 | 58 / 60 | 2 (2) | 0 | 126.8 | |
+| react-stop | **nominal** | **47 / 60** | 13 (13) | 0 | 180.3 | |
+| react-stop | exact | 56 / 60 | 1 (1) | 3 | 154.5 | 0.00 / 0.00 |
+| react-stop | diff@1.5, **@3**, @6 | 55, **49**, 42 | 3, 10, 18 | 2, 1, 0 | 145.2, 148.6, 145.9 | 0.86/1.51, 1.72/2.99, 3.47/5.91 |
+| react-stop | kf@1.5, **@3**, @6 | 56, **57**, 51 | 1, 3, 6 | 3, 0, 3 | 145.8, 147.6, 148.2 | 0.47/0.85, 0.56/1.04, 0.67/1.25 |
+
+**The registered tests.** C1 **HELD**: `kf@3` reaches 57 against the nominal arm's 47 in react-stop (+10; the bar +9). C2 **MISSED**: `kf@3` reaches 45 against 51 in react-none (-6; the bar at least -3). C3 **HELD**: `diff@3` reaches 49, **8 below** `kf@3`'s 57 (the bar 5). So **PARTLY SUPPORTED**, C1 held with C3 and C2 missed.
+
+**Predictions scored (held or missed, moving nothing).** **E1 held** (the controls), **E2 held** (C1; I had said 55 percent), **E3 MISSED** (C2; 65), **E4 held** (C3; 75), **E5 held** (`diff@6` reaches 42, below the nominal arm's 47; 60), **E6 MISSED** (`kf@6` reaches 51, +4 over the nominal arm, the bar +5; 45), **E7 held** (`replan@3` reaches 58; 65), **E8 held** (in react-turn `kf@3` and the nominal arm both reach 47; 80), **E9 MISSED** (the verdict is PARTLY SUPPORTED; 30). **The DEV note had foreshadowed C3 missing** (the naive difference tied the filter at 3 m on 30 scenarios: 26 and 26); on the 60 held scenarios it did not tie, so **that DEV hint was wrong**, the kind of reading 30 scenarios cannot bear.
+
+**Post hoc, from the 1,800 recorded flights (labelled: none of it was registered and none of it moves the verdict; `node tools/ship/subNoisePostHoc.mjs` and the study command's own paired table).** Paired on the same 60 seeds (flights gained / lost, exact two-sided sign test):
+* **Against the nominal arm, react-stop**: `kf@3` **12 gained, 2 lost (p 0.013)**; `kf@1.5` 13 and 4 (p 0.049); `kf@6` 8 and 4 (p 0.39); the exact estimate 12 and 3 (p 0.035); `diff@3` **10 and 8 (p 0.82)**, `diff@6` 6 and 11 (p 0.33); `replan@3` 12 and 1 (p 0.003).
+* **Against the nominal arm, react-none (the world where the schedule is true)**: `kf@3` 4 and 10 (p 0.18), `kf@1.5` 5 and 6 (p 1.0), `kf@6` 3 and 9 (p 0.15); **`diff@3` 3 and 14 (p 0.013), `diff@6` 5 and 22 (p 0.002), `replan@3` 3 and 23 (p < 0.001)**. In react-turn nothing separates any belief from the nominal arm (`kf@3` 7 and 7; the exact estimate 7 and 3, p 0.34; only `diff@6` loses, 4 and 14, p 0.031).
+* **Against the plain replan**: in react-stop `kf@3` 1 and 3 (p 0.63): the filter brings the predicting arm up to the plain replan (59 exact) and not past it, as the exact estimate did in FOLLOW-UP 6. In react-none the plain replan is far behind the filter (29 against 45: 19 and 3, p 0.001): prediction is what pays when the ships hold course.
+* **What the filter costs in react-none**: of the 10 scenarios `kf@3` lost to the nominal arm 7 ended in a collision with a ship, 2 with a berg and 1 in an exit; its collisions with ships were 11 against 9, with bergs 2 against 0 and its exits 2 against 0.
+* **The noise grows the naive difference's loss and the filter's much less**: in react-stop the naive difference falls from 55 to 49 to 42 as the error goes 1.5, 3, 6 m and the filter from 56 to 57 to 51; the naive difference's velocity error is sigma x 1.41 / 3 times the square root of two as computed (0.86, 1.72 and 3.47 m/s) and the filter's 0.47, 0.56 and 0.67, in every behaviour (the same noise whatever the ships do).
+* **A caveat on C1's bar.** C1 was set at half of the exact estimate's +18 over the nominal arm in HELD6 (56 against 38); **on HELD14 the nominal arm reached 47 in react-stop, 9 more than on HELD6, and the exact estimate's gain over it is +9 (56 against 47), not +18**, so `kf@3`'s +10 says "as good as the exact estimate on this set", not "half of it". The nominal arm moving 9 flights between two sets is the set-to-set movement FOLLOW-UP 5 measured.
+
+**What this says.** At a few metres of noise, observing a ship once a second and filtering is enough to keep what the noiseless estimate bought in the world where ships stop for the vessel: 57 against 47, as good as the exact estimate's 56 and as the plain replan's 58 to 59. A raw two-point difference of the same observations is not: at 3 m it is no better than the schedule (49 against 47, 10 and 8) and in the world where ships hold course it is much worse (40 against 51), because its velocity error is as large as the ships' own speeds. The filter's gain has a price: **where the schedule is simply true, any estimate can only lose, and the filter loses 6 of 60 at 3 m (1 at 1.5 m, 6 at 6 m), the naive difference 11 at 3 m and 17 at 6 m.** So the question the item left, "could a noisy estimate be worse than the schedule?", is answered by where the ships are: yes in a world that holds course, no in one that reacts by stopping, and in a world that turns away nothing here separates the beliefs. **The thing the planner does not know is which world it is in** (FOLLOW-UP 6's remark) and the price of guessing the estimate is now measured.
+
+**What this would not say.** The noise is Gaussian, independent between observations and ships, equal for every ship, sampled once a second, with no missed or false observation (the registration's list stands); the filter is the simplest, with a process noise from the stopping ship's greatest acceleration and a start from the contact report, not tuned, and a turning ship breaks its model (no turn-aware filter was tried); the ships' rules and the exact knowledge they have of the vessel are mine (FOLLOW-UP 6's list). A cell of 60 moves by about nine flights between two sets of one arm, so the C2 miss (-6, p 0.18) is a miss of the registered bar and not a measured loss: the bar was a loss of at most 3 and the data cannot tell -6 from a few flights of noise. DEV pointed the wrong way on C3.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** **`nav-belief-by-behaviour`** now has its numbers: the nominal arm reaches 51 where ships hold course and 47 where they stop, the filter 45 and 57, so an arm that trusts the schedule while the observations agree with it and the estimate when they do not could take the better of each (51 and 57); and **`nav-estimate-filter-variants`**: the observation interval (0.25, 1 and 4 s), the process noise (0.3 and 3 times) and a turn-aware (interacting multiple model) filter against the same price and gain.
+
 ## FOLLOW-UP 6: GIVE WAY, AND A WAY OUT OF THE EDGE BAND (Keith, 2026-11-16: "lets do all 3 next steps", the third being `nav-traffic-avoid-not-slow`; REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
 
 **Why.** HELD5 left two failures in the traffic kind: 14 collisions with ships that a 2 m/s slow-down did not prevent, and 4 exits, which the diagnosis above traced to a vessel standing inside the blocked edge band with no route from its own cell. This round adds one fix for each and flies them alone and together.
