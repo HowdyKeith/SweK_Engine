@@ -72,3 +72,35 @@ but not that. Nothing here is of the animal.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeCompassNoise.mjs run` -> `brain/flyHomeCompassNoiseRound.jsonl`, committed byte for byte,
 whole, before it is read; `node tools/ship/takeFlyHomeCompassNoise.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at 41b1ad07, then read once)
+One start, 56.0 minutes on four processes, 49 records (sha256 89be16c3a54a14d4...). **The checks hold**: the committed
+files as committed and passing their own checks; 48 flies each once, every one its arm's committed weights, **at sigma 0
+every fly's committed course and home scores to the bit**; HOMEP draw 1 the same twice.
+* **C: THE NOISIER COMPASS HOLDS A COURSE WORSE** (48 of 48 below at sigma 0.8).
+* **R8: AT SIGMA 0.8 FINDING HOME FALLS FURTHER THAN THE LOST COURSE-HOLDING ACCOUNTS FOR** (45 of 48 below, p 1.3e-10;
+  on average 0.0121 further than the line says).
+* **R4: AT SIGMA 0.4 FINDING HOME FALLS AS FAR AS THE LOST COURSE-HOLDING ACCOUNTS FOR, AS FAR AS CAN BE TOLD** (27
+  above, 21 below, p 0.47; on average 0.0005 the other way).
+
+| arm | sigma 0: course / home | 0.4 | 0.8 |
+|---|---|---|---|
+| HOMEP | 0.6501 / 0.5501 | 0.6224 / 0.5393 | 0.5407 / 0.4904 |
+| COURSE64 | 0.6688 / 0.5541 | 0.6456 / 0.5420 | 0.5770 / 0.4947 |
+| HOME16 | 0.6555 / 0.5517 | 0.6285 / 0.5410 | 0.5492 / 0.4927 |
+| H16BYC | 0.6687 / 0.5548 | 0.6450 / 0.5426 | 0.5748 / 0.4960 |
+
+**Two of the three expectations came**: C WORSE (99), R8 WORSE (85). R4 came CANNOT, which was given 35. So, as section 5
+put it, **a noisier compass costs homing more than it costs course-holding by the line's measure** -- at the heavier
+noise. At the milder noise it costs homing about what the line says the lost course-holding should, and no more.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** home's fall for each unit of
+course lost grows with the noise. By arm it is 0.15 to 0.43 at sigma 0.2, 0.39 to 0.52 at 0.4 and 0.55 to 0.65 at 0.8,
+against the line's 0.47. Section 7's worry was that R8 leans on the line below where it was measured; at sigma 0.8 the 36
+flies whose course score stays within its range (0.554 and up) are all 36 below it (on average 0.0147), so R8 does not
+come from the 12 that fall beyond it.
+
+**What it does not mean.** Section 7 holds. It says that in this fly, a compass jittered a little costs homing what the
+lost course-holding accounts for, and a compass jittered a lot costs it more; that fits a homing fly that leans on its
+compass twice, to steer and to keep its tally, with the tally's errors adding up only when the noise is large. This
+round did not take the tally out to see, so it does not say that is the reason. Nothing here is of the animal.

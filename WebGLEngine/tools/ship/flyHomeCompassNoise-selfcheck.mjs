@@ -10,6 +10,8 @@
 //   3  ONE FLY                  a record is its arm's committed fly flown at each sigma by hand; at sigma 0 the committed audits' own functions to the bit
 //   4  THE RECORDS              48 flies and a second one; C, R8 and R4
 //   5  THE COMMAND              it is this round's; no flight of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at 41b1ad07, read from the file: the checks, C, R8, R4, the arms, the description after the reading (the falls'
+//                               ratio at each sigma, R8 within the line's range), a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the noise's, the library's and the note's, this gate
 // and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name but FOUR, findings (the number is the rows red):
 //   THE NOISE: E1 the noise not from the life's own stream 1 | E2 a draw at sigma 0 too 1 | E3 the true heading moved 2 | E4 the noise twice as wide 1 | E5 the compass life edited (a comment) 1
@@ -23,6 +25,9 @@
 //   slope to 0.4 and faster at 0.8, and records whose home rises as course falls, were added. And no made file broke the course-predicts round's own checks; one does now. F3, F5, F6 and F9
 //   were run again after the fixes: 1 red each. FOUND BEFORE THE SABOTAGES: a row of section 2 compared the compass life's hash with itself; it now holds the committed hashes of the
 //   compass and homing lives. FOUND BY tools/ship/definitionGates-selfcheck.mjs AFTER THEM: courseScore was named by no gate (homeScore only by a namesake); section 3 now names both.
+// THE VERDICT'S SABOTAGES (2026-11-26, after the reading, the same runner, this gate alone): V1 a fly's home score changed in a digit the double holds 3 | V2 R8 at 0.4 4 | V3 the slope
+//   0.6 3 | V4 BETTER and WORSE swapped 4 | V5 the note's R4 says FURTHER 1 | V6 the note's expectation of R4 WORSE is 55 1 | V7 the note names another commit 1 | V8 the note says every
+//   expectation came 1 | V9 the note's flies within range 35 of 36 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -134,6 +139,29 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one fly is flown on 2 lives at home and 1 on the course, not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"COURSE64", 5, F, TWO, COURSE']) && ![...TWO, ...COURSE].some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at 41b1ad07 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, N.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = N.reading(lines, F), A = R.arms, fl = lines.filter((r) => r.kind === "fly"), mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    ok("!! the results file is the one the run wrote: 49 records, sha256 89be16c3a54a14d4... (one start, 56.0 minutes on four processes)", lines.length === 49 && createHash("sha256").update(bytes).digest("hex") === "89be16c3a54a14d49084f5027925fbe2aab958dc99805d09510c3a6dabf4f74a");
+    ok("!! THE CHECKS HOLD: the committed files as committed and passing their own checks; 48 flies each once, its arm's weights, at sigma 0 its committed scores to the bit; HOMEP draw 1 the same twice", R.checks.length === 0);
+    ok("!! *** C -- THE NOISIER COMPASS HOLDS A COURSE WORSE (48 of 48 below); R8 -- AT SIGMA 0.8 FINDING HOME FALLS FURTHER THAN THE LOST COURSE-HOLDING ACCOUNTS FOR (45 of 48 below, mean -0.0121); R4 -- AT SIGMA 0.4 AS FAR AS CAN BE TOLD AS FAR AS IT ACCOUNTS FOR (27 above, 21 below, mean +0.0005) ***",
+        R.C.word === N.WORDS.C[1] && R.C.below === 48 && R.R8.word === N.WORDS.R8[1] && R.R8.below === 45 && R.R8.above === 3 && near(mean(R.R8.resid), -0.0121) && R.R4.word === N.WORDS.R4[2] && R.R4.above === 27 && R.R4.below === 21 && near(mean(R.R4.resid), 0.0005) && near(R.R4.p, 0.4709));
+    ok("!! the arms' mean course / home at sigma 0 and 0.8: HOMEP 0.6501 / 0.5501 and 0.5407 / 0.4904 | COURSE64 0.6688 / 0.5541 and 0.5770 / 0.4947 | HOME16 0.6555 / 0.5517 and 0.5492 / 0.4927 | H16BYC 0.6687 / 0.5548 and 0.5748 / 0.4960",
+        [["HOMEP", 0.6501, 0.5501, 0.5407, 0.4904], ["COURSE64", 0.6688, 0.5541, 0.5770, 0.4947], ["HOME16", 0.6555, 0.5517, 0.5492, 0.4927], ["H16BYC", 0.6687, 0.5548, 0.5748, 0.4960]].every(([a, c0, h0, c8, h8]) => near(A[a][0].course, c0) && near(A[a][0].home, h0) && near(A[a][3].course, c8) && near(A[a][3].home, h8)));
+    const ratio = (a, k) => (A[a][k].home - A[a][0].home) / (A[a][k].course - A[a][0].course), rs = (k) => N.ARMS.map((a) => ratio(a, k)), inr = fl.filter((r) => r.levels[3].course >= 0.55417).map((r) => (r.levels[3].home - r.levels[0].home) - R.line.b * (r.levels[3].course - r.levels[0].course));
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: home's fall for each unit of course lost, by arm, grows with the noise -- 0.15 to 0.43 at sigma 0.2, 0.39 to 0.52 at 0.4, 0.55 to 0.65 at 0.8, against the line's 0.47; at 0.8, the 36 flies whose course stays within the line's range (0.554 and up) are all 36 below it (mean -0.0147), the 12 that fall below that range included in none",
+        near(Math.min(...rs(1)), 0.15, 5e-3) && near(Math.max(...rs(1)), 0.43, 5e-3) && near(Math.min(...rs(2)), 0.39, 5e-3) && near(Math.max(...rs(2)), 0.52, 5e-3) && near(Math.min(...rs(3)), 0.55, 5e-3) && near(Math.max(...rs(3)), 0.65, 5e-3) &&
+        inr.length === 36 && inr.every((x) => x < 0) && near(mean(inr), -0.0147), rs(3).map((x) => x.toFixed(3)).join(" "));
+    const f12 = fl.find((r) => r.arm === "H16BYC" && r.s === 12), c = N.committedOf("H16BYC", 12, F);
+    ok("!! RE-AUDITED AFTER THE READING: H16BYC draw 12 at sigma 0.8 gives its home and course scores again to the bit", N.homeScore(T.flyOf("HOMEP", 12, c.weights), N.AUDIT, 0.8) === f12.levels[3].home && N.courseScore(T.flyOf("HOMEP", 12, c.weights), N.COURSE_AUDIT, 0.8) === f12.levels[3].course);
+    const note = src("brain/FLY_HOME_COMPASS_NOISE_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: C WORSE (99) and R8 WORSE (85) came; R4 came CANNOT, which was given 35",
+        /C: \*\*WORSE about 99\*\*\. R8: \*\*WORSE about 85\*\*, CANNOT 15\. R4: WORSE about 65, CANNOT 35\./.test(flat) && R.C.word === N.WORDS.C[1] && R.R8.word === N.WORDS.R8[1] && R.R4.word === N.WORDS.R4[2]);
+    ok("the registration's RESULT SECTION (section 10) carries the three readings' words, the commit the file was read at, the expectation that did not come, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && ["C", "R8", "R4"].every((k) => res.includes(`**${k}: ${R[k].word}**`)) && /41b1ad07/.test(res) && /\*\*Two of the three expectations came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /all 36 below it/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyHomeCompassNoise-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
