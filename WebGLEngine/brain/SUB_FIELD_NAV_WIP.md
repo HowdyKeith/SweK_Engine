@@ -1089,3 +1089,20 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **DEV sanity run (seeds 1 to 30, both arms, 60 flights):** the arc rule is NOT degenerate -- it fires in 23,333 ticks and turns in 19,305 (stuck in 4,028, 17 percent) -- so the one amendment the registration allowed is not used. The reference arm reproduces FOLLOW-UP 8's own DEV counts exactly (26,472 fires, 18,794 turns, 7,678 stuck), so it is the same rule. Read for sanity, not tuned on: the reference reached 20 of 30 (8 collisions, 4 with ships, 2 exits); the arc arm 25 of 30 (1 collision, none with ships, 4 exits).
 
 **Nothing was tuned.** HELD9 (8801 to 8860) is flown once, both arms, to `brain/subAvoidHeld9.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 9: EACH HEADING TESTED ALONG THE TURN (2026-11-26; `brain/subAvoidHeld9.{0,1,2,3}.jsonl`, HELD9 = seeds 8801 to 8860 of hard-traffic, 120 flights, committed unread at `c94681286`, then read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | fires | stuck / fires |
+|---|---|---|---|---|---|
+| any+predict+edge+avoid (reference, FOLLOW-UP 8's) | 44 / 60 | 11 (10) | 5 | 63,985 | 24.0 % |
+| **any+predict+edge+avoid-arc** (designated) | 47 / 60 | **0 (0)** | **13** | 51,875 | 21.7 % |
+
+**The verdict (registered):** on REACHED, the arc arm arrives where the reference does not on 8 seeds and the reverse on 5 -- p = 0.29: **NO DIFFERENCE SHOWN.**
+
+**Predictions scored (moving nothing).** **B1 held** (NO DIFFERENCE SHOWN). **B2 MISSED**: the arc rule's stuck fraction is LOWER (21.7 % against 24.0 %), not higher -- testing from the current heading finds clear headings the instant-turn test missed as often as it loses them. **B3 held** (0 ship collisions against 10). **B4 held** (47 against 44).
+
+**Post hoc, from the 120 recorded flights (labelled: not registered, moves nothing).** On collisions the change is total: the reference collided on 11 seeds and the arc arm on none (a 11-to-0 split, exact two-sided p = 0.001 if it had been registered). The price is exits: 13 flights left the region against 5 -- the vessel that now sees its own turn takes wider headings, and some of them run it out of the region before it can come back.
+
+**What this says.** The instant-turn test was not only optimistic, it was the cause of the turn-away rule's ship collisions: tested along the 35 m turn the vessel actually flies, the same rule chose headings that kept it clear of every ship and every berg in 60 scenarios. It did not turn that into more arrivals, because the clear headings it found took 8 more flights out of the region. The next question is the region edge, not the ships: FOLLOW-UP 5's edge term in the plan does not see a turn-away's heading.
+
+**What this would not say.** FOLLOW-UP 8's list stands; the arc is the planner's model of the turn (a 35 m circle at cruise speed), not the hull's measured one; the 90 degree limit, 15 degree step and clearances were not swept.

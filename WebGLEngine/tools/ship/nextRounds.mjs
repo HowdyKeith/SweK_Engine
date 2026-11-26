@@ -3111,6 +3111,13 @@ export const NEXT_ROUNDS = [
         why: "A gate proves the paths; a look proves a person sees them.",
     },
     {
+        id: "nav-avoid-arc-edge",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 9 (brain/SUB_FIELD_NAV_WIP.md): tested along its real turn the turn-away rule hit nothing in 60 scenarios, but 13 flights left the region (against 5); its arrivals did not rise (47 against 44).",
+        how: "Register first one change: the arc rule's candidates also refused when their arc leaves the region (or comes within the plan's edge margin of it) within the look, on fresh hard-traffic seeds, the arc arm as the reference.",
+        why: "The arc rule removed the collisions; the exits are now the whole of its loss.",
+    },
+    {
         id: "fly-gf-input-signs",
         blocker: "UPSTREAM -- needs the neuPrint male-cns service (neuprint.janelia.org, and a token)",
         what: "brain/FLY_VISUAL_INPUTS_WIP.md: LC4 and LPLC2 are wired, cholinergic inputs to the Giant Fiber in male-cns v1.0, but excitation is a neurotransmitter PREDICTION whose confidence (predictedNtConfidence) was not read, the Giant Fibers are only 'Roughly traced', and the 1,271 other hop-1 partners (cb_intrinsic, 51 % of the input) are untyped.",
@@ -3740,8 +3747,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-avoid-turn-radius",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 8 tested each candidate heading as a straight line after an instant turn; the real vessel turns on about a 35 m radius, and 28 percent of the rule's fires found no safe heading at all.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as FOLLOW-UP 9 (brain/SUB_FIELD_NAV_WIP.md): each heading tested along the 35 m turn -- NO DIFFERENCE SHOWN on arrivals (47 against 44, 8 to 5, p 0.29), but every collision gone (0 against 11, post hoc) at the price of exits (13 against 5). The instant-turn test caused the rule's ship collisions; the remaining loss is the region edge. Was: FOLLOW-UP 8 tested each candidate heading as a straight line after an instant turn; the real vessel turns on about a 35 m radius, and 28 percent of the rule's fires found no safe heading at all.",
         how: "The same rule with each candidate tested along the vessel's own turning arc (a circle of radius R_TURN to the new heading, then straight) over the same 25 s, on fresh seeds, the straight-line rule as the reference and the paired test beside it.",
         why: "The flown result is worse than the rule's own test by construction; whether an honest test changes the choice, or only shows the rule was optimistic, is the question.",
     },
