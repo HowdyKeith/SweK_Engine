@@ -3185,6 +3185,7 @@ export const NEXT_ROUNDS = [
         what: "FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
         how: "Add noise to the observed positions (a standard deviation of a few metres) and replace the difference by a filter (an alpha-beta or a constant-velocity Kalman filter); read the same three behaviours on fresh seeds. The gate's identity (react-none is flyHard, and the estimating arm equals the nominal one with no reaction and no noise) is the control.",
         why: "A noiseless difference is the best case; the result is a ceiling for estimation, and a noisy one could be worse than the schedule.",
+        note: "2026-11-26: REGISTERED as FOLLOW-UP 14 of brain/SUB_FIELD_NAV_WIP.md (before any code): the observation once a second with an error of 1.5, 3 and 6 m, a constant-velocity Kalman filter against the two-point difference, three ship behaviours, 10 arms, HELD14 = seeds 14001 to 14060, tests C1 to C3 and predictions E1 to E9 written first. Nothing built or flown yet.",
     },
     {
         id: "nav-current-in-field",
