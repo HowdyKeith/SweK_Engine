@@ -3274,6 +3274,27 @@ export const NEXT_ROUNDS = [
         why: "A ratchet raised for 600 symbols is a ratchet that no longer notices the next 600; the split that proved the whole rise is the branch's own is the evidence the debt is nameable.",
     },
     {
+        id: "nav-series-reconcile",
+        blocker: "OPEN",
+        what: "Two navigation series were written in parallel and both closed overlapping items. Main's (brain/NAV_MISSIONS_WIP.md, brain/navMission.mjs, brain/navEnergy.mjs, HELD83) and the sub field series B (brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 10, brain/subMissionNav.mjs, tools/ship/subMissionStudy.mjs, HELD10) disagree on missions: main's reference arm ran out of energy 5 of 60 times with 41 flights flat, series B's reference ran out 1 of 60, under different battery accounting. The depth rounds (main's HELD77 and series B's HELD11) and the fleet rounds (main's fleet avoidance in subTankNav and series B's HELD12) overlap the same way and were never compared.",
+        how: "Missions first. Read both energy models and both scenario generators side by side and list every difference (battery size, power model, speed, leg length, what counts as flat or energy-out). Register the hypotheses BEFORE flying. Fly each series' mission arms on the OTHER's scenario generator, on a fresh held set, once, and say which difference explains the gap, or that none does. Then the same for depth and fleet. Keep the result in a new file and append to SUB_FIELD_NAV_WIP.md only, because that file and this register are where both series write and where they collided at the v4934 merge.",
+        why: "Two answers to one question stand in the repository and the changelog says they are not reconciled. Until one is explained, neither mission result can be cited.",
+    },
+    {
+        id: "peer-queue-h83-h86",
+        blocker: "OPEN",
+        what: "The peer queue (branch peer-jobs) holds rig-h64 to rig-h82, pinned to commit 3b69658a3, and nothing has run through it. H83 to H86 are in tools/ship/rigOrder.json (H86 priority 7 and about 2 h, H83 -1 and about 6 h, H84 and H85 -2 and about 9 h each) but are not queued.",
+        how: "Whoever holds the queue signing key runs, from a checkout of current main with that commit pushed: node tools/ship/peerJobsCmd.mjs submit --id rig-h86 --rounds 86 --gpu any --priority 7, then the same for rig-h83 (--priority -1), rig-h84 and rig-h85 (--priority -2). Submit pins to HEAD. Steps for a peer to start watching are in docs/PEER_JOBS.md. The key is never printed or committed.",
+        why: "Four built rounds that no machine has flown; the queue is the way the peers take them in order.",
+    },
+    {
+        id: "rig-results-h64-h86",
+        blocker: "HARDWARE",
+        what: "H64 to H86 are built and gated and none has been flown by a rig or a peer, so none has a RESULT section in brain/SUB_FIELD_NAV_WIP.md or its own WIP note. The earlier rig runs of H64 were deleted with their folder and need no merge.",
+        how: "As each rig or peer zip comes back, write its RESULT section and the paired post hoc statistics, as the series does. Two things to say plainly in the write-up: H66's miscount (16 against 17) and that H70 replicates H46 at 800 ids. Do not queue a round by hand while its peer job is queued; the queue cannot see manual runs and the round would be flown twice.",
+        why: "The series records a result only after it is flown; this is the largest block of built rounds without one.",
+    },
+    {
         id: "nav-match-consumes-layer",
         blocker: "UPSTREAM",
         what: "PARKED (UPSTREAM: it waits on a space scene with obstacles) 2026-11-18 (brain/SPACE_ITEMS_2026-11-18.md): the arena approach has nothing to route around -- no space scene has static obstacles -- so a field-and-aim-point layer could only reproduce a straight line; a round would need an invented rock field and edits to two heavily gated files. Reopen once a space scene has obstacles of its own. WAS: brain/spaceArena.mjs (the ship-vs-ship match) scores combat; it contains navigation but is not scored on it (Keith asked 2026-11-01 whether the match counts as navigation: no, and the layer could feed it).",
