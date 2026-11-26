@@ -3084,7 +3084,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-surround-balance",
-        blocker: "OPEN -- needs a principle for the balance chosen BEFORE any run; w = 1's outcome has been read, so a weight picked now would be a fit",
+        blocker: "UPSTREAM -- READ 2026-11-26 (brain/FLY_RETINOTOPY_RF_WIP.md Part 12): Klapoetke 2017 supports Part 9's FORM (periphery motion of either direction, subtracted -- LPi4-3 depolarization cut weak responses, not looming) but gives NO strength; needs a source that states it (a published LPLC2 model with fitted inhibition, or a recording of the inhibition)",
         what: "Parts 9-11 of brain/FLY_RETINOTOPY_RF_WIP.md: the surround is active at the wide bars' peaks but at w = 1 the arms' drive outweighs it (S10 78 %, S11 66 % against S9's 29 %).",
         how: "Find the balance's form in the literature (Klapoetke 2017's LPi inhibition, or a divisive normalization with a stated constant from a published model) before choosing; then register Part 7's stimuli and P1-P8 unchanged, run once. Do not pick a weight from Part 10's numbers.",
         why: "The one remaining lever on the wide-bar tuning; choosing it by eye would make the verdict mean little.",
