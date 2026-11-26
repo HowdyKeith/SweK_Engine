@@ -9,6 +9,8 @@
 //   2  ONE WALK                 a record is its committed walk's points flown home and on the course by hand; the Spearman correlation by hand
 //   3  THE RECORDS              24 walks and a second one; S and W
 //   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at 05491300, read from the file: the checks, S, W, the groups and walks, the description after the reading, a
+//                               re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the library's and the note's, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name but ONE, a finding (the number is the rows red):
 //   THE ROUND: P1 iteration 50 for 59 2 | P2 the HOMEP set from the gradient round 2 | P3 home flown on the course lives 1 | P4 ties given the lower rank 0 -- A FINDING, see below -- then 1 |
@@ -19,6 +21,10 @@
 //   second walk recorded as a walk 1 | K6 reads without the committed files 1.   THE NOTE: M1 its iterations end at 50 1 | M2 a correlation not computed counts above 0 1 | M3 its S over 24 1
 //   THE FINDING: section 2's one tie case, 1 1 2 against 1 2 3, gives 0.866 whether a tie takes its mean rank or its lowest; a case with two ties where they differ (0.949 against 0.938) was
 //   added, and P4 was run again: 1 red.
+// THE VERDICT'S SABOTAGES (2026-11-26, after the reading, the same runner, this gate alone): V1 a fly's home score changed in a digit the double holds 1 (the file's hash alone) | V2 S
+//   over the walks 2 | V3 BETTER and WORSE swapped 4 | V4 ties given the lower rank 1 | V5 the note's S says CANNOT 1 | V6 the note's expectation of S BETTER is 75 1 | V7 the note names
+//   another commit 1 | V8 the note drops that every expectation came 1 | V9 the note's best course at iteration 20 is 0.6614 1. None went 0 red. FOUND WHEN THE VERDICT WAS FIRST RUN: its
+//   range row held 0.6573 for the least group's correlation, a figure of mine; the correlation is 95/143 (0.6643), and the row now holds the exact fractions.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -30,6 +36,7 @@ import * as T from "./flyTrainedHome.mjs";
 import * as H from "./flyHome.mjs";
 import * as V from "./flyCompass.mjs";
 import * as PF from "./paintingFly.mjs";
+import { createHash } from "node:crypto";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -116,6 +123,28 @@ section(() => {
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one walk is flown on 2 lives at home and 1 on the course, not the round's (and one call refused); it starts no process; the file's size and time are what they were",
         J(calls) === J(['"HOMEP", 13, F', '"HOME16", 5, F, TWO, COURSE']) && ![...TWO, ...COURSE].some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before,
         `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at 05491300 before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, P.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = P.reading(lines, F), g = (set, it) => R.groups.find((x) => x.set === set && x.it === it), rhos = R.walks.map((w) => w.rho);
+    ok("!! the results file is the one the run wrote: 25 records, sha256 99f2f6cfd0531989... (one start, 42.3 minutes on four processes)", lines.length === 25 && createHash("sha256").update(bytes).digest("hex") === "99f2f6cfd05319894afda69f048beec7def1ab16dbe0e7359e542f49c61f1511");
+    ok("!! THE CHECKS HOLD: both committed files as committed and passing their own checks; 24 walks each once, every fly its point; the HOMEP walk of draw 1 the same twice", R.checks.length === 0);
+    ok("!! *** S -- AT A FIXED STAGE OF TRAINING, THE BETTER COURSE-HOLDER FINDS HOME BETTER (12 of 12 groups above 0, p 2/4096); W -- ALONG A WALK, FINDING HOME AND HOLDING A COURSE RISE AND FALL TOGETHER (24 of 24 above 0, p 2/2^24) ***",
+        R.S.word === P.WORDS.S[0] && R.S.above === 12 && R.S.p === 2 / 4096 && R.W.word === P.WORDS.W[0] && R.W.above === 24 && R.W.p === 2 / 2 ** 24);
+    ok("!! the groups' correlations from 95/143 = 0.66 (HOMEP at 20) to 142/143 = 0.99 (HOMEP at 10); the walks' from 1/7 = 0.14 (HOME16 draw 2) to 1; over all 144 flies 0.8749",
+        near(Math.min(...R.groups.map((x) => x.rho)), 95 / 143, 1e-12) && near(g("HOMEP", 20).rho, Math.min(...R.groups.map((x) => x.rho)), 1e-12) && near(Math.max(...R.groups.map((x) => x.rho)), 142 / 143, 1e-12) && near(g("HOMEP", 10).rho, Math.max(...R.groups.map((x) => x.rho)), 1e-12) &&
+        near(Math.min(...rhos), 1 / 7, 1e-12) && R.walks.find((w) => w.rho === Math.min(...rhos)).set === "HOME16" && R.walks.find((w) => w.rho === Math.min(...rhos)).s === 2 && near(Math.max(...rhos), 1, 1e-12) && near(R.pooled, 0.8749), `pooled ${R.pooled.toFixed(4)}`);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: the homing walks wander in holding a course and home follows -- HOMEP's mean course 0.6641 at iteration 20 and 0.6258 at 30, its mean home 0.5541 and 0.5448; HOME16's best mean home (0.5535, at 40) where its mean course is best (0.6597)",
+        near(g("HOMEP", 20).course, 0.6641) && near(g("HOMEP", 30).course, 0.6258) && near(g("HOMEP", 20).home, 0.5541) && near(g("HOMEP", 30).home, 0.5448) && near(g("HOME16", 40).home, 0.5535) && near(g("HOME16", 40).course, 0.6597) &&
+        P.ITS.every((it) => g("HOME16", it).home <= g("HOME16", 40).home && g("HOME16", it).course <= g("HOME16", 40).course));
+    const w = lines.find((r) => r.kind === "walk" && r.set === "HOME16" && r.s === 2), f0 = w.flies[5], pts = C.pointsOf(P.walkOf("HOME16", 2, F));
+    ok("!! RE-AUDITED AFTER THE READING: HOME16 draw 2's last point (the weakest walk) gives its home and course scores again to the bit", H.homeScore(T.flyOf("HOMEP", 2, pts[59]), T.AUDIT) === f0.home && V.auditScore(T.flyOf("HOMEP", 2, pts[59]), V.AUDIT) === f0.course);
+    const note = src("brain/FLY_HOME_COURSE_PREDICTS_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 9. The result"));
+    ok("the expectations, written before the code, against what came -- every one: S BETTER (85), W BETTER (60)", /S: \*\*BETTER about 85\*\*, CANNOT 15\. W: BETTER about 60, CANNOT 40\./.test(flat) && R.S.word === P.WORDS.S[0] && R.W.word === P.WORDS.W[0]);
+    ok("the registration's RESULT SECTION (section 9) carries both readings' words, the commit the file was read at, that every expectation came, the description after the reading said as such, and what it does not mean",
+        /## 9\. The result/.test(note) && res.includes(`**S: ${R.S.word}**`) && res.includes(`**W: ${R.W.word}**`) && /05491300/.test(res) && /\*\*Every expectation came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /0\.6641/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyHomeCoursePredicts-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

@@ -55,3 +55,27 @@ the sandbox.
 ## 8. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeCoursePredicts.mjs run` -> `brain/flyHomeCoursePredictsRound.jsonl`, committed byte for byte,
 whole, before it is read; `node tools/ship/takeFlyHomeCoursePredicts.mjs read` prints the checks and the reading.
+
+## 9. The result (the whole results file committed unread at 05491300, then read once)
+One start, 42.3 minutes on four processes, 25 records (sha256 99f2f6cfd0531989...). **The checks hold**: both committed
+files as committed and passing their own checks; 24 walks each once, every fly its point; the HOMEP walk of draw 1 the
+same twice.
+* **S: AT A FIXED STAGE OF TRAINING, THE BETTER COURSE-HOLDER FINDS HOME BETTER** (12 of 12 groups above 0, p 0.00049;
+  the groups' correlations from 0.66 to 0.99).
+* **W: ALONG A WALK, FINDING HOME AND HOLDING A COURSE RISE AND FALL TOGETHER** (24 of 24 walks above 0, p 1.2e-7; from
+  0.14, HOME16's draw 2, to 1.00).
+* Over all 144 flies the correlation is 0.87.
+
+**Every expectation came**: S BETTER (85), W BETTER (60). So, as section 4 put it, **among flies at the same stage of
+training, the better course-holder finds home better: the link is not only that both rise as training goes on**. That is
+the pattern the four homing rounds kept meeting: a point chosen for holding a course comes home well, and none comes home
+better than the course-holder.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** the homing walks wander in
+holding a course, and home follows. HOMEP's walks hold a course best at iteration 20 on average (0.6641) and worse by
+iteration 30 (0.6258), and their home score falls with it (0.5541 to 0.5448). HOME16's walks home best on average at
+iteration 40 (0.5535), which is also where they hold a course best (0.6597).
+
+**What it does not mean.** Section 6 holds. A correlation, however tight, says the two go together in this fly; it does
+not say holding a course is what makes it home. That is what the compass-noise round, if run, would ask, by making the
+compass worse and seeing whether home and course fall together.
