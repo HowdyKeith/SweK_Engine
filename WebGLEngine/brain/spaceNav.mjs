@@ -108,29 +108,50 @@ export function aimOf(F, pos, info = null) {
 export const shipOf = (arena) => arena.crafts.find((c) => c.kind === "capital");
 
 /**
- * The layer's pilot. `arenaOf()` returns the arena (bound after build). `probe`, when given, is written each call: { calls, aimed, fallback,
+ * The layer's pilot. `arenaOf()` returns the arena (bound after build); `field` is a field, or a function returning the current one (followingField; an aim
+ * cached under one field is never reused under another). `probe`, when given, is written each call: { calls, aimed, fallback,
  * handBack, near (aimed calls flying a NEAR aim), last: { inside, aim } }. Inside the strafe range it returns AP.decide(body, target, opts) unchanged.
  */
 export function navPilot(arenaOf, field, { every = NAV_DEFAULTS.every, probe = null } = {}) {
     const cache = new Map();
     return (body, target, opts) => {
-        const arena = arenaOf(), ship = shipOf(arena), s = ship.body.pos;
+        const arena = arenaOf(), ship = shipOf(arena), s = ship.body.pos, F = typeof field === "function" ? field() : field;
         const inside = Math.hypot(body.pos[0] - s[0], body.pos[1] - s[1], body.pos[2] - s[2]) <= SA.STRAFE_RANGE;
         if (probe) probe.calls++;
         if (!inside) {
             const c = arena.crafts.find((x) => x.body === body), hit = cache.get(c.id);
             let aim;
             let near = false;
-            if (hit && arena.i - hit.i < every) ({ aim, near } = hit); else { const info = {}; aim = aimOf(field, body.pos, info); near = info.near; cache.set(c.id, { i: arena.i, aim, near }); }
+            if (hit && hit.F === F && arena.i - hit.i < every) ({ aim, near } = hit); else { const info = {}; aim = aimOf(F, body.pos, info); near = info.near; cache.set(c.id, { i: arena.i, aim, near, F }); }
             if (probe && near) probe.near = (probe.near || 0) + 1;
-            if (probe) probe.last = { inside: false, aim };
+            if (probe) probe.last = { inside: false, aim, field: F };
             if (aim) { if (probe) probe.aimed++; return AP.decide(body, { pos: aim, vel: [0, 0, 0] }, opts); }
             if (probe) probe.fallback++;
             return AP.decide(body, target, opts);
         }
-        if (probe) { probe.handBack++; probe.last = { inside: true, aim: null }; }
+        if (probe) { probe.handBack++; probe.last = { inside: true, aim: null, field: F }; }
         return AP.decide(body, target, opts);
     };
+}
+
+/**
+ * ROUND C: a field that follows the ship. Returns a function handing back the current field; the first call builds it round the capital ship's CURRENT centre,
+ * and the first call at or after `every` ticks since the last build rebuilds it there. Pass it to navPilot in place of a field. `fieldOf.builds` lists each
+ * build as { i, origin, shipPos } (the ship's position when it was built, for the check that they agree).
+ */
+export function followingField(arenaOf, rocks, { every = 60, lane = false, goalR = SA.STRAFE_RANGE, ...fieldOpts } = {}) {
+    let F = null, at = -Infinity;
+    const fieldOf = () => {
+        const arena = arenaOf();
+        if (!F || arena.i - at >= every) {
+            const s = [...shipOf(arena).body.pos];
+            F = buildField(rocks, s, goalR, { ...fieldOpts, lane }); at = arena.i;
+            fieldOf.builds.push({ i: arena.i, origin: [...F.origin], shipPos: s });
+        }
+        return F;
+    };
+    fieldOf.builds = [];
+    return fieldOf;
 }
 
 export function reportLines() {

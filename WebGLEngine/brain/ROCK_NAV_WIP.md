@@ -294,6 +294,11 @@ Round A's per-fighter endpoints, plus each fight's total rock strikes (struck).
    * Every rock centre is blocked in every build.
 5. **EVERY FIGHT ENDS.**
 
+* **AMENDMENT (2026-11-26), made before any DEV or HELD seed was flown and found while sabotaging the study gate:**
+  * Check 4's "every rock centre is blocked in every build" cannot hold once the ship has drifted more than about 230 units. A rock can then lie outside a rebuilt field's cube, and the grid lookup clamps it to an edge cell that is not blocked.
+  * Such a rock is not in that field at all, so the check now holds only the rocks INSIDE each build's grid. The number of rock-builds off the grid is reported.
+  * The check also now requires that every build was checked: the builds checked must equal the builds made.
+
 ## HELD: the verdict (pairs by (seed, kind), F against L; the sign verdict of Rounds A and B)
 * **V1, THE ROCKS:** d = L.struck - F.struck (all rock strikes, before and after arriving).
   * FOLLOW BETTER: wins > losses, p <= 0.05, and F's total is lower.

@@ -10,6 +10,11 @@
 // ROUND B (rows 12-15): B1 arm L built without the lane: 1 red (12). B2 V1's sign flipped: 1 red (13; the first pattern also matched Round A's
 //   reported line and was refused by the harness, then re-run on Round B's own). B3 the bottom line ignores V2: 1 red (13). B4 the lane check ignores N:
 //   1 red (14). B5 Round B's HELD opened by Round A's DEV report: 1 red (15). B6 the verdicts not renamed: 1 red (13).
+// ROUND C (rows 16-19): C1 arm F built without following: 1 red (16). C2 the ship recorded after the step: 1 red (16). C3 V1 reads the strikes after
+//   arriving: 1 red (17). C4 the bottom line ignores L BETTER: 1 red (17). C5 the follow check ignores L's single build: 1 red (18). C6 Round C's HELD opened by
+//   Round B's DEV report: 1 red (19). C7 the verdicts not renamed: 1 red (17). C8 aims checked against the start field only: FIRST PASS 0 red (nothing
+//   counted the builds checked); row 16 now requires fieldsChecked = builds, then 1 red (16). C9 off-grid rocks held to the grid: FIRST PASS 0 red (the
+//   gate's fight puts no rock off a grid); row 16b added on a field with a rock beyond its cube, then 1 red (16b). C10 the off-grid count dropped: 1 red (16b).
 "use strict";
 
 import fs from "node:fs";
@@ -20,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import * as S from "./rockNavStudy.mjs";
 import * as BF from "../../brain/battleshipFight.mjs";
 import * as SA from "../../brain/spaceArena.mjs";
+import * as NV from "../../brain/spaceNav.mjs";
 import { rOf } from "./spaceDoctrineStudy.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -131,6 +137,46 @@ row("15 THE COMMAND REFUSES ROUND B'S HELD BEFORE ITS DEV PASSES, AND THE ROUND 
     const st = spawnSync(process.execPath, [cmd, "heldB", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
     fs.rmSync(dir, { recursive: true, force: true });
     return { ok: st === 2 && S.DEV_B_SEEDS[0] === 3301 && S.DEV_B_SEEDS.length === 30 && S.HELD_B_SEEDS[0] === 3401 && S.HELD_B_SEEDS.length === 90, detail: `heldB exit ${st}` };
+});
+
+// ROUND C: arm F (the field that follows the ship) against L
+const F41 = fly(41, "bow", "F"), L41c = L41;
+row("16 ARM F FOLLOWS THE SHIP: at least 2 builds, every one centred on the ship at its tick, the hand-back exact, every build sound, the same field as L", () => {
+    const p = F41.probe;
+    return { ok: !!p && p.builds >= 2 && p.fieldsChecked === p.builds && p.buildOriginDev === 0 && p.handBackMismatch === 0 && p.aimBlocked === 0 && p.rockCentresBlockedAll === true && F41.fieldKey === L41c.fieldKey && L41c.probe.builds === 1,
+        detail: p ? `${p.builds} builds over ${F41.t.toFixed(1)} s (${p.fieldsChecked} checked, ${p.rocksOffGrid} rock-builds off the grid), worst distance ${p.buildOriginDev}` : "no probe" };
+});
+row("16b CHECK 4 HOLDS THE ROCKS INSIDE EACH BUILD'S GRID AND COUNTS, NOT FAILS, THE ROCKS OUTSIDE IT", () => {
+    const rocks = [{ pos: [60, 0, 0], radius: 8 }, { pos: [400, 0, 0], radius: 8 }];   // the grid is +-160: the second rock is off it
+    const G = NV.buildField(rocks, [0, 0, 0], 40, { cell: 16, half: 160, margin: 4 }), unblocked = { ...G, blocked: new Uint8Array(G.blocked.length) };
+    const a = S.rockCentresSound([G], rocks), b = S.rockCentresSound([G, unblocked], rocks), c = S.rockCentresSound([], rocks);
+    return { ok: a.ok === true && a.offGrid === 1 && b.ok === false && c.ok === false, detail: `in-grid ok ${a.ok}, off-grid ${a.offGrid}, an unblocked build ok ${b.ok}` };
+});
+const synC = (arm, i, o) => ({ ...syn("N", i, {}), arm, probe: { calls: 10, aimed: 5, fallback: 0, near: 0, handBack: 5, handBackMismatch: 0, aimBlocked: 0, rockCentresBlocked: true, rockCentresBlockedAll: true, builds: arm === "F" ? 3 : 1, buildOriginDev: arm === "F" ? 0 : undefined }, ...o });
+const setC = (n, fL, fF) => Array.from({ length: n }, (_, i) => [synC("L", i, fL(i)), synC("F", i, fF(i))]).flat();
+row("17 ROUND C'S BOTTOM LINE (V1 reads ALL strikes): WINS / SAVES FIGHTERS AND HURTS THE SHIP LESS / LOSES MORE FIGHTERS / DOES NOT WIN", () => {
+    const wins = S.readHeldC(setC(40, (i) => ({ struck: i < 30 ? 1 : 0 }), () => ({}))).bottom;
+    const less = S.readHeldC(setC(40, (i) => ({ struck: i < 30 ? 1 : 0, damageOnShip: 100 }), () => ({ damageOnShip: 50 }))).bottom;
+    const loses = S.readHeldC(setC(40, () => ({}), (i) => ({ struck: i < 30 ? 1 : 0 }))).bottom;
+    const combatOnly = S.readHeldC(setC(40, (i) => ({ combatStruck: i < 30 ? 1 : 0 }), () => ({}))).bottom;   // struck unchanged: V1 must not move
+    return { ok: wins === "THE FOLLOWING FIELD WINS" && less === "THE FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS" && loses === "THE FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS" && combatOnly === "THE FOLLOWING FIELD DOES NOT WIN (FLOOR)",
+        detail: [wins, less, loses, combatOnly].join(" / ") };
+});
+row("18 ROUND C'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT", () => {
+    const good = setC(4, () => ({}), () => ({})), c0 = S.devChecksC(good);
+    const fault = (k, edit) => { const rs = JSON.parse(JSON.stringify(good)); edit(rs); return S.devChecksC(rs)[k].ok; };
+    const f = [fault("sameField", (rs) => { rs[1].fieldKey = "x"; }), fault("handBack", (rs) => { rs[1].probe.handBackMismatch = 1; }),
+        fault("follows", (rs) => { rs[1].probe.builds = 1; }), fault("follows", (rs) => { rs[1].probe.buildOriginDev = 0.5; }), fault("follows", (rs) => { rs[0].probe.builds = 2; }),
+        fault("fieldSound", (rs) => { rs[1].probe.rockCentresBlockedAll = false; }), fault("fieldSound", (rs) => { rs[0].probe.aimBlocked = 1; }), fault("allEnd", (rs) => { rs[3].t = 200; })];
+    return { ok: Object.values(c0).every((x) => x.ok) && f.every((x) => x === false), detail: `faults pass: ${f.join(",")}` };
+});
+row("19 THE COMMAND REFUSES ROUND C'S HELD BEFORE ITS DEV PASSES; ROUND C'S SETS ARE NEW", () => {
+    const cmd = path.join(HERE, "rockNavStudyCmd.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "rocknavc-"));
+    fs.writeFileSync(path.join(dir, "devB-report.json"), JSON.stringify({ allOk: true }));   // Round B's pass must not open Round C
+    const st = spawnSync(process.execPath, [cmd, "heldC", "--part", "1/90", "--dir", dir], { encoding: "utf8" }).status;
+    fs.rmSync(dir, { recursive: true, force: true });
+    const earlier = [...S.DEV_SEEDS, ...S.HELD_SEEDS, ...S.DEV_B_SEEDS, ...S.HELD_B_SEEDS], mine = [...S.DEV_C_SEEDS, ...S.HELD_C_SEEDS];
+    return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldC exit ${st}` };
 });
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);

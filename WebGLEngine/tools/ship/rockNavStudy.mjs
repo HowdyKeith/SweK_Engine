@@ -30,6 +30,11 @@ export const ARMS = Object.freeze(["D", "N"]);
 export const ARMS_B = Object.freeze(["N", "L"]);
 export const DEV_B_SEEDS = Object.freeze(range(RESERVED_B.dev[0], RESERVED_B.dev[1]));
 export const HELD_B_SEEDS = Object.freeze(range(RESERVED_B.held[0], RESERVED_B.held[1]));
+/** ROUND C (the field that follows the ship): L, Round B's lane field built once, against F, the same field rebuilt round the ship every FOLLOW_EVERY ticks. */
+export const ARMS_C = Object.freeze(["L", "F"]);
+export const FOLLOW_EVERY = 60;   // 2 s; fixed from the survey on throwaway seeds 9990013-9990018 (brain/ROCK_NAV_WIP.md, Round C)
+export const DEV_C_SEEDS = Object.freeze(range(3501, 3530));
+export const HELD_C_SEEDS = Object.freeze(range(3601, 3690));
 
 export const scenariosOf = (seeds) => seeds.flatMap((seed) => KINDS.map((kind) => ({ seed, kind })));
 const fold = (h, x) => { const s = x.toFixed(6); for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; };
@@ -46,18 +51,20 @@ export function fieldKey(arena) {
  * t, drift, fieldKey, probe (N only: calls, aimed, fallback, near, handBack, handBackMismatch, aimBlocked, rockCentresBlocked) }.
  */
 export function flyOne({ seed, kind, arm }) {
-    const ALL = [...new Set([...ARMS, ...ARMS_B])];
+    const ALL = [...new Set([...ARMS, ...ARMS_B, ...ARMS_C])];
     if (!ALL.includes(arm)) throw new Error(`rockNavStudy.flyOne: arm must be one of ${ALL.join(", ")} (got ${arm})`);
     const layered = arm !== "D";
-    let arena = null, field = null, probe = null, pilot;
+    let arena = null, field = null, probe = null, pilot, follow = null, buildMs = 0;
+    const seen = new Set();   // every field object an aim was drawn from (Round C: each build)
     if (layered) {
         probe = { calls: 0, aimed: 0, fallback: 0, near: 0, handBack: 0, handBackMismatch: 0, aimBlocked: 0, last: null };
         let nav = null;
         pilot = (body, target, opts) => {
-            if (!nav) nav = NV.navPilot(() => arena, field, { probe });
-            const out = nav(body, target, opts);
+            if (!nav) nav = NV.navPilot(() => arena, follow ? () => { const n = follow.builds.length, t0 = Date.now(), F = follow(); if (follow.builds.length > n) buildMs += Date.now() - t0; return F; } : field, { probe });
+            const out = nav(body, target, opts), F = probe.last.field;
+            seen.add(F);
             if (probe.last.inside) { if (JSON.stringify(out) !== JSON.stringify(AP.decide(body, target, opts))) probe.handBackMismatch++; }
-            else if (probe.last.aim && field.blocked[NV.indexOf(field, probe.last.aim)]) probe.aimBlocked++;
+            else if (probe.last.aim && F.blocked[NV.indexOf(F, probe.last.aim)]) probe.aimBlocked++;
             return out;
         };
     }
@@ -65,7 +72,8 @@ export function flyOne({ seed, kind, arm }) {
     arena = b.arena;
     const ship = NV.shipOf(arena), start = [...ship.body.pos], key = fieldKey(arena);
     if (layered) {
-        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" });
+        field = NV.buildField(arena.rocks, start, SA.STRAFE_RANGE, { lane: arm === "L" || arm === "F" });
+        if (arm === "F") follow = NV.followingField(() => arena, arena.rocks, { every: FOLLOW_EVERY, lane: true });
         probe.rockCentresBlocked = arena.rocks.every((q) => field.blocked[NV.indexOf(field, q.pos)] === 1);
         let goalCells = 0, goalBlockedLine = 0;
         for (let v = 0; v < field.dist.length; v++) if (field.dist[v] === 0) {
@@ -76,7 +84,9 @@ export function flyOne({ seed, kind, arm }) {
     }
     const fighters = arena.crafts.filter((c) => c.kind === "fighter"), state = new Map(fighters.map((c) => [c.id, "out"]));
     const row = { seed, kind, arm, approachStruck: 0, approachShot: 0, arrived: 0, combatStruck: 0, struck: 0, arrivalT: [] };
+    const shipAt = new Map();   // the ship's position at the start of each tick: what a build in that tick must be centred on (Round C's check 3)
     while (!arena.done) {
+        if (follow) shipAt.set(arena.i, [...ship.body.pos]);
         SA.stepSpaceArena(arena);
         const s = ship.body.pos;
         for (const c of fighters) {
@@ -90,8 +100,29 @@ export function flyOne({ seed, kind, arm }) {
     const t = BF.tally(arena);
     Object.assign(row, { R: rOf(t), damageOnShip: t.damageOnShip, shipDead: t.ship.status !== "flying", over: !!arena.over, t: arena.i * arena.dt,
         drift: Math.hypot(ship.body.pos[0] - start[0], ship.body.pos[1] - start[1], ship.body.pos[2] - start[2]), fieldKey: key });
-    if (probe) { const { last, ...p } = probe; row.probe = p; }
+    if (probe) {
+        const fields = follow ? [...seen] : [field];
+        const sound = rockCentresSound(fields, arena.rocks);
+        probe.rockCentresBlockedAll = sound.ok; probe.fieldsChecked = fields.length; probe.rocksOffGrid = sound.offGrid;
+        probe.builds = follow ? follow.builds.length : 1;
+        if (follow) {
+            probe.buildMs = buildMs;
+            probe.buildOriginDev = follow.builds.reduce((m, b) => { const s = shipAt.get(b.i); return Math.max(m, s ? Math.hypot(b.origin[0] - s[0], b.origin[1] - s[1], b.origin[2] - s[2]) : Infinity); }, 0);
+        }
+        const { last, ...p } = probe; row.probe = p;
+    }
     return row;
+}
+
+/**
+ * Round C's check 4 on a list of fields: every rock whose centre lies INSIDE a field's grid is blocked in it. A rock outside a build's cube is not in that
+ * field at all (the grid is a cube round where the ship was; NV.indexOf would clamp it to an edge cell), so it is counted (offGrid) and not held to it.
+ */
+export function rockCentresSound(fields, rocks) {
+    const onGrid = (G, p) => [0, 1, 2].every((ax) => Math.abs(p[ax] - G.origin[ax]) < G.half);
+    let offGrid = 0;
+    const ok = fields.length > 0 && fields.every((G) => rocks.every((q) => { if (!onGrid(G, q.pos)) { offGrid++; return true; } return G.blocked[NV.indexOf(G, q.pos)] === 1; }));
+    return { ok, offGrid };
 }
 
 export function median(xs) {
@@ -163,6 +194,39 @@ export function devChecksB(rows) {
             && N.every((r) => r.probe && r.probe.field && r.probe.field.lane === false) && fld(N, "goalBlockedLine") > 0,
             laneGoalCells: fld(L, "goalCells"), laneBlocked: fld(L, "goalBlockedLine"), plainGoalCells: fld(N, "goalCells"), plainBlocked: fld(N, "goalBlockedLine") },
         fieldSound: { ok: both.length > 0 && tot(both, "aimBlocked") === 0 && both.every((r) => r.probe && r.probe.rockCentresBlocked === true), aimBlocked: tot(both, "aimBlocked") },
+        allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
+    };
+}
+
+const renameC = (v) => ({ ...v, verdict: v.verdict === "LAYER BETTER" ? "FOLLOW BETTER" : v.verdict === "DOCTRINE BETTER" ? "L BETTER" : v.verdict });
+/** ROUND C's HELD reading: V1 (all rock strikes), V2 (the damage on the ship), the bottom line, and the reported readings. */
+export function readHeldC(rows) {
+    const F = rows.filter((r) => r.arm === "F"), L = rows.filter((r) => r.arm === "L"), pairs = pairsOf(F, L);   // pairsOf(n, d): here n is F, d is L
+    const better = (k) => renameC(signVerdict(pairs.map((p) => p.d[k] - p.n[k]), sum(F, k) < sum(L, k), sum(F, k) > sum(L, k)));
+    const v1 = better("struck");
+    const v2 = renameC(signVerdict(pairs.map((p) => p.n.damageOnShip - p.d.damageOnShip), sum(F, "damageOnShip") > sum(L, "damageOnShip"), sum(F, "damageOnShip") < sum(L, "damageOnShip")));
+    const bottom = v1.verdict === "FOLLOW BETTER" ? (v2.verdict === "L BETTER" ? "THE FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS" : "THE FOLLOWING FIELD WINS")
+        : v1.verdict === "L BETTER" ? "THE FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS" : `THE FOLLOWING FIELD DOES NOT WIN (${v1.verdict})`;
+    const arm = (rs) => ({ fights: rs.length, approachStruck: sum(rs, "approachStruck"), approachShot: sum(rs, "approachShot"), arrived: sum(rs, "arrived"), combatStruck: sum(rs, "combatStruck"),
+        struck: sum(rs, "struck"), medianArrivalT: median(rs.flatMap((r) => r.arrivalT)), meanR: sum(rs, "R") / rs.length, meanDamage: sum(rs, "damageOnShip") / rs.length,
+        shipDead: rs.filter((r) => r.shipDead).length, fallbacks: rs.reduce((a, r) => a + (r.probe ? r.probe.fallback : 0), 0), near: rs.reduce((a, r) => a + (r.probe ? r.probe.near : 0), 0),
+        meanBuilds: rs.reduce((a, r) => a + (r.probe ? r.probe.builds : 0), 0) / rs.length, buildS: rs.reduce((a, r) => a + ((r.probe && r.probe.buildMs) || 0), 0) / 1000 });
+    return { v1, v2, bottom, reported: { F: arm(F), L: arm(L), approachStruck: better("approachStruck"), combatStruck: better("combatStruck") } };
+}
+
+/** ROUND C's DEV checks: SAME FIELD, THE HAND-BACK (both arms), IT FOLLOWS, THE FIELD IS SOUND (every build), EVERY FIGHT ENDS. */
+export function devChecksC(rows) {
+    const F = rows.filter((r) => r.arm === "F"), L = rows.filter((r) => r.arm === "L"), both = [...F, ...L];
+    let same = F.length > 0 && F.length === L.length;
+    if (same) { try { same = pairsOf(F, L).every((p) => p.n.fieldKey === p.d.fieldKey); } catch { same = false; } }
+    const tot = (rs, k) => rs.reduce((a, r) => a + ((r.probe || {})[k] || 0), 0);
+    const long = F.filter((r) => r.t > FOLLOW_EVERY / 30 + 1e-9);
+    return {
+        sameField: { ok: same, n: F.length },
+        handBack: { ok: both.length > 0 && [F, L].every((rs) => tot(rs, "handBack") > 0) && tot(both, "handBackMismatch") === 0, handBack: tot(both, "handBack"), mismatches: tot(both, "handBackMismatch") },
+        follows: { ok: F.length > 0 && long.length > 0 && long.every((r) => r.probe && r.probe.builds >= 2) && F.every((r) => r.probe && r.probe.buildOriginDev === 0) && L.every((r) => r.probe && r.probe.builds === 1),
+            builds: tot(F, "builds"), worstDev: Math.max(0, ...F.map((r) => (r.probe && Number.isFinite(r.probe.buildOriginDev) ? r.probe.buildOriginDev : Infinity))) },
+        fieldSound: { ok: both.length > 0 && tot(both, "aimBlocked") === 0 && both.every((r) => r.probe && r.probe.rockCentresBlockedAll === true), aimBlocked: tot(both, "aimBlocked") },
         allEnd: { ok: rows.length > 0 && rows.every((r) => r.over && r.t <= SECONDS + 1e-9), n: rows.length },
     };
 }

@@ -12,6 +12,8 @@
 //   N12 the heap pops out of order: 10 red. FIRST PASS: 0 red and NO VERDICT (hung), fixed by the pop bound above.
 // ROUND B's clear lane (rows 14-16), sabotaged the same way: L1 the lane option never read: 2 red (14, 15). L2 the lane test inverted: 2 red (14, 15).
 //   L3 the lane on by default: 1 red (16).
+// ROUND C's following field (rows 17-18): F1 never rebuilt: 1 red (17). F2 rebuilt round the first origin: 1 red (17). F3 the aim cache ignores the field:
+//   1 red (18). F4 rebuilt at every call: 1 red (17). F5 the pilot ignores a field-giving function: 1 red (18).
 "use strict";
 
 import fs from "node:fs";
@@ -135,6 +137,22 @@ row("15 THE LANE REACHES THE FIELD: the plain field has goal cells with the line
     return { ok: hidden.length > 0 && gl.length === gp.length - hidden.length, detail: `plain ${gp.length}, hidden ${hidden.length}, lane ${gl.length}` };
 });
 row("16 THE LANE IS OFF BY DEFAULT: Round A's field, to the bit", () => LD.lane === false && LD.dist.length === LP.dist.length && LD.dist.every((x, v) => x === LP.dist[v]) && LD.blocked.every((x, v) => x === LP.blocked[v]));
+
+// Round C: the field that follows the ship
+row("17 THE FOLLOWING FIELD: built at the first call round the ship, the same field until `every` ticks have passed, then rebuilt round where the ship is NOW", () => {
+    const A = { i: 0, crafts: [{ id: 1, kind: "capital", body: { pos: [0, 0, 0] } }] }, fo = NV.followingField(() => A, [ROCK], { every: 10, cell: 16, half: 160, margin: 20, goalR: 40 });
+    const f0 = fo(); A.i = 5; A.crafts[0].body.pos = [30, 0, 0]; const f5 = fo(); A.i = 10; const f10 = fo(); A.i = 15; const f15 = fo(); A.i = 20; A.crafts[0].body.pos = [-40, 8, 0]; const f20 = fo();
+    const ok = f0 === f5 && f10 !== f5 && f15 === f10 && f20 !== f15 && same(f0.origin, [0, 0, 0]) && same(f10.origin, [30, 0, 0]) && same(f20.origin, [-40, 8, 0])
+        && fo.builds.length === 3 && same(fo.builds.map((b) => b.i), [0, 10, 20]) && f10.dist[NV.indexOf(f10, [30, 0, 0])] === 0;
+    return { ok, detail: `builds at ${fo.builds.map((b) => b.i).join(",")}` };
+});
+row("18 THE PILOT TAKES A FIELD-GIVING FUNCTION, AND NEVER REUSES AN AIM CACHED UNDER ANOTHER FIELD", () => {
+    const body = at([150, 60, 0]), A = fakeArena([-300, 0, 0], body), dead = build([ROCK], [0, 0, 0], 40, SMALL); dead.dist.fill(Infinity);
+    let cur = F; const probe = { calls: 0, aimed: 0, fallback: 0, handBack: 0, last: null }, pilot = NV.navPilot(() => A, () => cur, { every: 15, probe });
+    pilot(body, target, opts); const first = probe.last.aim, f1 = probe.last.field;
+    cur = dead; A.i = 1; pilot(body, target, opts); const second = probe.last.aim, f2 = probe.last.field;
+    return { ok: !!first && f1 === F && f2 === dead && second === null && probe.fallback === 1, detail: `first ${!!first}, second ${second}` };
+});
 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;

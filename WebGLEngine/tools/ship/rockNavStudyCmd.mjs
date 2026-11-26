@@ -7,6 +7,7 @@
 //   node tools/ship/rockNavStudyCmd.mjs held --part 1/4       HELD, one quarter, both arms (writes held-1of4.json ONCE); refused until dev-report.json passes
 //   node tools/ship/rockNavStudyCmd.mjs held-read             the verdict (writes held-report.json)
 //   ROUND B (the clear lane; arms N and L): devB --part k/K, devB-read, heldB --part k/K (refused until devB-report.json passes), heldB-read
+//   ROUND C (the field that follows the ship; arms L and F): devC --part k/K, devC-read, heldC --part k/K (refused until devC-report.json passes), heldC-read
 // --dir DIR overrides brain/rig-results/rock-nav. A part file is written the moment it exists and is never flown again.
 "use strict";
 
@@ -39,8 +40,8 @@ function fly(set, seeds, arms = S.ARMS, round = "rock-nav A") {
     S.scenariosOf(seeds).forEach(({ seed, kind }, i) => { if (i % K !== k - 1) return; for (const arm of arms) rows.push(S.flyOne({ seed, kind, arm })); });
     write(name, { round, set, part: [k, K], arms, seeds: [seeds[0], seeds.at(-1)], seconds: (Date.now() - t0) / 1000, rows });
 }
-const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS };
-const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B };
+const SEEDS_OF = { dev: S.DEV_SEEDS, held: S.HELD_SEEDS, devB: S.DEV_B_SEEDS, heldB: S.HELD_B_SEEDS, devC: S.DEV_C_SEEDS, heldC: S.HELD_C_SEEDS };
+const ARMS_OF = { dev: S.ARMS, held: S.ARMS, devB: S.ARMS_B, heldB: S.ARMS_B, devC: S.ARMS_C, heldC: S.ARMS_C };
 function gather(set) {
     const names = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => new RegExp(`^${set}-\\d+of\\d+\\.json$`).test(f)) : [];
     const Ks = new Set(names.map((f) => +/of(\d+)/.exec(f)[1]));
@@ -115,7 +116,39 @@ else if (mode === "devB-read") {
     const notWeighed = !scen || !allEnd;
     console.log(`[rock-nav] ROUND B BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
     write("heldB-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
+} else if (mode === "devC") fly("devC", S.DEV_C_SEEDS, S.ARMS_C, "rock-nav C");
+else if (mode === "devC-read") {
+    const rows = gather("devC"), c = S.devChecksC(rows), scen = sameScenarios(rows, S.DEV_C_SEEDS, S.ARMS_C);
+    const line = (n, name, ok, detail) => console.log(`  check ${n} ${name}${detail ? " (" + detail + ")" : ""}: ${ok ? "PASS" : "FAIL"}`);
+    console.log(`[rock-nav] ROUND C DEV ${S.DEV_C_SEEDS[0]}-${S.DEV_C_SEEDS.at(-1)}: ${rows.length} fights; checks only`);
+    line(0, "EVERY SCENARIO IN BOTH ARMS", scen, "");
+    line(1, "SAME FIELD", c.sameField.ok, `${c.sameField.n} pairs`);
+    line(2, "THE HAND-BACK", c.handBack.ok, `${c.handBack.handBack} calls inside the strafe range, ${c.handBack.mismatches} mismatches`);
+    line(3, "IT FOLLOWS", c.follows.ok, `${c.follows.builds} builds in F, worst distance from the ship ${fmt(c.follows.worstDev, 6)}`);
+    line(4, "THE FIELD IS SOUND", c.fieldSound.ok, `${c.fieldSound.aimBlocked} aims in a blocked cell; rock centres blocked in every build`);
+    line(5, "EVERY FIGHT ENDS", c.allEnd.ok, `${c.allEnd.n} fights`);
+    const H = S.readHeldC(rows), a = (x) => `struck ${x.struck} (before ${x.approachStruck}, after ${x.combatStruck}), mean damage ${fmt(x.meanDamage, 1)}, fallbacks ${x.fallbacks}`;
+    console.log(`  reported, moving nothing: L ${a(H.reported.L)}; F ${a(H.reported.F)}`);
+    const allOk = scen && Object.values(c).every((x) => x.ok);
+    console.log(`[rock-nav] ROUND C DEV: ${allOk ? "ALL CHECKS PASS -- commit the DEV files and this report, then fly HELD once" : "A CHECK FAILED -- HELD stays unflown"}`);
+    write("devC-report.json", { checks: c, sameScenarios: scen, allOk, totals: H.reported });
+} else if (mode === "heldC") {
+    if (!fs.existsSync(out("devC-report.json")) || !readJson("devC-report.json").allOk) { console.error("[rock-nav] REFUSED: ROUND C's DEV has not passed its checks (devC-report.json)"); process.exit(2); }
+    fly("heldC", S.HELD_C_SEEDS, S.ARMS_C, "rock-nav C");
+} else if (mode === "heldC-read") {
+    const rows = gather("heldC"), scen = sameScenarios(rows, S.HELD_C_SEEDS, S.ARMS_C), allEnd = rows.every((r) => r.over && r.t <= S.SECONDS + 1e-9);
+    const H = S.readHeldC(rows), R = H.reported, v = (x) => `${x.verdict}: following better in ${x.wins}, worse in ${x.losses}, tied ${x.ties}; p ${fmt(x.p, 4)}`;
+    console.log(`[rock-nav] ROUND C HELD ${S.HELD_C_SEEDS[0]}-${S.HELD_C_SEEDS.at(-1)}: ${rows.length / 2} pairs; SAME SCENARIOS ${scen ? "PASS" : "FAIL"}; EVERY FIGHT ENDS ${allEnd ? "PASS" : "FAIL"}`);
+    console.log(`  V1 THE ROCKS (all rock strikes: L ${R.L.struck}, F ${R.F.struck}) ${v(H.v1)}`);
+    console.log(`  V2 THE DAMAGE (mean on the ship: L ${fmt(R.L.meanDamage, 1)}, F ${fmt(R.F.meanDamage, 1)}) ${v(H.v2)}`);
+    console.log(`  reported: strikes before arriving L ${R.L.approachStruck}, F ${R.F.approachStruck} -- ${v(R.approachStruck)}`);
+    console.log(`  reported: strikes after arriving L ${R.L.combatStruck}, F ${R.F.combatStruck} -- ${v(R.combatStruck)}`);
+    console.log(`  reported: arrived L ${R.L.arrived}, F ${R.F.arrived}; approach shot L ${R.L.approachShot}, F ${R.F.approachShot}; median arrival L ${fmt(R.L.medianArrivalT, 2)} s, F ${fmt(R.F.medianArrivalT, 2)} s; mean R L ${fmt(R.L.meanR, 1)}, F ${fmt(R.F.meanR, 1)}; ship dead L ${R.L.shipDead}, F ${R.F.shipDead}`);
+    console.log(`  reported: fallbacks L ${R.L.fallbacks}, F ${R.F.fallbacks}; NEAR L ${R.L.near}, F ${R.F.near}; builds a fight L ${fmt(R.L.meanBuilds, 1)}, F ${fmt(R.F.meanBuilds, 1)}; F's build time ${fmt(R.F.buildS, 0)} s in all`);
+    const notWeighed = !scen || !allEnd;
+    console.log(`[rock-nav] ROUND C BOTTOM LINE: ${notWeighed ? "NOT WEIGHED (a check failed)" : H.bottom}`);
+    write("heldC-report.json", { ...H, checks: { sameScenarios: scen, allEnd }, notWeighed });
 } else {
-    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).join("\n"));
+    console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 11).join("\n"));
     process.exit(mode ? 2 : 0);
 }
