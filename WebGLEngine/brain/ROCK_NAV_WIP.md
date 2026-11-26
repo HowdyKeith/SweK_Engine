@@ -508,3 +508,65 @@ This is backlog space-nav-fallback-cause. It is a diagnostic, not a registered r
   - The harm the fallbacks can do is small: at most 2 of 9 strikes, about 0.08 a fight.
   - A paired round on 360 fights would most likely end at FLOOR.
   - The shipped layer is the static field.
+
+# ROUND E -- Round C again, with the empty-lane defect fixed (Keith 2026-11-26: "lets do rock-nav-follow-fix"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## Why
+- The fallback DIAGNOSTIC (above) found Round C's arm F carried a defect. When the field is rebuilt round a ship whose centre lies in a blocked cell, no cell has a clear line to it, the lane goal is EMPTY, and every fighter outside 220 flies the doctrine until the next rebuild. That was 70 of 795 builds, in 3 of 24 fights.
+- Round C's null was measured with that defect. This round asks Round C's question again with it fixed.
+- I recommended against flying it, because the harm the fallbacks can do is small. Keith asked for it.
+
+## The fix (brain/spaceNav.mjs buildField)
+- With `lane`, when no cell qualifies for the lane goal, the build falls back to the plain goal (every free cell within goalR of the origin) and marks itself `laneEmpty`.
+- A field built at t = 0 never has an empty lane goal: rocks lie 150 or more from the ship's start, and Rounds B, C and D checked for goal cells in every one. So **Rounds B-D's fields are unchanged to the bit**, and the rock-nav replays must stay IDENTICAL.
+
+## What is already known, said first
+The design survey flew throwaway space seeds 9990031-9990036 (24 fights, in no set; a scratch copy of the library with the fix):
+
+| | L (lane, built once) | FX (fixed following field) |
+|---|---|---|
+| rock strikes after arriving | 4 | 8 |
+| rock strikes before arriving | 0 | 0 |
+| damage on the ship | 4,654 | 6,858 |
+| doctrine fallbacks | 5,374 | 1,208 |
+
+- The fix does what it is for: fallbacks fall by 78%, where Round C's broken arm cut them by 14%.
+- The strikes are 4 against 8 on 24 fights.
+
+## The arms
+* **L:** Round B's arm exactly.
+* **FX:** Round C's arm F (followingField, lane true, every 60 ticks), flown on the fixed library.
+* Everything else as in Round C.
+
+## SETS
+* DEV: 3901-3930 x 4 kinds, checks only.
+* HELD: 4001-4090 x 4 kinds, flown once.
+* Gate seeds 41-50. The survey: 9990031-9990036.
+
+## DEV: checks only (a failure stops the round)
+Round C's five checks, plus:
+6. **THE FIX REACHES THE FIELD:** in FX every build has goal cells, and at least one DEV build was an empty lane that fell back (laneEmpty). If no DEV fight drifts into a rock, this check fails and the round says so: the fix was never exercised.
+
+## HELD: the verdict -- ROUND C's, word for word, with F read as FX
+* **V1 THE ROCKS:** d = L.struck - FX.struck.
+  * FOLLOW BETTER: wins > losses, p <= 0.05, and FX's total is lower.
+  * L BETTER is the mirror; FLOOR is under 20 non-tied pairs; otherwise NO DIFFERENCE SHOWN.
+* **V2 THE DAMAGE:** d = FX.damageOnShip - L.damageOnShip. It must not be L BETTER.
+* **BOTTOM LINE:** Round C's four lines.
+* **Reported, not weighed:**
+  * Round C's readings;
+  * the empty-lane builds and their fights;
+  * the sign test on damage both ways.
+
+## Expectations, recorded before any code
+* V1 NO DIFFERENCE SHOWN: about 60%. FOLLOW BETTER: about 10%. L BETTER: about 15%. FLOOR: about 15%.
+* V2 not L BETTER: about 90%.
+* Fallbacks lower under FX than under L, by more than half: about 85%.
+* At least one empty-lane build in DEV (check 6): about 80%.
+
+## What will be built
+* The fix in brain/spaceNav.mjs, with gate rows and sabotages.
+* Arm "FX" in tools/ship/rockNavStudy.mjs, with readHeldE and devChecksE.
+* The command's modes devE, devE-read, heldE and heldE-read.
+* Gate rows and sabotages.
+* The two rock-nav replays re-run here, to show the fix left Rounds A and C's DEV fields as recorded.
