@@ -3120,8 +3120,8 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-26 -- after the Santon raw data and follow-up 9.
     {
         id: "stealth-criteria-audit",
-        blocker: "OPEN",
-        what: "Rounds 13, 29 and 30's criteria C1-C4 were set from values read off Santon et al.'s Figure 2; the raw data is now in vendor/santon2025.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 (brain/STEALTH_ROUNDS_WIP.md, the criteria audit): C1-C4 all hold on the animal's own response rates and the within-crab tests back each (C2: 6 to 0 and 15 to 2; C4 pooled 46 to 17, p 0.0003); none amended. The margins are probabilities for the animal and alarm sizes for the model. Was: Rounds 13, 29 and 30's criteria C1-C4 were set from values read off Santon et al.'s Figure 2; the raw data is now in vendor/santon2025.",
         how: "A reading, no runs: each criterion's claim about the animal checked against the per-contrast response rates and the within-crab paired tests; any the data does not back is corrected by a registered amendment before the model is tested again.",
         why: "It fixes what the next stealth round tests.",
     },
