@@ -1,0 +1,21 @@
+{
+ "checks": {
+  "signalDecides": {
+   "ok": true,
+   "reached": 480,
+   "chose20": 240
+  },
+  "capApplied": {
+   "ok": true,
+   "overCap": 3143781,
+   "notCut": 0,
+   "chose12": 240,
+   "sameAsFixed": true
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 1440
+  }
+ },
+ "allOk": true
+}
