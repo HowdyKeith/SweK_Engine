@@ -3027,8 +3027,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-release-on-rise",
-        blocker: "OPEN",
-        what: "HOLD-R still broached 20 of 96 on the high rider (round 20): the boat's upward speed carries it through the 10 m release line.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as round 21 (brain/SUB_STATIONS_WIP.md sections 43-45): HOLD-R BEATS HOLD-RR on the high rider (45 to 8) and HOLD BEATS HOLD-RR on the default vessel (55 to 0): releasing on a fast rise trades broaches for crushes. HOLD-R stays the best high-rider rule (86 of 96 on these seeds). Was: HOLD-R still broached 20 of 96 on the high rider (round 20): the boat's upward speed carries it through the 10 m release line.",
         how: "Register first one change: release the held blow also when the boat is rising faster than a stated rate (fixed before DEV), on round 20's task with fresh seed blocks; against HOLD-R on the high rider, and against HOLD on the default vessel as round 20 did.",
         why: "It is the remaining loss of the best high-rider rule.",
     },

@@ -1008,3 +1008,17 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-re
 **Seen on DEV and recorded because it was seen (DEV only, not a result):** on the high rider HOLD-RR ended 34 submerged and 14 crushed (HOLD-R: 42 submerged, 6 broached); on the default vessel HOLD-RR lost 22 crushed (HOLD-R 14, HOLD none). Every HOLD crew's hold fired on all 48 dives of both vessels.
 
 **Nothing was tuned.** HELD: HOLD-RR, HOLD-R, HOLD and TRIAGE on both vessels on 223001 to 223096 to `brain/releaseRiseHeld.<part>.jsonl` (with each dive's `held`), committed unread, then read once.
+
+## 45. ROUND 21 RESULT (2026-11-26; `brain/releaseRiseHeld.{0,1,2,3}.jsonl`, committed unread at `ab1b6ad34`, then read ONCE)
+
+**THE VERDICTS (registered):**
+* **V1, the high rider: HOLD-R BEATS HOLD-RR,** 45 to 8 (p = 1e-7). HOLD-RR kept 49 of 96 (47 crushed); HOLD-R kept 86 (10 broached).
+* **V2, the default vessel: HOLD BEATS HOLD-RR,** 55 to 0 (p = 3e-17). HOLD kept all 96; HOLD-RR 41 (55 crushed).
+* Reported: HOLD-RR against TRIAGE on the high rider, HOLD-RR BEATS TRIAGE 9 to 2 (p = 0.033; 49 against 42 kept). Every HOLD crew's hold fired on all 96 dives of both vessels (the `held` reading, recorded this time).
+
+**What it says.**
+* Releasing the blow whenever the boat rises fast trades broaches for crushes, and loses badly on the trade: freed mid-water, the high rider's tank floods back and the boat sinks again past the crush depth. Round 20's single depth line (HOLD-R) remains the best high-rider rule on record -- 86 of 96 on these seeds, against round 20's 76 on its own (the seeds differ; both are HELD sets).
+* On the default vessel any release is a loss, again: HOLD's 96 of 96 stands.
+* The broaches HOLD-R leaves (10 here) are not fixed by speed; a rule for them would need to know the boat will reach the surface, not only that it is rising.
+
+**Status: round 21 CLOSED.** Backlog `stations-release-on-rise` is closed with this result.
