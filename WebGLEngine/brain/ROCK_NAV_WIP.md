@@ -366,3 +366,72 @@ Round A's per-fighter endpoints, plus each fight's total rock strikes (struck).
   - A likelier cause under F is the goal sphere's edge (a goal cell whose centre is inside 220 holds a fighter up to about 14 units outside it), plus the ship's motion between rebuilds.
   - This is not measured here.
 - **The layer ships as Round B left it:** the lane field, built once. Nothing is replaced.
+
+# ROUND D -- the clear lane with the doctrine's closing-speed cap (Keith 2026-11-26: "lets register 1 now"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## Why
+- Round B's strikes after arriving are momentum strikes: the doctrine strafes with the thrust cut, so a fighter coasts in at 20-28 u/s with no time to turn.
+- The space-doctrine round (brain/SPACE_DOCTRINE_WIP.md) found that cutting the thrust whenever the closing speed is at or above a cap (CAP_CHOSEN = 12) beats today's approach under regular and green gunners.
+- A capped fighter arrives slower, so it has more time inside the rock band.
+
+## What is already known, said first
+The design survey flew throwaway space seeds 9990019-9990024 (24 fights, in no set; a scratch prototype, never committed), regular gunners, 24 rocks, the lane field:
+
+| | L (lane) | LC, cap 9 | LC, cap 12 | LC, cap 15 |
+|---|---|---|---|---|
+| rock strikes after arriving | 5 | 0 | 0 | 1 |
+| rock strikes before arriving | 0 | 1 | 0 | 0 |
+| shot before arriving | 4 | 17 | 9 | 5 |
+| damage on the ship | 5,760 | 33,308 | 27,654 | 17,234 |
+| ship destroyed | 0 | 16 | 8 | 1 |
+
+* **The cap is NOT chosen here.** It is the space-doctrine round's CAP_CHOSEN, 12, fixed at that round's DEV before this survey. The survey's other caps are shown and choose nothing.
+* **Damage is no guard once ships die**, so V2 uses that round's R: the damage on the ship if it survives, else 1500 + (120 - the time it died).
+
+## The arms (Round B's library and pilot; nothing in spaceArena.mjs or battleshipFight.mjs edited)
+* **L:** Round B's arm exactly: the lane field, built once at t = 0, and the hand-back inside the strafe range.
+* **LC:** the same pilot, whose output then has its thrust set to 0 whenever the closing speed to the nearest foe's centre (spaceDoctrineStudy.closingSpeed, against SA.nearestFoe) is at or above 12. This is the doctrine round's arm C rule, applied on top of the layer, in every mode.
+* Same rocks, starts and regular gunners; margin 20, re-aim every 15 ticks.
+
+## Endpoints
+Round A's per-fighter endpoints, R (spaceDoctrineStudy.rOf), and the cap's own counts: the calls at or over the cap, and how many of them flew with thrust.
+
+## SETS
+* DEV: 3701-3730 x 4 kinds, checks only.
+* HELD: 3801-3890 x 4 kinds, flown once.
+* Gate seeds 41-50. The survey: 9990019-9990024.
+
+## DEV: checks only (a failure stops the round)
+1. **SAME FIELD:** identical rocks and starts.
+2. **THE HAND-BACK** is exact in both arms. It is read on the layer's output before the cap.
+3. **THE CAP IS APPLIED:**
+   * In LC there are calls at or over 12, and none flew with thrust.
+   * In L no call had its thrust cut by this rule.
+4. **THE FIELD IS SOUND** in both arms.
+5. **EVERY FIGHT ENDS.**
+
+## HELD: the verdict (pairs by (seed, kind), LC against L; the sign verdict of Rounds A-C)
+* **V1, THE STRAFE:** d = L.combatStruck - LC.combatStruck.
+  * CAP BETTER: wins > losses, p <= 0.05, and LC's total is lower.
+  * L BETTER is the mirror; FLOOR is under 20 non-tied pairs; otherwise NO DIFFERENCE SHOWN.
+* **V2, THE ATTACK:** d = LC.R - L.R (higher R is better for the fighters). It must not be L BETTER.
+* **BOTTOM LINE:**
+  * V1 CAP BETTER and V2 not L BETTER: `THE CAP SAVES FIGHTERS IN THE STRAFE`.
+  * V1 CAP BETTER and V2 L BETTER: `THE CAP SAVES FIGHTERS BUT HITS THE SHIP LESS`.
+  * V1 L BETTER: `THE CAP LOSES MORE FIGHTERS TO THE ROCKS`.
+  * Otherwise: `THE CAP DOES NOT WIN THE STRAFE (<V1's verdict>)`.
+* **Reported, not weighed:**
+  * V2's own verdict both ways;
+  * ship deaths, damage, strikes before arriving, shot before arriving, arrivals, total struck, median arrival;
+  * the cap's counts, fallbacks and NEAR aims.
+
+## Expectations, recorded before any code
+* V1 CAP BETTER: about 75%.
+* V2 not L BETTER: about 95%. V2 CAP BETTER on R (reported): about 90%.
+* More fighters shot before arriving under LC: about 80%. The survey's 9 against 4 is the cost of a slower approach.
+
+## What will be built
+* Arm "LC" in tools/ship/rockNavStudy.mjs, with readHeldD and devChecksD.
+* The command's modes devD, devD-read, heldD and heldD-read.
+* Gate rows and sabotages.
+* A `fly` study entry is NOT added: HELD is a sandbox-sized run (about 15 minutes on 4 cores).
