@@ -975,3 +975,26 @@ Keith, 2026-11-26: "Let's do 2, then 1" -- the backlog entries stations-hold-bre
 * No single rule of these is best on both hulls. Per vessel, the best on record: the default vessel, HOLD (96/96); the high rider, HOLD-R (76/96).
 
 **Status: rounds 19 and 20 CLOSED.** Backlog stations-hold-breached-courier and stations-hold-surface-release are closed with these results.
+
+## 43. ROUND 21, REGISTRATION (2026-11-26, committed before any seed of its sets is flown and before its code)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-release-on-rise`. No stations file uses a seed from 222000 to 223999 (grep, 2026-11-26).
+
+### ROUND 21: THE HELD BLOW, RELEASED ON A FAST RISE
+
+**THE QUESTION.** HOLD-R (round 20) kept 76 of 96 high-rider boats, and the other 20 broached: the boat's upward speed carries it through the 10 m release line. If the held blow is also released whenever the boat is rising fast, are those broaches kept -- without losing what HOLD-R kept, and what does it cost the default vessel?
+
+**THE RULE (HOLD-RR), FIXED NOW.** HOLD-R (`HOLDR_KNOBS`: the held blow forced only deeper than 10 m) with ONE change: the held blow is also NOT forced while the boat is **rising faster than 0.5 m/s** (a quarter of the task's 2 m/s transit speed); then the helm's own ballast stands. The latch is never cleared: the blow returns as soon as the boat is deeper than 10 m and rising at 0.5 m/s or less. One constant, fixed here.
+
+**THE TASK.** Round 20's (round 2's task with `HARD_LEAK`, both vessels), unchanged.
+
+**THE SETS.** DEV: 222001 to 222048. HELD: 223001 to 223096.
+
+**THE DEV CHECKS (non-degeneracy, nothing chosen).** Each verdict goes to HELD iff its two crews differ in survival on at least 3 of the 48 DEV dives; a verdict whose check fails is STOPPED AT DEV.
+
+**THE VERDICTS (HELD, once; exact one-sided sign tests on the discordant dives, p at most 0.05).**
+* **V1:** HOLD-RR against HOLD-R on the high rider.
+* **V2:** HOLD-RR against HOLD on the default vessel.
+* Reported, not in a verdict: HOLD-RR against TRIAGE on the high rider; every lost dive's status; and how many dives each crew's hold fired on (the `held` reading, recorded this time).
+
+**EXPECTATION.** V1: HOLD-RR BEATS HOLD-R about 45 percent (a fast rise near the surface is the broach), NO DIFFERENCE about 35, HOLD-R BEATS HOLD-RR about 20 (releasing mid-water may let the boat sink back past the crush depth). V2: HOLD BEATS HOLD-RR about 70 percent (round 20's release already cost the default vessel 30 boats; this releases more often).
