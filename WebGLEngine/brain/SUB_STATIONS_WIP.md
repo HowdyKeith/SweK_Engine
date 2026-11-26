@@ -937,3 +937,15 @@ Keith, 2026-11-26: "Let's do 2, then 1" -- the backlog entries stations-hold-bre
 * Reported, not in a verdict: HOLD-R on the high rider against HOLD-R on the default vessel; the statuses of every lost dive.
 
 **EXPECTATION.** V1: HOLD-R BEATS TRIAGE about 55 percent (the high rider's tank lifts a 6-8 % leak; the question is whether the helm's flooding above 10 m catches it before the surface); TRIAGE BEATS HOLD-R about 20 (it may still broach on momentum). V2: NO DIFFERENCE SHOWN or STOPPED AT DEV about 70 percent.
+
+## 41. ROUNDS 19 AND 20, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `breachCourierTask.mjs`'s NEED-C and HOLD-C crews (`NEEDC_KNOBS`, `HOLDC_KNOBS`) and round 19's sets; `triageCaptain`'s `holdBelow` (null by default: round 16's hold at every depth), `stationsTask.mjs`'s HOLD-R crew (`HOLDR_KNOBS`) and round 20's sets. Gated in `brain/breachCourierTask-selfcheck.mjs` section 9 and `brain/stationsTask-selfcheck.mjs` section 10 (12 mutants, every one red; two went 0 red first and the crews are now driven by name through the latch fixture).
+
+**DEV, the non-degeneracy checks only (all pass, so all go to HELD):**
+* Round 19 (218001 to 218024): HOLD-C and COND differ in goals or survival on 19 of 24 (4 needed).
+* Round 20 (220001 to 220048): V1, HOLD-R against TRIAGE on the high rider, differ in survival on 29 of 48; V2, HOLD-R against HOLD on the default vessel, on 12 of 48 (3 needed each).
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result):** round 19 -- COND kept 20 of 24 boats and delivered 65 goals, HOLD-C kept 22 and delivered 35. Round 20 -- on the high rider HOLD-R ended 40 submerged and 8 broached (HOLD: all 48 broached; TRIAGE: 27 submerged, 21 crushed); on the default vessel HOLD-R lost 12 crushed where HOLD lost none.
+
+**Nothing was tuned.** HELD: COND, HOLD-C and NEED-C on 219001 to 219096 to `brain/holdCourierHeld.<part>.jsonl`; HOLD-R, TRIAGE and HOLD on both vessels on 221001 to 221096 to `brain/holdReleaseHeld.<part>.jsonl`; each committed unread, then read once.
