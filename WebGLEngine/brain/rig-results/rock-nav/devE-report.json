@@ -1,0 +1,86 @@
+{
+ "checks": {
+  "sameField": {
+   "ok": true,
+   "n": 120
+  },
+  "handBack": {
+   "ok": true,
+   "handBack": 497752,
+   "mismatches": 0
+  },
+  "follows": {
+   "ok": true,
+   "builds": 4245,
+   "worstDev": 0
+  },
+  "fieldSound": {
+   "ok": true,
+   "aimBlocked": 0
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 240
+  },
+  "fixReaches": {
+   "ok": true,
+   "laneEmptyBuilds": 267,
+   "buildsWithoutGoal": 0
+  }
+ },
+ "sameScenarios": true,
+ "allOk": true,
+ "totals": {
+  "L": {
+   "fights": 120,
+   "approachStruck": 3,
+   "approachShot": 46,
+   "arrived": 909,
+   "combatStruck": 34,
+   "struck": 37,
+   "medianArrivalT": 15.833333333333334,
+   "meanR": 216.08333333333334,
+   "meanDamage": 216.08333333333334,
+   "shipDead": 0,
+   "fallbacks": 26231,
+   "near": 42852,
+   "meanBuilds": 1,
+   "buildS": 0
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 1,
+   "losses": 2,
+   "ties": 117,
+   "n": 3,
+   "p": 1
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 13,
+   "losses": 7,
+   "ties": 100,
+   "n": 20,
+   "p": 0.26317596435546875
+  },
+  "FX": {
+   "fights": 120,
+   "approachStruck": 4,
+   "approachShot": 31,
+   "arrived": 925,
+   "combatStruck": 27,
+   "struck": 31,
+   "medianArrivalT": 15.833333333333334,
+   "meanR": 245.05,
+   "meanDamage": 245.05,
+   "shipDead": 0,
+   "fallbacks": 5514,
+   "near": 45375,
+   "meanBuilds": 35.375,
+   "buildS": 1765.131,
+   "laneEmptyBuilds": 267,
+   "fightsWithEmpty": 26,
+   "buildsWithoutGoal": 0
+  }
+ }
+}
