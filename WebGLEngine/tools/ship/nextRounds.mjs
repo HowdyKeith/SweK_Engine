@@ -3296,7 +3296,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "rock-nav-follow-replicate",
-        blocker: "OPEN",
+        blocker: "CLOSED -- 2026-11-26, rock nav Round F (brain/ROCK_NAV_WIP.md, registered first, read once): ROUND E DOES NOT REPLICATE -- on 360 fresh pairs the fixed following field and the lane built once lost 163 and 161 fighters to rocks (44 to 49, p 0.68), damage no different. Across Rounds C, E and F a following field does not lower the rock losses; Round E's p 0.047 was the chance a series throws up once. The layer stays the lane built once; the following-field line is closed.",
         what: "OPENED 2026-11-26 from rock nav Round E: the fixed following field (brain/spaceNav.mjs followingField, rebuilt round the ship every 60 ticks, lane goal with the empty-lane fall-back) beat the lane built once on rock strikes, 143 against 121 on 360 HELD pairs, at p 0.0474 -- under the line by a hair, on the fifth paired round of the series, against a registered expectation of about 10%.",
         how: "Register a replication before any code: Round E's arms, checks and verdict word for word, on fresh space seeds (DEV for checks only, HELD 360 pairs), with Round E's effect (about 15% fewer strikes) as the stated expectation. Only if it replicates should the page or the default layer follow the ship, and then with the build cost measured on the page (about 34 builds a fight).",
         why: "A p of 0.047 on a result nobody expected is the shape that most often fails to replicate; the default layer should not move on it alone.",

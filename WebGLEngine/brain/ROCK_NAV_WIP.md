@@ -658,3 +658,47 @@ Round E's FOLLOW BETTER cleared its line by a hair (p 0.0474), on the fifth pair
 * Arm sets and the modes devF, devF-read, heldF and heldF-read in tools/ship/rockNavStudy*.mjs.
 * readHeldF: Round E's reading plus the replication line.
 * Gate rows and sabotages.
+
+## ROUND F, RESULT (2026-11-26): ROUND E DOES NOT REPLICATE (NO DIFFERENCE SHOWN)
+
+**DEV** (4101-4130, 120 pairs): all six checks passed.
+- The hand-back was exact on 510,894 calls.
+- There were 3,920 builds in FX, each centred exactly on the ship.
+- 127 empty-lane builds fell back, and no build was left without a goal.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (4201-4290 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/heldF-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | L (lane, built once) | FX (fixed following field) |
+|---|---|---|
+| all rock strikes | 161 | 163 |
+| before arriving | 17 | 15 |
+| after arriving | 144 | 148 |
+| arrived | 2768 | 2792 |
+| shot before arriving | 89 | 71 |
+| mean damage on the ship | 255.0 | 263.0 |
+| doctrine fallbacks | 81,837 | 16,750 |
+
+- FX made 34.4 builds a fight. There were 377 empty-lane builds that fell back, in 41 of 360 fights.
+- **V1 THE ROCKS:** NO DIFFERENCE SHOWN. Following was better in 44 fights, worse in 49, tied in 267; p 0.68.
+- **V2 THE DAMAGE:** NO DIFFERENCE SHOWN (177 against 149, p 0.13).
+- **BOTTOM LINE:** THE FIXED FOLLOWING FIELD DOES NOT WIN. **THE REPLICATION: ROUND E DOES NOT REPLICATE.**
+
+**Against the expectations (written first):**
+- FX's total lower, about 70: NO (163 against 161).
+- REPLICATES, about 35: NO.
+- V2 not L BETTER, about 90: YES.
+
+**WHAT THE THREE FOLLOWING-FIELD ROUNDS MEAN TOGETHER** (C with the defect, E and F with it fixed; each on its own fresh 360 pairs):
+
+| round | L strikes | following strikes | fights better / worse | p |
+|---|---|---|---|---|
+| C | 147 | 141 | 47 / 48 | 1.0 |
+| E | 143 | 121 | 46 / 28 | 0.047 |
+| F | 161 | 163 | 44 / 49 | 0.68 |
+
+- Taken together, a field that follows the ship does not lower the rock losses. Round E's win is best read as the chance a series of paired rounds will throw up once.
+- The fallbacks it removes (by about 80%) do not cost fighters, which is what the DIAGNOSTIC said: they fall where the doctrine does no harm.
+- **The layer stays the lane field built once.** That is Round B's, with Round D's cap as the page's option.
+- The following field stays in brain/spaceNav.mjs (followingField, with the empty-lane fix) for whoever has a reason beyond rock losses.
+- This line of rounds is closed.
