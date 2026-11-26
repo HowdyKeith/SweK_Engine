@@ -1,0 +1,91 @@
+{
+ "checks": {
+  "sameField": {
+   "ok": true,
+   "n": 120
+  },
+  "handBack": {
+   "ok": true,
+   "handBack": 490424,
+   "mismatches": 0
+  },
+  "capApplied": {
+   "ok": true,
+   "overCap": 340946,
+   "cut": 238534,
+   "notCut": 0,
+   "lCut": 0,
+   "lOverWithThrust": 186508
+  },
+  "fieldSound": {
+   "ok": true,
+   "aimBlocked": 0
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 240
+  }
+ },
+ "sameScenarios": true,
+ "allOk": true,
+ "totals": {
+  "LC": {
+   "fights": 120,
+   "approachStruck": 10,
+   "approachShot": 54,
+   "arrived": 892,
+   "combatStruck": 31,
+   "struck": 41,
+   "medianArrivalT": 21.2,
+   "meanR": 1067.786388888889,
+   "meanDamage": 1047.5333333333333,
+   "shipDead": 27,
+   "fallbacks": 15080,
+   "near": 50528,
+   "overCap": 340946,
+   "capCut": 238534,
+   "capNotCut": 0
+  },
+  "L": {
+   "fights": 120,
+   "approachStruck": 11,
+   "approachShot": 33,
+   "arrived": 913,
+   "combatStruck": 48,
+   "struck": 59,
+   "medianArrivalT": 15.966666666666667,
+   "meanR": 238.78333333333333,
+   "meanDamage": 238.78333333333333,
+   "shipDead": 0,
+   "fallbacks": 21860,
+   "near": 45598,
+   "overCap": 379199,
+   "capCut": 0,
+   "capNotCut": 186508
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 3,
+   "losses": 2,
+   "ties": 115,
+   "n": 5,
+   "p": 1
+  },
+  "approachShot": {
+   "verdict": "L BETTER",
+   "wins": 15,
+   "losses": 33,
+   "ties": 72,
+   "n": 48,
+   "p": 0.013283281562245008
+  },
+  "struck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 26,
+   "losses": 13,
+   "ties": 81,
+   "n": 39,
+   "p": 0.05325191409792751
+  }
+ }
+}
