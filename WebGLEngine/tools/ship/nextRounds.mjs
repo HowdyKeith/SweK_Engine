@@ -3005,10 +3005,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-subunit-model",
-        blocker: "OPEN -- but needs Klapoetke et al. 2017's Figure 4 stimulus definitions read exactly (the note has the responses read off the plots, not the stimuli's geometry) before predictions can be registered",
-        what: "brain/FLY_RETINOTOPY_RF_WIP.md proposes LPLC2 as four displaced subunits (the measured layer offsets, two opposite pairs at a right angle) with the published rule: each arm excited by outward motion along its layer's direction and inhibited by inward motion, the arms summed nonlinearly. Klapoetke's numbers are in the note (outward cross 100 %, inward cross about 0, one outward and one inward arm about 45 %; bars 10/20/40/60 degrees about 30/45/25/5 %).",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 (brain/FLY_RETINOTOPY_RF_WIP.md Parts 4-6): the stimuli read from the text (PMC7457385), the model registered, run once: NOT SUPPORTED (P7) -- six of seven predictions hold (outward not inward; single arms small but there, where Zhao's product gives 0; two arms more than the sum; orthogonal inward motion subtracts; no translation response; looming not receding), and a 60 degree diagonal bar drives it 9x a 10 degree one where the paper shows it falling. Was: brain/FLY_RETINOTOPY_RF_WIP.md proposes LPLC2 as four displaced subunits (the measured layer offsets, two opposite pairs at a right angle) with the published rule: each arm excited by outward motion along its layer's direction and inhibited by inward motion, the arms summed nonlinearly. Klapoetke's numbers are in the note (outward cross 100 %, inward cross about 0, one outward and one inward arm about 45 %; bars 10/20/40/60 degrees about 30/45/25/5 %).",
         how: "Read Klapoetke's Figure 4 and its Methods for each stimulus's geometry (arm length, width, speed, where the arms start) and write them into the note; THEN register the model's form and its qualitative predictions (looming above receding; inward cross near 0; one-in-one-out between; two outward arms above the sum of each alone; wide translation near 0) before building it beside brain/flyEmdLplc2Gf.mjs, and test it once.",
         why: "A spatial LPLC2 is the piece between the retinotopy the data gives and the Giant Fiber model the paper gives; registering it on paraphrased stimuli would make its verdict mean little.",
+    },
+    {
+        id: "fly-lplc2-oriented-arms",
+        blocker: "OPEN",
+        what: "The LPLC2 subunit round (brain/FLY_RETINOTOPY_RF_WIP.md Part 6) reproduced every cross result but not the orientation tuning: its four subunits are large round overlapping disks, so a 60 degree bar expanding between the cardinal axes excites all four (510 % of the cross against the 10 degree bar's 56 %), where the paper's clover (Figure 3f, 4e,f) shows the wide bar falling there.",
+        how: "Register first ONE change to the subunit's shape: narrow arms elongated along their own axis (the measured dendrite is a cross of two orthogonal axes, Part 2), or T4/T5's own direction tuning (about 90 degrees wide) in place of the plain x and y components. Keep Part 5's stimuli and P1-P6 as they are, add the clover as a prediction (a 60 degree bar at the cardinal axes above the same bar between them), run once with brain/lplc2Subunits.mjs as the template.",
+        why: "The orientation tuning is the one published property the subunit cell misses; it is the test of whether the dendrite's geometry, not just its opponency, is needed.",
     },
     {
         id: "fly-gf-input-signs",

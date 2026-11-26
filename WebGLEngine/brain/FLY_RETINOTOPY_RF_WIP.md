@@ -135,3 +135,28 @@ Keith, 2026-11-26: "Let's do ... item 7" -- backlog `fly-lplc2-subunit-model`.
 **THE VERDICT.** SUPPORTED iff all seven hold; otherwise NOT SUPPORTED, naming each failure. Reported beside it, not in the verdict: the same ten stimuli through `flyEmdLplc2Gf.mjs`'s own multiplicative cross unit (Zhao et al.), whose product of four arms gives zero for any single arm -- the case the text calls "detectable".
 
 **EXPECTATION.** P1, P3, P5 and P6 hold by the model's construction about 85 percent each (the opponent sum cancels uniform motion; the square makes two arms more than one); P2 is the riskiest -- one arm's 15 degree disk sees the moving edge only near its centre, about 65 percent; P7 about 60 percent (a wide bar's long edges move across the subunits, inhibiting). SUPPORTED overall about 35 percent.
+
+## Part 6. THE LPLC2 SUBUNIT ROUND, RESULT (2026-11-26; `brain/lplc2SubunitsRun.json`, run once, committed unread at `555ee3dd7`, then read ONCE)
+
+**THE VERDICT (registered): NOT SUPPORTED (P7).** Six of the seven predictions hold; the wide-bar prediction fails, and not by a hair.
+
+| | response, % of the outward cross S1 | holds? |
+|---|---|---|
+| P1 outward cross S1 / inward cross S2 | 100 / 0.0 | yes |
+| P2 one arm S3r, S3l (each below S4) | 6.3, 6.2 | yes |
+| P3 one axis S4 against S3r + S3l | 25.0 against 12.5 | yes |
+| P4 S4 with the orthogonal axis inward (S5) | 15.1 (below 25.0) | yes |
+| P5 wide-field translation S6 | 0.0 | yes |
+| P6 looming disc S7 / receding S8 | 406 / 0.0 | yes |
+| **P7 diagonal bar: 60 degrees wide (S10) against 10 (S9)** | **510 against 56** | **no** |
+
+**Reported beside it (not in the verdict):** Zhao et al.'s multiplicative cross unit (`flyEmdLplc2Gf.mjs`, its own rule, a 60 degree field) on the same frames is active on 152 frames of the outward cross and 250 of the looming disc, and on NONE of the single-arm, one-axis or mixed stimuli (S3r, S3l, S4, S5: 0 frames) -- where the paper says single arms give "detectable, but small responses". The subunit model gets that part right and the product of four arms cannot.
+
+**What it says.**
+* Radial opponency summed before a squaring nonlinearity reproduces every qualitative claim the text makes about the cross: outward not inward, single arms small but there, two arms more than the sum, inward motion on the other axis subtracting, no response to translation, looming not receding.
+* It does NOT reproduce the orientation tuning: a 60 degree bar expanding between the cardinal axes drives it nine times harder than a 10 degree one, where the paper shows the wide bar's response falling there (the clover of Figure 3f and Figure 4e,f). The reason is visible in the construction: a wide bar's expanding ends move diagonally outward, which has an outward component along BOTH axes in all four of these large, round, overlapping subunits, so everything it shows excites. Nothing in this model is narrow or oriented enough to tell a diagonal expansion from a radial one.
+* The disc (S7) driving the cell four times the cross is not a prediction and not compared with the paper (the text normalizes single cells to the disc, so the paper's cross is below 100 % of it, which matches in direction only).
+
+**What it does not say.** Nothing about the numbers in Figure 4 (only in the images); nothing about speed tuning or the population; a single cell drawn in its own cardinal axes, not the retinotopic population of Part 1.
+
+**Status: round CLOSED.** The backlog entry `fly-lplc2-subunit-model` is closed; the next question (an oriented subunit) is entered as `fly-lplc2-oriented-arms`, to be registered before it is built.
