@@ -196,3 +196,17 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `fly-lplc2-o
 * The larger miss is the one both rounds share: **a 60 degree bar drives this cell 7 to 9 times harder than a 10 degree bar, in either orientation**, where the paper's wide bars give LESS (Figure 3f's clover is a fall between the axes; Part 2 records "wide stimuli reduce the response through motion at the periphery of the field"). The model has no periphery: its four subunits reach 25 degrees and nothing outside them inhibits. The direction tuning was not the missing piece; a suppressive surround is the next candidate.
 
 **Status: round CLOSED.** Backlog `fly-lplc2-oriented-arms` is closed; the next question is entered as `fly-lplc2-wide-suppression`. The population round (`fly-lplc2-population`) waits on it: the single cell is not yet settled, which that entry required.
+
+## Part 9. THE WIDE-SUPPRESSION ROUND, REGISTERED (2026-11-26, before its code and before any stimulus is run)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- the LPLC2 population (`fly-lplc2-population`) was to wait until the single cell is settled, and Part 8 says it is not; this round is the step that entry's condition asks for (backlog `fly-lplc2-wide-suppression`).
+
+**WHY THIS CHANGE.** Parts 6 and 8: a 60 degree bar drives the cell 7 to 9 times a 10 degree bar in either orientation, where the paper's wide bars give less; Part 2 records "wide stimuli reduce the response through motion at the periphery of the field". A wide bar's expanding ends reach far off the cell's axes, where none of the four subunit disks lies; a narrow bar's ends stay near the axes, inside them.
+
+**THE MODEL (FIXED NOW): Part 7's (the signed squared cosine), with ONE change.** A **surround**: every pixel within 30 degrees of the cell's centre (the paper's 60 degree field) that lies in NONE of the four subunit disks. The cell is R = [ sum of the four drives - w x E ]+ squared, E the surround's motion energy (the sum of |m| = hypot(dh, dv) over its pixels, of any direction), **w = 1** (the surround's motion counts as much as an arm's; one weight, fixed here). Everything else is Part 7's.
+
+**THE STIMULI AND PREDICTIONS.** Part 7's S1 to S11 and P1 to P8, unchanged, and run ONCE. Reported, not in the verdict: each stimulus's surround energy at the response's peak window, and the Part 7 model's numbers beside them.
+
+**THE VERDICT.** SUPPORTED iff all eight hold; otherwise NOT SUPPORTED, naming each failure.
+
+**EXPECTATION.** P7 and P8 are the question and the surround acts on both: a wide bar's off-axis ends land in it. The risk is the rest: the cross's arm tips (25 to 30 degrees) and the looming disc's edge past about 21 degrees on the diagonals also land in it, so P1 and P6 could fall, and with w = 1 the surround may silence the wide bars entirely (S10 and S11 both 0, which fails P8). P7 holds about 70 percent, P8 about 35, P1 to P6 about 70 together; SUPPORTED about 25 percent.
