@@ -570,3 +570,16 @@ Round C's five checks, plus:
 * The command's modes devE, devE-read, heldE and heldE-read.
 * Gate rows and sabotages.
 * The two rock-nav replays re-run here, to show the fix left Rounds A and C's DEV fields as recorded.
+
+## ROUND E, BUILT (2026-11-26): the fix, and what it changes in Round C's own DEV
+The two replays were run in the cloud session after the fix, through tools/ship/studyRunner.mjs:
+- **rock-nav-a-dev-replay: IDENTICAL**, all 240 rows. The fix leaves Round A's fields as recorded.
+- **rock-nav-c-dev-replay: DIFFERS**, as the fix predicts. 226 of 240 rows are unchanged. By struck, damage, R, time and pilot calls, 11 rows differ:
+  - every one is an arm F row from a fight whose following field met an empty lane;
+  - NO arm L row and no F row without an empty lane moved;
+  - five F fights met an empty lane without moving (no fighter was outside 220 during those spells).
+- **In the 11 changed fights:**
+  - fallbacks fell from hundreds or thousands to tens (4,187 to 46 at seed 3523 bow);
+  - the rock strikes did not change in any of them;
+  - the damage on the ship moved both ways (54 more, 100 less, and so on).
+- This is Round C's DEV, already read; it moves no verdict. It agrees with the diagnostic: the defect sent fighters to the doctrine, and the doctrine did not walk them into rocks on these fights.
