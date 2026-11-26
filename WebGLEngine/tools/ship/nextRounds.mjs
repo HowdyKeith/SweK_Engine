@@ -3091,8 +3091,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stealth-masking-principle",
-        blocker: "OPEN",
-        what: "stealth-contrast-gain (corrected) needs a static-texture masking term with ONE constant chosen on a principle, not fitted to Round 29/30's C2.",
+        blocker: "UPSTREAM -- needs Treadmill_data.csv from Dryad (doi 10.5061/dryad.jh9w0vtkq; Dryad refuses automated downloads, so a person must fetch the zip)",
+        what: "LOOKED INTO 2026-11-26 (brain/STEALTH_ROUNDS_WIP.md, the masking principle): Santon et al. 2025's text proposes NO mechanism for static stripes and states NO low-contrast static drop in words -- C2 rests on values read off Figure 2's image. The model's stripes already match the paper's definition. Next: check the drop in the raw data (response rate by stimulus at WC 0.2 and 0.4); if it is not credible, the change is to the criterion, registered as such. Was: stealth-contrast-gain (corrected) needs a static-texture masking term with ONE constant chosen on a principle, not fitted to Round 29/30's C2.",
         how: "Read Santon et al. 2025 for what the static stripes do at low contrast and any stated mechanism; write the principle into brain/STEALTH_ROUNDS_WIP.md; then register the term.",
         why: "Choosing the constant blind would make the round's verdict mean little.",
     },
