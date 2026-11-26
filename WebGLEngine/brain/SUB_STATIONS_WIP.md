@@ -1022,3 +1022,26 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-re
 * The broaches HOLD-R leaves (10 here) are not fixed by speed; a rule for them would need to know the boat will reach the surface, not only that it is rising.
 
 **Status: round 21 CLOSED.** Backlog `stations-release-on-rise` is closed with this result.
+
+## 46. ROUND 22, REGISTRATION (2026-11-26, committed before any seed of its sets is flown and before its code)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-courier-hold-release`. No stations file uses a seed from 224000 to 225999 (grep, 2026-11-26).
+
+### ROUND 22: THE COURIER'S HOLD, LET GO ONCE THE CHARGE IS BACK
+
+**THE QUESTION.** Round 19's HOLD-C kept boats (92 against COND's 73) and lost half the goals, because the held blow keeps the boat at the surface for good. A courier's battery recharges at the surface. If the hold is let go once the charge is back, does the courier keep the hold's survival AND COND's deliveries?
+
+**THE CREWS, FIXED NOW.**
+* **COND**: round 10's, unchanged.
+* **HOLD-CR**: round 19's HOLD-C with ONE change: once held, **the hold is cleared when the battery reads at least half full (frac 0.5)** -- the blow is no longer forced and the latch is re-armed, so NEED's trigger can fire again on a later sinking. One constant, fixed here.
+* Reported, not in the verdict: **HOLD-C** (round 19's, no release) on the same runs.
+
+**THE TASK.** Round 7's breached courier, unchanged.
+
+**THE SETS.** DEV: 224001 to 224024. HELD: 225001 to 225096.
+
+**THE DEV CHECK (non-degeneracy, nothing chosen).** HOLD-CR and COND must differ in goals or survival on at least 4 of the 24 DEV runs; otherwise STOPPED AT DEV.
+
+**THE VERDICT (HELD, once).** Round 15's (`learnedCourier.verdict15`) with HOLD-CR in PRICED's place: HOLD-CR against COND on the mission value, goals and survival reported the same way. Reported beside it: HOLD-C on the same runs; for each run, how many times the hold fired and how many times it was let go (recorded in the HELD records this time).
+
+**EXPECTATION.** NO DIFFERENCE SHOWN about 45 percent (a released boat is again a boat in trouble); HOLD-CR BEATS COND about 30; COND BEATS HOLD-CR about 25.
