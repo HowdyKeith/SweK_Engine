@@ -160,3 +160,20 @@ Keith, 2026-11-26: "Let's do ... item 7" -- backlog `fly-lplc2-subunit-model`.
 **What it does not say.** Nothing about the numbers in Figure 4 (only in the images); nothing about speed tuning or the population; a single cell drawn in its own cardinal axes, not the retinotopic population of Part 1.
 
 **Status: round CLOSED.** The backlog entry `fly-lplc2-subunit-model` is closed; the next question (an oriented subunit) is entered as `fly-lplc2-oriented-arms`, to be registered before it is built.
+
+## Part 7. THE ORIENTED-ARMS ROUND, REGISTERED (2026-11-26, before its code and before any stimulus is run)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `fly-lplc2-oriented-arms`.
+
+**WHY THIS CHANGE.** Part 6's failure is in the arms' DIRECTION tuning, not their shape: a 60 degree bar expanding along the diagonal has ends moving at 45 degrees to every arm, and each arm takes the plain x or y component of the local motion -- cos 45 = 0.71 of it -- on all four arms; the same bar along a cardinal axis drives two arms at full strength. Narrower arms would not change that (the bar's ends cross all four). Part 2 records T4/T5 as tuned over "a broad range of about 90 degrees"; read as a half maximum at 45 degrees off the preferred direction, that is a squared cosine, not a cosine.
+
+**THE MODEL (FIXED NOW): Part 5's, with ONE change.** At each pixel the local motion m = (dh, dv) drives an arm along its outward axis u by |m| times s(cos theta), theta the angle between m and u, s(c) = c |c| (a SIGNED squared cosine: half the drive at 45 degrees, none at 90, the same inhibition mirrored for inward motion), in place of Part 5's plain component (|m| cos theta). Everything else is Part 5's: the four 15 degree disks at 10 degrees, the sum before the rectification, the square, the 300 ms peak, layer 1 unchanged.
+
+**THE STIMULI.** Part 5's S1 to S10, unchanged, and ONE new one: **S11**, Part 5's S10 (the 60 degree wide bar, expanding symmetrically at 20 degrees/s from a half-length of 5 to 30) laid along the cell's +x axis (a cardinal axis) instead of the diagonal.
+
+**THE PREDICTIONS (registered; the model is deterministic and run ONCE).** P1 to P7 as Part 5 wrote them, and:
+* **P8 (the clover):** S11 > S10 -- the wide bar drives the cell more along a cardinal axis than between them.
+
+**THE VERDICT.** SUPPORTED iff all eight hold; otherwise NOT SUPPORTED, naming each failure. Reported, not in the verdict: Part 5's model on S11 (whether it had the clover at all), and Zhao et al.'s unit on S11.
+
+**EXPECTATION.** P7 and P8 are the question: four arms at half drive against two at full is a near tie by the arithmetic above, and layer 1's detectors are separable x and y, so a diagonal edge's local vector is not exactly diagonal -- P7 and P8 hold about 40 percent; P1 to P6 should still hold (the change only weakens off-axis drive) about 85 percent; SUPPORTED about 35.
