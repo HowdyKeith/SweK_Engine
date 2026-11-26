@@ -435,3 +435,48 @@ Round A's per-fighter endpoints, R (spaceDoctrineStudy.rOf), and the cap's own c
 * The command's modes devD, devD-read, heldD and heldD-read.
 * Gate rows and sabotages.
 * A `fly` study entry is NOT added: HELD is a sandbox-sized run (about 15 minutes on 4 cores).
+
+## ROUND D, RESULT (2026-11-26): THE CAP SAVES FIGHTERS IN THE STRAFE
+
+**DEV** (3701-3730, 120 pairs): all five checks passed.
+- The hand-back was exact on 490,424 calls, read before the cap.
+- In LC, 340,946 calls were at or over 12; 238,534 were cut and none flew with thrust.
+- L cut nothing and had 186,508 over-cap calls with thrust.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (3801-3890 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/heldD-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | L (lane) | LC (lane + cap 12) |
+|---|---|---|
+| rock strikes after arriving | 112 | 59 |
+| rock strikes before arriving | 21 | 17 |
+| all rock strikes | 133 | 76 |
+| shot before arriving | 119 | 186 |
+| arrived | 2734 | 2667 |
+| median arrival | 15.93 s | 21.00 s |
+| mean R | 247.7 | 1062.4 |
+| ships destroyed | 1 | 74 |
+| doctrine fallbacks | 82,956 | 47,077 |
+
+- **V1 THE STRAFE:** CAP BETTER. The cap was better in 63 fights, worse in 17, tied in 280; p < 0.0001.
+- **V2 THE ATTACK:** not L BETTER. It is in fact CAP BETTER, in 354 fights against 5.
+- **Reported:**
+  - All rock strikes: CAP BETTER (67 against 17).
+  - Strikes before arriving: FLOOR.
+  - Shot before arriving: L BETTER (37 against 92). The slower approach costs about 0.19 fighters a fight to the guns.
+
+**Against the expectations (written first):**
+- V1 CAP BETTER, about 75: YES.
+- V2 not L BETTER, about 95: YES.
+- V2 CAP BETTER on R, about 90: YES.
+- More shot before arriving under LC, about 80: YES (186 against 119).
+
+**WHAT THIS MEANS.**
+- The cap halves the momentum strikes the clear lane left, and with the layer it turns the attack from scratching the ship (mean R 248, 1 kill in 360) into killing it in a fifth of fights (74 of 360). That is the space-doctrine round's finding, now reproduced inside the rock field.
+- The price is the one the survey showed: the slower fighters spend 5 s longer arriving and lose about 0.19 more of their number to the gunners on the way.
+- **Fallbacks also fell by 43%**, which no round predicted.
+  - The likeliest reading is that fewer fighters overshoot the strafe sphere outward and sit in stale goal cells.
+  - That reading is unmeasured; backlog space-nav-fallback-cause holds the diagnostic.
+- **The page (space-battleship.html) flies the layer without the cap**, as Round B left it.
+  - A cap option on the page is a small follow-on, filed with this result.
+  - The layer's own default does not change: the cap is the doctrine's choice, not the layer's.

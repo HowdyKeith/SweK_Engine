@@ -1,0 +1,84 @@
+{
+ "v1": {
+  "verdict": "CAP BETTER",
+  "wins": 63,
+  "losses": 17,
+  "ties": 280,
+  "n": 80,
+  "p": 2.2661405044675457e-7
+ },
+ "v2": {
+  "verdict": "CAP BETTER",
+  "wins": 354,
+  "losses": 5,
+  "ties": 1,
+  "n": 359,
+  "p": 8.347315669126995e-98
+ },
+ "bottom": "THE CAP SAVES FIGHTERS IN THE STRAFE",
+ "reported": {
+  "LC": {
+   "fights": 360,
+   "approachStruck": 17,
+   "approachShot": 186,
+   "arrived": 2667,
+   "combatStruck": 59,
+   "struck": 76,
+   "medianArrivalT": 21,
+   "meanR": 1062.3612037037035,
+   "meanDamage": 1043.8666666666666,
+   "shipDead": 74,
+   "fallbacks": 47077,
+   "near": 154936,
+   "overCap": 1001179,
+   "capCut": 703562,
+   "capNotCut": 0
+  },
+  "L": {
+   "fights": 360,
+   "approachStruck": 21,
+   "approachShot": 119,
+   "arrived": 2734,
+   "combatStruck": 112,
+   "struck": 133,
+   "medianArrivalT": 15.933333333333334,
+   "meanR": 247.65824074074075,
+   "meanDamage": 247.49722222222223,
+   "shipDead": 1,
+   "fallbacks": 82956,
+   "near": 133163,
+   "overCap": 1128510,
+   "capCut": 0,
+   "capNotCut": 557276
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 9,
+   "losses": 5,
+   "ties": 346,
+   "n": 14,
+   "p": 0.4239501953125
+  },
+  "approachShot": {
+   "verdict": "L BETTER",
+   "wins": 37,
+   "losses": 92,
+   "ties": 231,
+   "n": 129,
+   "p": 0.0000013971449486152944
+  },
+  "struck": {
+   "verdict": "CAP BETTER",
+   "wins": 67,
+   "losses": 17,
+   "ties": 276,
+   "n": 84,
+   "p": 3.495893514797303e-8
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}
