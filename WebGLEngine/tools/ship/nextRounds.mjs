@@ -3091,10 +3091,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stealth-masking-principle",
-        blocker: "UPSTREAM -- needs Treadmill_data.csv from Dryad (doi 10.5061/dryad.jh9w0vtkq; Dryad refuses automated downloads, so a person must fetch the zip)",
-        what: "LOOKED INTO 2026-11-26 (brain/STEALTH_ROUNDS_WIP.md, the masking principle): Santon et al. 2025's text proposes NO mechanism for static stripes and states NO low-contrast static drop in words -- C2 rests on values read off Figure 2's image. The model's stripes already match the paper's definition. Next: check the drop in the raw data (response rate by stimulus at WC 0.2 and 0.4); if it is not credible, the change is to the criterion, registered as such. Was: stealth-contrast-gain (corrected) needs a static-texture masking term with ONE constant chosen on a principle, not fitted to Round 29/30's C2.",
-        how: "Read Santon et al. 2025 for what the static stripes do at low contrast and any stated mechanism; write the principle into brain/STEALTH_ROUNDS_WIP.md; then register the term.",
-        why: "Choosing the constant blind would make the round's verdict mean little.",
+        blocker: "OPEN",
+        what: "READ 2026-11-26 from the raw data (vendor/santon2025/Treadmill_data.csv, brain/STEALTH_ROUNDS_WIP.md 'The low-contrast drop, read from the raw data'): the static-stripe drop at low contrast is REAL -- at WC 0.2 Grey 0.28, Static 0.09, Moving 0.04 (within crab: Grey above Static 6 to 0, p 0.031; Static and Moving level) -- and gone by 0.6. The paper gives no mechanism. The model's gap (C2, Rounds 29-30) is real.",
+        how: "Register first whether the gap is the network's or the READOUT's: the animal's numbers are response probabilities near threshold at 0.2, the model's r an alarm size with no threshold region. One candidate: a probabilistic readout of the alarm whose single constant is fixed from the PLAIN ellipse's contrast curve alone, then tested on both stripe kinds with Rounds 29-30's criteria word for word.",
+        why: "Before a new term in the network, check that the comparison itself is fair.",
     },
     {
         id: "ship-census-rederive",

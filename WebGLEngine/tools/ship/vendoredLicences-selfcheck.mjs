@@ -53,8 +53,9 @@ console.log("\n2. *** COUNTING BY FILENAME IS WRONG IN BOTH DIRECTIONS, AND HERE
     // (Merging with the fish branch, which took 6 -> 8 for vendor/zebrafish and vendor/hemibrain, makes it 9.)
     // UNNUMBERED (the fish round) -- 6 -> 7: vendor/zebrafish arrived, whose grant is the Fish1 DATA POLICY quoted in its PROVENANCE.md (no licence text exists to name), so a filename census cannot see it either.
     // UNNUMBERED (the fly central-complex round) -- 7 -> 8: vendor/hemibrain arrived, whose grant is the release's CC-BY 4.0 recorded in its PROVENANCE.md, so a filename census cannot see it either.
+    // 2026-11-26 -- 9 -> 10: vendor/santon2025 arrived (Santon et al. 2025's crab treadmill data), whose grant is Dryad's CC0 policy recorded in its PROVENANCE.md, so a filename census cannot see it either.
     ok("!! a filename census flags " + naive.length + " directories as unpapered",
-        naive.length === 9, naive.join(", "));
+        naive.length === 10, naive.join(", "));
     const real = unpapered();
     ok("!! *** AND THE TRUE ANSWER IS " + real.length + ", SO EVERY ONE OF THE " + naive.length + " IS WRONG ***",
         real.length === 0,

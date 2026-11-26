@@ -657,3 +657,18 @@ Response r = (74 - alarm size) / 74; every cell alarms (alarm sizes 15 to 39 deg
 * The text compares the stimuli ONLY at high contrast: "Crabs were more likely to react to high-contrast stimuli (e.g., WC = 1) without stripes or with stationary stripes than with stripes moving in a downward direction". **It states no low-contrast static-versus-plain difference in words, and proposes NO mechanism for static stripes** (its one mechanism: downward motion "overwhelming the threatening motion cues").
 **What this means for the gap.** Rounds 13, 29 and 30's C2 -- the low-contrast drop of STATIC stripes -- rests on values read off Figure 2's image (Round 13), with no stated statistic behind it. Before any masking term is registered, the drop itself should be checked in the data: the response rate by stimulus at WC 0.2 and 0.4 from `Treadmill_data.csv`, or Table S1's posterior differences. If the static drop is not credible in the data, C2 asks the model for something the animal may not show, and the right change is to the criterion (registered as such), not to the model.
 **Status:** blocked on the data file, which a person can download from Dryad (https://datadryad.org/dataset/doi:10.5061/dryad.jh9w0vtkq) and place in the tree for a reading.
+
+## The low-contrast drop, read from the raw data (2026-11-26; `vendor/santon2025/Treadmill_data.csv`, Keith's download from Dryad; a reading, not a registered round)
+753 trials, 55 crabs. Responded / shown:
+
+| Weber contrast | Grey (plain) | Static stripes | Moving stripes |
+|---|---|---|---|
+| 0.2 | 15/54 = 0.28 | 4/46 = 0.09 | 2/49 = 0.04 |
+| 0.4 | 28/53 = 0.53 | 17/50 = 0.34 | 24/50 = 0.48 |
+| 0.6 | 33/51 = 0.65 | 31/51 = 0.61 | 23/50 = 0.46 |
+| 0.8 | 43/53 = 0.81 | 40/51 = 0.78 | 30/53 = 0.57 |
+| 1.0 | 35/46 = 0.76 | 33/45 = 0.73 | 30/52 = 0.58 |
+
+Paired within each crab at the same contrast (crabs that responded to one and not the other; exact two-sided sign test): **at 0.2, Grey above Static 6 to 0 (p = 0.031), Grey above Moving 15 to 2 (p = 0.002), Static against Moving 4 to 2 (p = 0.69)**; at 0.4 Grey above Static 14 to 6 (p = 0.12); from 0.6 Grey and Static are level (11 to 11, 8 to 7, 7 to 7); at 0.8 Moving is below both (Grey 16 to 5, p = 0.027; Static 17 to 5, p = 0.017).
+**What it says.** The low-contrast drop of STATIC stripes is in the animal's data, not a figure-reading artefact: at 0.2 both stripe kinds fall below the plain ellipse, about equally, and the static drop is gone by 0.6 -- exactly the shape C2 (Rounds 13, 29, 30) asks for. **So the model's gap is real**, and the mechanism the paper does not give is still needed.
+**A lead, not a result.** The animal's numbers are response PROBABILITIES, near threshold at 0.2 (the plain ellipse 0.28), where a small loss of drive is a large loss of probability; the model's r is an ALARM SIZE, which has no threshold region. A striped ellipse carries the light value on 5/6 of its area and a near-background dark band on 1/6 (thin-stripe RGB 164 at 0.2, against a background of about 186). Whether the gap is the network's or the readout's (alarm size compared with a probability) is the question to register first -- for example a probabilistic readout of the alarm with its one constant fixed from the plain ellipse's contrast curve alone, tested on the stripes.

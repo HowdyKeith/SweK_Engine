@@ -72,7 +72,13 @@ export const VENDORED = Object.freeze([
             "the only one here that constrains RENAMING rather than copying." },
     { path: "vendor/gifenc",    kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/web-ocean", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4880 spike: noniv/web-ocean ocean.html, byte-identical, pinned by tools/ship/oceanSpikePage-selfcheck.mjs
-    { path: "vendor/snowflow", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4895 snowflow lift: Noniv/snowflow_demo, five files byte for byte, pinned by tools/ship/snowflowVendor-selfcheck.mjs
+    { path: "vendor/snowflow", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    { path: "vendor/smaa", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4933 (main's PlayCanvas line): the SMAA lookup tables from playcanvas@2.24.2, PROVENANCE.md beside them; undeclared until 2026-11-26
+    // 2026-11-26 -- Santon et al. 2025's crab treadmill data (stealth masking reading). DATA, NOT CODE; the grant is Dryad's CC0 policy recorded in PROVENANCE.md, not re-read from the record's page.
+    { path: "vendor/santon2025", kind: KIND.THIRD_PARTY, spdx: "CC0-1.0", grant: GRANT.NAMED_OTHER, file: "PROVENANCE.md",
+      upstream: "https://datadryad.org/dataset/doi:10.5061/dryad.jh9w0vtkq (Santon, Troscianko, Heatubun, How 2025, Sci Adv 11:eadr3686, doi:10.1126/sciadv.adr3686)",
+      pin: "Treadmill_data.csv as deposited (version of 27 Feb 2025), downloaded by Keith 2026-11-26; sha256 80da04ea975c3020fabdcdde8a7047342dde260be413e6db1983a91f9772aeab",
+      note: "*** DATA, NOT CODE, AND THE GRANT IS DRYAD'S STATED CC0 POLICY, RECORDED IN PROVENANCE.md, NOT RE-READ FROM THE RECORD. *** One CSV of crab responses, unchanged. CC0 asks nothing; the citation is carried anyway." },   // v4895 snowflow lift: Noniv/snowflow_demo, five files byte for byte, pinned by tools/ship/snowflowVendor-selfcheck.mjs
     { path: "vendor/grass",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     // v4498 -- the core of guillermolg00/morphicons (three files, no DOM, no dependencies), vendored when physics/mesh/strokeMorph.mjs's
     // written refusal expired: font glyphs are closed multi-subpath outlines, which is the half that file said not to re-derive.
