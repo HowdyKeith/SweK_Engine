@@ -5,6 +5,7 @@
 // layer 1 is brain/flyEmdLplc2Gf.mjs's motion detectors unchanged; four disks of radius 15 degrees at 10 degrees from the centre along +x, -x, +y, -y; each disk's drive is the outward motion along its
 // axis summed over the disk, less the inward; the cell is [sum of the four drives]+ squared; a stimulus's response is the largest 300 ms mean.
 // The stimuli are Part 4's, read from the text, with the arms' reach (30 degrees from the centre) ASSUMED where only the figure gives it. Edges are drawn with fractional coverage (4 x 4 supersampling).
+// 2026-11-26 -- PART 7 (registered first): `tuning: "cos2"` reads each arm's motion through a signed squared cosine; S11 the 60 degree bar on a cardinal axis; predictions7 adds the clover (P8).
 // Pure: no DOM, no clock, no Math.random, no file.
 "use strict";
 import * as FE from "./flyEmdLplc2Gf.mjs";
@@ -14,6 +15,10 @@ export const SUBUNITS = Object.freeze({ offset: 10, radius: 15 });
 export const STIM = Object.freeze({ background: 0.5, dark: 0, holdS: 2, barWidth: 10, edgeSpeed: 20, centreSquare: 10, reach: 30, discFrom: 5, discTo: 60, discSpeed: 10, gratingPeriod: 20, wideBar: 60 });
 export const PEAK_WINDOW_S = 0.3;
 export const STIMULI = Object.freeze(["S1", "S2", "S3r", "S3l", "S4", "S5", "S6", "S7", "S8", "S9", "S10"]);
+/** PART 7 (the oriented-arms round): Part 5's stimuli and S11, the 60 degree bar along the cell's +x axis (a cardinal axis). */
+export const STIMULI7 = Object.freeze([...STIMULI, "S11"]);
+/** Part 5's arm reads the plain component of the local motion along its axis; Part 7's reads it through a signed squared cosine (half the drive at 45 degrees). */
+export const TUNINGS = Object.freeze(["component", "cos2"]);
 
 const X0 = (FRAME.w - 1) / 2, Y0 = (FRAME.h - 1) / 2, SS = 4;
 
@@ -61,11 +66,12 @@ export function stimulus(name) {
             const r = name === "S7" ? (t) => r0 + STIM.discSpeed * t : (t) => r1 - STIM.discSpeed * t;
             return { name, frames: moving((t) => { const R = r(t); return (x, y) => x * x + y * y <= R * R; }, T), motionS: T };
         }
+        case "S11": { const L0 = grow; return { name, frames: moving((t) => { const L = L0(t); return (x, y) => Math.abs(x) <= L && Math.abs(y) <= STIM.wideBar / 2; }, reachT), motionS: reachT }; }
         case "S9": case "S10": {
             const W = name === "S9" ? STIM.barWidth : STIM.wideBar, c = Math.SQRT1_2;
             return { name, frames: moving((t) => { const L = grow(t); return (x, y) => Math.abs(c * (x + y)) <= L && Math.abs(c * (y - x)) <= W / 2; }, reachT), motionS: reachT };
         }
-        default: throw new Error(`lplc2Subunits.stimulus: no stimulus named ${JSON.stringify(name)} (${STIMULI.join(", ")})`);
+        default: throw new Error(`lplc2Subunits.stimulus: no stimulus named ${JSON.stringify(name)} (${STIMULI7.join(", ")})`);
     }
 }
 
@@ -84,9 +90,12 @@ export function masks({ offset = SUBUNITS.offset, radius = SUBUNITS.radius } = {
  * The cell from one frame's motion maps (dh: + is motion toward +x; dv: + is motion toward +y, as flyEmdLplc2Gf's maps): each subunit's drive is the outward motion along its axis summed over its disk
  * (the inward motion counts negative, one weight for both signs), and R = [the four drives summed]+ squared. Returns { drives, R }.
  */
-export function cellFromMaps(dh, dv, M = masks()) {
-    const sum = (a, idx) => { let s = 0; for (const i of idx) s += a[i]; return s; };
-    const drives = { "+x": sum(dh, M["+x"]), "-x": -sum(dh, M["-x"]), "+y": sum(dv, M["+y"]), "-y": -sum(dv, M["-y"]) };
+export function cellFromMaps(dh, dv, M = masks(), { tuning = "component" } = {}) {
+    if (!TUNINGS.includes(tuning)) throw new Error(`lplc2Subunits.cellFromMaps: a tuning is ${TUNINGS.join(" or ")}, got ${JSON.stringify(tuning)}`);
+    // component: the arm takes |m| cos(theta) = the component itself. cos2 (Part 7): |m| cos(theta) |cos(theta)| = c |c| / |m| for the component c -- the same sign, half the drive at 45 degrees, none at 90.
+    const along = tuning === "component" ? (a) => a : null;
+    const sum = (a, b, idx) => { let s = 0; for (const i of idx) { const c = a[i]; if (along) s += c; else { const m = Math.hypot(a[i], b[i]); if (m > 0) s += (c * Math.abs(c)) / m; } } return s; };
+    const drives = { "+x": sum(dh, dv, M["+x"]), "-x": -sum(dh, dv, M["-x"]), "+y": sum(dv, dh, M["+y"]), "-y": -sum(dv, dh, M["-y"]) };
     const s = drives["+x"] + drives["-x"] + drives["+y"] + drives["-y"];
     return { drives, R: s > 0 ? s * s : 0 };
 }
@@ -100,9 +109,9 @@ export function peakWindow(trace, n = Math.round(PEAK_WINDOW_S / FRAME.step)) {
 }
 
 /** One stimulus through layer 1 and the subunit cell: { name, peak, trace }. */
-export function respond(frames, M = masks()) {
+export function respond(frames, M = masks(), { tuning = "component" } = {}) {
     const m = FE.createModel({ w: FRAME.w, h: FRAME.h, units: [{ x: Math.round(X0), y: Math.round(Y0) }], keepMaps: true }), trace = [];
-    for (const f of frames) { const r = m.step(f); trace.push(r.maps ? cellFromMaps(r.maps.dh, r.maps.dv, M).R : 0); }
+    for (const f of frames) { const r = m.step(f); trace.push(r.maps ? cellFromMaps(r.maps.dh, r.maps.dv, M, { tuning }).R : 0); }
     return { peak: peakWindow(trace), trace };
 }
 
@@ -128,3 +137,12 @@ export function predictions(p) {
     const failed = P.filter((x) => !x.holds).map((x) => x.id);
     return { predictions: P, verdict: failed.length ? `NOT SUPPORTED (${failed.join(", ")})` : "SUPPORTED" };
 }
+
+/** PART 7'S REGISTERED PREDICTIONS: Part 5's P1 to P7 and P8 (the clover, S11 > S10), and the verdict. */
+export function predictions7(p) {
+    if (!Number.isFinite(p.S11)) throw new Error("lplc2Subunits.predictions7: no finite response for S11");
+    const base = predictions(p).predictions, P = [...base, { id: "P8", holds: p.S11 > p.S10, detail: "S11 > S10 (the clover)" }];
+    const failed = P.filter((x) => !x.holds).map((x) => x.id);
+    return { predictions: P, verdict: failed.length ? `NOT SUPPORTED (${failed.join(", ")})` : "SUPPORTED" };
+}
+

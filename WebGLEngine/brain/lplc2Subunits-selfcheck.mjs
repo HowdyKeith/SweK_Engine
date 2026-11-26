@@ -7,6 +7,9 @@
 //   U05 40 degrees/s | U06 the reach 40 | U07 S2 outward | U08 S3l on +x | U09 S5's y arms outward | U10 S9 on the x axis | U11 a 100 ms window | U12 P3 against one arm | U13 P5 at 20 % | U14 S8 looming |
 //   U15 edges without coverage | U16 no hold before the motion. FIRST PASS: four rows of mine were wrong, not the module -- the grating's dark fraction (90 px is 4.5 periods), the overlapping disks (the
 //   registered geometry shares |x| < 5 between +x and -x), a spike placed within a window of the plateau, and a P3 fixture that also crossed P4; each row was corrected to what the registration says.
+// 2026-11-26 -- PART 7 (section 6): 8 mutants of lplc2Subunits.mjs, every one red by name (final pass): O1 cos alone (no |m|) | O2 the sign lost | O3 a y arm against the wrong second component | O4 cos2 never used |
+//   O5 S11 10 degrees wide | O6 P8 always true | O7 respond dropping the tuning | O8 no S11. O1, O3 and O7 WENT 0 RED FIRST: unit-sized motion makes cos and |m| cos^2 coincide, equal x and y components hide a
+//   wrong second component, and nothing ran respond with cos2 -- rows for each now (twice the motion, motion (2, 1), a diagonally moving square under both tunings).
 "use strict";
 import * as L from "./lplc2Subunits.mjs";
 
@@ -48,8 +51,8 @@ guarded("section 2", () => {
     ok("S9 ends as a 10 x 60 bar on the diagonal (600 px), S10 as 60 x 60 (3,600)", near(s9.b, 600, 6) && near(s10.b, 3600, 20), J([s9.b, s10.b]));
     const f9 = L.stimulus("S9").frames.at(-1);
     ok("...on the DIAGONAL: 20 degrees along +x+y is dark, 20 degrees along +x is grey", at(f9, 14, 14) === 0 && at(f9, 20, 0) === 0.5, J([at(f9, 14, 14), at(f9, 20, 0)]));
-    let threw = null; try { L.stimulus("S11"); } catch (e) { threw = e.message; }
-    ok("an unknown stimulus is refused by name", /no stimulus named "S11"/.test(threw || ""), threw);
+    let threw = null; try { L.stimulus("S12"); } catch (e) { threw = e.message; }
+    ok("an unknown stimulus is refused by name", /no stimulus named "S12"/.test(threw || ""), threw);
 });
 
 sec("3. the subunit rule on hand-made motion maps");
@@ -95,6 +98,43 @@ guarded("section 5", () => {
     ok("draw: a 1 degree square at the centre darkens exactly the pixels it covers (1 px in all), with the frame's size", f.w === 90 && f.h === 90 && Math.abs(f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0) - 1) < 1e-9);
     const r = L.respond(grey), z = L.respondZhao(grey);
     ok("respond and respondZhao: a still grey screen gives the subunit cell 0 at every frame and Zhao's unit no active frame", r.trace.length === 60 && r.trace.every((v) => v === 0) && r.peak === 0 && z.activeFrames === 0, J({ peak: r.peak, zhao: z }));
+});
+
+sec("6. PART 7 (the oriented-arms round): the signed squared cosine, S11 and the clover, on hand-made maps and fixtures");
+guarded("section 6", () => {
+    ok("Part 7's stimuli are Part 5's and S11; the two tunings are component (Part 5) and cos2 (Part 7)", J(L.STIMULI7) === J([...L.STIMULI, "S11"]) && J(L.TUNINGS) === J(["component", "cos2"]) && Object.isFrozen(L.STIMULI7));
+    const M = L.masks(), n = 8100, X0 = 44.5, field = (f) => { const a = new Float64Array(n); for (let py = 0; py < 90; py++) for (let px = 0; px < 90; px++) a[py * 90 + px] = f(px - X0, py - X0); return a; };
+    const onlyX = (v) => { const a = new Float64Array(n); for (const i of M["+x"]) a[i] = v; return a; };
+    const zero = new Float64Array(n), len = M["+x"].length, shared = M["+x"].filter((i) => M["-x"].includes(i)).length;
+    const pureC = L.cellFromMaps(onlyX(1), zero, M), pureQ = L.cellFromMaps(onlyX(1), zero, M, { tuning: "cos2" });
+    ok("motion ALONG the arm is read the same by both tunings (cos 0 = cos^2 0 = 1)", pureC.drives["+x"] === len && pureQ.drives["+x"] === len, J([pureC.drives, pureQ.drives]));
+    const diagC = L.cellFromMaps(onlyX(1), onlyX(1), M).drives["+x"], diagQ = L.cellFromMaps(onlyX(1), onlyX(1), M, { tuning: "cos2" }).drives["+x"], mag = Math.SQRT2 * len;
+    ok("!! motion at 45 DEGREES to the arm: the component keeps cos 45 = 0.71 of |m|, the signed squared cosine HALF of it", Math.abs(diagC / mag - Math.SQRT1_2) < 1e-12 && Math.abs(diagQ / mag - 0.5) < 1e-12, J({ component: diagC / mag, cos2: diagQ / mag }));
+    const across = L.cellFromMaps(zero, onlyX(1), M, { tuning: "cos2" }).drives["+x"], back = L.cellFromMaps(onlyX(-1), zero, M, { tuning: "cos2" }).drives["+x"];
+    ok("...motion ACROSS the arm drives it not at all, and INWARD motion along it inhibits it by the same amount (the sign kept)", across === 0 && back === -len, J({ across, back }));
+    const twice = L.cellFromMaps(onlyX(2), zero, M, { tuning: "cos2" }).drives["+x"];
+    ok("the drive scales with the motion's size: twice the motion along the arm, twice the drive (|m| cos^2, not cos alone)", twice === 2 * len, String(twice));
+    const onlyY = (v) => { const a = new Float64Array(n); for (const i of M["+y"]) a[i] = v; return a; };
+    // asymmetric on purpose (x motion 2, y motion 1): with equal components a y arm reading the wrong second component gives the same number
+    const yOff = L.cellFromMaps(onlyY(2), onlyY(1), M, { tuning: "cos2" }).drives["+y"], yLen = M["+y"].length;
+    ok("...and the y arms read their own component against the FULL vector: motion (2, 1) on the +y disk drives it by 1 x 1 / sqrt 5 a pixel", Math.abs(yOff / yLen - 1 / Math.sqrt(5)) < 1e-12, String(yOff / yLen));
+    const t = L.cellFromMaps(field(() => 1), zero, M, { tuning: "cos2" });
+    ok("uniform motion still cancels under cos2 (+x and -x arms equal and opposite) and the cell is 0", t.R === 0 && t.drives["+x"] === -t.drives["-x"], J(t.drives));
+    let bad = null; try { L.cellFromMaps(zero, zero, M, { tuning: "cos3" }); } catch (e) { bad = e.message; }
+    ok("an unknown tuning is refused by name", /a tuning is component or cos2, got "cos3"/.test(bad || ""), bad);
+    // respond carries the tuning through: a small dark square moving diagonally across the +x disk (no registered stimulus), read by both tunings, gives two different peaks
+    const sq = Array.from({ length: 120 }, (_, k) => L.draw((x, y) => Math.abs(x - 2 - 0.1 * k) <= 3 && Math.abs(y - 0.1 * k) <= 3));
+    const pc = L.respond(sq, M).peak, pq = L.respond(sq, M, { tuning: "cos2" }).peak;
+    ok("respond passes the tuning to the cell: a diagonally moving square gives different peaks under the two tunings, both above 0", pc > 0 && pq > 0 && pc !== pq, J({ component: pc, cos2: pq }));
+    const s11 = L.stimulus("S11"), end = s11.frames.at(-1), at = (f, x, y) => f.data[(44.5 + y - 0.5) * 90 + (44.5 + x - 0.5)], darkPx = (f) => f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0);
+    const s10end = L.stimulus("S10").frames.at(-1);
+    ok("S11: the 60 degree bar along +x, from a half-length of 5 to 30 (600 px to 3,600), axis-aligned: a corner pixel at (28, 28) is dark in S11 and grey in S10 (S10 is the same bar on the diagonal)",
+        Math.abs(darkPx(s11.frames[0]) - 600) <= 2 && Math.abs(darkPx(end) - 3600) <= 4 && at(end, 28, 28) === 0 && at(s10end, 28, 28) === 0.5 && s11.motionS === 1.25, J([darkPx(s11.frames[0]), darkPx(end)]));
+    const good = { S1: 100, S2: 1, S3r: 10, S3l: 10, S4: 40, S5: 20, S6: 2, S7: 80, S8: 3, S9: 30, S10: 10, S11: 20 };
+    ok("predictions7: P1-P7 as Part 5's and P8 the clover; SUPPORTED on a fixture meeting all eight", L.predictions7(good).verdict === "SUPPORTED" && L.predictions7(good).predictions.map((p) => p.id).join() === "P1,P2,P3,P4,P5,P6,P7,P8");
+    ok("...P8 fails alone when the cardinal bar is not above the diagonal one; P7 still counts", L.predictions7({ ...good, S11: 10 }).verdict === "NOT SUPPORTED (P8)" && L.predictions7({ ...good, S10: 35, S11: 40 }).verdict === "NOT SUPPORTED (P7)");
+    let miss = null; try { L.predictions7({ ...good, S11: undefined }); } catch (e) { miss = e.message; }
+    ok("...and a missing S11 is refused by name", /no finite response for S11/.test(miss || ""), miss);
 });
 
 finished = true;
