@@ -75,3 +75,35 @@ at a time: about 25 minutes, in the sandbox.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlySceneTypes.mjs run` -> `brain/flySceneTypesRound.jsonl`, committed byte for byte, whole, before it
 is read; `node tools/ship/takeFlySceneTypes.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at 1ff16e90, then read once)
+One start, 30.4 minutes on four processes, 49 records (sha256 b615c753f69a9721...). **The checks hold**: the
+compass-error round's file as committed and passing its own checks; 48 flies each once, its arm's committed weights, in
+each scene; HOMEP draw 1 the same twice.
+* **H11: IN THE 11-CLASS SCENE THE FLY FINDS HOME BETTER** (48 of 48, by 0.024 on average).
+* **C11: IN THE 11-CLASS SCENE THE FLY HOLDS A COURSE BETTER** (48 of 48, by 0.053).
+* **W11: IN THE 11-CLASS SCENE THE COMPASS ERRS LESS IN THE WIND** (48 of 48, by 0.115 radians).
+* **H26: THE 26-TYPE SCENE FINDS HOME BETTER THAN THE 11-CLASS** (46 of 48, by 0.008; COURSE64's draw 7 and H16BYC's
+  draw 8 the other way).
+
+| arm | home: plain (committed) / 11 classes / 26 types | course: plain / 26 types |
+|---|---|---|
+| HOMEP | 0.5501 / 0.5798 / 0.5911 | 0.6501 / 0.7130 |
+| COURSE64 | 0.5541 / 0.5717 / 0.5761 | 0.6688 / 0.7124 |
+| HOME16 | 0.5517 / 0.5799 / 0.5900 | 0.6555 / 0.7149 |
+| H16BYC | 0.5548 / 0.5750 / 0.5797 | 0.6687 / 0.7151 |
+
+**Three of the four expectations came**: H11 BETTER (90), C11 BETTER (95), W11 below (95). H26 came BETTER, which was
+given 35. So, as section 5 put it, **a scene whose cues the ring classes see apart is read better, by flies never trained
+on it, and they come home better: the compass's reading of the scene was the limit, and more cues lift it** -- and finer
+still is better still.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** **the choosers' order at home
+turns over.** In the plain scene the flies whose point the homing score chose (HOMEP and HOME16) come home worse than
+those the course score chose (COURSE64 and H16BYC): ranks 411 of a middle 588, p 0.00016. In the 26-type scene they come
+home better: ranks 784, p 0.00002. The perfect-tally round found the homing-chosen flies steer home better and their
+tally hid it; with a scene their compass can read, it shows.
+
+**What it does not mean.** Section 7 holds. Which landmarks each ring class sees is invented here; real ring types answer
+to different visual features, and which is not in this data. The flies were trained in the plain scene, so this is what
+they do, untrained, in a richer one; a fly trained in it may do otherwise. Nothing here is of the animal.

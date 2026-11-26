@@ -9,6 +9,8 @@
 //                               scene the plain life to the bit, and the round's measures there the compass-error round's
 //   3  THE RECORDS              48 flies and a second one; H11, C11, W11, H26
 //   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at 1ff16e90, read from the file: the checks, H11, C11, W11, H26, the arms, the description after the reading (the
+//                               choosers' order at home in each scene), a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the scene's, the library's and the note's, this gate
 // and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name but THREE (the number is the rows red):
 //   THE SCENE: S1 the class the type up to the last underscore 0 -- NOT A GAP: no ring type has two underscores, so the classes are the same -- replaced by the class the type's first three
@@ -21,6 +23,9 @@
 //   second fly recorded as a fly 1 | K6 reads without the committed files 1.   THE NOTE: M1 its classes 10 1 | M2 its salt another 1 | M3 it drops HOMEP draw 1 again 1
 //   THE FINDING: section 3's made 26-type scene was above both the plain and the 11-class, so H26 read against either came out the same; a 26-type scene above the plain and under the 11-class
 //   was added, and F5 was run again: 1 red.
+//   THE VERDICT (after the reading; every one red by name): V1 the results file with a record the run did not write 3 | V2 H26 read the other way 4 | V3 the plain home taken from
+//   the 11-class scene 5 | V4 alpha far smaller 5 | V5 the scene's salt another (the re-audit) 3 | V6 the note's H26 word 1 | V7 the note saying all four came 1 | V8 the note's
+//   expectations rewritten 1 | V9 the note's rank 1 | V10 the note without what it does not mean 1
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -35,6 +40,7 @@ import * as V from "./flyCompass.mjs";
 import * as CE from "../../brain/rl/compassEnv.mjs";
 import * as TS from "../../brain/rl/typedSceneEnv.mjs";
 import { RING_TYPES } from "../../brain/compassRingTopology.mjs";
+import { rankSum } from "./paintingFly.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -112,6 +118,30 @@ section(() => {
     const me = src("tools/ship/flySceneTypes-selfcheck.mjs"), calls = [...me.matchAll(/S\.flyOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one fly is flown on 1 course life and 2 homing lives, not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"HOME16", 6, F, [TWO[0]], TWO']) && !TWO.some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at 1ff16e90 before it was read, and is read here from the file)");
+section(() => {
+    const nr = (a, b, e = 5e-5) => Math.abs(a - b) < e, mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const bytes = fs.readFileSync(path.join(ENG, S.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = S.reading(lines, F), A = R.arms, fl = lines.filter((r) => r.kind === "fly");
+    ok("!! the results file is the one the run wrote: 49 records, sha256 b615c753f69a9721... (one start, 30.4 minutes on four processes)", lines.length === 49 && createHash("sha256").update(bytes).digest("hex") === "b615c753f69a97215609819fc9b2c5c4819b4f70e30c712007ae33d6fe61ba46");
+    ok("!! THE CHECKS HOLD: the compass-error round's file as committed and passing its own checks; 48 flies each once, its arm's weights, in each scene; HOMEP draw 1 the same twice", R.checks.length === 0);
+    ok("!! *** H11 -- HOME BETTER IN THE 11-CLASS SCENE (48 of 48, by 0.0239 on average); C11 -- COURSE BETTER (48 of 48, by 0.0527); W11 -- LESS ERROR IN THE WIND (48 of 48, by 0.1149); H26 -- THE 26-TYPE SCENE BETTER STILL (46 of 48, by 0.0076; COURSE64 7 and H16BYC 8 the other way) ***",
+        R.H11.word === S.WORDS.H11[0] && R.H11.above === 48 && nr(mean(R.H11.diffs), 0.0239) && R.C11.word === S.WORDS.C11[0] && R.C11.above === 48 && nr(mean(R.C11.diffs), 0.0527) && R.W11.word === S.WORDS.W11[1] && R.W11.below === 48 && nr(mean(R.W11.diffs), -0.1149) &&
+        R.H26.word === S.WORDS.H26[0] && R.H26.above === 46 && nr(mean(R.H26.diffs), 0.0076) && J(fl.filter((r, i) => R.H26.diffs[i] < 0).map((r) => r.arm + " " + r.s)) === J(["COURSE64 7", "H16BYC 8"]));
+    ok("!! the arms' mean home: plain (committed) | 11 classes | 26 types -- HOMEP 0.5501 0.5798 0.5911 | COURSE64 0.5541 0.5717 0.5761 | HOME16 0.5517 0.5799 0.5900 | H16BYC 0.5548 0.5750 0.5797",
+        [["HOMEP", 0.5501, 0.5798, 0.5911], ["COURSE64", 0.5541, 0.5717, 0.5761], ["HOME16", 0.5517, 0.5799, 0.5900], ["H16BYC", 0.5548, 0.5750, 0.5797]].every(([a, p, c, t]) => nr(A[a].plain.home, p) && nr(A[a].class.home, c) && nr(A[a].type.home, t)));
+    const hc = (arms, f) => fl.filter((r) => arms.includes(r.arm)).map(f), homing = ["HOMEP", "HOME16"], course = ["COURSE64", "H16BYC"], g26 = rankSum(hc(homing, (r) => r.type.home), hc(course, (r) => r.type.home)), gp = rankSum(hc(homing, (r) => N.committedOf(r.arm, r.s, F).home), hc(course, (r) => N.committedOf(r.arm, r.s, F).home));
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: the choosers' order at home turns over -- in the plain scene the homing-chosen flies (HOMEP, HOME16) come home worse than the course-chosen (ranks 411 of a middle 588, p 1.6e-4); in the 26-type scene better (ranks 784, p 2.2e-5)",
+        gp.sumA === 411 && gp.p < 2e-4 && gp.pLower < gp.pHigher && g26.sumA === 784 && g26.p < 3e-5 && g26.pHigher < g26.pLower);
+    const r5 = fl.find((r) => r.arm === "HOMEP" && r.s === 5), c5 = N.committedOf("HOMEP", 5, F);
+    ok("!! RE-AUDITED AFTER THE READING: HOMEP draw 5 in the 26-type scene gives its home score again to the bit", S.homeIn(T.flyOf("HOMEP", 5, c5.weights), S.AUDIT, "type") === r5.type.home);
+    const note = src("brain/FLY_SCENE_TYPES_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came: H11 BETTER (90), C11 BETTER (95) and W11 below (95) came; H26 came BETTER, which was given 35",
+        /H11: \*\*BETTER about 90\*\*\. C11: \*\*BETTER about 95\*\*\. W11: \*\*below about 95\*\*\. H26: CANNOT about 60, BETTER 35, WORSE 5\./.test(flat) && R.H11.word === S.WORDS.H11[0] && R.C11.word === S.WORDS.C11[0] && R.W11.word === S.WORDS.W11[1] && R.H26.word === S.WORDS.H26[0]);
+    ok("the registration's RESULT SECTION (section 10) carries the four readings' words, the commit the file was read at, the expectation that did not come, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && ["H11", "C11", "W11", "H26"].every((k) => res.includes(`**${k}: ${R[k].word}**`)) && /1ff16e90/.test(res) && /\*\*Three of the four expectations came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /ranks 784/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflySceneTypes-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
