@@ -3056,15 +3056,15 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-26 -- after stations rounds 21-22 and the LPLC2 rounds of Parts 7-10.
     {
         id: "stations-courier-break-even",
-        blocker: "OPEN",
-        what: "COND beat every courier hold tried (rounds 19 and 22, brain/SUB_STATIONS_WIP.md sections 42 and 48) at the registered price of a lost boat (2.42 goals per 1,200 s). At what price would a hold tie COND?",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 (brain/SUB_STATIONS_WIP.md section 49, a reading, no flight): no price makes a hold beat COND on the paired test (to 200 goals a boat; in most runs both survive and COND delivers more); the hold wins on the mean only at 14-18 goals a boat, 6-7x the registered price. Was: COND beat every courier hold tried (rounds 19 and 22, brain/SUB_STATIONS_WIP.md sections 42 and 48) at the registered price of a lost boat (2.42 goals per 1,200 s). At what price would a hold tie COND?",
         how: "A reading of the committed HELD records (holdCourierHeld, courierReleaseHeld): the price at which the sign test on the mission value would turn, for HOLD-C and HOLD-CR against COND. Reported, not a verdict; no new flight.",
         why: "It says whether COND-for-couriers depends on the price or holds broadly.",
     },
     {
         id: "stations-courier-hold-no-chatter",
-        blocker: "OPEN -- worth it only if stations-courier-break-even finds a price within reach",
-        what: "Round 22's HOLD-CR re-armed at once and relatched tick after tick above half charge (171,745 latches in 96 runs).",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 UNRUN by its own condition: section 49 found no price within reach. Was: Round 22's HOLD-CR re-armed at once and relatched tick after tick above half charge (171,745 latches in 96 runs).",
         how: "Register first one change: after a release, the hold is not re-armed until the charge falls below a stated level (fixed before DEV). COND against it on round 15's mission value, fresh seeds.",
         why: "It asks whether the chatter cost the goals.",
     },

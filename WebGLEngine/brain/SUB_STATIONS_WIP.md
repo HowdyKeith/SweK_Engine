@@ -1070,3 +1070,17 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-co
 * Across rounds 19 and 22 the courier's choice is stable: COND's mission beats every hold tried on the price a lost boat costs (2.42 goals per 1,200 s). Only a higher price on a boat would change that.
 
 **Status: round 22 CLOSED.** Backlog `stations-courier-hold-release` is closed with this result.
+
+## 49. THE COURIER'S BREAK-EVEN PRICE: A READING OF THE COMMITTED RECORDS (2026-11-26; no new flight, not a verdict)
+
+Backlog `stations-courier-break-even`. The mission value of rounds 19 and 22's HELD runs recomputed at boat prices P from 2 to 200 goals per 1,200 s of a lost boat's time (the registered price is 2.42), with the same paired sign test.
+
+| | runs the hold has more value / COND more, at P = 2.5 | ... at P = 100 | the test turns? | the MEANS equal at |
+|---|---|---|---|---|
+| round 19, HOLD-C | 21 / 68 | 23 / 66 | never (to P = 200) | P = 14 |
+| round 22, HOLD-C | 17 / 68 | 22 / 63 | never | P = 18 |
+| round 22, HOLD-CR | 20 / 57 | 22 / 55 | never | P = 14 |
+
+**What it says.** No price makes a hold beat COND on the paired test: the price only touches the runs where one boat is lost and the other is not, and in most runs BOTH survive and COND simply delivers more. The hold wins on the MEAN only if a lost boat costs 14 to 18 goals -- six to seven times the registered price, and more than a whole mission's deliveries (about 2.4). COND-for-couriers holds broadly, not by the price.
+
+**Consequence.** Backlog `stations-courier-hold-no-chatter` was conditional on a price within reach; there is none, so it is closed unrun. (Its question -- whether the chatter cost goals -- would change HOLD-CR's goals, not the paired test's shape.)
