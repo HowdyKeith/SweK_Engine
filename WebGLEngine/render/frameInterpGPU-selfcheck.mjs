@@ -287,6 +287,7 @@ console.log("\n3. DEPTH THAT VARIES, INCLUDING NEGATIVE -- WHERE A RAW BITCAST W
        [["checker", c], ["signed", s], ["contested", x]].map(([k, v]) => `${k}: ${v.holeDiff} mask differences`).join("; ") +
        ". The signed case is the one that fails on a raw bitcast: half its depths are negative, and IEEE floats compare backwards as unsigned there.");
     ok("...and the winner's DEPTH is carried out too, which render/holeFill.mjs reads and a later round needs",
+       // SETTLED at v4777: that round is render/holeFillGPU.mjs.
        [c, s, x].every((v) => v.worstZ < 1e-6),
        `worst |zbuf| ${Math.max(c.worstZ, s.worstZ, x.worstZ).toExponential(2)} -- the depth the contest was settled on, per pixel`);
     ok("*** and the contested case really is contested, so this is not a row where nothing overlaps ***",

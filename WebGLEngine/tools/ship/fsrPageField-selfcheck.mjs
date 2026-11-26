@@ -244,7 +244,7 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
        `repeated one round later on the next label added to the same readout.`);
     // *** v4687 -- AND THE FILL RUNS THERE NOW TOO, WHICH IS WHAT CLOSES THE GAP THE ROW BELOW MEASURED. ***
     // v4686's version of this row asserted the device arm fills NOTHING, and said a later round would close it.
-    // That round is this one: render/holeFillGPU.mjs and render/frameInterpWgsl.mjs's fourth entry point exist,
+    // That round is this one (SETTLED at v4687): render/holeFillGPU.mjs and render/frameInterpWgsl.mjs's fourth entry point exist,
     // the page calls them, and the assertion has been turned over rather than loosened. v4686's record of the
     // 0.13 dB it measured stands where it was written; what changed is the page, not the reading.
     ok("*** all four passes of the device arm now run on the device, and the FILL among them actually fills ***",

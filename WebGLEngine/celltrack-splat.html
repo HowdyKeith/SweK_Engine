@@ -41,6 +41,9 @@
 
 <script type="module">
 import { estimateDatasetDrift } from "/cell-tracking/drift/driftEstimator.js";
+import { createCameraControls, bindCameraControls } from "/render/cameraControls.mjs";   // 2026-11-22: the shared camera (orbit, pan, zoom, fly, F to frame)
+import { createGpuTimerGL } from "/render/gpuTimerGL.mjs";
+import { timerLines } from "/render/gpuTimer.mjs";
 
 // ---------- mat4 (column-major) ----------
 const M = {
@@ -136,33 +139,37 @@ function driftAt(t){ return document.getElementById("correct").checked ? (cumDri
 function posOf(id){ const rec=byId.get(id); const p=phys(rec); const d=driftAt(rec[1]); return [p[0]-d[0],p[1]-d[1],p[2]-d[2]]; }
 
 // ---------- camera ----------
-const cam={yaw:0.7,pitch:1.0,dist:0};
-function camPos(){ const cp=Math.cos(cam.pitch),sp2=Math.sin(cam.pitch),cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw); const d=cam.dist||radius*3.2;
-  return {eye:[center[0]+d*cp*sy,center[1]+d*sp2,center[2]+d*cp*cy],c:center}; }
-function VP(){ const {eye,c}=camPos(); const a=cv.width/cv.height||1; return {vp:M.mul(M.persp(50*Math.PI/180,a,radius*0.05,radius*40),M.look(eye,c,[0,1,0])),eye}; }
-let drag=null;
-cv.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId);});
-cv.addEventListener("pointermove",e=>{if(!drag)return;cam.yaw-=(e.clientX-drag.x)*0.008;cam.pitch=Math.max(0.12,Math.min(1.55,cam.pitch+(e.clientY-drag.y)*0.006));drag.x=e.clientX;drag.y=e.clientY;});
-cv.addEventListener("pointerup",()=>drag=null);
-cv.addEventListener("wheel",e=>{e.preventDefault();const d=cam.dist||radius*3.2;cam.dist=Math.max(radius*0.4,Math.min(radius*20,d*(1+Math.sign(e.deltaY)*0.12)));},{passive:false});
-
+// 2026-11-22: render/cameraControls.mjs in place of this page's own drag and wheel: the same eye formula (up "y"), the same drag feel (0.008 rad a pixel), the same pitch
+// range (0.12 to 1.55) and zoom limits; right or shift-drag pans, F frames the cells, W A S D Q E fly, C switches orbit and fly
+const controls=createCameraControls({up:"y",yaw:0.7,pitch:1.0,distance:3.2,target:[0,0,0],fovY:50*Math.PI/180,minPitch:0.12,maxPitch:1.55});
+const camInput=bindCameraControls(cv,controls,{focusOn:()=>({center,radius})});
+addEventListener("keydown",e=>{ if(e.code==="KeyC"&&!(e.target&&/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName||""))) controls.mode=controls.mode==="orbit"?"fly":"orbit"; });
+/** Frame the cells at once when a dataset is indexed: the old page's distance, 3.2 radii, and its zoom limits. */
+function frameCells(){ controls.options.minDistance=radius*0.4; controls.options.maxDistance=radius*20; controls.goal.target=center.slice(); controls.goal.distance=radius*3.2; controls.snap(); }
+window.__camera={controls,input:camInput};
+function VP(){ const {eye,target}=controls.pose(); const a=cv.width/cv.height||1; return {vp:M.mul(M.persp(50*Math.PI/180,a,radius*0.05,radius*40),M.look(eye,target,[0,1,0])),eye}; }
+let lastTick=performance.now();
 // ---------- render ----------
 function resize(){const dpr=Math.min(devicePixelRatio||1,2);cv.width=innerWidth*dpr|0;cv.height=innerHeight*dpr|0;}
 addEventListener("resize",resize);resize();
 let curT=0;
+// 2026-11-22: the trails and the nuclei timed on the card (render/gpuTimerGL.mjs), shown under the view; ?gputimer=0 turns it off
+const gpuTimer=createGpuTimerGL(new URLSearchParams(location.search).get("gputimer")==="0"?null:gl);
+const gpuEl=document.createElement("div"); gpuEl.id="gpuTimes"; gpuEl.style.cssText="position:fixed;left:8px;bottom:8px;font:11px ui-monospace,monospace;white-space:pre;color:#7e9a92;pointer-events:none"; document.body.appendChild(gpuEl);
 const NUC=[vs.z,vs.y,vs.x].map(v=>v* (radius? 1:1));  // placeholder; real scale set at draw
 
 function draw(){
+  const tnow=performance.now(); camInput.tick(Math.min(0.1,(tnow-lastTick)/1000)); lastTick=tnow;
   const {vp,eye}=VP();
   gl.viewport(0,0,cv.width,cv.height); gl.clearColor(0.02,0.031,0.043,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
   // trails (up to current frame)
-  if(document.getElementById("trails").checked){
+  if(document.getElementById("trails").checked){ gpuTimer.begin("trails");
     gl.useProgram(lp); gl.bindVertexArray(lineVAO); gl.uniformMatrix4fv(lVP,false,vp);
     for(const [tk,ids] of trailOf){ const pts=[]; for(const id of ids){ const rec=byId.get(id); if(rec[1]>curT)break; const p=posOf(id); pts.push(p[0],p[1],p[2]); }
       if(pts.length<6)continue; gl.bindBuffer(gl.ARRAY_BUFFER,lineVBO); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pts),gl.DYNAMIC_DRAW);
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); const c=trackColor(tk); gl.uniform3f(lColor,c[0]*0.6,c[1]*0.6,c[2]*0.6); gl.drawArrays(gl.LINE_STRIP,0,pts.length/3); }
-  }
+  gpuTimer.end(); }
 
   // splats at current frame -- additive, no depth write
   gl.useProgram(splat); gl.bindVertexArray(vao);
@@ -170,12 +177,13 @@ function draw(){
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
   const rad=radius*0.012;                     // base nucleus radius (physical), scaled anisotropically below
   const scale=[rad*vs.z/vs.x, rad, rad];      // elongate in z by the voxel-scale ratio (physically honest)
-  const ids=byT.get(curT)||[];
+  const ids=byT.get(curT)||[]; gpuTimer.begin("nuclei");
   document.getElementById("kN").textContent=ids.length;
   for(const id of ids){ const p=posOf(id); gl.uniformMatrix4fv(uModel,false,M.trs(p,scale)); const c=trackColor(trackOf.get(id)); gl.uniform3fv(uColor,c); gl.drawElements(gl.TRIANGLES,SPHERE_IDX,gl.UNSIGNED_SHORT,0); }
-  gl.depthMask(true); gl.disable(gl.BLEND);
+  gpuTimer.end(); gl.depthMask(true); gl.disable(gl.BLEND);
+  gpuTimer.finish(); const gst=gpuTimer.collect(); if(gst.frames){ window.__gpuTimes=Object.fromEntries(Object.entries(gst.labels).map(([k,v])=>[k,v.ms])); gpuEl.textContent=timerLines(gst).join("\n"); } else if(!gst.supported) gpuEl.textContent="GPU timer: this browser offers no EXT_disjoint_timer_query_webgl2";
 
-  if(document.getElementById("spin").checked) cam.yaw+=0.003;
+  if(document.getElementById("spin").checked) controls.orbit(0.003,0);
   const d=cumDrift[curT]||[0,0,0]; document.getElementById("kDrift").textContent=document.getElementById("correct").checked?("["+d.map(x=>x.toFixed(1)).join(", ")+"]"):"off";
   requestAnimationFrame(draw);
 }
@@ -203,7 +211,7 @@ async function load(){
   } else {
     dataset=makeDemo(); document.getElementById("msg").textContent="no live tracks \u2014 showing a synthetic demo (injected drift)"; setTimeout(()=>document.getElementById("msg").style.display="none",2500);
   }
-  indexDataset(dataset); computeDrift();
+  indexDataset(dataset); computeDrift(); frameCells();
   const tEl=document.getElementById("time"); tEl.max=tmax; tEl.value=0; curT=0; document.getElementById("kT").textContent=0;
   requestAnimationFrame(draw);
 }

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · gizmos</title>
+<!--
+  GIZMOS, A VIEW CUBE AND AN INFINITE GRID (render/BACKLOG_2026-11-21_PLAYCANVAS.md, `gizmos`; Keith: "It pairs naturally with the new camera controls").
+  Three boxes stand on the grid (render/infiniteGrid.mjs). Click a box to pick it; its gizmo (render/gizmo.mjs, drawn by render/gizmoOverlay.mjs) moves, turns or scales it:
+  drag an arrow along its axis, a square in its plane, the centre in the view's plane; a ring about its axis; a box end along its axis, the centre to scale evenly.
+  1 move, 2 turn, 3 scale, X world or local axes, the buttons the same; Snap rounds to 0.25, 15 degrees, a tenth. The view cube (top right) turns the camera to a face, an edge
+  or a corner. The camera is render/cameraControls.mjs: drag to orbit, right-drag to pan, wheel to zoom, F to frame.
+  ?fog=1 or the Fog button: render/volumetricFog.mjs over the scene -- height fog, thick at the ground and thinning upward, lit from the light's side.
+  window.__gizmoDemo reports { ready, frames, selected, boxes, overlay, controls, fogOn, fogParams } for tools/ship/gizmoOverlay-selfcheck.mjs.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0f17; color: #cfd8e6; font: 13px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  #wrap { position: absolute; inset: 0; } #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: absolute; left: 10px; top: 10px; z-index: 6; background: rgba(10,14,22,.78); border: 1px solid #22304a; border-radius: 8px; padding: 8px 10px; max-width: 520px; }
+  button { font: 12px ui-sans-serif, system-ui; background: #18233a; color: #cfe0ff; border: 1px solid #2f456c; border-radius: 5px; padding: 3px 9px; cursor: pointer; margin-right: 4px; }
+  button.on { background: #2b4a7c; border-color: #5b84c8; } .dim { color: #8494ad; }
+</style></head>
+<body><div id="wrap"><canvas id="cv"></canvas>
+<div id="hud"><b>Gizmos</b> <span class="dim">· click a box, drag a handle</span><br>
+  <button id="m-translate" class="on">1 Move</button><button id="m-rotate">2 Turn</button><button id="m-scale">3 Scale</button>
+  <button id="space">X World</button><button id="snap">Snap off</button><button id="fog">Fog off</button>
+  <div id="sel" class="dim" style="margin-top:6px">nothing picked</div></div></div>
+<script type="module">
+import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
+import { perspective, lookAt } from "./render/gpuDriven.mjs";
+import * as G from "./render/gizmo.mjs";
+import { createGizmoOverlay } from "./render/gizmoOverlay.mjs";
+import { createGridGL } from "./render/infiniteGrid.mjs";
+import { createFogGL } from "./render/volumetricFog.mjs";
+
+const cv = document.getElementById("cv"), gl = cv.getContext("webgl2", { antialias: true }), Q = new URLSearchParams(location.search), FOV = 0.9;
+const state = window.__gizmoDemo = { ready: false, frames: 0, selected: -1, error: null };
+if (!gl) { state.error = "no WebGL2"; throw new Error(state.error); }
+const mul4 = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+const modelOf = (t) => { const [x, y, z, w] = t.rotation, s = t.scale, R = [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)];
+    return new Float32Array([R[0] * s[0], R[1] * s[0], R[2] * s[0], 0, R[3] * s[1], R[4] * s[1], R[5] * s[1], 0, R[6] * s[2], R[7] * s[2], R[8] * s[2], 0, ...t.position, 1]); };
+
+// a unit box (half-side 0.5) with face normals
+const P = [], N = []; for (const [n, u, v] of [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]]]) {
+    const c = (a, b) => n.map((x, i) => 0.5 * x + 0.5 * a * u[i] + 0.5 * b * v[i]); for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) { P.push(...c(a, b)); N.push(...n); } }
+const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, `#version 300 es
+in vec3 aP; in vec3 aN; uniform mat4 uVP, uM; out vec3 vN; void main() { vN = mat3(uM) * aN; gl_Position = uVP * uM * vec4(aP, 1.0); }`));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, `#version 300 es
+precision highp float; in vec3 vN; uniform vec3 uC; uniform float uSel; out vec4 o;
+void main() { float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.4, 0.9, 0.3))), 0.0); o = vec4(uC * l + uSel * vec3(0.18, 0.16, 0.05), 1.0); }`));
+gl.linkProgram(prog);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+for (const [name, data] of [["aP", P], ["aN", N]]) { const b = gl.createBuffer(), l = gl.getAttribLocation(prog, name); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 3, gl.FLOAT, false, 0, 0); }
+gl.bindVertexArray(null);
+const U = Object.fromEntries(["uVP", "uM", "uC", "uSel"].map((n) => [n, gl.getUniformLocation(prog, n)])), grid = createGridGL(gl), fog = createFogGL(gl);
+// ?fog=1 (2026-11-22): the scene and the grid are drawn into a framebuffer whose colour and depth are textures, then render/volumetricFog.mjs marches each pixel's ray to that depth
+state.fogOn = Q.get("fog") === "1";
+state.fogParams = { density: 0.08, falloff: 1.5, baseHeight: 0, albedo: 0.85, ambient: [0.42, 0.47, 0.56], lightDir: [0.4, 0.75, 0.3], lightColor: [0.55, 0.5, 0.42], g: 0.55, maxDistance: 60, steps: 32 };
+let fbo = null, fboColor = null, fboDepth = null, fboW = 0, fboH = 0;
+function fogTargets(w, h) {
+    if (fbo && w === fboW && h === fboH) return;
+    if (fbo) { gl.deleteFramebuffer(fbo); gl.deleteTexture(fboColor); gl.deleteTexture(fboDepth); }
+    const tex = (ifmt, fmt, type) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, null); for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v); return t; };
+    fboColor = tex(gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE); fboDepth = tex(gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT);
+    fbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboColor, 0); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, fboDepth, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); fboW = w; fboH = h;
+}
+
+const boxes = state.boxes = [
+    { position: [-1.6, 0.5, 0], rotation: G.quat.identity(), scale: [1, 1, 1], color: [0.85, 0.42, 0.36] },
+    { position: [0, 0.75, -0.4], rotation: G.quat.axisAngle([0, 1, 0], 0.5), scale: [1, 1.5, 1], color: [0.4, 0.72, 0.45] },
+    { position: [1.7, 0.4, 0.6], rotation: G.quat.identity(), scale: [0.8, 0.8, 0.8], color: [0.42, 0.55, 0.9] }];
+const GROUND = { position: [0, -0.015, 0], rotation: [0, 0, 0, 1], scale: [60, 0.01, 60], color: [0.075, 0.09, 0.115] };   // not pickable: not a box
+const controls = state.controls = createCameraControls({ up: "y", yaw: 0.7, pitch: 0.45, distance: 8, target: [0, 0.5, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
+// the camera's listeners FIRST, as a page that adds a gizmo to its camera would: the overlay still wins, by listening in the capture phase
+const camInput = bindCameraControls(cv, controls, { focusOn: () => (state.selected >= 0 ? { center: boxes[state.selected].position, radius: 1.2 } : { center: [0, 0.5, 0], radius: 3 }) });
+const ov = state.overlay = createGizmoOverlay(cv, { controls, up: "y", onChange: (t) => { if (state.selected >= 0) Object.assign(boxes[state.selected], { position: t.position, rotation: t.rotation, scale: t.scale }); showSel(); } });
+ov.visible = false;
+
+// picking: the box whose own (local) cube the pointer's ray enters first
+function pick(x, y) {
+    if (!ov.view) return -1;
+    const r = G.rayAt(ov.view, x, y); let best = -1, bt = Infinity;
+    boxes.forEach((b, i) => { const qi = [-b.rotation[0], -b.rotation[1], -b.rotation[2], b.rotation[3]], o = G.quat.rotate(qi, G.vec.sub(r.origin, b.position)).map((v, k) => v / b.scale[k]), d = G.quat.rotate(qi, r.dir).map((v, k) => v / b.scale[k]);
+        let tn = -Infinity, tf = Infinity; for (let k = 0; k < 3; k++) { if (Math.abs(d[k]) < 1e-12) { if (Math.abs(o[k]) > 0.5) return; continue; } let t1 = (-0.5 - o[k]) / d[k], t2 = (0.5 - o[k]) / d[k]; if (t1 > t2) [t1, t2] = [t2, t1]; tn = Math.max(tn, t1); tf = Math.min(tf, t2); }
+        if (tn <= tf && tf > 0 && tn < bt) { bt = tn; best = i; } });
+    return best;
+}
+/** The next frame's pixels (bottom row first, as readPixels gives them), for the gate. */
+state.capture = () => new Promise((res) => { state._want = res; });
+state.pick = pick;
+state.select = (i) => { state.selected = i; ov.visible = i >= 0; if (i >= 0) ov.transform = { position: [...boxes[i].position], rotation: [...boxes[i].rotation], scale: [...boxes[i].scale] }; showSel(); };
+let down = null;
+cv.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener("pointerup", (e) => { if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return; const r = cv.getBoundingClientRect(); state.select(pick(e.clientX - r.left, e.clientY - r.top)); down = null; });
+function showSel() { const el = document.getElementById("sel"); if (state.selected < 0) { el.textContent = "nothing picked"; return; } const b = boxes[state.selected], f = (v) => v.map((x) => x.toFixed(2)).join(", ");
+    el.textContent = `box ${state.selected + 1} · at (${f(b.position)}) · scale (${f(b.scale)}) · ${ov.gizmo.mode}, ${ov.gizmo.space} axes`; }
+const modeBtn = (m) => document.getElementById("m-" + m).onclick = () => { ov.setMode(m); syncButtons(); };
+["translate", "rotate", "scale"].forEach(modeBtn);
+document.getElementById("space").onclick = () => { ov.setSpace(ov.gizmo.space === "world" ? "local" : "world"); syncButtons(); };
+document.getElementById("snap").onclick = () => { ov.gizmo.snap = ov.gizmo.snap ? null : { translate: 0.25, rotate: Math.PI / 12, scale: 0.1 }; syncButtons(); };
+function syncButtons() { for (const m of ["translate", "rotate", "scale"]) document.getElementById("m-" + m).classList.toggle("on", ov.gizmo.mode === m); document.getElementById("space").textContent = `X ${ov.gizmo.space === "world" ? "World" : "Local"}`; document.getElementById("snap").textContent = ov.gizmo.snap ? "Snap on" : "Snap off"; showSel(); }
+addEventListener("keydown", () => setTimeout(syncButtons, 0));
+document.getElementById("fog").onclick = () => { state.fogOn = !state.fogOn; document.getElementById("fog").textContent = state.fogOn ? "Fog on" : "Fog off"; document.getElementById("fog").classList.toggle("on", state.fogOn); };
+if (state.fogOn) { document.getElementById("fog").textContent = "Fog on"; document.getElementById("fog").classList.add("on"); }
+
+let last = performance.now();
+function frame() {
+    const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
+    const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+    const pose = controls.pose(), vp = mul4(perspective(FOV, w / h, 0.05, 200), lookAt(pose.eye, pose.target));
+    state.viewProj = Array.from(vp); state.eye = pose.eye;
+    if (state.fogOn) { fogTargets(cv.width, cv.height); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); }
+    gl.viewport(0, 0, cv.width, cv.height); gl.clearColor(0.043, 0.059, 0.09, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+    gl.useProgram(prog); gl.bindVertexArray(vao); gl.uniformMatrix4fv(U.uVP, false, vp);
+    gl.uniformMatrix4fv(U.uM, false, modelOf(GROUND)); gl.uniform3fv(U.uC, GROUND.color); gl.uniform1f(U.uSel, 0); gl.drawArrays(gl.TRIANGLES, 0, 36);   // the ground: a slab, its top a hair under the grid
+    boxes.forEach((b, i) => { gl.uniformMatrix4fv(U.uM, false, modelOf(b)); gl.uniform3fv(U.uC, b.color); gl.uniform1f(U.uSel, i === state.selected ? 1 : 0); gl.drawArrays(gl.TRIANGLES, 0, 36); });
+    gl.bindVertexArray(null);
+    const view = G.viewOf({ viewProj: vp, eye: pose.eye, fovY: FOV, width: w, height: h, zRange: "gl" });
+    if (Q.get("grid") !== "0" && state.gridOn !== false) { gl.depthMask(false); grid.draw({ invViewProj: view.inv, viewProj: vp, eye: pose.eye, up: "y", cell: 0.5, major: 10, fade: 25 }); gl.depthMask(true); }
+    if (state.fogOn) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.disable(gl.DEPTH_TEST); fog.draw({ colorTex: fboColor, depthTex: fboDepth, invViewProj: view.inv, eye: pose.eye, params: state.fogParams }); gl.enable(gl.DEPTH_TEST); }
+    ov.draw(view);
+    if (state._want) { const px = new Uint8Array(cv.width * cv.height * 4); gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = state._want; state._want = null; r({ w: cv.width, h: cv.height, d, px: Array.from(px) }); }
+    state.frames++; if (state.frames >= 2) state.ready = true;
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

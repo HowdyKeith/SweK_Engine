@@ -51,6 +51,18 @@ function _pyCmd() { const v = process.env.VOXEL_VENV_PY; return (v && fs.existsS
 //          { kind:"link", url:"…" }                 → no silent install; panel shows a "Get it" link
 const REGISTRY = [
     {
+        // 2026-11-21 -- tvpipe's Node SDK, the /tv/* routes' engine (ai-bridge/tvpipeBridge.js: TO TV, LIVE TV, the dock's sixth row). It must live in
+        // THIS folder's node_modules (the bridge imports it), not npm's global one, so it is a `cmd` with --prefix rather than the `npm` kind (which is
+        // -g). npm brings the tvpipe binary for this platform with it (@tvpipe/<platform>, ~9 MB). On Windows it goes through cmd /c: Node refuses to
+        // spawn a .cmd directly since its 2024 security fix. tvpipeBridge.loadSdk calls ensure() on first use, so with Auto-Install on it installs itself.
+        id: "tvpipe-sdk", tier: "dep",
+        label: "tvpipe SDK (AirPlay / Chromecast)",
+        powers: "TO TV and LIVE TV on the dock: this page, or its canvas live, on an Apple TV, a Chromecast or a smart TV",
+        detect:  { kind: "file", path: path.join(__dirname, "node_modules", "@tvpipe", "sdk", "package.json") },
+        install: { kind: "cmd", win: ["cmd", "/c", "npm", "install", "--prefix", __dirname, "--no-save", "--no-audit", "--no-fund", "@tvpipe/sdk@^0.3.0"], unix: ["npm", "install", "--prefix", __dirname, "--no-save", "--no-audit", "--no-fund", "@tvpipe/sdk@^0.3.0"] },
+        est: { downloadMB: 10, installMB: 10, timeSec: 30 },
+    },
+    {
         id: "pymupdf", tier: "dep",
         label: "PyMuPDF",
         powers: "Comic / PDF reader — render PDF pages and export their images",

@@ -382,7 +382,7 @@ console.log("\n5. *** v4676 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
         "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
         "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
         "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
-        "is a round of its own. THAT ROUND IS v4677: tools/ship/exitBusy.mjs is the screen, and " +
+        "is a round of its own. THAT ROUND IS v4677 (SETTLED at v4677): tools/ship/exitBusy.mjs is the screen, and " +
         "tools/ship/exit-busy-census.json is what it measured. The width below is what was known BEFORE it.");
 
     // *** v4677 -- THE WIDTH ABOVE, NARROWED BY MEASUREMENT, AND THE NUMBER IS A FLOOR. ***

@@ -764,3 +764,24 @@ export const COMMIT_BELT_DRIFT_V4929 = Object.freeze({
             why: COMMIT_BELT_DRIFT_V4912.arrivedSince4475.hemibrain.why + "; v4929 then vendored the steering readout (the heading loop and PFL1-3, 198 neurons) beside it and re-read the licence from the hemibrain project page" }),
     }),
 });
+
+/**
+ * v4932 -- male-cns and zebrafish GAINED COMMITS with the merge of claude/inspiring-mayer-9mdcut: the fly's Giant Fiber visual inputs (e5b750b6, vendor/male-cns/giant-fiber-visual-circuit.json)
+ * and their retinotopy (a1ecad48, giant-fiber-visual-retinotopy.json), and the Fish1 Mauthner candidates' signed top-30 circuit (68c43c85, vendor/zebrafish/fish1-escape-top30.json), each in front of what
+ * the body had. Everything else is v4929's own object.
+ */
+export const COMMIT_BELT_DRIFT_V4932 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4929,
+    at: "v4933",   // v4933 -- this object was taken again IN PLACE (a new frozen record would have moved every ratchet that counts them): male-cns's nine new commits and smaa's arrival are in it, so the fleet is 29 bodies
+    bodiesNow: 29,
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475,
+        "male-cns": Object.freeze({ now: Object.freeze(["daa9b8af", "bea9121f", "46164bcb", "1cb4414b", "402a8817", "70394eb3", "5badcb88", "796d2849", "889ddb7d", "a1ecad48", "e5b750b6", "133bdc88", "bb90f832", ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475["male-cns"].now]),
+            why: COMMIT_BELT_DRIFT_V4929.arrivedSince4475["male-cns"].why + "; v4932 then merged the stealth line's reads of the Giant Fiber's visual inputs (LC4 and LPLC2 as wired cells) and their retinotopy; v4933 (the same record, taken again in place, not a new object) then carried the fly pathways line's nine commits in front -- the tracking cells' dendrites, LC11, LC6 and LC16, LC4 and LPLC2 flown, and the two loom bench reads -- and the two older commits of that line (133bdc88, the steering circuit's inputs and the target-tracking circuit; bb90f832) that main's history does not have" }),
+        // v4933 -- vendor/smaa (the SMAA 1x lookup textures) arrived with the SMAA pass; it is an ARRIVED body, recorded here in place with its two commits (the vendoring, aa032543, and the verdict's reds fixed, ca358ce1).
+        smaa: Object.freeze({ now: Object.freeze(["ca358ce1", "aa032543"]),
+            why: "the SMAA 1x anti-aliasing pass vendored its two lookup textures (area and search) as vendor/smaa/smaaLookup.mjs, MIT, read by render/smaaPass.js and render/smaaPassGPU.mjs" }),
+        "zebrafish": Object.freeze({ now: Object.freeze(["68c43c85", ...COMMIT_BELT_DRIFT_V4929.arrivedSince4475["zebrafish"].now]),
+            why: COMMIT_BELT_DRIFT_V4929.arrivedSince4475["zebrafish"].why + "; v4932 then merged the Fish1 read of the two Mauthner candidates' inputs and its signed top-30 circuit file" }),
+    }),
+});

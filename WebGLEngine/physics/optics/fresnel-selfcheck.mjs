@@ -13,7 +13,7 @@
 // constant used as a cross-check, not as the primary claim -- the primary claim at the edge is I = 1/4 EXACTLY,
 // and that follows from C(0)=S(0)=0.
 
-import { fresnelCS, knifeEdgeIntensity, knifeEdgeProfile, edgeV, slitFresnel, slitFresnelNumeric, slitFresnelAtAngles, fresnelNumber, regime, profileRms } from "./fresnel.js";
+import { fresnelCS, fresnelCSFast, knifeEdgeIntensity, knifeEdgeProfile, edgeV, slitFresnel, slitFresnelNumeric, slitFresnelAtAngles, fresnelNumber, regime, profileRms } from "./fresnel.js";
 import { slitAnalytic } from "./diffraction.js";
 
 let fails = 0;
@@ -120,6 +120,26 @@ const Sser = (x) => P * x ** 3 / 3 - P ** 3 * x ** 7 / 42 + P ** 5 * x ** 11 / 1
 {
     const src = (await import("node:fs")).readFileSync(new URL("./fresnel.js", import.meta.url), "utf8");
     ok("fresnel.js imports nothing and uses no DOM", !/^\s*import\s/m.test(src) && !/\bwindow\.|\bdocument\./.test(src));
+}
+
+// 9. THE FAST FRESNEL INTEGRALS (the bounded path the optics converge mode takes over its evaluation budget)
+{
+    const ref = (x) => fresnelCS(x, { perUnit: 1600 });
+    const err = (x) => { const r = ref(x), t = fresnelCSFast(x); return Math.max(Math.abs(r.C - t.C), Math.abs(r.S - t.S)); };
+    const xs = [0.001, 0.1, 0.5, 1, 1.4999, 1.5, 1.5001, 2, 3, 5, 10, 20, 42, 100, -2.5, -42];
+    ok("fresnelCSFast agrees with a fine composite Simpson (1600 steps per unit) to 5e-13 at sixteen arguments on both sides of the 1.5 switch, both signs", xs.every((x) => err(x) < 5e-13), "worst " + Math.max(...xs.map(err)).toExponential(2));
+    const c1 = fresnelCSFast(1);
+    ok("...and equals the tabulated C(1) = 0.7798934003768228 and S(1) = 0.4382591473903548 to 1e-12 (a table the Simpson path is graded against in section 1, not a number derived from it)", Math.abs(c1.C - 0.7798934003768228) < 1e-12 && Math.abs(c1.S - 0.4382591473903548) < 1e-12, `C ${c1.C} S ${c1.S}`);
+    const a = fresnelCSFast(1.5 - 1e-9), b = fresnelCSFast(1.5 + 1e-9);
+    ok("the series and the continued fraction meet at 1.5 (the two sides differ by less than 1e-8 across a gap of 2e-9, which is the integrand's own slope)", Math.abs(a.C - b.C) < 1e-8 && Math.abs(a.S - b.S) < 1e-8);
+    const o1 = fresnelCSFast(2.7), o2 = fresnelCSFast(-2.7);
+    ok("C and S are odd (the fast path returns exactly the negative), zero at zero, and both tend to 1/2 at a huge argument (1e6 to within 1e-6)", o1.C === -o2.C && o1.S === -o2.S && fresnelCSFast(0).C === 0 && fresnelCSFast(0).S === 0 && Math.abs(fresnelCSFast(1e6).C - 0.5) < 1e-6 && Math.abs(fresnelCSFast(1e6).S - 0.5) < 1e-6);
+    ok("fresnelCS keeps its Simpson default: with no option it equals the 400-steps-per-unit Simpson exactly, and with { method: 'fast' } it equals fresnelCSFast exactly", JSON.stringify(fresnelCS(3)) === JSON.stringify(fresnelCS(3, { perUnit: 400 })) && JSON.stringify(fresnelCS(3, { method: "fast" })) === JSON.stringify(fresnelCSFast(3)) && JSON.stringify(fresnelCS(3)) !== JSON.stringify(fresnelCSFast(3)));
+    const t0 = Date.now(); let acc = 0; for (let i = 0; i < 20000; i++) acc += fresnelCSFast(300 + i * 0.01).C;
+    ok("the cost does not grow with the argument: 20000 calls near x = 300 (Simpson would take 3.6e7 steps each) finish in under 3 s", Number.isFinite(acc) && Date.now() - t0 < 3000, (Date.now() - t0) + " ms");
+    const ang = []; for (let i = -40; i <= 40; i++) ang.push(i * 0.0003);
+    const d = slitFresnelAtAngles(0.1, 500e-6, 300, ang), f = slitFresnelAtAngles(0.1, 500e-6, 300, ang, { method: "fast" });
+    ok("slitFresnelAtAngles passes the option through: a near-field profile by the fast path is within 1e-9 of the Simpson one at every angle, and the two are not the same array of numbers", d.every((v, i) => Math.abs(v - f[i]) < 1e-9) && d.some((v, i) => v !== f[i]));
 }
 
 console.log("fresnel-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

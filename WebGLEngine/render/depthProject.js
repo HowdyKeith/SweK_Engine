@@ -3,7 +3,7 @@
 // THE ANSWER KEY FOR COMPOSITING (v3063), built before the compositing.
 //
 // v3045 said plainly that the ray marcher does not composite with the raster pass -- no depth exchange, so it
-// draws the region alone -- and called that "its own round with its own answer key". This is that answer key.
+// draws the region alone -- and called that "its own round with its own answer key". This is that answer key (SETTLED at v3938).
 // The round after this one can wire gl_FragDepth knowing what the right number is; doing it the other way round
 // means eyeballing whether voxels look correctly buried in terrain, which is not a check.
 //

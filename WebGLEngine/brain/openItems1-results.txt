@@ -1,0 +1,20 @@
+== A. luminance scale x contrast (fly A, r/v 100 ms): margin ms, peak N
+lumScale 255 wc 1: none 183 (peak 1820)  |  moving 183 (peak 1820)
+lumScale 255 wc 0.2: none 183 (peak 1820)  |  moving 183 (peak 1820)
+lumScale 25 wc 1: none 183 (peak 1816)  |  moving 183 (peak 1820)
+lumScale 25 wc 0.2: none 183 (peak 1670)  |  moving 183 (peak 1670)
+lumScale 5 wc 1: none 183 (peak 1670)  |  moving 183 (peak 1670)
+lumScale 5 wc 0.2: none 153 (peak 715)  |  moving 163 (peak 778)
+lumScale 1 wc 1: none 153 (peak 715)  |  moving 163 (peak 778)
+lumScale 1 wc 0.2: none MISSED (peak 0)  |  moving MISSED (peak 0)
+
+== B. surround strength kappa (C), moving/plain peak ratio
+kappa 1: r/v 0.05: 0.696 (plain 1286)  |  r/v 0.1: 1.022 (plain 1453)
+kappa 5: r/v 0.05: 0.756 (plain 1300)  |  r/v 0.1: 1.000 (plain 1820)
+kappa 20: r/v 0.05: 0.756 (plain 1300)  |  r/v 0.1: 1.000 (plain 1820)
+kappa 100: r/v 0.05: 0.756 (plain 1300)  |  r/v 0.1: 1.000 (plain 1820)
+
+== C. lattice degrees per column (D), moving/plain peak ratio and units placed
+degPerColumn 3 (80 placed, 11 dropped): r/v 0.05: 0.875 (plain 3000)  |  r/v 0.1: 1.000 (plain 4500)
+degPerColumn 5 (57 placed, 34 dropped): r/v 0.05: 0.667 (plain 1579)  |  r/v 0.1: 1.000 (plain 2105)
+degPerColumn 8 (29 placed, 62 dropped): r/v 0.05: NaN (plain 0)  |  r/v 0.1: 1.000 (plain 2069)

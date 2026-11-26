@@ -99,7 +99,9 @@ const src = fs.readFileSync(PAGE, "utf8");
 
 // ---- 3. THE PAGE STILL LOADS AS A CLASSIC SCRIPT -----------------------------------------------------------------
 {
-    const firstTag = src.slice(src.indexOf("<script"), src.indexOf("<script") + 30);
+    // the MAIN script is the first INLINE one: a classic <script src> ahead of it (render/gpuTimerAuto.js, which must run before the page makes its context) is not the page's code and
+    // changes nothing this row guards -- it would still find a type="module" main tag, which is the break
+    const mainAt = src.search(/<script(?![^>]*\bsrc=)[^>]*>/), firstTag = src.slice(mainAt, mainAt + 30);
     ok("the MAIN script tag is still a PLAIN <script>", /^<script>/.test(firstTag.trim()),
        "'" + firstTag.trim().split("\\n")[0] + "'. TURNING IT INTO type=module WOULD MAKE EVERY FUNCTION DEFERRED AND MODULE-SCOPED, and every onclick in the markup would stop finding its callback -- THE PAGE WOULD BREAK IN A WAY THAT LOOKS LIKE NOTHING HAPPENING.");
     ok("...and the greedy import lives in a SEPARATE module tag", /<script type="module">\s*import \{ buildVoxelMeshGreedy \}/.test(src),

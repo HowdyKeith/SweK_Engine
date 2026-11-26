@@ -1,0 +1,56 @@
+
+crab/both  r (gray / static / moving) by contrast:
+  0.2: 0.42 / 0.37 / 0.83
+  0.4: 0.66 / 0.66 / 0.83
+  0.6: 0.75 / 0.67 / 0.85
+  0.8: 0.77 / 0.73 / 0.91
+  1: 0.82 / 0.77 / 0.91
+  C1 true C2 false C3 true C4 false  -> score 2/4
+
+crab/off  r (gray / static / moving) by contrast:
+  0.2: 0.42 / 0.00 / 0.74
+  0.4: 0.66 / 0.00 / 0.74
+  0.6: 0.75 / 0.00 / 0.81
+  0.8: 0.77 / 0.00 / 0.81
+  1: 0.82 / 0.59 / 0.81
+  C1 true C2 false C3 false C4 false  -> score 1/4
+
+fly/both/lum255  r (gray / static / moving) by contrast:
+  0.2: 1.00 / 0.95 / 1.00
+  0.4: 1.00 / 0.95 / 1.00
+  0.6: 1.00 / 0.95 / 1.00
+  0.8: 1.00 / 0.95 / 1.00
+  1: 1.00 / 0.95 / 1.00
+  C1 true C2 false C3 true C4 false  -> score 2/4
+
+fly/off/lum255  r (gray / static / moving) by contrast:
+  0.2: 1.00 / 0.33 / 0.41
+  0.4: 1.00 / 0.34 / 0.41
+  0.6: 1.00 / 0.34 / 0.41
+  0.8: 1.00 / 0.34 / 0.41
+  1: 1.00 / 0.34 / 0.41
+  C1 true C2 true C3 false C4 true  -> score 3/4
+
+fly/both/lum1  r (gray / static / moving) by contrast:
+  0.2: 0.00 / 0.00 / 0.00
+  0.4: 0.00 / 0.00 / 0.00
+  0.6: 0.00 / 0.00 / 0.00
+  0.8: 0.39 / 0.54 / 0.61
+  1: 0.92 / 0.97 / 1.00
+  C1 true C2 false C3 false C4 false  -> score 1/4
+
+fly/off/lum1  r (gray / static / moving) by contrast:
+  0.2: 0.00 / 0.00 / 0.00
+  0.4: 0.00 / 0.00 / 0.00
+  0.6: 0.00 / 0.00 / 0.00
+  0.8: 0.42 / 0.00 / 0.00
+  1: 1.00 / 0.00 / 0.00
+  C1 true C2 false C3 false C4 true  -> score 2/4
+
+SUMMARY
+crab/both        C1 Y C2 n C3 Y C4 n  score 2
+crab/off         C1 Y C2 n C3 n C4 n  score 1
+fly/both/lum255  C1 Y C2 n C3 Y C4 n  score 2
+fly/off/lum255   C1 Y C2 Y C3 n C4 Y  score 3
+fly/both/lum1    C1 Y C2 n C3 n C4 n  score 1
+fly/off/lum1     C1 Y C2 n C3 n C4 Y  score 2

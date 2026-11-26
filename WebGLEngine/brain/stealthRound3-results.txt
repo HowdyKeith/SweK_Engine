@@ -1,0 +1,35 @@
+det  r/v   stripes   peakN   spikes  theta@first
+A    0.05  none       1300      18  57.3
+B    0.05  none       9192     308  7.1
+C    0.05  none       1286      18  57.3
+D    0.05  none       1579      30  70.0
+A    0.05  static     1150      14  57.3
+B    0.05  static     9113     349  6.0
+C    0.05  static     1074      14  57.3
+D    0.05  static     1053      20  70.0
+A    0.05  moving      983      10  57.3
+B    0.05  moving     9359     374  6.0
+C    0.05  moving      895       9  57.3
+D    0.05  moving     1053      15  70.0
+A    0.1  none       1820      28  57.3
+B    0.1  none       9964     434  7.1
+C    0.1  none       1453      22  57.3
+D    0.1  none       2105      45  63.1
+A    0.1  static     1738      28  57.3
+B    0.1  static     9971     462  6.0
+C    0.1  static     1376      20  57.3
+D    0.1  static     2105      45  63.1
+A    0.1  moving     1820      28  57.3
+B    0.1  moving    10113     598  5.8
+C    0.1  moving     1485      22  57.3
+D    0.1  moving     2105      45  63.1
+
+moving-stripe ratio (peak N moving / plain), static ratio:
+A r/v 0.05: moving 0.756  static 0.885  (plain 1300)
+A r/v 0.1: moving 1.000  static 0.955  (plain 1820)
+B r/v 0.05: moving 1.018  static 0.991  (plain 9192)
+B r/v 0.1: moving 1.015  static 1.001  (plain 9964)
+C r/v 0.05: moving 0.696  static 0.835  (plain 1286)
+C r/v 0.1: moving 1.022  static 0.947  (plain 1453)
+D r/v 0.05: moving 0.667  static 0.667  (plain 1579)
+D r/v 0.1: moving 1.000  static 1.000  (plain 2105)

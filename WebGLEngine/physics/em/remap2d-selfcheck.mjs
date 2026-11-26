@@ -5,6 +5,7 @@
 // *** I PREDICTED THAT PER-AXIS LIMITING WOULD FAIL IN 2D. IT DOES NOT, AND THE ROUND IS BETTER FOR IT. ***
 //
 // v3634 ended by naming 2D as its own round because "a slope is a GRADIENT and the limiter has to choose a
+// SETTLED at v3938: THIS FILE IS THAT 2D ROUND (physics/em/remap2d.mjs is its subject).
 // direction". The expectation was the textbook caution: limit each axis with the 1D limiter, and the CORNERS --
 // which add both slopes at once, and which 1D does not have -- escape the neighbourhood. Measured: they do not.
 // Section 2 gives the two-line reason, section 3 shows the bound is TIGHT rather than comfortable, and section 4

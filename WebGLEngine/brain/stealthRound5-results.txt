@@ -1,0 +1,11 @@
+r/v   stripes   alarmSeg4  frame  size(deg)  winner  lsl   spikes4  peakF4  anyAlarmSegs
+0.2   none      yes        64    13.2      4     4    47   14.14   [3,4,5,6]  (108 frames)
+0.2   static    yes        77    17.6      4     4    34   35.30   [3,4,5,6]  (108 frames)
+0.2   moving    yes        28    7.9      4     4    62   52.94   [3,4,5]  (108 frames)
+0.4   none      yes        150    16.7      4     4    67   8.47   [2,3,4,5,6]  (215 frames)
+0.4   static    yes        166    20.7      5     5    53   26.62   [2,3,4,5,6]  (215 frames)
+0.4   moving    yes        50    7.6      4     4    111   57.07   [2,3,4,5,6]  (215 frames)
+
+moving over plain: spike ratio, size ratio at alarm
+r/v 0.2: spike ratio moving 1.319 static 0.723; size ratio moving 0.595 static 1.325; peak F plain 14.14 moving 52.94
+r/v 0.4: spike ratio moving 1.657 static 0.791; size ratio moving 0.456 static 1.235; peak F plain 8.47 moving 57.07

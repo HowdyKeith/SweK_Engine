@@ -28,6 +28,8 @@ import * as NP from "../brain/needsPilot.mjs";
 import * as AV from "../brain/needsAdvisor.mjs";
 import * as SST from "../brain/subStations.mjs";   // 2026-11-19: a captain over the stations (brain/SUB_STATIONS_WIP.md): FIXED or TRIAGE on a sub with needs, and the breach it was registered against
 import { FROZEN_TRIAGE } from "../brain/stationsTask.mjs";
+import { COND_KNOBS } from "../brain/breachCourierTask.mjs";   // 2026-11-20: the COND captain (round 10: ROUTE's legs with TRIAGE, the surface latched only on a second sinking after the weight is gone)
+import { legsStation } from "../brain/courierTask.mjs";   // v4930: the ROUTE captain (rounds 4-5: charge between legs, by the planned route)
 import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
 import * as TN from "../brain/subTankNav.mjs";
@@ -65,7 +67,17 @@ export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "nav
 export const KICK = Object.freeze({ at: 3 });
 export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
 /** Is the compass reporting at event time t (seconds)? */
-export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS.period) % COMPASS.period; return !(p >= COMPASS.darkFrom && p < COMPASS.darkFrom + COMPASS.darkLen); };
+export const compassValidAt = (t, spec = COMPASS) => { const p = ((t % spec.period) + spec.period) % spec.period; return !(p >= spec.darkFrom && p < spec.darkFrom + spec.darkLen); };
+// UNNUMBERED (H72, unseen disturbances) -- AN OPTIONAL SCHEDULE FOR THE COMPASS EVENTS. `setEvent(id, "dropout" | "navigator" | an estimator event, { period, darkFrom, darkLen })` replaces the frozen COMPASS for that sub's event only; with no schedule given the
+// flight is the one that was always flown (a gate row shows it bit-identical). A bad schedule throws and changes nothing; a schedule for any other event throws.
+export function compassSpecOf(o) {
+    if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("subAquariumSim.setEvent: the compass schedule is { period, darkFrom, darkLen }");
+    for (const k of Object.keys(o)) if (!["period", "darkFrom", "darkLen"].includes(k)) throw new Error(`subAquariumSim.setEvent: unknown compass schedule field "${k}"`);
+    const { period, darkFrom, darkLen } = o;
+    if (![period, darkFrom, darkLen].every((x) => typeof x === "number" && Number.isFinite(x))) throw new Error("subAquariumSim.setEvent: period, darkFrom and darkLen are finite numbers of seconds");
+    if (!(period > 0) || !(darkFrom >= 0) || !(darkLen > 0) || darkFrom + darkLen > period) throw new Error("subAquariumSim.setEvent: a compass schedule needs period > 0, darkFrom >= 0, darkLen > 0 and darkFrom + darkLen <= period");
+    return Object.freeze({ period, darkFrom, darkLen });
+}
 export const ESTIMATORS = Object.freeze(["fly-estimator", "er-estimator"]);
 const isEstimator = (ev) => ESTIMATORS.includes(ev);
 const isCompass = (ev) => ev === "dropout" || ev === "navigator" || isEstimator(ev);
@@ -148,7 +160,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const inner = nav ? deadReckoning(sub.pilot) : estimators.has(kind) ? estimators.get(kind)(spy) : sub.pilot, tgt = {}; let held = null;
         return (state, t, current) => {
             Object.assign(tgt, t);
-            const valid = compassValidAt(sub.eventT), psi = S.attitude(state).heading;
+            const valid = compassValidAt(sub.eventT, sub.compassSpec || COMPASS), psi = S.attitude(state).heading;
             if (valid || held === null) held = psi;
             if (valid) { const cmd = inner(state, tgt, current, { compassValid: 1, dt: sub.tickDt }); sub.compass = { valid: true, seen: estimators.has(kind) ? seen.h : psi, error: estimators.has(kind) ? wrap(seen.h - psi) : 0 }; return cmd; }
             const sw = turnWorld(state, current, held - psi);
@@ -166,7 +178,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const pilot = (st, tg, cur, aux) => {
             if (sub.captainPilot) { const c = sub.captainPilot(st, tg, cur, aux); sub.advice = null; return c; }
             if (sub.advisor) { const c = adv(st, tg, cur, aux); sub.advice = adv.advice; return c; } sub.advice = null; return trip(st, tg, cur, aux); };
-        Object.defineProperty(pilot, "refilling", { get: () => (sub.captainPilot ? !!sub.captainPilot.log && (sub.captainPilot.log.con === "energy" || sub.captainPilot.log.con === "breach") : sub.advisor ? adv.refilling : trip.refilling) });
+        Object.defineProperty(pilot, "refilling", { get: () => (sub.captainPilot ? !!sub.captainPilot.log && (sub.captainPilot.log.con === "energy" || sub.captainPilot.log.con === "breach" || sub.captainPilot.log.con === "legs") : sub.advisor ? adv.refilling : trip.refilling) });
         return pilot;
     }
     /** v4912 -- the survey event's pilot: the survey seat (brain/surveySeat.mjs) behind needsTask's decision wrapper, shown what the task shows a seat (the stations with their visited flags, the needs readings through the task's noisy gauge). After the survey it holds the surface. */
@@ -206,7 +218,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
-        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.captainKind = null; sub.captainPilot = null; sub.breach = null; sub.survey = null; sub.pendingSurvey = null; sub.kick = null; sub.pendingKick = null;
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.compassSpec = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.captainKind = null; sub.captainPilot = null; sub.breach = null; sub.survey = null; sub.pendingSurvey = null; sub.kick = null; sub.pendingKick = null;
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
@@ -214,6 +226,32 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         sub.state = spawn(entry, rng); retarget(sub); seat(sub, entry);
         subs.set(entry.id, sub);
         return sub;
+    }
+    // 2026-11-25 (backlog stations-cond-default-courier) -- the captain seating, as a closure: the public setCaptain seats and MARKS THE CHOICE (sub.captainChosen); the default below seats COND and does not, so a
+    //   later explicit choice (off included) always wins and is never overridden. Starting the needs again clears both, as it always cleared the captain.
+    function seatCaptain(id, kind) {
+            const off = kind === null || kind === undefined || kind === "";
+            if (!off && kind !== "fixed" && kind !== "triage" && kind !== "route" && kind !== "cond") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage", "route", "cond" or null, got ${JSON.stringify(kind)}`);
+            const sub = subs.get(id); if (!sub) return null;
+            if (!sub.needs) throw new Error("subAquariumSim.setCaptain: the sub has no needs (start them with setNeeds)");
+            if (off) { sub.captainKind = null; sub.captainPilot = null; sub.aux = null; return null; }
+            if ((kind === "route" || kind === "cond") && !sub.nav) throw new Error(`subAquariumSim.setCaptain: the ${kind} captain is for a courier (start one with setNav)`);
+            const read = () => N.readings(sub.eventModel, sub.needs, sub.state), pilot = sub.pilot;
+            // v4930 -- ROUTE (brain/SUB_STATIONS_WIP.md rounds 4-5): the legs station over THIS sub's navigator, read through a proxy so a new sea or a new navigator (startNav replaces sub.nav) is followed and an ended courier
+            //   reads as no goal (it then charges only in an emergency); the energy station's own claim shut, its pump and repair asks kept; damage control on the tank's room. It does not read a breach (round 7: see the note).
+            const navProxy = { snapshot: () => (sub.nav ? sub.nav.snapshot() : { arrivals: 0, goal: null, travel: 0 }), routeLength: (x, y) => (sub.nav ? sub.nav.routeLength(x, y) : null) };
+            if (kind === "route") { sub.captainPilot = SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [legsStation({ read, nav: navProxy, pos: () => [sub.state.pos[0], sub.state.pos[1]], route: true }), SST.gatedStation(SST.energyStation({ read }), () => false), SST.damageStation(RESCUE)] }); sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind; }
+            // 2026-11-20 -- COND (round 10, brain/SUB_STATIONS_WIP.md section 29: 2.42 goals and 76 of 96 boats on the breached courier): TRIAGE with ROUTE's legs station first and its energy claim shut, the breach latch only on a
+            //   SECOND sinking after the weight is gone (COND_KNOBS, as frozen). The same legs station over the same proxy as ROUTE; damage control on the tank's room.
+            if (kind === "cond") { sub.captainPilot = SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: COND_KNOBS, damageOpts: RESCUE, more: [legsStation({ read, nav: navProxy, pos: () => [sub.state.pos[0], sub.state.pos[1]], route: true })], energyAllow: () => false }); sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind; }
+            sub.captainPilot = kind === "triage" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: FROZEN_TRIAGE, damageOpts: RESCUE })
+                : SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [SST.energyStation({ read }), SST.damageStation(RESCUE)] });
+            sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind;
+}
+    /** COND (round 10's winner) for a courier with needs, unless a captain or the advisor was chosen for it, or the sub is not both. Seated, not chosen. */
+    function defaultCaptain(api, sub) {
+        if (!sub || !sub.needs || !sub.nav || sub.captainChosen || sub.captainPilot || sub.advisor) return null;
+        return seatCaptain(sub.id, "cond");
     }
     return {
         subs, length, width,
@@ -246,7 +284,8 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         setNeeds(id, cls, { crushDepth = NEEDS_CRUSH } = {}) {
             const n = N.initialNeeds(cls, { crushDepth });   // throws on a bad class or crush depth BEFORE anything changes
             const sub = subs.get(id); if (!sub) return null;
-            sub.pendingNeeds = n; try { return this.setEvent(id, "needs"); } catch (e) { sub.pendingNeeds = null; throw e; }
+            sub.pendingNeeds = n; let ev; try { ev = this.setEvent(id, "needs"); } catch (e) { sub.pendingNeeds = null; throw e; }
+            defaultCaptain(this, sub); return ev;
         },
         /**
          * v4912 -- start the SURVEY event on a sub: a battery hull (the class the planner models) with a charge, the survey seat (brain/surveySeat.mjs, `profile`: standard, events, wide or ensemble; or, from render/subAquariumCircuit.mjs, rule or circuit -- the tuned rule and the decision circuit's champion, which fly the task's own 600 s survey) choosing the order of the stations. `opts`: stations
@@ -309,17 +348,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          * 2026-11-19 -- put a CAPTAIN on a sub that has needs: "fixed" (brain/subStations.mjs captain over the energy and damage stations, by rank) or "triage" (registration B of brain/SUB_STATIONS_WIP.md, which kept 75 of 96 HELD boats
          * against FIXED's 62), or null to give the boat back to the refill trip. A captain turns the advisor off. Answers the captain now; an unknown kind throws and changes nothing; an unknown id answers null; a sub with no needs throws.
          */
-        setCaptain(id, kind) {
-            const off = kind === null || kind === undefined || kind === "";
-            if (!off && kind !== "fixed" && kind !== "triage") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage" or null, got ${JSON.stringify(kind)}`);
-            const sub = subs.get(id); if (!sub) return null;
-            if (!sub.needs) throw new Error("subAquariumSim.setCaptain: the sub has no needs (start them with setNeeds)");
-            if (off) { sub.captainKind = null; sub.captainPilot = null; sub.aux = null; return null; }
-            const read = () => N.readings(sub.eventModel, sub.needs, sub.state), pilot = sub.pilot;
-            sub.captainPilot = kind === "triage" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: FROZEN_TRIAGE, damageOpts: RESCUE })
-                : SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [SST.energyStation({ read }), SST.damageStation(RESCUE)] });
-            sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind;
-        },
+        setCaptain(id, kind) { const r = seatCaptain(id, kind); const sub = subs.get(id); if (sub) sub.captainChosen = true; return r; },
         /**
          * 2026-11-19 -- BREACH the hull of a sub that has needs: a leak of `leak` of the weight (0 < leak <= 0.2; default 0.07, past the 6 % drop weight) that builds over 5 s from now and never mends -- the case brain/stationsTask.mjs flies.
          * Answers the leak; a bad leak throws and changes nothing; an unknown id answers null; a sub with no needs throws. Ending or starting an event mends it.
@@ -368,7 +397,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             const sub = subs.get(id); if (!sub) return null;
             if (off) { endNav(sub); return null; }
             if (!scene) throw new Error("subAquariumSim.setNav: start a sea first (setScene)");
-            startNav(sub, arm); return arm;
+            startNav(sub, arm); defaultCaptain(this, sub); return arm;
         },
         /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
         registerEstimator(event, build) {
@@ -380,11 +409,12 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          * Start (or, with null, end) an event on one sub: "flood", "sink" or "surface" (see EVENTS). Returns the event now running, or null. An unknown event name throws and changes nothing; an unknown id does nothing and returns null.
          * Starting one on a sub that already has one swaps it: the tank state is kept (a dropped weight stays dropped, the air stays spent), the leak and the clock start again.
          */
-        setEvent(id, ev) {
+        setEvent(id, ev, opts) {
             const sub = subs.get(id);
             if (sub && sub.steer && ev !== null && ev !== undefined && ev !== "") throw new Error("subAquariumSim.setEvent: clear the sub's steer first (an event wraps the pilot it was started with)");
             if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
             if (isEstimator(ev) && !estimators.has(ev)) throw new Error(`subAquariumSim.setEvent: no builder is registered for "${ev}" (a page registers one with registerEstimator)`);
+            const spec = opts === undefined || opts === null ? null : (isCompass(ev) ? compassSpecOf(opts) : (() => { throw new Error("subAquariumSim.setEvent: a compass schedule is only for the compass events"); })());
             if (!sub) return null;
             if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
             if (needsTank(ev)) {
@@ -392,7 +422,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
             sub.kick = ev === "kick" ? { sign: sub.pendingKick ? sub.pendingKick.sign : 1, at: sub.pendingKick ? sub.pendingKick.at : KICK.at, fired: false } : null; sub.pendingKick = null;
-            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null; sub.advisor = false; sub.advice = null; sub.captainKind = null; sub.captainPilot = null; sub.breach = null;
+            sub.compassSpec = spec; sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null; sub.advisor = false; sub.advice = null; sub.captainKind = null; sub.captainPilot = null; sub.captainChosen = false; sub.breach = null;
             if (ev === "needs" || ev === "survey") { sub.needs = sub.pendingNeeds || N.initialNeeds("battery", { crushDepth: NEEDS_CRUSH }); sub.pendingNeeds = null; } else sub.needs = null;
             sub.survey = null; if (ev === "survey") { sub.survey = sub.pendingSurvey || { stations: surveyStations(hash(String(sub.id)), SURVEY.count, length, width).map((q) => ({ ...q, visited: false })), profile: "standard", gaugeSd: SURVEY.gaugeSd, seconds: SURVEY.seconds, damage0: sub.needs.damage, ticks: 0, done: false, status: "running", score: null, returned: false, stats: null }; sub.surveyResult = null; } sub.pendingSurvey = null;
             sub.eventPilot = ev === "needs" ? needsPilotOf(sub) : ev === "survey" ? surveyPilotOf(sub) : ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
@@ -462,7 +492,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : sub.kindInfo ? sub.kindInfo.circuit : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, circuit: sub.circuit, kind: sub.kindInfo ? sub.kindInfo.circuit : null, kindError: sub.kindError, waiting: !!sub.kindWeights && !sub.kindInfo && !sub.kindError, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, kick: sub.kick ? { sign: sub.kick.sign, at: sub.kick.at, fired: sub.kick.fired } : null, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging), t: sub.eventT, leak: sub.breach ? breachAt(sub) : 0, captain: sub.captainPilot ? { kind: sub.captainKind, con: sub.captainPilot.log ? sub.captainPilot.log.con : "mission", reason: sub.captainPilot.log ? sub.captainPilot.log.reason : null, overrides: sub.captainPilot.log ? sub.captainPilot.log.overrides : [], watch: sub.captainPilot.watch } : null } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, nav: sub.nav ? sub.nav.snapshot() : null, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, circuit: sub.circuit, kind: sub.kindInfo ? sub.kindInfo.circuit : null, kindError: sub.kindError, kindWait: sub.kindWeights && !sub.kindInfo && !sub.kindError ? (kinds.has(sub.circuit) ? "count" : "kind") : null, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, kick: sub.kick ? { sign: sub.kick.sign, at: sub.kick.at, fired: sub.kick.fired } : null, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging), t: sub.eventT, leak: sub.breach ? breachAt(sub) : 0, captain: sub.captainPilot ? { kind: sub.captainKind, con: sub.captainPilot.log ? sub.captainPilot.log.con : "mission", reason: sub.captainPilot.log ? sub.captainPilot.log.reason : null, overrides: sub.captainPilot.log ? sub.captainPilot.log.overrides : [], watch: sub.captainPilot.watch, latch: sub.captainPilot.latch || null, byDefault: !sub.captainChosen } : null } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, nav: sub.nav ? sub.nav.snapshot() : null, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

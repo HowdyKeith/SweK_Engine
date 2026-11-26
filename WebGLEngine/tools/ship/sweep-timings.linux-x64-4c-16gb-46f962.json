@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-46f962",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-08T21:14:45.599Z",
+ "captured": "2026-11-20T17:23:50.511Z",
  "timings": {
   "brain/deciderAdvisor-selfcheck.mjs": 1094,
   "brain/pilot6dofMlp-selfcheck.mjs": 829,
@@ -120,7 +120,16 @@
   "tools/ship/trainDecisionCircuit-selfcheck.mjs": 9605,
   "tools/ship/trainStation-selfcheck.mjs": 10546,
   "tools/ship/winPathLint-selfcheck.mjs": 2331,
-  "ui/privateLmClient-selfcheck.mjs": 398
+  "ui/privateLmClient-selfcheck.mjs": 398,
+  "brain/crabMlg1-selfcheck.mjs": 42214,
+  "brain/flyEmdLplc2Gf-selfcheck.mjs": 29466,
+  "brain/flyGfLoomModel-selfcheck.mjs": 72,
+  "brain/gfGain-selfcheck.mjs": 33538,
+  "brain/oppLoom-selfcheck.mjs": 6049,
+  "brain/stealthLoomStimuli-selfcheck.mjs": 41870,
+  "brain/stealthMotion-selfcheck.mjs": 2679,
+  "render/subAquarium3dDark-selfcheck.mjs": 78,
+  "render/subAquariumKinds-selfcheck.mjs": 97
  },
  "at": {
   "brain/deciderAdvisor-selfcheck.mjs": "2026-11-05T13:21:59.994Z",
@@ -240,7 +249,16 @@
   "tools/ship/trainDecisionCircuit-selfcheck.mjs": "2026-11-08T21:14:45.599Z",
   "tools/ship/trainStation-selfcheck.mjs": "2026-11-08T21:14:45.599Z",
   "tools/ship/winPathLint-selfcheck.mjs": "2026-11-08T21:14:45.599Z",
-  "ui/privateLmClient-selfcheck.mjs": "2026-11-08T21:14:45.599Z"
+  "ui/privateLmClient-selfcheck.mjs": "2026-11-08T21:14:45.599Z",
+  "brain/crabMlg1-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/flyEmdLplc2Gf-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/flyGfLoomModel-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/gfGain-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/oppLoom-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/stealthLoomStimuli-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "brain/stealthMotion-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "render/subAquarium3dDark-selfcheck.mjs": "2026-11-20T17:23:50.511Z",
+  "render/subAquariumKinds-selfcheck.mjs": "2026-11-20T17:23:50.511Z"
  },
  "kinds": {
   "brain/deciderAdvisor-selfcheck.mjs": "alone",
@@ -360,7 +378,16 @@
   "tools/ship/trainDecisionCircuit-selfcheck.mjs": "alone",
   "tools/ship/trainStation-selfcheck.mjs": "alone",
   "tools/ship/winPathLint-selfcheck.mjs": "alone",
-  "ui/privateLmClient-selfcheck.mjs": "alone"
+  "ui/privateLmClient-selfcheck.mjs": "alone",
+  "brain/crabMlg1-selfcheck.mjs": "alone",
+  "brain/flyEmdLplc2Gf-selfcheck.mjs": "alone",
+  "brain/flyGfLoomModel-selfcheck.mjs": "alone",
+  "brain/gfGain-selfcheck.mjs": "alone",
+  "brain/oppLoom-selfcheck.mjs": "alone",
+  "brain/stealthLoomStimuli-selfcheck.mjs": "alone",
+  "brain/stealthMotion-selfcheck.mjs": "alone",
+  "render/subAquarium3dDark-selfcheck.mjs": "alone",
+  "render/subAquariumKinds-selfcheck.mjs": "alone"
  },
  "codes": {
   "brain/deciderAdvisor-selfcheck.mjs": 0,
@@ -480,7 +507,16 @@
   "tools/ship/trainDecisionCircuit-selfcheck.mjs": 0,
   "tools/ship/trainStation-selfcheck.mjs": 0,
   "tools/ship/winPathLint-selfcheck.mjs": 0,
-  "ui/privateLmClient-selfcheck.mjs": 0
+  "ui/privateLmClient-selfcheck.mjs": 0,
+  "brain/crabMlg1-selfcheck.mjs": 0,
+  "brain/flyEmdLplc2Gf-selfcheck.mjs": 0,
+  "brain/flyGfLoomModel-selfcheck.mjs": 0,
+  "brain/gfGain-selfcheck.mjs": 0,
+  "brain/oppLoom-selfcheck.mjs": 0,
+  "brain/stealthLoomStimuli-selfcheck.mjs": 0,
+  "brain/stealthMotion-selfcheck.mjs": 0,
+  "render/subAquarium3dDark-selfcheck.mjs": 0,
+  "render/subAquariumKinds-selfcheck.mjs": 0
  },
  "serialRing": {
   "brain/deciderAdvisor-selfcheck.mjs": [
@@ -984,6 +1020,51 @@
    394,
    390,
    398
+  ],
+  "brain/crabMlg1-selfcheck.mjs": [
+   42253,
+   42016,
+   42214
+  ],
+  "brain/flyEmdLplc2Gf-selfcheck.mjs": [
+   30113,
+   28342,
+   29466
+  ],
+  "brain/flyGfLoomModel-selfcheck.mjs": [
+   85,
+   76,
+   72
+  ],
+  "brain/gfGain-selfcheck.mjs": [
+   30981,
+   33067,
+   33538
+  ],
+  "brain/oppLoom-selfcheck.mjs": [
+   5943,
+   6914,
+   6049
+  ],
+  "brain/stealthLoomStimuli-selfcheck.mjs": [
+   44535,
+   54657,
+   41870
+  ],
+  "brain/stealthMotion-selfcheck.mjs": [
+   2595,
+   2729,
+   2679
+  ],
+  "render/subAquarium3dDark-selfcheck.mjs": [
+   78,
+   76,
+   78
+  ],
+  "render/subAquariumKinds-selfcheck.mjs": [
+   94,
+   92,
+   97
   ]
  }
 }

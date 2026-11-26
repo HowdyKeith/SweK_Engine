@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ea3cd5abb527c4a729e956401a7670a4843c66b4",
+ "head": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -131,7 +131,7 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 24503,
+    "bytes": 25002,
     "sha": "171f3111e8f89d077853d5c1fa6e0cc93653b128"
    },
    {
@@ -217,8 +217,8 @@
    },
    {
     "path": "slug-text.html",
-    "bytes": 12133,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 12286,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "slug-ticker.html",
@@ -369,9 +369,14 @@
     "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
+    "path": "render/subAquariumKinds-selfcheck.mjs",
+    "bytes": 10878,
+    "sha": "0b432755f177e35f59ae0d57de0f2f34a6a4da4c"
+   },
+   {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 57463,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "bytes": 57854,
+    "sha": "aff6734bb19ca97f583da9bfd8ca8dd1bc189e78"
    },
    {
     "path": "render/switchboardView-selfcheck.mjs",
@@ -380,8 +385,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 59791,
-    "sha": "6b949003dda79eb1ff8d31ff459cfd534516902b"
+    "bytes": 61813,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "switchboard.html",
@@ -482,8 +487,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "clients.html",
@@ -492,8 +497,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 904940,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -557,8 +562,8 @@
    },
    {
     "path": "krbn-compare.html",
-    "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "bytes": 37536,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-lyapunov.html",
@@ -592,8 +597,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    }
   ],
   "male-cns": [
@@ -608,9 +613,54 @@
     "sha": "e336692128303e452c50f7fe9c9f385cc47c81b2"
    },
    {
+    "path": "brain/flyEmdLplc2Gf-selfcheck.mjs",
+    "bytes": 39533,
+    "sha": "18d638c114bb37d6f6d8b992f6c3dc5cc6e9397b"
+   },
+   {
+    "path": "brain/flySteering-selfcheck.mjs",
+    "bytes": 25896,
+    "sha": "3c0a92b61c64888952aec42a2a93c9a2a980f32e"
+   },
+   {
+    "path": "brain/flyTracking-selfcheck.mjs",
+    "bytes": 51031,
+    "sha": "743ff3d46654f5cf6f42a9228d85c89105306123"
+   },
+   {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
     "bytes": 40686,
     "sha": "caf901a66f7fbb39120fe93ab294af676736a7cb"
+   },
+   {
+    "path": "brain/helmCompassPolicy-selfcheck.mjs",
+    "bytes": 15993,
+    "sha": "aed20ecb362fbfc3dcd8df508283d0d1af1634c7"
+   },
+   {
+    "path": "brain/helmSteerPolicy-selfcheck.mjs",
+    "bytes": 20185,
+    "sha": "7c4cbd77fa1f519725d6cd4c25a8fc387282cd27"
+   },
+   {
+    "path": "brain/maleCnsCircuits-selfcheck.mjs",
+    "bytes": 34110,
+    "sha": "bea9121fea16dec7840d815183a79f4b5ef1f50e"
+   },
+   {
+    "path": "brain/openItems1-run.mjs",
+    "bytes": 2286,
+    "sha": "12fac7508f2e8f519baf016fc19eb0a1eace2998"
+   },
+   {
+    "path": "brain/seatTrackGunner-selfcheck.mjs",
+    "bytes": 18427,
+    "sha": "31be7a6d6e04448f4d1520993c46f743500893d6"
+   },
+   {
+    "path": "brain/stealthRound3-run.mjs",
+    "bytes": 2133,
+    "sha": "418ca94cd6a99ac157e10383700b93523853f1fb"
    },
    {
     "path": "fly-connectome.html",
@@ -668,6 +718,23 @@
    }
   ],
   "slug": [],
+  "smaa": [
+   {
+    "path": "render/smaaPass.js",
+    "bytes": 19688,
+    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a"
+   },
+   {
+    "path": "render/smaaPassGPU.mjs",
+    "bytes": 27714,
+    "sha": "be9689c3796cb55de6cb70d6d7dbed0233bec793"
+   },
+   {
+    "path": "tools/ship/smaaPass-selfcheck.mjs",
+    "bytes": 14251,
+    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a"
+   }
+  ],
   "snowflow": [
    {
     "path": "render/aerial-selfcheck.mjs",
@@ -726,8 +793,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -736,8 +803,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 161481,
-    "sha": "735eddf2263f9548dd2e5400993ead89ea62f721"
+    "bytes": 164897,
+    "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
    }
   ],
   "taichi-js": [
@@ -770,8 +837,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "aquarelle.html",
@@ -950,8 +1017,8 @@
    },
    {
     "path": "index.html",
-    "bytes": 23021,
-    "sha": "ca8b8f0ce2cd7678617f50a01920d68eddd146f7"
+    "bytes": 23174,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-avatar.html",
@@ -960,8 +1027,8 @@
    },
    {
     "path": "krbn-compare.html",
-    "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "bytes": 37536,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-rigged.html",
@@ -980,8 +1047,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3819947,
-    "sha": "a70bc81d849ecf888bac8193702cc730aeaa7f17"
+    "bytes": 3831441,
+    "sha": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2"
    },
    {
     "path": "mpm3d.html",
@@ -1025,18 +1092,18 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 29448,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "bytes": 25349,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
+   },
+   {
+    "path": "render/subAquarium3dDark-selfcheck.mjs",
+    "bytes": 5727,
+    "sha": "c7afabbbd7f030597600f79d955d460d58f1a41f"
    },
    {
     "path": "render/subAquarium3dMarks-selfcheck.mjs",
-    "bytes": 6731,
+    "bytes": 16484,
     "sha": "5fd137be3c15f6b629dff50e9471e426abb7f503"
-   },
-   {
-    "path": "render/subAquarium3dNav-selfcheck.mjs",
-    "bytes": 7811,
-    "sha": "87dffb9353f61fd1666586230a407a08df4c6fb5"
    },
    {
     "path": "render/subBallastCues-selfcheck.mjs",
@@ -1085,8 +1152,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 904940,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "shipavatar.html",
@@ -1110,8 +1177,13 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 85612,
-    "sha": "dc45bed917a8026025d60dc34473ab0c717bde6e"
+    "bytes": 85912,
+    "sha": "23c03b0360cab54c19ec66b7b2e669211fe1714c"
+   },
+   {
+    "path": "space-duel.html",
+    "bytes": 25698,
+    "sha": "896ffc6ef4791b57fd597806b1555b23e51da4c8"
    },
    {
     "path": "splat_viewer.html",
@@ -1120,8 +1192,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 59791,
-    "sha": "6b949003dda79eb1ff8d31ff459cfd534516902b"
+    "bytes": 61813,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "svg-forge.html",
@@ -1175,8 +1247,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1649,8 +1721,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1708,8 +1780,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",

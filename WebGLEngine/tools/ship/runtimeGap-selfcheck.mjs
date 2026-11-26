@@ -53,6 +53,24 @@ const VBA_CODE = VBA_SRC.map((f) => f.text.split("\n").filter((l) => !/^\s*'/.te
 const c = R.census(files);
 const rows = R.ranked(c);
 
+// ---- 0. v4934 -- THE LITERAL PRE-TEST IS EXACT, AND THE TWO TABLES CANNOT DRIFT APART ----------------------------
+// census() skips a file for four patterns when none of the pattern's fixed strings is in it, because an alternation of N literals is a
+// regex that scans the text N ways. That is only sound while PREFILTER_LITERALS rebuilds each pattern's own source, and while the
+// answer is the one the plain regex gives. Both are asserted, the second on the real tree (a copy of the table takes the plain path).
+// SABOTAGES (v4934, restored): "WebGPU" literal `requestAdapter` removed from PREFILTER_LITERALS -> the source row goes red naming WebGPU;
+// `workers/threads` literal list emptied of `Atomics.` -> source row red naming it; census made to skip on the FIRST literal only ->
+// the equivalence row goes red on the real tree (typed arrays and workers/threads undercount).
+{
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bad = Object.entries(R.PREFILTER_LITERALS).filter(([k, lits]) => !R.PATTERNS[k] || new RegExp("(" + lits.map(esc).join("|") + ")").source !== R.PATTERNS[k].source).map(([k]) => k);
+    ok("!! *** every literal pre-test list rebuilds its pattern's own source exactly -- so editing PATTERNS or PREFILTER_LITERALS alone goes red ***", bad.length === 0 && Object.keys(R.PREFILTER_LITERALS).length === 4,
+       bad.length ? "DRIFTED: " + bad.join(", ") : Object.keys(R.PREFILTER_LITERALS).join(", ") + " -- each list is the pattern's alternatives, escaped and joined");
+    const plain = R.census(files, { ...R.PATTERNS });
+    const diff = Object.keys(R.PATTERNS).filter((k) => plain.counts[k] !== c.counts[k]);
+    ok("!! *** the pre-tested census gives the plain regex's answer on every row, over the real tree ***", diff.length === 0 && plain.files === c.files,
+       diff.length ? "differs on " + diff.map((k) => k + " " + plain.counts[k] + " vs " + c.counts[k]).join(", ") : c.files + " files, 12 rows identical");
+}
+
 // ---- 1. *** THE ORDERING IS THE FINDING, AND THREADS ARE NEAR THE BOTTOM OF IT *** ---------------------------
 {
     say(`${c.files} runtime source files (vendor, node_modules and dist excluded), comment-stripped`);

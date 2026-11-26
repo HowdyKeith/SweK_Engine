@@ -1,0 +1,150 @@
+{
+ "gate": "tools/ship/gpuTimerAuto-selfcheck.mjs",
+ "at": "2026-11-24",
+ "tables": [
+  {
+   "title": "the pages that carry the timer line, by class (read from the source, so it is written on a box with no browser too)",
+   "columns": [
+    "page",
+    "class"
+   ],
+   "rows": [
+    [
+     "avatarstage.html",
+     "draws at load or every frame"
+    ],
+    [
+     "backend-dom.html",
+     "context made on ask"
+    ],
+    [
+     "benchmark.html",
+     "draws at load or every frame"
+    ],
+    [
+     "brain-room.html",
+     "draws at load or every frame"
+    ],
+    [
+     "bzflag.html",
+     "draws at load or every frame"
+    ],
+    [
+     "camera-effects.html",
+     "draws at load or every frame"
+    ],
+    [
+     "comic-voxel-fire.html",
+     "draws at load or every frame"
+    ],
+    [
+     "cube.html",
+     "draws at load or every frame"
+    ],
+    [
+     "gallery.html",
+     "other"
+    ],
+    [
+     "gizmo-demo.html",
+     "other"
+    ],
+    [
+     "index.html",
+     "draws at load or every frame"
+    ],
+    [
+     "indexPlus.html",
+     "other"
+    ],
+    [
+     "krbn-compare.html",
+     "draws at load or every frame"
+    ],
+    [
+     "lights-demo.html",
+     "other"
+    ],
+    [
+     "mesh-line.html",
+     "draws at load or every frame"
+    ],
+    [
+     "nebula.html",
+     "draws at load or every frame"
+    ],
+    [
+     "panels.html",
+     "other"
+    ],
+    [
+     "path-tracer.html",
+     "context made on ask"
+    ],
+    [
+     "phone.html",
+     "draws at load or every frame"
+    ],
+    [
+     "pom-demo.html",
+     "draws at load or every frame"
+    ],
+    [
+     "population.html",
+     "context made on ask"
+    ],
+    [
+     "raymarch-gl-demo.html",
+     "draws at load or every frame"
+    ],
+    [
+     "raymarch-live.html",
+     "draws at load or every frame"
+    ],
+    [
+     "rps.html",
+     "draws at load or every frame"
+    ],
+    [
+     "sinogram-gpu.html",
+     "draws at load or every frame"
+    ],
+    [
+     "sky.html",
+     "other"
+    ],
+    [
+     "slug-text.html",
+     "draws at load or every frame"
+    ],
+    [
+     "sphere-impostor.html",
+     "other"
+    ],
+    [
+     "volume-cache.html",
+     "draws at load or every frame"
+    ],
+    [
+     "voxel-viewer.html",
+     "draws at load or every frame"
+    ],
+    [
+     "water.html",
+     "draws at load or every frame"
+    ],
+    [
+     "wormhole-jump.html",
+     "draws at load or every frame"
+    ],
+    [
+     "zoom-blur.html",
+     "draws at load or every frame"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

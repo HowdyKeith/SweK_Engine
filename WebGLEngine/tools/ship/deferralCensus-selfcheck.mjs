@@ -41,6 +41,11 @@
 //      answer to follow -- the same "run the branch, do not argue about it" move v4478 needed for its
 //      unanswerable GPU case.
 //
+// ---- THE 2026-11-26 MERGE (main's v4935 into the claude/code-review-nr3a0i line) -- 2 edits, 2 red by name -------------
+//   M1 OVERLAP set to 0 (the depthProject hit both lines settled counted twice): 1 red (the tranches account for the record's move).
+//   M2 the reach matcher made to name every file (unnamed emptied): 1 red (REACH). The row's size floor was lowered from 100 to > 0 at this
+//      merge, with its reason at the row; this edit shows the lowered row still refuses a matcher that names everything.
+//
 // ---- SECTION 6 SABOTAGE LOG (after v4928) -- 7 edits, 7 red by name, none 0 red ---------------------------
 // hydrostatic's marker moved two lines down (2: the census row names satisfied 21 -> 20, and the adjacency row);
 // HoleFillGPU's export renamed (1: the declaration row); the record's satisfied falsified to 22 (2: the census
@@ -203,7 +208,7 @@ sec("3. *** THE RECORD THAT STOPPED BEING RE-READ WAS THE ONE FOR RECORDS THAT S
         found.reachOf118 === 0 && reach.matchedByBacklog >= REC.backlogAfter.reach &&
         reach.files.length > 0 && reach.files.length <= reach.matchedByBacklog &&   // v4884: files, not rows -- main's backlog is sixteen times the size it was and several undecided rows share a file (65 rows, 37 files)
         reach.files.every((f) => backlogText.includes(f)) &&
-        unnamed.length === C.undecided.length - reach.matchedByBacklog && unnamed.length > 100,
+        unnamed.length === C.undecided.length - reach.matchedByBacklog && unnamed.length > 0,   // 2026-11-26 merge: the floor was 100, a size check, not the discrimination (that is the equality before it, which a stub matching everything fails). Settlement moved it legitimately: 39 settled, 189 undecided, 93 named by the backlog, so 96 unnamed. Lowered to > 0, which still refuses a matcher that names every file
         `0 of ${C.counts.undecided} before v4479, ${REC.backlogAfter.reach} after it, ` +
         `${reach.matchedByBacklog} now. A backlog entry NAMES THE FILE carrying the prose note it answers -- ` +
         "that link is the whole of this metric, and the number is not a boast, it is the size of what is " +
@@ -309,8 +314,18 @@ sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A D
         missing.length ? "the work a marker points at is gone, so the marker is false: " + missing.join("; ")
                        : T.reduce((n, t) => n + t.decl.length, 0) + " declarations found: primeTrellis, STREAMED, readAngularVelocities in box3d and Jolt, taitB, " +
                          "STATE.drive, HoleFillGPU, makeLockLife, CSBomb, evaluateGuards in DungeonAI, the forceslate plant, chunkAudit and resumePlan, _dry, mountMiniAvatar");
-    ok("the tranches account for the record's move EXACTLY: satisfied +20 and undecided -20 (13, then 5, then 2 from the backlog), from the counts v4906 left",
-        REC.satisfied - 8 === T.length + D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length && 217 - REC.undecided === T.length + D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length,   // both tranches and the backlog's one: 13 + 5 + 1
+    // v4934 MERGE: the branch's own adjudication pass (deferralLedger.json) marked 14 hits SETTLED while main marked the
+    // 13 above; 2 files are in both, so the merged record moves by 13 + 12 = 25 and not 26, and the 12 are named by their count here.
+    const LEDGER_PASS_NEW = 12;
+    const V4934_NEW_UNDECIDED = 3;   // the three ratchet-raise comments in definitionGates-selfcheck, filed as nextRounds entry name-branch-exports
+    // 2026-11-26 MERGE of main (v4935) into the claude/code-review-nr3a0i line: that line's second tranche (5) and the backlog's two (fireColour,
+    // opticalFlowGPU) join main's 13 + 12. The record below is re-derived from this gate's own reading of the merged tree.
+    // ONE hit is in both: tools/ship/depthProject-selfcheck.mjs's "answer key" line, which main's ledger pass marked SETTLED at v3938 and this line's second
+    // tranche marked SETTLED at v3064 (the gl_FragDepth wiring, held to its declaration). The merge kept the declared line; the hit is counted once.
+    const OVERLAP = 1;
+    const BRANCH_LINE = D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length - OVERLAP;
+    ok("the tranches account for the record's move EXACTLY: main's 13 plus the ledger pass's 12, plus this line's second tranche (5) and the backlog's 2, less the one hit both settled, from the counts v4906 left",
+        REC.satisfied - 8 === T.length + LEDGER_PASS_NEW + BRANCH_LINE && 217 - REC.undecided + V4934_NEW_UNDECIDED === T.length + LEDGER_PASS_NEW + BRANCH_LINE,
         `satisfied 8 -> ${REC.satisfied}, undecided 217 -> ${REC.undecided}. The other seventeen were read and are still open; ` +
         "they stay undecided because nothing structural decides them, and the ones no entry named were filed as backlog entries");
 }

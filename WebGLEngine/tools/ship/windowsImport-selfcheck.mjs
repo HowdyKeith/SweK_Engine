@@ -100,6 +100,7 @@ export function classifySpecifier(arg, src = "") {
     if (URL_ROOTED.test(a)) return "safe";
     if (/pathToFileURL/i.test(a)) return "safe";
     if (/^import\.meta/.test(a)) return "safe";
+    if (/^new URL\(.*\)(\.href)?$/.test(a)) return "safe";   // a URL object always carries a scheme (a classic browser script resolving beside itself: render/gpuTimerAuto.js)
     if (BARE_NAME.test(a)) return "undecidable";
     if (assignedAsUrl(src, (a.match(/^[A-Za-z_$][\w$]*/) || [""])[0])) return "safe";
     return "offender";
@@ -403,7 +404,7 @@ function walk(dir, out = []) {
        "the old pattern matched `path.join(` and `path.resolve(` by name, so a destructured import of the " +
        "same function was invisible to it");
     ok("...and the corrected form is NOT an offender",
-       classifySpecifier('pathToFileURL(path.join(ENG, "x.js")).href') === "safe",
+       classifySpecifier('pathToFileURL(path.join(ENG, "x.js")).href') === "safe" && classifySpecifier('new URL("gpuTimerGL.mjs", here).href') === "safe",
        "so the check tracks the defect rather than the word 'import'");
 
     // *** v4676 -- THE GENERATED-IMPORT SURFACE, DRIVEN ON THE TWO LINES THAT ACTUALLY SHIPPED. *** Both of

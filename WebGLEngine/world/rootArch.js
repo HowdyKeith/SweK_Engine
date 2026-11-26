@@ -7,7 +7,7 @@
 // Keith: could Sylva's (github.com/MengTo/sylva -- all-rights-reserved, so nothing of its CODE is used, only the
 // idea of a procedural root/arch) geometry fold into the engine, alongside the moss it also showed. v4076 shipped
 // moss and deliberately left this for its own round, naming it rather than dropping it silently; this is that
-// round.
+// round (SETTLED at v4090).
 //
 // *** ONE LANDMARK, NOT SCATTERED GROUND COVER, AND THAT IS A DELIBERATE DIFFERENCE FROM MOSS. *** A natural rock
 // arch or an exposed root arching over ground is RARE in reality -- it is a landmark you notice, not a texture

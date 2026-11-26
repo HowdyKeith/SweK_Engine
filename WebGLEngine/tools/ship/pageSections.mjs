@@ -724,7 +724,38 @@ export const SECTIONS = [
     // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
     { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
       pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "switchboard.html", "sea-ogre.html", "battleship3d.html"] },
+    // UNNUMBERED (2026-11-14) -- SPACE COMBAT, KEITH'S CALL. space-duel.html arrived with Flight Simulation at its fifteen; asked whether it should have a drawer of its own or stay a loose link, Keith: "'Space Combat' is good." The pages that FIGHT in vacuum: the 6DOF fleet fight
+    // (es-box3d-6dof.html), the capital ship against fighters (space-battleship.html) and the capital ship against a capital ship (space-duel.html). FILED AFTER Flight Simulation, so the first two keep their homes there and are CLONED here, and Flight Simulation stays at fifteen; the duel page lives here.
+    { id: "spacecombat", tab: "spacecombat", label: "Space Combat", note: "the pages that fight in vacuum: the 6DOF fleets, a capital ship against fighters, a capital ship against a capital ship",
+      pages: ["es-box3d-6dof.html", "space-battleship.html", "space-duel.html"] },
+    // UNNUMBERED (2026-11-23) -- RECENT NEW PAGES, KEITH'S DEFAULT. Four new pages (splat-gpu, gizmo-demo, lights-demo, lights-gpu) had no drawer: the WebGPU one was full at 15 of 15 and
+    // the rest were drawer decisions, so they sat in UNPLACED -- an inbox that, by this file's own v3227 finding, nobody empties. Keith: "By default, if a new page cannot be placed anywhere, it can go
+    // into the Recent New Pages section. New pages that are less than a week old could also be listed." and, asked how to date a page: "use the file's first commit date, one week."
+    // SO THE DEFAULT HOME OF A PAGE WITH NO DRAWER IS THIS ONE, AND IT IS A LEASE, NOT A HOME: every page here carries `added`, the date of its file's FIRST commit (git log --follow
+    // --diff-filter=A, earliest), and once it is more than RECENT_DAYS (7) old it is OVERDUE -- pageSections-selfcheck goes red naming it, and it must go into a drawer or back into UNPLACED
+    // with a reason. THAT IS HOW A PAGE "STOPS BEING RECENT AND DROPS OFF", which the Arriving row promised for 900 versions and never did. The date is declared, not read at load, because the
+    // page is static markup and a shallow clone cannot read history; the gate checks the declaration against git instead (never later than git's earliest, and equal when the clone is full).
+    // A page claimed by an earlier section keeps its anchor there and gets a clone here, as every duplicate does (v4778), so a page may be listed here AND in its drawer.
+    { id: "recentnew", tab: "recentnew", label: "Recent New Pages", note: "new pages with no drawer yet, for a week from the day their file was first committed",
+      added: { "splat-gpu.html": "2026-11-21", "gizmo-demo.html": "2026-11-22", "lights-demo.html": "2026-11-22", "lights-gpu.html": "2026-11-22" },
+      pages: ["splat-gpu.html", "gizmo-demo.html", "lights-demo.html", "lights-gpu.html"] },
 ];
+
+/** Keith: "use the file's first commit date, one week." A page in the recentnew section stays while it is at most this many whole days old. */
+export const RECENT_DAYS = 7;
+export const RECENT_ID = "recentnew";
+/** Whole days from `added` (YYYY-MM-DD) to `now` (a Date or ISO string); NaN for a date that is not YYYY-MM-DD. */
+export function ageDays(added, now) {
+    if (typeof added !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(added)) return NaN;
+    const a = Date.parse(added + "T00:00:00Z"), b = new Date(now).getTime();
+    return Number.isFinite(a) && Number.isFinite(b) ? Math.floor((b - a) / 86400000) : NaN;
+}
+/** The pages of `section` that are OVERDUE at `now`: no valid `added`, or older than RECENT_DAYS. [{ page, added, age }] */
+export function overdue(section, now, days = RECENT_DAYS) {
+    const out = [];
+    for (const page of section.pages) { const added = (section.added || {})[page], age = ageDays(added, now); if (!(age <= days)) out.push({ page, added, age }); }
+    return out;
+}
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
 // v3434 -- KEITH'S RULE, RAISED FROM TEN: "allow the panel to grow past 10, but when it reaches the 15th item,
@@ -914,6 +945,8 @@ export const UNPLACED = new Map([
     // as born invisible at the first verdict). WHICH DRAWER IS KEITH'S CALL, as it was for the rtx pages: the fruit-fly drawer already holds es-flight6dof.html, whose pilots
     // these pages fly, but a combat page is not obviously a brain page, and the choice is one he makes with the three side by side.
     // UNNUMBERED -- the sub aquarium (WIP, the submarine line). Linked from Arriving so it is reachable, and it is the FISH BRAIN chip's click-through; the drawer is Keith's call: it is a brain page (the GFC pilots) AND a fleet page (peers send subs).
+    // v4933 -- FOUR PAGES OF THE PLAYCANVAS LINE, linked from server.html (beside blackhole.html) at the ship so pageReach could see them. Which drawer is Keith's call:
+    // the WebGPU drawer they would join is full at 15 of 15, and gizmo-demo and lights-demo are WebGL2. Waiting here, said, until he files them.
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */
@@ -926,7 +959,7 @@ export function claimedPages() {
 /** The shape an export hands back: flat, readable, and editable by a person in a text box. */
 export function toJSON() {
     return { version: 1, maxPerPanel: MAX_PER_PANEL,
-             sections: SECTIONS.map((s) => ({ id: s.id, tab: s.tab, label: s.label, note: s.note, pages: s.pages.slice() })) };
+             sections: SECTIONS.map((s) => ({ id: s.id, tab: s.tab, label: s.label, note: s.note, pages: s.pages.slice(), ...(s.added ? { added: { ...s.added } } : {}) })) };
 }
 
 /**
@@ -1029,7 +1062,7 @@ export const CHIP_GROUPS = [
     // claim no page in SECTIONS, so this moves a chip and strands nothing.
     { id: "systools", tab: "systools", label: "System Tools",
       note: "the rig, the ship ritual, the record -- and the live verify surface",
-      chips: ["verify", "renderqa", "rigjob"] },
+      chips: ["verify", "renderqa", "rigjob", "peerjobs"] },
     // v4127 -- Keith: "'Homebrew formula' goes in Mac System". `brew install swek-engine` is macOS-only by
     // construction, so it belongs with the other things that need a Mac rather than in the top row. The slot
     // it moves into is added to the macsystem gpanel in server.html the same round -- a group with no slot is

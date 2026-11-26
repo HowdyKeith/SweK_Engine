@@ -125,6 +125,9 @@ export const DERIVED = Object.freeze([
     { path: "world/procPlanet.js", upstream: "TheLongSilence", spdx: "MIT", evidence: "lifted (not copied)" },
     { path: "world/spaceStructures.js", upstream: "TheLongSilence", spdx: "MIT", evidence: "Technique from" },
     { path: "render/greeble.js", upstream: "TheLongSilence", spdx: "MIT", evidence: "nothing copied" },
+    // v4935: the splat GPU sort (main's PlayCanvas line, v4933) carries PlayCanvas's WGSL with their full MIT notice in its header; the copy census found it unregistered.
+    { path: "render/splatSortGPU.mjs", upstream: "playcanvas/engine", spdx: "MIT", evidence: "The WGSL below is theirs",
+      noticeInFile: true },
 ]);
 
 /** The MIT sentence this round turned on, so a gate can assert against the words rather than a paraphrase. */

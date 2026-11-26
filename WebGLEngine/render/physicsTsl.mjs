@@ -436,6 +436,7 @@ export const CMD_STRUCT = Object.freeze({ name: "Cmd", fields: Object.freeze([
 //
 // Step 6 of the roadmap said, from v4331 to v4470, that a TSL Loop wants a JavaScript bound, so every generated pass
 // baked its trip count into the text and a stepper whose step count arrives at run time was "a round of its own".
+// SETTLED at v4470: a run-time bound is a node, as the next sentence shows.
 // three's LoopNode takes `end` as a NODE (it builds it: `end.build(builder, type)`), so the bound may be a uniform
 // or an element of a storage buffer, and this graph is the measurement: the logistic map stepped `bound` times, the
 // bound read from a vec4 uniform (`boundFrom: "uniform"`) or from a storage buffer's element 0 (`"storage"`), r and

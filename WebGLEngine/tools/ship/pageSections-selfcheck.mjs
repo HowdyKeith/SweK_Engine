@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/pageSections-selfcheck.mjs
 //
-// Run: node tools/ship/pageSections-selfcheck.mjs   (~0.2-1.2 s -- MEASURED)
+// Run: node tools/ship/pageSections-selfcheck.mjs   (~0.2-3.6 s -- MEASURED; the added-date check reads git history, so a full clone is the slow one)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3227 -- ARRIVING PAGES HELD 96 OF 315. NOW IT HOLDS EIGHT, AND THE OTHER 88 ARE IN DRAWERS.
@@ -43,7 +43,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SECTIONS, MAX_PER_PANEL, UNPLACED, claimedPages, PROFILES, sectionsFor, CHIP_GROUPS } from "./pageSections.mjs";
+import { SECTIONS, MAX_PER_PANEL, UNPLACED, claimedPages, PROFILES, sectionsFor, CHIP_GROUPS, RECENT_DAYS, RECENT_ID, ageDays, overdue, toJSON } from "./pageSections.mjs";
+import { spawnSync } from "node:child_process";
 import { noComments } from "./sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -365,6 +366,41 @@ const ui = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
         "and panel -- A THIRTEENTH BUTTON on a row already carrying twelve, to hold pages that belong to the " +
         "lab. THE PAGES STAY PAGES; ONLY THE DOOR MOVED INSIDE");
 }
+
+// ---- RECENT NEW PAGES: THE DEFAULT HOME OF A PAGE WITH NO DRAWER, FOR ONE WEEK FROM ITS FILE'S FIRST COMMIT (2026-11-23, Keith) ------
+// Keith: "By default, if a new page cannot be placed anywhere, it can go into the Recent New Pages section. New pages that are less than a week old could also be listed." and then
+// "use the file's first commit date, one week." The section is a LEASE: `added` is the date of the page's first commit, and a page older than RECENT_DAYS is OVERDUE and turns this red.
+// THE CLOCK CAN BE HANDED IN (SWEK_PAGESECTIONS_NOW=2026-12-01) so the lease can be exercised without waiting a week.
+// SABOTAGES, MEASURED (2026-11-23, each edit made to pageSections.mjs and restored): (1) clock set to 2026-12-10 -> 1 red, the lease row, naming all four pages and their ages; (2) lights-gpu.html's date moved
+// one day LATER than its first commit -> 1 red, the first-commit row, naming the page; (3) gizmo-demo.html's date deleted -> 3 red (the section row, the lease, the future-date row); (4) splat-gpu.html dated 2027-01-01
+// -> 2 red (the future-date row and the first-commit row); (5) RECENT_DAYS raised to 70 -> 2 red (the constant and the overdue() boundary row).
+{
+    const rec = SECTIONS.find((x) => x.id === RECENT_ID), now = process.env.SWEK_PAGESECTIONS_NOW || new Date().toISOString().slice(0, 10);
+    ok("!! *** Keith's rule is the registry's constant: one week, listed while at most 7 whole days old ***", RECENT_DAYS === 7 && RECENT_ID === "recentnew");
+    ok("!! the Recent New Pages section exists, is top-level with a chip, and every page in it carries an `added` date (and no date names a page that is not in it)",
+        !!rec && !!rec.tab && !rec.parentTab && rec.pages.length > 0 && rec.pages.every((p) => /^\d{4}-\d{2}-\d{2}$/.test((rec.added || {})[p] || "")) && Object.keys(rec.added || {}).every((p) => rec.pages.includes(p)) && rec.pages.length === Object.keys(rec.added).length,
+        rec ? rec.pages.length + " pages: " + rec.pages.join(", ") : "NO SECTION");
+    const fx = { pages: ["a.html", "b.html", "c.html", "d.html", "e.html"], added: { "a.html": "2026-11-16", "b.html": "2026-11-15", "c.html": "garbage", "d.html": "2026-11-23" } };
+    const od = overdue(fx, "2026-11-23T12:00:00Z").map((x) => x.page);
+    ok("!! overdue() is a LEASE of seven whole days: 7 days old stays, 8 days old is overdue, a page with a bad or missing date is overdue, today and a date in the future stay",
+        ageDays("2026-11-16", "2026-11-23T12:00:00Z") === 7 && ageDays("2026-11-15", "2026-11-23T12:00:00Z") === 8 && J(od) === J(["b.html", "c.html", "e.html"]) && Number.isNaN(ageDays("2026-1-1", "2026-11-23")) && Number.isNaN(ageDays(undefined, "2026-11-23")) && ageDays("2026-11-24", "2026-11-23") < 0 && J(overdue(fx, "2026-11-23", 8).map((x) => x.page)) === J(["c.html", "e.html"]),
+        "overdue at 2026-11-23: " + od.join(", "));
+    const late = rec ? overdue(rec, now) : [{ page: "(no section)" }];
+    ok("!! *** no page in Recent New Pages is more than a week old (the lease) ***", late.length === 0,
+        "as of " + now + (late.length ? ". OVERDUE -- put each in a drawer, or in UNPLACED with the reason: " + late.map((x) => x.page + " (added " + x.added + ", " + x.age + " days)").join(", ") : ""));
+    ok("!! ...and a date is never in the future (a typed date cannot extend the lease)", !rec || rec.pages.every((p) => ageDays(rec.added[p], now) >= 0), "as of " + now);
+    const git = (args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8" });
+    const shallow = (git(["rev-parse", "--is-shallow-repository"]).stdout || "").trim() === "true", okGit = git(["rev-parse", "--git-dir"]).status === 0;
+    const first = (p) => { const r = git(["log", "--follow", "--diff-filter=A", "--format=%cs", "--", p]); return r.status === 0 ? r.stdout.trim().split("\n").filter(Boolean).pop() : undefined; };
+    const bad = [];
+    if (okGit && rec) for (const p of rec.pages) { const g = first(p), d = rec.added[p]; if (g && (shallow ? d > g : d !== g)) bad.push(p + " declares " + d + " but git's first commit is " + g); }
+    ok("!! *** each `added` date is the file's FIRST COMMIT date (git log --follow --diff-filter=A, earliest): equal on a full clone, never later than git's on a shallow one ***", bad.length === 0,
+        !okGit ? "NOT GRADED: no git here" : (shallow ? "shallow clone: a shallow history can only make a first commit look LATER, so the date may not be later than git's" : "full clone: equal") + (bad.length ? ". WRONG: " + bad.join("; ") : ""));
+    const j = toJSON().sections.find((x) => x.id === RECENT_ID);
+    ok("...and the exported registry carries the dates", !!j && J(j.added) === J(rec.added) && toJSON().sections.every((x) => x.id === RECENT_ID || !("added" in x)));
+    ok("...and the four pages Keith's note named left UNPLACED for this section (a page is never in both)", ["splat-gpu.html", "gizmo-demo.html", "lights-demo.html", "lights-gpu.html"].every((p) => rec.pages.includes(p) && !UNPLACED.has(p)));
+}
+function J(x) { return JSON.stringify(x); }
 
 console.log();
 console.log("  ----  ARRIVING GOES FROM 96 LINKS TO EIGHT, AND THE EIGHT ARE NAMED WITH REASONS. What this does");

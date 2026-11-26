@@ -190,7 +190,7 @@ let out;
         "a libm-free code path from a quantised observable from a perturbation that never armed. optics " +
         "rayleighFactor is the case that proves it. c4 should require a live control the way c2 requires " +
         "non-identity -- its own round, because it would move standings that already exist");
-    // *** v3313 -- THAT ROUND HAPPENED, AT v3083, AND THIS NOTE OUTLIVED IT BY THIRTY VERSIONS. ***
+    // *** v3313 -- THAT ROUND HAPPENED, AT v3083 (SETTLED at v3083), AND THIS NOTE OUTLIVED IT BY THIRTY VERSIONS. ***
     // corroborateFully.mjs now refuses a bit-identical c4 without a live control on the SAME DEVICE in the SAME
     // PROCESS, naming the three situations that produce no movement -- a libm-free path, a quantised observable,
     // and a perturbation that never armed -- and grading an undeclared control as UNVERIFIED rather than PASS.

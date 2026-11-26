@@ -983,8 +983,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4928 -- MERGED with v4927 (23 gates): main's 2401 plus this branch's three (circuitBias, ruleMove, circuitRetrain) = 2404, usesOk 2383, definesOk 2375, nameFirst 2265, read off the code's own census.
     // v4929 -- seven gates (tools/flyCx-selfcheck's neighbours unchanged; new: render/advisorTrace, render/subAquariumCaptain, brain/subStations, brain/stationsTask, brain/subStationsNavSonar, brain/duelStationsTask, brain/courierTask), each defining ok(n, c, d) once and naming first: gates 2404 -> 2411, usesOk 2383 -> 2390, definesOk 2375 -> 2382, nameFirst 2265 -> 2272, read off the code's own census.
     // v4930 -- the merge of v4929 into this line: three gates of this line beside v4929's seven (tools/ship/circuitRetrain2-selfcheck.mjs, spaceDoctrineStudy-selfcheck.mjs, plannerCircuit-selfcheck.mjs), each defining ok(n, c, d) once and naming first: gates 2411 -> 2414, usesOk 2390 -> 2393, definesOk 2382 -> 2385, nameFirst 2272 -> 2275, read off the gate.
-    gates: 2414, usesOk: 2393, definesOk: 2385, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2275, condFirst: 99, unknownSignature: 19,
+    // v4931 -- three gates (brain/breachCourierTask, brain/learnedCaptain, brain/learnedCourier: stations rounds 7, 8 and 11), each defining ok(n, c, d) once and naming first: gates 2414 -> 2417, usesOk 2393 -> 2396, definesOk 2385 -> 2388, nameFirst 2275 -> 2278, read off the code's own census.
+    // v4932 -- nine gates in (the branch claude/inspiring-mayer-9mdcut's seven: brain/crabMlg1, flyEmdLplc2Gf, flyGfLoomModel, gfGain, oppLoom, stealthLoomStimuli, stealthMotion; and render/subAquarium3dDark, render/subAquariumKinds) and two out (render/subAquarium3dNav and render/subAquariumLabel, whose code the merge replaced), each defining ok(n, c, d) once and naming first: gates 2417 -> 2424, usesOk 2396 -> 2403, definesOk 2388 -> 2395, nameFirst 2278 -> 2285, read off the code's own census.
+    // v4933 -- +106 gates, the round since v4932 (the PlayCanvas line's, the duel studies', the fly pathways') plus main's two restored at the ship (tools/ship/takeEvadeSeat-selfcheck.mjs and
+    // tools/ship/gpuTimer-selfcheck.mjs, which this round's same-named gates had replaced and which were given back their names): every one defines and uses ok() name-first, so usesOk,
+    // definesOk and nameFirst each rose by the same 106; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
+    // v4934 -- +79 gates, this branch's navigation and head-to-head rounds meeting main at the merge: every one defines and uses ok() name-first, so usesOk, definesOk and nameFirst each rose by the same 79; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
+    gates: 2609, usesOk: 2588, definesOk: 2580, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2470, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

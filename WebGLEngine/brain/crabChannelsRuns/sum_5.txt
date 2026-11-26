@@ -1,0 +1,3 @@
+R5 sum r/v 0.2: plain light 13.2 deg (47 sp) dark 13.2 deg (47 sp) | static 17.6 deg (33 sp) x1.33 | moving 9.5 deg (57 sp) x0.72 | recede light ALARM dark ALARM | stripes-like false
+R5 sum r/v 0.4: plain light 16.7 deg (67 sp) dark 16.7 deg (67 sp) | static 23.0 deg (44 sp) x1.38 | moving 6.6 deg (114 sp) x0.39 | recede light ALARM dark ALARM | stripes-like false
+R5 sum: ANIMAL-LIKE-STRIPES false

@@ -69,7 +69,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as TR from "./treeRead.mjs";
-import { stripComments } from "../../vba/runtimeGap.mjs";
+import { stripComments, strippedOnce } from "../../vba/runtimeGap.mjs";
 import { resolveSpec } from "./importClosure.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -191,7 +191,8 @@ const _stripCache = new Map();     // absolute path -> comment-stripped source
  */
 function strippedOf(f, read, cacheable) {
     if (cacheable) { const hit = _stripCache.get(f); if (hit !== undefined) return hit; }
-    const out = stripComments(read(f));
+    // v4934 -- through runtimeGap's shared memo when the read is the real one, so the census recordDrift runs beside this one strips each file once
+    const out = cacheable ? strippedOnce(f, read(f)) : stripComments(read(f));
     if (cacheable) _stripCache.set(f, out);
     return out;
 }
@@ -358,9 +359,12 @@ export function codeMask(src) {
 }
 
 /** Does `src` use `name` as a whole word, at least once, in CODE (codeMask)? `mask` may be passed in, cached. */
+const _useRe = new Map();   // v4934 -- one RegExp per name, not one per name per file (it is a global one, so lastIndex is reset below)
 export function usesInCode(src, name, mask = null) {
     if (!src.includes(name)) return false;
-    const re = new RegExp("(?<![\\w$])" + name + "(?![\\w$])", "g");
+    let re = _useRe.get(name);
+    if (!re) { re = new RegExp("(?<![\\w$])" + name + "(?![\\w$])", "g"); _useRe.set(name, re); }
+    re.lastIndex = 0;
     let mk = mask, r;
     while ((r = re.exec(src))) { mk = mk || codeMask(src); if (mk[r.index]) return true; }
     return false;
@@ -427,7 +431,14 @@ export function readSites(names, { root = ENG } = {}) {
             if (end > at) spans.push([at, end + 3]);
         }
         for (const [a, b] of spans) src = src.slice(0, a) + " ".repeat(b - a) + src.slice(b);
-        const mask = codeMask(src);
+        // v4934 -- NOTHING BLANKED MEANS THE SAME TEXT, SO THE SAME MASK. This lexed every matching file twice, and most
+        // matching files hold no record declaration and no name table (spans is empty): the second lex was the first
+        // one over again. Reused only when no span was blanked, so a file that did blank something is lexed afresh.
+        // MEASURED (v4934): readSites 1,030 -> 920 ms with this and the per-name RegExp below; the output over the 77
+        // names and census() hashes identical before and after (sha1 0139c0ca...). NOT SABOTAGE-PROVEN for the blanked
+        // branch: a mask reused there goes 0 red too, because a blanked span no longer holds the name, so usesInCode
+        // returns before it reads the mask -- the blanked branch is kept for the cases where the lexer state could differ.
+        const mask = spans.length ? codeMask(src) : declMask;
         for (const n of want) if (usesInCode(src, n, mask)) out.get(n).push(rel(f));
     }
     return out;
@@ -883,7 +894,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4922 -- 190 / 99 / 534 -> 191 / 99 / 534: one more frozen record, NO_GATE_V4922 in tools/ship/reportDoors.mjs (the rung 4a v6 study library gated from tools/subReservoirV6-selfcheck.mjs; read by code in the same file and named by reportDoors-selfcheck, no field of its own -- v4905's shape).
     // v4929 -- 191 / 99 / 534 -> 192 / 99 / 534: one more frozen record, COMMIT_BELT_DRIFT_V4929 in world/orreryFleet.mjs (hemibrain's second commit), built by spreading v4912's, no field of its own the census counts.
     // v4930 -- 192 / 99 / 534 -> 193 / 99 / 534: one more frozen record, SETTLED_TRANCHE_AFTER_V4928 in tools/ship/deferralCensus.mjs (the thirteen settled deferrals, each held against a declaration; read and guarded by deferralCensus-selfcheck section 6), no numeric field the census counts.
-    currentIncludingModule: Object.freeze({ records: 193, withFields: 99, fields: 534 }),
+    // v4932 -- 193 / 99 / 534 -> 194 / 99 / 534: one more frozen record, COMMIT_BELT_DRIFT_V4932 in world/orreryFleet.mjs (male-cns's and zebrafish's merged commits), built by spreading v4929's, no field of its own the census counts.
+    // v4933 -- 194 / 99 / 534 -> 194 / 100 / 535 and excluding 190 / 95 / 499 -> 190 / 96 / 500: NO new record; COMMIT_BELT_DRIFT_V4932 in world/orreryFleet.mjs was taken again IN PLACE (smaa arrived, male-cns carries the fly pathways line) and now names `bodiesNow: 29` itself instead of inheriting it by spread, so the census counts one field it did not before.
+    currentIncludingModule: Object.freeze({ records: 194, withFields: 100, fields: 535 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -1107,7 +1120,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4922 -- 186 -> 187 with NO_GATE_V4922 (tools/ship/reportDoors.mjs), read off the gate.
     // v4929 -- 187 -> 188 with COMMIT_BELT_DRIFT_V4929 (world/orreryFleet.mjs), read off the gate.
     // v4930 -- 188 -> 189 with SETTLED_TRANCHE_AFTER_V4928 (tools/ship/deferralCensus.mjs), read off the gate.
-    excluding: Object.freeze({ records: 189, withFields: 95, fields: 499 }),
+    // v4932 -- 189 -> 190 with COMMIT_BELT_DRIFT_V4932 (world/orreryFleet.mjs), read off the gate.
+    // v4933 -- 190 / 95 / 499 -> 190 / 96 / 500: see currentIncludingModule above (the one new own field, bodiesNow, of COMMIT_BELT_DRIFT_V4932).
+    excluding: Object.freeze({ records: 190, withFields: 96, fields: 500 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

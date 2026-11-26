@@ -121,13 +121,44 @@ export const CENSUS_FIELDS = Object.freeze({
 export const stripComments = (src) =>
     src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
 
+// v4934 -- ONE STRIP PER FILE PER PROCESS. recordDrift runs this census and frozenRecords' census in one process, and both strip the
+// same texts with this same function (the gates, about 2,600 of the files, twice). Keyed by path AND validated against the exact text
+// (an identical string compares by pointer, so a hit is O(1); a fixture with the same path and different text is a miss and is
+// stripped afresh), so a caller that injects its own text can never be handed another file's answer.
+const _stripMemo = new Map();
+export function strippedOnce(file, text) {
+    const e = _stripMemo.get(file);
+    if (e !== undefined && e.text === text) return e.out;
+    const out = stripComments(text);
+    _stripMemo.set(file, { text, out });
+    return out;
+}
+
 /** Count, per capability, how many of `files` ({path, text}) use it in CODE. */
+// v4934 -- A LITERAL PRE-TEST FOR THE FOUR PATTERNS THAT ARE PURE ALTERNATIONS OF FIXED STRINGS. A regex alternation of N literals
+// scans the text N ways per file; `includes` of each literal is the same necessary condition and cheaper, and the regex still
+// decides (the pre-test only skips files that cannot match). MEASURED over the 6,274 files: census 826 -> see the v4934 note in
+// recordDrift's cost (counts identical, every row). PREFILTER_LITERALS is HELD to PATTERNS by runtimeGap-selfcheck: each list must
+// rebuild its pattern's own source exactly, so editing one table without the other goes red there.
+export const PREFILTER_LITERALS = Object.freeze({
+    "typed arrays": Object.freeze(["Float32Array", "Float64Array", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "Int8Array", "Int16Array", "Int32Array", "BigInt64Array", "BigUint64Array", "ArrayBuffer", "DataView"]),
+    "fetch/XHR": Object.freeze(["fetch(", "XMLHttpRequest"]),
+    "WebGPU": Object.freeze(["navigator.gpu", "requestAdapter"]),
+    "workers/threads": Object.freeze(["new Worker", "SharedArrayBuffer", "Atomics.", "worker_threads"]),
+});
 export function census(files, patterns = PATTERNS) {
     const out = {};
-    for (const k of Object.keys(patterns)) out[k] = 0;
+    const keys = Object.keys(patterns);
+    for (const k of keys) out[k] = 0;
+    // the literal pre-test applies only to the real table: a caller passing its own patterns gets the plain regex test
+    const pre = patterns === PATTERNS ? PREFILTER_LITERALS : {};
     for (const f of files) {
-        const code = stripComments(f.text);
-        for (const [k, re] of Object.entries(patterns)) if (re.test(code)) out[k]++;
+        const code = patterns === PATTERNS && f.path ? strippedOnce(f.path, f.text) : stripComments(f.text);
+        for (const k of keys) {
+            const lits = pre[k];
+            if (lits && !lits.some((l) => code.includes(l))) continue;
+            if (patterns[k].test(code)) out[k]++;
+        }
     }
     return { files: files.length, counts: out };
 }
@@ -663,7 +694,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4928 -- MERGED with v4927: main's 5716 plus this branch's nine files of Needs Rounds 38-40 (circuitBias, ruleMove, circuitRetrain: a library, a command and a gate each) = 5725, re-derived by the gate.
     // v4929 -- this round's thirteen files (the submarine stations' four libraries and five gates, the advisor trace and its gate, the aquarium captain gate, tools/ship/takeStationRun.mjs): 5725 -> 5738, re-derived by the gate.
     // v4930 -- the merge: this line's ten files beside v4929's thirteen (tools/ship/circuitRetrain2*, spaceDoctrineStudy*, plannerCircuit* -- three each -- and brain/plannerCircuitSeat.mjs): 5738 -> 5748, re-derived by the gate.
-    files: 5748,                              // v4926 (was 5586: +67, this round's modules, gates and the eight study commands); v4912 (was 5201 at v4911; see the line above); v4911 (Rounds 11-13: the planner seat, its audit libraries, the perturbed twin and the tolerance sweep, their commands and gates -- 5180 -> 5193, ES modules 4871 -> 4884, closures 4682 -> 4695, async/await 1986 -> 1987, Promises 501 -> 502). v4910 (the FSR4 branch's rounds 70-76 merged over v4908 -- 5142 -> 5150: the temporal modules, study, GPU pass, live page and their gates (ES modules +8, closures +8, async/await +5, typed arrays +7, Promises +1, fetch +1, WebGPU +1, workers +1: path-tracer.html's temporal worker). v4901 -- RE-DERIVED over the Sea OGRE round on the merged tree (+54 files: the sub round, the Sea OGRE, the bridge, the squad, the 3D view and the merged FSR4 and rung 4a lines). v4897 -- RE-DERIVED over the beauty-pass round (+14 files). v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4931 -- eight files of stations rounds 7 to 12 (brain/breachCourierTask.mjs, learnedCaptain.mjs, learnedCourier.mjs, their three gates, tools/ship/trainLearnedCaptain.mjs and trainLearnedCourier.mjs): 5748 -> 5756, re-derived by the gate.
+    // v4932 -- the merge of claude/inspiring-mayer-9mdcut (its looming modules, gates and run scripts) and stations rounds 13-15, less the two removed Sub Aquarium modules and their gates, and the stealthFigure4 command: files 5756 -> 5814, read off the gate.
+    // v4933 -- the round that built the PlayCanvas line, the space duel's studies and the five fly pathways (the whole branch since v4932), every row read off the gate: files 5814 -> 6054.
+    // v4934 -- the merge of this branch's navigation and head-to-head rounds (the 79 gates, their modules and studies) beside main: files 6054 -> 6274, read off the gate.
+    // v4935 -- stealth Round 30's two modules (brain/crabOrder30.mjs, the held-out worker; brain/crabRepl30Agg.mjs, its aggregator): files 6274 -> 6276, read off the gate.
+    files: 6276,                              // v4926 (was 5586: +67, this round's modules, gates and the eight study commands); v4912 (was 5201 at v4911; see the line above); v4911 (Rounds 11-13: the planner seat, its audit libraries, the perturbed twin and the tolerance sweep, their commands and gates -- 5180 -> 5193, ES modules 4871 -> 4884, closures 4682 -> 4695, async/await 1986 -> 1987, Promises 501 -> 502). v4910 (the FSR4 branch's rounds 70-76 merged over v4908 -- 5142 -> 5150: the temporal modules, study, GPU pass, live page and their gates (ES modules +8, closures +8, async/await +5, typed arrays +7, Promises +1, fetch +1, WebGPU +1, workers +1: path-tracer.html's temporal worker). v4901 -- RE-DERIVED over the Sea OGRE round on the merged tree (+54 files: the sub round, the Sea OGRE, the bridge, the squad, the 3D view and the merged FSR4 and rung 4a lines). v4897 -- RE-DERIVED over the beauty-pass round (+14 files). v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1310,13 +1346,22 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4928 -- MERGED with v4927: main's rows plus this branch's nine files -- ES modules 5370 -> 5379, closures 5153 -> 5162, async/await 2243 -> 2247, typed arrays 1599 -> 1603, Promises 580 -> 583, read off the gate.
     // v4929 -- the thirteen files: ES modules 5379 -> 5392, closures 5162 -> 5175; the other rows held but one (below).
     // v4930 -- the merge's ten files of this line: ES modules 5392 -> 5402, closures 5175 -> 5185, async/await 2247 -> 2252, typed arrays 1603 -> 1609, Promises 583 -> 585, read off the gate; the other rows held.
-    esModules: 5402, closures: 5185, asyncAwait: 2252, typedArrays: 1609, promises: 585,
+    // v4931 -- the eight files: ES modules 5402 -> 5410, closures 5185 -> 5193, async/await 2252 -> 2255, Promises 585 -> 587 (the two trainers and the courier learner are async), and one worker (below).
+    // v4932 -- the merge, rounds 13-15 and the stealthFigure4 command: ES modules 5410 -> 5468, closures 5193 -> 5246, async/await 2255 -> 2256, typed arrays 1609 -> 1620, read off the gate.
+    // v4933 -- the round since v4932 (the PlayCanvas line, the duel studies, the fly pathways, the pair pool): ES modules 5468 -> 5704, closures 5246 -> 5466, async/await 2256 -> 2429, typed arrays 1620 -> 1714, Promises 587 -> 619, read off the gate.
+    // v4933, later the same day -- async/await 2429 -> 2435: six gates that had no await now import their module for the export-list row the ship added (tools/ship/definitionGates-selfcheck.mjs's naming).
+    // v4933, the verdict after the hold -- async/await 2435 -> 2436: the commit after the last census re-take (94aa76bad, Recent New Pages: pageSections and its gate) added one file that awaits; no other row moved.
+    // v4934 -- the same merge: ES modules 5704 -> 5923, closures 5466 -> 5686, async/await 2436 -> 2500, typed arrays 1714 -> 1812, Promises 619 -> 683 (re-derived from the gate, not set).
+    // v4935 -- the same two modules: ES modules 5923 -> 5925, closures 5686 -> 5688 (re-derived from the gate, not set).
+    esModules: 5925, closures: 5688, asyncAwait: 2500, typedArrays: 1812, promises: 683,
     // v4920 -- tools/ship/orreryPost-selfcheck.mjs holds the orrery page's frame loop from an init script and so names requestAnimationFrame for the first time: 135 -> 136; the other rows held.
     // v4922 -- performance.now 282 -> 284 (the reservoir kernel's gate and its rig command time the device) and WebGPU 84 -> 86 (brain/reservoirGpu.mjs and its gate); the other rows held.
     // v4926 -- performance.now 284 -> 285 and WebGPU 86 -> 89 (brain/reservoirPilotGpu.mjs, render/subAquariumFlyCxGpu.mjs and the aquarium's GPU switch gate); the other rows held.
     // v4929 -- raf 137 -> 136, AND IT IS THE CENSUS, NOT THE TREE: render/subDropoutView-selfcheck.mjs still says requestAnimationFrame in code, but on a line whose string holds "// the compass-dropout view", which stripComments
     //   reads as a comment and cuts. Said rather than worked around; a census that strips by regex cannot see strings.
-    fetchXhr: 267, performanceNow: 285, raf: 136, webgl: 210, webgpu: 89, threads: 31, wasm: 28,
+    // v4931 -- threads 31 -> 32: tools/ship/trainLearnedCourier.mjs evaluates the ES in worker_threads.
+    // v4933 -- fetch/XHR 267 -> 268, performance.now 285 -> 290, requestAnimationFrame 136 -> 141, WebGL 210 -> 216, WebGPU 89 -> 98 (the PlayCanvas line's pages and passes and the GPU timers), threads 32 -> 33 (tools/ship/pairPool.mjs flies pairs on every core in worker_threads); WebAssembly held. Read off the gate.
+    fetchXhr: 268, performanceNow: 290, raf: 141, webgl: 216, webgpu: 98, threads: 33, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -3,7 +3,7 @@
 // Run: node brain/advisorTranscript-selfcheck.mjs      (~1-2.5s: 1 on the Linux build box, 2.5 on the Windows rig)
 //
 // THE GATE OF brain/advisorTranscript.mjs, the recorded-decision seat a language-model chip plugs into (brain/NEEDS_AND_LIMITS.md Round 4: "a language-model chip is a LATER round on the same socket with recorded decisions"). No model exists here: `modelFn` is a scripted function, so every
-// branch has a worked answer.
+// branch has a worked answer. SETTLED at v4906: the language-model chip is brain/advisorChip.mjs.
 //   1  CONSTANTS   the schemas, the 30-tick default, the cap range, the modes, the reply format.
 //   2  THE PROMPT  deterministic; rounded the way a gauge is read; the bearing relative to the heading; the station list in order; NOTHING from outside the observation (a seed, a true charge, a secret field) can reach it.
 //   3  THE REPLY   parsed strictly: wrapped in prose or a code fence, the first of several objects, every wrong type and every out-of-range station refused with its reason, the cap clamped, extra fields ignored.

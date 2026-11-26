@@ -51,7 +51,12 @@ import { tacticsPanel, drawPanel } from "/render/brainPanel.mjs";   // the selec
 import { mountTacticsPanel } from "/ui/tacticsPanel.mjs";   // v4839 -- Load Tactics: brain/tacticsRoster.mjs behind two selects (the sim below reads roster.weights("A"|"B"))
 import { createESBox3D } from "/physics/esBox3d.js";
 import { box3d } from "/physics/box3d/box3dLoader.js";
+import { createSmaaGPU } from "/render/smaaPassGPU.mjs";   // 2026-11-22: ?aa=smaa | t2x (T2x reprojected by this page's own depth buffer, with disocclusion)
+import { jitterProjection } from "/render/jitter.mjs";
+import { mat4Invert } from "/render/motionVectors.mjs";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
+import { createClusteredLightingGPU, clusteredWGSL, perspective as perspGL } from "/render/clusteredLights.mjs";   // 2026-11-22: ?lights=1 -- shots and explosions as clustered point lights, a sun with cascaded shadows on the ships
+import { createFogGPU } from "/render/volumetricFog.mjs";   // 2026-11-22: ?fog=1 -- a thin haze that thickens with distance
 import { installRecorder } from "/ui/canvasRecorder.js";
 installRecorder();
 
@@ -184,6 +189,27 @@ struct O { @builtin(position) pos: vec4f, @location(0) col: vec3f, @location(1) 
 }
 @fragment fn fs(v: O) -> @location(0) vec4f { let l = normalize(vec3f(0.4, 0.8, 0.3)); let sh = 0.5 + 0.5 * max(dot(normalize(v.nrm), l), 0.0); return vec4f(v.col * sh, 1.0); }
 `;
+// ?lights=1: the same ship, lit by render/clusteredLights.mjs (the sun's cascades and every shot and explosion near it), and its depth for the shadow atlas
+const SHIP_VS_BODY = `
+  let fwd = vec3f(i0.z, 0.0, i0.w); let rgt = vec3f(i0.w, 0.0, -i0.z); let up = vec3f(0.0, 1.0, 0.0);
+  let off = p.x * fwd + p.y * up + p.z * rgt;
+  let world = vec3f(i0.x, 0.0, i0.y) + i1.w * off;`;
+const SHIP_LIT_WGSL = `
+struct U { vp: mat4x4f, eye: vec4f };
+@group(0) @binding(0) var<uniform> u: U;
+${clusteredWGSL({ group: 1 })}
+struct O { @builtin(position) pos: vec4f, @location(0) col: vec3f, @location(1) nrm: vec3f, @location(2) w: vec3f };
+@vertex fn vs(@location(0) p: vec3f, @location(1) i0: vec4f, @location(2) i1: vec4f) -> O {${SHIP_VS_BODY}
+  var o: O; o.pos = u.vp * vec4f(world, 1.0); o.nrm = normalize(off + vec3f(0.0001, 0.0, 0.0)); o.col = i1.xyz; o.w = world; return o;
+}
+@fragment fn fs(v: O) -> @location(0) vec4f { let n = normalize(v.nrm); let c = v.col * 0.22 + clusteredLight(v.w, n, normalize(u.eye.xyz - v.w), v.col); return vec4f(c, 1.0); }
+`;
+const SHIP_DEPTH_WGSL = `
+@group(0) @binding(0) var<uniform> face: mat4x4f;
+@vertex fn vs(@location(0) p: vec3f, @location(1) i0: vec4f, @location(2) i1: vec4f) -> @builtin(position) vec4f {${SHIP_VS_BODY}
+  return face * vec4f(world, 1.0);
+}
+`;
 const GRID_WGSL = `
 struct U { vp: mat4x4f };
 @group(0) @binding(0) var<uniform> u: U;
@@ -296,6 +322,27 @@ fn disk(r: f32, pos: vec3f, rs: f32) -> vec3f {
 }
 `;
 
+const AA_MODE = ["smaa", "t2x"].includes(new URLSearchParams(location.search).get("aa")) ? new URLSearchParams(location.search).get("aa") : null, AA_REPROJECT = new URLSearchParams(location.search).get("reproject") !== "0";
+const LIGHTS = new URLSearchParams(location.search).get("lights") === "1", FOG = new URLSearchParams(location.search).get("fog") === "1";
+// window.__flightLights (only with ?lights=1 or ?fog=1): what was lit this frame, and switches a gate turns -- sun, points, casters, fog, extra (lights added to the frame's), freeze (the sim and the orbit held), view ({ eye, center }: the camera, for a gate)
+const flightLights = window.__flightLights = LIGHTS || FOG ? { lights: LIGHTS, fog: FOG, sun: true, points: true, casters: true, fogOn: true, extra: [], freeze: false, view: null, frames: 0, stats: null, count: null, vp: null, eye: null, error: null, capture: null } : null;
+// the haze: uniform (no falloff with height -- this is space), 1 - e^-1 of the light gone by 4000 units, lit faintly by the sun and a blue ambient
+const FOG_PARAMS = { density: 0.00025, falloff: 0, albedo: 0.9, ambient: [0.05, 0.07, 0.12], lightDir: [0.75, 0.4, 0.53], lightColor: [0.12, 0.11, 0.1], g: 0.5, maxDistance: 12000, steps: 16, jitter: true };
+if (flightLights) flightLights.fogParams = FOG_PARAMS;
+let lighting = null, shipLitPipe = null, shipDepthPipe = null, litBG0 = null, litBG1 = null, litBGVersion = -1, faceBGs = null, fog = null, fogScene = false;
+const SUN = { type: "directional", direction: [-0.75, -0.4, -0.53], color: [1.0, 0.93, 0.82], intensity: 0.9, shadow: true };   // low (23 degrees): a ship's ridge, 27 units up, throws a shadow 60 units long -- onto a neighbour flying beside it
+// the frame's lights: the sun, the explosions and muzzle flashes (fx 36 units or larger: not the engine glow) and every shot, at most 250
+function buildLights() {
+  const L = [];
+  if (flightLights.sun) L.push(SUN);
+  if (flightLights.points) {
+    for (const p of fx) { if (L.length >= 250) break; if (p.size < 36) continue; const f = Math.max(0, p.life / p.max); L.push({ type: "point", position: [p.x, 40, p.y], range: p.size * 5, color: [p.r, p.g, p.b], intensity: f * p.size * p.size * 2, shadow: false }); }
+    for (const sh of shots) { if (L.length >= 250) break; L.push({ type: "point", position: [sh.x, 20, sh.y], range: 200, color: sh.team === "A" ? [0.5, 0.9, 1.0] : [1.0, 0.8, 0.5], intensity: 2500, shadow: false }); }
+  }
+  for (const l of flightLights.extra) if (L.length < 256) L.push(l);
+  return L;
+}
+let sceneFormat, aa = null, aaPrevVP = null; const aaState = window.__flightAA = { aa: AA_MODE || "off", frames: 0, carried: 0, reproject: null };
 let device, ctx, format, uBuf, bind, shipPipe, gridPipe, shotPipe, fxPipe, meshBuf, instBuf, shotInst, shotCol, fxInst, fxCol, depthTex;
 let bhPipe, bhUBO, bhBind, sceneTex, sceneView, depthView, sampler;
 const bhCam = new Float32Array(36);   // 5 vec4 camera + mat4 viewProj
@@ -341,14 +388,16 @@ async function initGPU() {
   device.addEventListener("uncapturederror", (ev) => {
     const m = (ev.error && ev.error.message) || String(ev.error);
     console.error("[flight-gpu] WebGPU error:", m);
+    if (flightLights && !flightLights.error) flightLights.error = m;
     if (_gpuErrShown) return; _gpuErrShown = true;
     try { const s = document.getElementById("stat"); if (s) s.innerHTML = "<span style=\"color:#ff8a8a\">WebGPU error</span> \u00b7 " + String(m).replace(/&/g, "&amp;").replace(/</g, "&lt;"); } catch (_) {}
   });
   ctx = canvas.getContext("webgpu"); if (!ctx) { fallback("getContext('webgpu') null."); return false; }
   format = navigator.gpu.getPreferredCanvasFormat();
-  ctx.configure({ device, format, alphaMode: "opaque" });
+  ctx.configure({ device, format, alphaMode: "opaque", ...(flightLights ? { usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC } : {}) });   // read back by tools/ship/flightLights-selfcheck.mjs
+  sceneFormat = AA_MODE ? "rgba8unorm" : format;   // with SMAA the scene is drawn into its input
 
-  uBuf = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  uBuf = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   meshBuf = device.createBuffer({ size: shipMesh().byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(meshBuf, 0, shipMesh());
   instBuf = device.createBuffer({ size: instData.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
@@ -379,12 +428,12 @@ async function initGPU() {
         { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
         { arrayStride: 32, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }, { shaderLocation: 2, offset: 16, format: "float32x4" }] },
       ] },
-      fragment: { module: modS, entryPoint: "fs", targets: [{ format }] },
+      fragment: { module: modS, entryPoint: "fs", targets: [{ format: sceneFormat }] },
     });
     gridPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
       vertex: { module: modG, entryPoint: "vs" },
-      fragment: { module: modG, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modG, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     shotPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
@@ -392,7 +441,7 @@ async function initGPU() {
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
       ] },
-      fragment: { module: modH, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modH, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     fxPipe = device.createRenderPipeline({
       layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
@@ -400,9 +449,23 @@ async function initGPU() {
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
       ] },
-      fragment: { module: modFX, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+      fragment: { module: modFX, entryPoint: "fs", targets: [{ format: sceneFormat, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
   } catch (e) { fallback("pipeline failed: " + e.message); return false; }
+  if (LIGHTS) {
+    const modL = device.createShaderModule({ code: SHIP_LIT_WGSL }), modD = device.createShaderModule({ code: SHIP_DEPTH_WGSL }), VB = [
+      { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
+      { arrayStride: 32, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }, { shaderLocation: 2, offset: 16, format: "float32x4" }] }];
+    for (const [nm, mod] of [["ship lit", modL], ["ship depth", modD]]) { const ci = mod.getCompilationInfo ? await mod.getCompilationInfo() : null; if (ci) for (const m of ci.messages) if (m.type === "error") { fallback("WGSL (" + nm + ") error: " + m.message); return false; } }
+    shipLitPipe = device.createRenderPipeline({ layout: "auto", primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: DS, vertex: { module: modL, entryPoint: "vs", buffers: VB }, fragment: { module: modL, entryPoint: "fs", targets: [{ format: sceneFormat }] } });
+    shipDepthPipe = device.createRenderPipeline({ layout: "auto", primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" }, vertex: { module: modD, entryPoint: "vs", buffers: VB } });
+    // the battle is some 2600 units across and the orbit 3300 from its middle: the sun's cascades cover 6000 units of the view, casters 2000 above them
+    lighting = createClusteredLightingGPU(device, { maxLights: 256, viewCells: [16, 9, 24], space: "view", maxPerCell: 48, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 6000, casterReach: 2000 });
+    litBG0 = device.createBindGroup({ layout: shipLitPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uBuf } }] });
+    faceBGs = lighting.faceBuffers.map((b) => device.createBindGroup({ layout: shipDepthPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }] }));
+  }
+  if (FOG) fog = createFogGPU(device, sceneFormat);
+  if (AA_MODE) aa = createSmaaGPU(device, { width: 1, height: 1, outputFormat: format, temporal: AA_MODE === "t2x" });
   bind = device.createBindGroup({ layout: sceneBGL, entries: [{ binding: 0, resource: { buffer: uBuf } }] });
   bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
@@ -419,7 +482,7 @@ function resizeTargets() {
   if (canvas.width !== w || canvas.height !== h || !depthTex) {
     canvas.width = w; canvas.height = h;
     if (depthTex) depthTex.destroy(); depthTex = device.createTexture({ size: [w, h], format: "depth32float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
-    if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [w, h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [w, h], format: sceneFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
     sceneView = sceneTex.createView(); depthView = depthTex.createView();
     bhBind = device.createBindGroup({ layout: bhPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bhUBO } }, { binding: 1, resource: sampler }, { binding: 2, resource: sceneView }, { binding: 3, resource: depthView }] });
   }
@@ -449,9 +512,21 @@ function render() {
   } else if (camMode === "follow" && A.concat(B).some((e) => !e.dead)) {
     const list = A.concat(B).filter((e) => !e.dead); const me = list[followIdx % list.length]; const hv = headingVector(me.heading);
     eye = [me.x - hv.x * 520 + 60, 260, me.y - hv.y * 520 + 60]; center = [me.x + hv.x * 300, 40, me.y + hv.y * 300];
-  } else { theta += 0.0016; const R = 2900, hgt = 1500; eye = [ccx + Math.cos(theta) * R, hgt, ccy + Math.sin(theta) * R]; center = [ccx, 0, ccy]; }
+  } else { if (!(flightLights && flightLights.freeze)) theta += 0.0016; const R = 2900, hgt = 1500; eye = [ccx + Math.cos(theta) * R, hgt, ccy + Math.sin(theta) * R]; center = [ccx, 0, ccy]; }
+  if (flightLights && flightLights.view) { eye = flightLights.view.eye; center = flightLights.view.center; }   // a gate frames what it measures
   const view = lookAt(eye, center, [0, 1, 0]); const proj = perspZO(52 * Math.PI / 180, canvas.width / canvas.height, 12, 12000);
-  device.queue.writeBuffer(uBuf, 0, mul(proj, view));
+  const vp = mul(proj, view), useAA = aa && !bhOn;
+  let drawVP = vp;
+  if (useAA) { aa.resize(canvas.width, canvas.height); const [jx, jy] = aa.jitter(); if (aa.temporal) drawVP = mul(jitterProjection(proj, jx, jy, canvas.width, canvas.height), view); }
+  device.queue.writeBuffer(uBuf, 0, drawVP); device.queue.writeBuffer(uBuf, 64, new Float32Array([eye[0], eye[1], eye[2], 0]));
+  const lit = lighting && !bhOn;
+  if (flightLights) { flightLights.vp = Array.from(vp); flightLights.eye = eye.slice(); }
+  if (lit) {
+    const L = buildLights();
+    flightLights.stats = lighting.update(L, { view: Array.from(view), proj: Array.from(perspGL(52 * Math.PI / 180, canvas.width / canvas.height, 12, 12000)), near: 12, far: 12000 });
+    flightLights.count = { lights: L.length, sun: L.filter((l) => l.type === "directional").length, shots: L.filter((l) => l.range === 200).length, fx: L.filter((l) => l.type === "point" && l.range !== 200).length - flightLights.extra.length, simShots: shots.length, simFx: fx.filter((p) => p.size >= 36).length };
+    if (lighting.cookieVersion !== litBGVersion) { litBG1 = lighting.bindGroupFor(shipLitPipe, 1); litBGVersion = lighting.cookieVersion; }
+  }
   if (bhOn) {
     let fx0 = center[0] - eye[0], fy0 = center[1] - eye[1], fz0 = center[2] - eye[2]; const fl = Math.hypot(fx0, fy0, fz0) || 1; fx0 /= fl; fy0 /= fl; fz0 /= fl;   // forward
     let rx = -fz0, ry = 0, rz = fx0; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;                                                    // right = norm(cross(fwd,(0,1,0)))
@@ -478,26 +553,43 @@ function render() {
     const pb = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
     pb.setPipeline(bhPipe); pb.setBindGroup(0, bhBind); pb.draw(3); pb.end();
   } else {
+    if (lit) lighting.renderShadows(enc, (pass, face) => { if (!nShip || !flightLights.casters) return; pass.setPipeline(shipDepthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); });
+    const fogged = fog && flightLights.fogOn;   // with the fog the scene is drawn into sceneTex, and the fog pass writes it on to where the scene went
+    const sceneTarget = useAA ? aa.inputView : ctx.getCurrentTexture().createView();
     const pass = enc.beginRenderPass({
-      colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
+      colorAttachments: [{ view: fogged ? sceneView : sceneTarget, clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
       depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" },
     });
     pass.setBindGroup(0, bind);
     pass.setPipeline(gridPipe); pass.draw(6);
-    if (nShip) { pass.setPipeline(shipPipe); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); }
+    if (nShip && lit) { pass.setPipeline(shipLitPipe); pass.setBindGroup(0, litBG0); pass.setBindGroup(1, litBG1); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); pass.setBindGroup(0, bind); }
+    else if (nShip) { pass.setPipeline(shipPipe); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); }
     if (nShot) { pass.setPipeline(shotPipe); pass.setVertexBuffer(0, shotInst); pass.setVertexBuffer(1, shotCol); pass.draw(6, nShot); }
     if (nFx) { pass.setPipeline(fxPipe); pass.setVertexBuffer(0, fxInst); pass.setVertexBuffer(1, fxCol); pass.draw(6, nFx); }
     pass.end();
+    if (fogged) fog.encode(enc, sceneTarget, { colorView: sceneView, depthView, invViewProj: mat4Invert(drawVP), eye, zRange: "zo", params: FOG_PARAMS });
+    if (useAA) {   // the camera moves every frame here: the history is carried by this frame's depth buffer and last frame's matrix, or dropped (&reproject=0)
+      const reproject = aa.temporal && AA_REPROJECT && aaPrevVP ? { invViewProj: mat4Invert(vp), prevViewProj: aaPrevVP, depth: depthView } : null;
+      aa.encode(enc, ctx.getCurrentTexture().createView(), { moved: true, reproject });
+      aaState.frames++; if (aa.lastUsedHistory) aaState.carried++; aaState.reproject = aa.temporal ? (AA_REPROJECT ? "depth" : "off") : null;
+    }
   }
+  aaPrevVP = useAA ? vp : null;   // the black hole's lensing pass draws without SMAA: the history starts again after it
+  let rb = null;
+  if (flightLights && flightLights._want) { const tex = ctx.getCurrentTexture(), row = 256 * Math.ceil(canvas.width * 4 / 256); rb = { buf: device.createBuffer({ size: row * canvas.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), row, w: canvas.width, h: canvas.height, res: flightLights._want }; flightLights._want = null; enc.copyTextureToBuffer({ texture: tex }, { buffer: rb.buf, bytesPerRow: row }, [rb.w, rb.h]); }
   device.queue.submit([enc.finish()]);
+  if (flightLights) flightLights.frames++;
+  if (rb) rb.buf.mapAsync(GPUMapMode.READ).then(() => { const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), bgra = /^bgra/.test(format), px = new Uint8Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w; x++) for (let c = 0; c < 4; c++) px[(y * rb.w + x) * 4 + c] = raw[y * rb.row + x * 4 + (bgra && c < 3 ? 2 - c : c)]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, px: Array.from(px) }); });
 }
+if (flightLights) flightLights.capture = () => new Promise((res) => { flightLights._want = res; });
 
 let acc = 0, last = performance.now();
 function loop() {
   requestAnimationFrame(loop);
   const now = performance.now(); const frameDt = Math.min(0.1, (now - last) / 1000); acc += frameDt; last = now;
-  let steps = 0; while (acc >= 1 / 30 && steps < 4) { stepSim(); acc -= 1 / 30; steps++; }
-  updateFx(frameDt);
+  const frozen = flightLights && flightLights.freeze;
+  let steps = 0; while (!frozen && acc >= 1 / 30 && steps < 4) { stepSim(); acc -= 1 / 30; steps++; }
+  if (frozen) acc = 0; else updateFx(frameDt);
   drawBrain();
   render();
   const el = document.getElementById("stat"); if (el) el.textContent = "A " + A.filter((e) => !e.dead).length + " vs B " + B.filter((e) => !e.dead).length + "  \u00b7  battles A:" + wins.A + " B:" + wins.B + "  \u00b7  " + (ready ? "box3d" : "fallback") + " \u00b7 " + shots.length + " shots";

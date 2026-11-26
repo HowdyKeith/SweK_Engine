@@ -411,6 +411,22 @@ export const RECORD_HANDOVERS = Object.freeze([
         decidedBy: "Keith",
         evidence: "boxId() reads linux-x64-4c-16gb-142c0d after the container restart of 2026-11-09; the shared record names 420793 (captured 2026-11-05T23:31Z). Keith's answer \"i say yes\" of 2026-11-09 to the handover question put to him after the rig's clone-verify of main v4913 failed on the 17 untimed slow gates. " +
                   "The sandbox's rotation and verdicts went to sweep-timings.local.json and refused the shared record; that local file and its ledger are deleted at the handover, as at v4818, v4838, v4850, v4880, v4897 and v4912. 420793 held the record from v4912 to v4913." }),
+    // v4932 -- TO 46f962, BECAUSE THE SANDBOX RESTARTED ONTO THAT HOST MID-ROUND (2026-11-20) AND THE MERGED ROUND'S GATES HAD NOWHERE TO BE RECORDED. The merge of claude/inspiring-mayer-9mdcut and stations rounds 13-15 brought nine
+    // gates no shared record had read; the verdict's sweep ran four of them (crabMlg1, flyEmdLplc2Gf, gfGain, stealthLoomStimuli, 28 to 56 s alone) as unmeasured and killed them at the 20 s cap ("nothing timed out alone under the cap"), and
+    // the rotation and boxTimings readings went to sweep-timings.local.json and sweep-timings.linux-x64-4c-16gb-46f962.json, which the sweep's budget does not read. Keith chose the handover in the session.
+    Object.freeze({ at: "v4932", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-46f962",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"Yes, hand it over\" to the record-owner question on 2026-11-20. boxId() reads linux-x64-4c-16gb-46f962 after the container restart of 2026-11-20 (the round's first verdict printed 'the record belongs to " +
+                  "linux-x64-4c-16gb-142c0d and this box is linux-x64-4c-16gb-46f962'); the shared record named 142c0d, captured 2026-11-20T06:18:42Z. The untracked sweep-timings.local.json and its ledger are deleted at the handover, " +
+                  "as at v4818, v4838, v4850, v4877, v4880, v4897, v4912 and v4913; the tracked per-box record stays. 142c0d held the record from v4913 to v4932." }),    // v4933 -- BACK TO 142c0d, BECAUSE THE SANDBOX RESTARTED ONTO THAT HOST AND THE ROUND'S 106 NEW GATES HAD NOWHERE TO BE RECORDED. The round since v4932 (the PlayCanvas line, the duel
+    // studies, the fly pathways) brought 106 gates no shared record had read; the first two verdicts' sweeps ran the slow ones (battleshipDuel, clusteredLights, smaaPassGPU, softShadows and others,
+    // 20 to 100 s alone) as unmeasured and killed them at the 20 s cap, and the boxTimings and rotation readings went to sweep-timings.linux-x64-4c-16gb-142c0d.json and sweep-timings.local.json,
+    // which a fresh clone on the rig does not read -- so the rig's verify would have run them unmeasured too. Keith chose the handover in the session.
+    Object.freeze({ at: "v4933", from: "linux-x64-4c-16gb-46f962", to: "linux-x64-4c-16gb-142c0d",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"Hand over to 142c0d\" to the record-owner question on 2026-11-22. boxId() reads linux-x64-4c-16gb-142c0d at v4933 (the round's first verdict printed 'the record belongs to " +
+                  "linux-x64-4c-16gb-46f962 and this box is linux-x64-4c-16gb-142c0d'); the shared record named 46f962, captured 2026-11-20T18:27:08Z. The untracked sweep-timings.local.json and its ledger are deleted at the handover, " +
+                  "as at v4818, v4838, v4850, v4877, v4880, v4897, v4912, v4913 and v4932; the tracked per-box record stays. 46f962 held the record from v4932 to v4933." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
