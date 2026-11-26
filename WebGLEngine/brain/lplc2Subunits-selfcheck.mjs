@@ -89,6 +89,14 @@ guarded("section 4", () => {
     ok("a missing or non-finite response is refused by name", /no finite response for S7/.test(threw || ""), threw);
 });
 
+sec("5. draw, respond and respondZhao on a STILL grey frame sequence (no registered stimulus)");
+guarded("section 5", () => {
+    const f = L.draw((x, y) => Math.abs(x) <= 0.5 && Math.abs(y) <= 0.5), grey = Array.from({ length: 60 }, () => L.draw(() => false));
+    ok("draw: a 1 degree square at the centre darkens exactly the pixels it covers (1 px in all), with the frame's size", f.w === 90 && f.h === 90 && Math.abs(f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0) - 1) < 1e-9);
+    const r = L.respond(grey), z = L.respondZhao(grey);
+    ok("respond and respondZhao: a still grey screen gives the subunit cell 0 at every frame and Zhao's unit no active frame", r.trace.length === 60 && r.trace.every((v) => v === 0) && r.peak === 0 && z.activeFrames === 0, J({ peak: r.peak, zhao: z }));
+});
+
 finished = true;
 console.log(fails ? `\nlplc2Subunits-selfcheck: ${fails} FAILED` : "\nlplc2Subunits-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
