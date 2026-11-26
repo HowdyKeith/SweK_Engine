@@ -18,7 +18,7 @@ export const HELD_SEEDS = Object.freeze(range(4401, 4460));
 export const SPENT = Object.freeze({ survey: [9990037, 9990048] });
 export const FLOOR_MIN = S.FLOOR_MIN, ALPHA = S.ALPHA, TIE_EPS = S.TIE_EPS;
 /** CAP_STRONG: null until DEV is read and the choice is committed with its report (then the number, by hand, in the same commit). */
-export const CAP_STRONG = null;
+export const CAP_STRONG = 20;   // 2026-11-26: DEV (4301-4330) chose 20 by mean R (17.93; the doctrine 4.35) and passed its checks; committed with the DEV report before any HELD seed
 
 export const scenariosOf = (seeds) => seeds.flatMap((seed) => S.KINDS.map((kind) => ({ seed, kind })));
 
