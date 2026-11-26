@@ -16,6 +16,9 @@
 // 2026-11-26 -- FOLLOW-UP 9 (section 5): 9 mutants of brain/subAvoidNav.mjs, every one red by name (final pass): V1 R_TURN 20 | V2 the longer way round | V3 the turn's sense reversed | V4 the arc's y sign |
 //   V5 the straight leg on the OLD heading | V6 the arc from the candidate, not the current heading | V7 the arc arm flying the straight test | V8 candidates not tested against statics | V9 HELD9 on HELD8's seeds.
 //   V8 WENT 0 RED FIRST and got a row (an iceberg on the first ship-clear candidate's path, at 25 s: at 10 s every candidate's turn passed it and the rule went stuck, which proved nothing).
+// 2026-11-26 -- FOLLOW-UP 10 (section 6): 7 mutants, every one red by name (final pass): E1 a 0 m band | E2 the south edge not tested | E3 the trigger edge-tested | E4 candidates not edge-tested | E5 the edge on the
+//   wrong arm | E6 HELD10 on HELD9's seeds | E7 a 3 s edge look. E1 and E5 WENT 0 RED FIRST: the band row started where the path crossed the edge anyway (now 85 m out, ending 10 m inside the band), and swapping the arms
+//   kept them different (a golden of both arms on six DEV seeds now pins each). The south-edge row's first fixture sat by the east edge, where nothing was refused.
 import * as A from "./subAvoidNav.mjs";
 import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
@@ -147,6 +150,12 @@ console.log("\n6. FOLLOW-UP 10: THE ARC RULE KEPT OFF THE REGION'S EDGE");
     const at = [mid[0], R.y0 + 30], ships = [ship(at[0] + 90, at[1], 0, 0)], plain = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity), edged = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity, { edge: true });
     ok("!! a ship ahead 30 m inside the south edge: the plain arc rule turns starboard toward the edge, the edge-kept rule refuses that and turns to port, and what it takes keeps off the band",
         plain.turned && plain.heading > 0 && edged.turned && edged.heading < 0 && !A.conflictArc(at[0], at[1], 0, 0, edged.heading, ships, -Infinity, { ships: true, statics: true, edge: true }), JSON.stringify({ plain: plain.heading, edged: edged.heading }));
+    ok("!! the band, not the edge itself, decides: 85 m from the south edge heading at it, the 25 s look ends 10 m from the edge -- inside the 20 m band (a conflict) but never past the edge (none without the band)",
+        A.conflictArc(mid[0], R.y0 + 85, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === true && Math.abs(A.arcPos(mid[0], R.y0 + 85, Math.PI / 2, Math.PI / 2, 25)[1] - R.y0 - 10) < 1e-9);
+    // GOLDEN (a regression snapshot of this module's own flights, not a hand derivation): the two arms on six DEV seeds -- the edge arm refuses more and turns less, and the arc arm is FOLLOW-UP 9's, untouched
+    const gold = Object.fromEntries(A.EDGE_ARMS.map((arm) => { let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), arm)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; } return [arm, { f, t, k, st }]; }));
+    ok("!! GOLDEN: on DEV seeds 1-6 the arc arm fires 4638, turns 4497, stuck 141 and the edge arm fires 4571, turns 3819, stuck 752 (each arm flies its own test: swapping them moves both)",
+        same(gold[A.EDGE_REFERENCE], { f: 4638, t: 4497, k: 141, st: "rrrrrr" }) && same(gold[A.EDGE_DESIGNATED], { f: 4571, t: 3819, k: 752, st: "rrrrrr" }), JSON.stringify(gold));
     const sc = H.hardScenario(1, "hard-traffic"), e1 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 })), e2 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 }));
     ok("the edge arm flies (DEV seed 1, 60 s), names itself, and is deterministic", !!e1 && e1.arm === A.EDGE_DESIGNATED && same(e1, e2), JSON.stringify(e1 && { s: e1.status, f: e1.fires, t: e1.turns, k: e1.stuck }));
 }
