@@ -8,6 +8,8 @@
 //   2  THE PERFECT TALLY        the homing fly's life to the turn for home, then the true way home shown and nothing else changed; one fly flown by hand
 //   3  THE RECORDS              48 flies and a second one; T0 and T8
 //   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at cd3036c6, read from the file: the checks, T0, T8, the arms, the description after the reading (how
+//                               course and the perfect tally's home go together, which choosers steer home better), a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the library's and the note's, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name (the number is the rows red):
 //   THE ROUND: G1 the way home shown backwards 1 | G2 the way home shown a tick late 1 | G3 sigma 0.2 for 0.4 3 | G4 the compass not jittered 1 | G5 T0 against the own tally at 0.4 1 | G6 T8
@@ -16,6 +18,9 @@
 //   THE COMMAND: K1 exits 0 on a word it does not know 1 | K2 the job flies on lives of its own 1 | K3 the file's flies not counted as done 1 | K4 the second fly never in the pool 1 | K5 the
 //   second fly recorded as a fly 1 | K6 reads without the committed files 1.   THE NOTE: M1 it shows the way home from the start 1 | M2 its levels 0, 0.2, 0.8 1 (first skipped: its text spans
 //   a line of the note; run again on one line) | M3 it drops HOMEP draw 1 again 1
+// THE VERDICT'S SABOTAGES (2026-11-26, after the reading, the same runner, this gate alone): V1 a fly's home score changed in a digit the double holds 1 (the file's hash alone) | V2 T0
+//   against the own tally at 0.4 2 | V3 T8 without the own tally's fall 4 | V4 BETTER and WORSE swapped 4 | V5 the note's T8 says CANNOT 1 | V6 the note's expectation of T8 BETTER is 75 1 |
+//   V7 the note names another commit 1 | V8 the note drops that every expectation came 1 | V9 the note's perfect-tally correlation -0.26 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,6 +32,9 @@ import * as CE from "../../brain/rl/compassEnv.mjs";
 import { HOME_AT } from "../../brain/rl/homeEnv.mjs";
 import { HomingFly } from "../../brain/rl/homingFly.mjs";
 import { NoisyHomeEnv } from "../../brain/rl/noisyCompassEnv.mjs";
+import { createHash } from "node:crypto";
+import * as P from "./flyHomeCoursePredicts.mjs";
+import { rankSum } from "./paintingFly.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -99,6 +107,32 @@ section(() => {
     const me = src("tools/ship/flyHomeTrueTally-selfcheck.mjs"), calls = [...me.matchAll(/Q\.flyOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one fly is flown on 2 lives not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"HOME16", 5, F, TWO']) && !TWO.some((x) => T.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at cd3036c6 before it was read, and is read here from the file)");
+section(() => {
+    const near = (a, b, e = 5e-5) => Math.abs(a - b) < e, mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const bytes = fs.readFileSync(path.join(ENG, Q.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = Q.reading(lines, F), A = R.arms, fl = lines.filter((r) => r.kind === "fly");
+    const own = (r) => F.noise.lines.find((x) => x.kind === "fly" && x.arm === r.arm && x.s === r.s);
+    ok("!! the results file is the one the run wrote: 49 records, sha256 9226e52c44940a5f... (one start, 22.5 minutes on four processes)", lines.length === 49 && createHash("sha256").update(bytes).digest("hex") === "9226e52c44940a5f109ada6594f03258b2c6c131a341cde531abcf6f7b8baeff");
+    ok("!! THE CHECKS HOLD: the compass-noise round's file as committed and passing its own checks; 48 flies each once, its arm's weights; HOMEP draw 1 the same twice", R.checks.length === 0);
+    ok("!! *** T0 -- WITH A PERFECT TALLY THE FLY FINDS HOME BETTER THAN WITH ITS OWN (48 of 48, by 0.3612 on average); T8 -- WITH A PERFECT TALLY A NOISIER COMPASS COSTS HOMING LESS (46 of 48, by 0.0235 on average; HOMEP 12 and HOME16 12 the other way) ***",
+        R.T0.word === Q.WORDS.T0[0] && R.T0.above === 48 && near(mean(R.T0.diffs), 0.3612) && R.T8.word === Q.WORDS.T8[0] && R.T8.above === 46 && R.T8.below === 2 && near(mean(R.T8.diffs), 0.0235) &&
+        J(fl.filter((r, i) => R.T8.diffs[i] < 0).map((r) => r.arm + " " + r.s)) === J(["HOMEP 12", "HOME16 12"]));
+    ok("!! the arms' mean home with the perfect tally at sigma 0 and 0.8: HOMEP 0.9164, 0.8800 | COURSE64 0.9099, 0.8744 | HOME16 0.9169, 0.8806 | H16BYC 0.9123, 0.8774; the mean fall to 0.8 0.0358 with it, 0.0593 with the fly's own",
+        [["HOMEP", 0.9164, 0.8800], ["COURSE64", 0.9099, 0.8744], ["HOME16", 0.9169, 0.8806], ["H16BYC", 0.9123, 0.8774]].every(([a, h0, h8]) => near(A[a][0].home, h0) && near(A[a][2].home, h8)) &&
+        near(mean(fl.map((r) => r.levels[0].home - r.levels[2].home)), 0.0358) && near(mean(fl.map((r) => own(r).levels[0].home - own(r).levels[3].home)), 0.0593));
+    const c = fl.map((r) => own(r).levels[0].course), t = fl.map((r) => r.levels[0].home), o = fl.map((r) => own(r).levels[0].home), arm = (a) => fl.filter((r) => r.arm === a).map((r) => r.levels[0].home);
+    const g = rankSum([...arm("HOMEP"), ...arm("HOME16")], [...arm("COURSE64"), ...arm("H16BYC")]);
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: over the 48 at sigma 0, course and home go together at 0.80 with the fly's own tally and at -0.36 with the perfect one; with the perfect tally the flies whose point the homing score chose (HOMEP, HOME16) come home better than those the course score chose (COURSE64, H16BYC), ranks 771 of a middle 588, p 0.0001 (not registered)",
+        P.spearman(c, o).toFixed(2) === "0.80" && P.spearman(c, t).toFixed(2) === "-0.36" && g.sumA === 771 && near(g.p, 0.0001, 5e-5) && g.pHigher < g.pLower, `${P.spearman(c, o).toFixed(4)}, ${P.spearman(c, t).toFixed(4)}, p ${g.p.toExponential(2)}`);
+    const d3 = fl.find((r) => r.arm === "COURSE64" && r.s === 3), cc = N.committedOf("COURSE64", 3, F);
+    ok("!! RE-AUDITED AFTER THE READING: COURSE64 draw 3 with the perfect tally at sigma 0.8 gives its home score again to the bit", Q.trueHome(T.flyOf("HOMEP", 3, cc.weights), Q.AUDIT, 0.8) === d3.levels[2].home);
+    const note = src("brain/FLY_HOME_TRUE_TALLY_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came -- every one: T0 BETTER (99), T8 BETTER (85)", /T0: \*\*BETTER about 99\*\*\. T8: \*\*BETTER about 85\*\*, CANNOT 15\./.test(flat) && R.T0.word === Q.WORDS.T0[0] && R.T8.word === Q.WORDS.T8[0]);
+    ok("the registration's RESULT SECTION (section 10) carries both readings' words, the commit the file was read at, that every expectation came, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && res.includes(`**T0: ${R.T0.word}**`) && res.includes(`**T8: ${R.T8.word}**`) && /cd3036c6/.test(res) && /\*\*Every expectation came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /-0\.36/.test(res) && /ranks 771/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyHomeTrueTally-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

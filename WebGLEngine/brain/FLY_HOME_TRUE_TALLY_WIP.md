@@ -65,3 +65,35 @@ sandbox.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyHomeTrueTally.mjs run` -> `brain/flyHomeTrueTallyRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyHomeTrueTally.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at cd3036c6, then read once)
+One start, 22.5 minutes on four processes, 49 records (sha256 9226e52c44940a5f...). **The checks hold**: the
+compass-noise round's file as committed and passing its own checks; 48 flies each once, its arm's committed weights;
+HOMEP draw 1 the same twice.
+* **T0: WITH A PERFECT TALLY THE FLY FINDS HOME BETTER THAN WITH ITS OWN** (48 of 48, by 0.36 on average, p 7e-15).
+* **T8: WITH A PERFECT TALLY A NOISIER COMPASS COSTS HOMING LESS** (46 of 48, by 0.024 on average, p 8e-12; HOMEP's and
+  HOME16's draw 12 the other way).
+
+| arm | home at sigma 0: perfect tally / own | at 0.8: perfect / own |
+|---|---|---|
+| HOMEP | 0.9164 / 0.5501 | 0.8800 / 0.4904 |
+| COURSE64 | 0.9099 / 0.5541 | 0.8744 / 0.4947 |
+| HOME16 | 0.9169 / 0.5517 | 0.8806 / 0.4927 |
+| H16BYC | 0.9123 / 0.5548 | 0.8774 / 0.4960 |
+
+**Every expectation came**: T0 BETTER (99), T8 BETTER (85). So, as section 5 put it, **the homing fly's shortfall is
+mostly its tally**: steering on its own compass, a fly that knew where it was would come home at about 0.91 where it
+comes home at about 0.55. And **part of the noise's cost to homing is the tally's**: with the perfect tally the noise
+costs 0.036 on average to sigma 0.8, against 0.059 with the fly's own.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** over the 48 flies at sigma 0,
+course and home go together at 0.80 with the fly's own tally, and at **-0.36** with the perfect one. With the perfect
+tally, the flies whose point the homing score chose (HOMEP and HOME16) come home better than those the course score
+chose (COURSE64 and H16BYC): ranks 771 of a middle 588, p 0.0001 (not registered). **So the course-holder's better homing,
+which the four homing rounds and the course-predicts round kept meeting, comes through the tally**: a fly that holds a
+course keeps a truer reckoning of where home is, because both are made from the same heading. The homing-trained flies
+steer to a shown goal better, and their poorer tally hides it.
+
+**What it does not mean.** Section 7 holds. A perfect tally is the fly told where it is, which no fly is; it says what the
+tally, as this fly keeps it, costs, not how to keep a better one. The reversal is described, not registered, and rests on
+these 48 flies. Nothing here is of the animal.
