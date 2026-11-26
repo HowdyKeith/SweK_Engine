@@ -325,3 +325,44 @@ Round A's per-fighter endpoints, plus each fight's total rock strikes (struck).
 * Arm "F" in tools/ship/rockNavStudy.mjs, with readHeldC and devChecksC.
 * The command's modes devC, devC-read, heldC and heldC-read.
 * Gate rows and sabotages in the study gate.
+
+## ROUND C, RESULT (2026-11-26): THE FOLLOWING FIELD DOES NOT WIN (NO DIFFERENCE SHOWN)
+
+**DEV** (3501-3530, 120 pairs): all five checks passed.
+- The hand-back was exact on 515,549 calls.
+- There were 4,288 builds in F, each centred exactly on the ship at its tick.
+- No aim lay in a blocked cell, and every rock inside a build's grid was blocked.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (3601-3690 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/heldC-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | L (lane, built once) | F (lane, rebuilt every 2 s) |
+|---|---|---|
+| all rock strikes | 147 | 141 |
+| before arriving | 32 | 21 |
+| after arriving | 115 | 120 |
+| arrived | 2745 | 2771 |
+| mean damage on the ship | 239.7 | 240.4 |
+| doctrine fallbacks | 86,901 | 75,031 |
+| builds a fight | 1 | 35 |
+
+- **V1 THE ROCKS:** NO DIFFERENCE SHOWN. Following was better in 47 fights, worse in 48, tied in 265; p 1.0.
+- **V2 THE DAMAGE:** NO DIFFERENCE SHOWN (167 against 151, p 0.40). So it is not L BETTER.
+- **Reported:**
+  - Strikes before arriving: FLOOR (13 against 3 non-tied pairs, p 0.02, under the 20-pair floor, so not a finding).
+  - Strikes after arriving: no difference (40 against 49).
+  - F's rebuilds cost 4,564 s of CPU across the 360 fights, about 12.7 s a fight.
+
+**Against the expectations (written first):**
+- NO DIFFERENCE SHOWN, about 50: YES.
+- V2 not L BETTER, about 80: YES.
+- Fallbacks lower under F, about 95: YES, but only by 14%, not the large drop the stale-goal diagnosis implied.
+- The survey's direction (F worse after arriving, 11-12 against 6 on 24 fights) did not replicate. It was noise at that size.
+
+**WHAT THIS MEANS.**
+- Re-centring the field on the drifting ship changes nothing measurable in rock losses or damage, and it costs about 35 builds a fight. The stale goal was a real defect in the plan's bookkeeping. It was not a cause of losses: a fighter that falls back to the doctrine near the ship is mostly already past the rocks.
+- **What remains unexplained, and is said plainly:** fallbacks fell only 14% even with a fresh field every 2 s. So most fallbacks are not the stale goal after all; the cause is unsettled.
+  - The survey's diagnostic counted 4,085 of 4,817 as stale, on three seeds and the start-centred field.
+  - A likelier cause under F is the goal sphere's edge (a goal cell whose centre is inside 220 holds a fighter up to about 14 units outside it), plus the ship's motion between rebuilds.
+  - This is not measured here.
+- **The layer ships as Round B left it:** the lane field, built once. Nothing is replaced.
