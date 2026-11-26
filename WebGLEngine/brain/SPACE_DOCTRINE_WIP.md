@@ -345,3 +345,73 @@ HELD is space seeds 4401-4460 x 4 kinds x {ace, perfect}, flown once with arms D
 - **The right approach speed rises with the gunners' skill.** Too slow, and the fighters die on the way in; too fast, and the passes are wasted.
 - Rock nav Round D and the page's cap box use 12. That is right for the regular gunners they fly against, and it would be wrong against strong ones.
 - A cap that adapts to what the fighters meet, for example one raised after the first losses, is the open question. It is filed as backlog space-cap-adaptive.
+
+# ROUND 4: AN ADAPTIVE CAP -- CAN ONE RULE KEEP 12'S WIN AGAINST WEAK GUNNERS AND TAKE 20'S AGAINST STRONG ONES? (backlog space-cap-adaptive; Keith 2026-11-26, "lets do the next suggested round"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## Why
+Round 3 found no one cap best:
+- 12 wins against regular and green by killing the ship.
+- 20 wins against ace and perfect, where a fighter capped at 12 dies before it strafes.
+The fighters do not know the gunners in advance, but they can see what is happening to them.
+
+## The rule (ADAPT), fixed from a survey on throwaway seeds and said here
+- Every fighter flies Round 1's arm C (cappedPilot's rule: thrust 0 at or over the cap's closing speed to the nearest foe) with a cap that starts at 12.
+- At every decision, the team LATCHES to cap 20 for the rest of the fight once both hold:
+  - at least K = 1 of its fighters is dead;
+  - the capital ship has taken no damage (hp equal to hpMax).
+- The latch never returns.
+- Everything the rule reads is what the fighters can see: their own losses and the ship's hull.
+
+## What is already known, said first
+The design survey flew throwaway space seeds 9990049-9990060 (48 fights a preset, in no set; a scratch script, never committed). Mean R:
+
+| preset | fixed 12 | fixed 20 | ADAPT K=1 | K=2 | K=3 | K=4 |
+|---|---|---|---|---|---|---|
+| regular | 1594.2 | 1100.7 | 1488.1 | 1544.5 | 1594.2 | 1594.2 |
+| green | 1595.8 | 1197.4 | 1577.6 | 1595.8 | 1595.8 | 1595.8 |
+| ace | 6.8 | 40.5 | 40.9 | 22.1 | 18.8 | 10.5 |
+| perfect | 0.8 | 11.3 | 10.9 | 8.3 | 3.0 | 0.8 |
+
+- **K = 1 is fixed by the survey's criterion, stated now:** the only K within 10% of the better fixed cap under all four presets.
+- The survey shows its price: about 7% against regular, where a fighter lost before any hit latches the team to the slower kill. HELD weighs that price, per preset.
+
+## The arms
+battleshipFight.build(seed, kind, { gunners: preset, pilot }), nothing in the arena edited.
+* **FIXED12:** the cap at 12, as cappedPilot.
+* **FIXED20:** the cap at 20.
+* **ADAPT:** the rule above.
+
+## SETS
+* DEV: space seeds 4501-4530 x 4 kinds x {regular, green, ace, perfect}, checks only.
+* HELD: 4601-4660 x 4 kinds x the four presets, flown once.
+* The survey: 9990049-9990060.
+
+## DEV: checks only (a failure stops the round)
+1. **THE LATCH FIRES:**
+   * ADAPT latched in at least one fight under ace and under perfect.
+   * It never latched before a fighter was lost, nor while the ship was damaged (recorded at the latch).
+2. **THE CAP IS APPLIED:** at or over the cap in force (12 before the latch, 20 after), every decision flew with thrust 0. ADAPT's before-latch decisions are those of FIXED12, so an ADAPT fight that never latches IS the FIXED12 fight, R for R.
+3. **EVERY FIGHT ENDS.**
+
+## HELD: the verdict (pairs by (seed, kind) within a preset; R; the exact sign test; FLOOR_MIN 20, alpha 0.05)
+* **THE WEAK SIDE (regular, green):** ADAPT against FIXED12. It KEEPS 12'S WIN under a preset unless that preset's verdict is FIXED12 BETTER.
+* **THE STRONG SIDE (ace, perfect):** ADAPT against FIXED20. It TAKES 20'S WIN under a preset unless that preset's verdict is FIXED20 BETTER, AND ADAPT against FIXED12 is ADAPT BETTER there.
+* **BOTTOM LINE:**
+  * Both sides hold under all four presets: `THE ADAPTIVE CAP HAS BOTH`.
+  * Only the weak side fails: `THE ADAPTIVE CAP PAYS ON THE WEAK SIDE (<preset(s)>)`.
+  * Only the strong side fails: `THE ADAPTIVE CAP MISSES THE STRONG SIDE (<preset(s)>)`.
+  * Both sides fail: `THE ADAPTIVE CAP HAS NEITHER (<preset(s)>)`.
+* **Reported, not weighed:**
+  * every pair's verdict under every preset;
+  * mean R, ships destroyed and the fights ADAPT latched in, per preset;
+  * the latch's mean time and losses at the latch.
+
+## Expectations, recorded before any code
+* The strong side holds under both: about 70%.
+* The weak side holds under green: about 80%. Under regular: about 45%. The survey's 7% price may well be FIXED12 BETTER at 240 pairs.
+* THE ADAPTIVE CAP HAS BOTH: about 35%. PAYS ON THE WEAK SIDE (regular): about 40%.
+
+## What will be built
+* tools/ship/adaptiveCapStudy.mjs (the arms, the latch, the checks and the verdict).
+* tools/ship/adaptiveCapStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/adaptive-cap/).
+* tools/ship/adaptiveCapStudy-selfcheck.mjs, with a mutation pass.
