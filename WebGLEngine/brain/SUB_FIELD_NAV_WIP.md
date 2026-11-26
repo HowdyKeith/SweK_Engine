@@ -1106,3 +1106,23 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **What this says.** The instant-turn test was not only optimistic, it was the cause of the turn-away rule's ship collisions: tested along the 35 m turn the vessel actually flies, the same rule chose headings that kept it clear of every ship and every berg in 60 scenarios. It did not turn that into more arrivals, because the clear headings it found took 8 more flights out of the region. The next question is the region edge, not the ships: FOLLOW-UP 5's edge term in the plan does not see a turn-away's heading.
 
 **What this would not say.** FOLLOW-UP 8's list stands; the arc is the planner's model of the turn (a 35 m circle at cruise speed), not the hull's measured one; the 90 degree limit, 15 degree step and clearances were not swept.
+
+## FOLLOW-UP 10 [SERIES B]: THE ARC RULE THAT ALSO KEEPS OFF THE REGION'S EDGE (backlog `nav-avoid-arc-edge`; Keith, 2026-11-26; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 9's arc rule hit nothing in 60 scenarios but 13 flights left the region (against the straight test's 5), and its arrivals did not rise (47 against 44). Exits are its whole loss.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge`: FOLLOW-UP 9's arc rule exactly, with each CANDIDATE heading also refused when its arc comes within **EDGE_EXTRA = 20 m** (subHardNav's own edge band, the plan's +edge) of the region's boundary at any whole second of the same 25 s look. The trigger on the plan's heading is unchanged (the plan's heading already keeps off the edge by the field). Nothing else changes; FOLLOW-UP 8's and 9's arms are not edited.
+
+**Arms flown:** `any+predict+edge+avoid-arc` (FOLLOW-UP 9's designated, now the REFERENCE) and `any+predict+edge+avoid-arc-edge` (**designated**), HELD5's world.
+
+**The set.** NEW: **HELD10, seeds 8901 to 8960 of hard-traffic (60 scenarios, 120 flights), flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) once as a sanity run, not a result; the one amendment allowed before HELD10 is read: if DEV shows the rule degenerate (the edge test never refuses a candidate, or the rule never turns), it is amended and written here.
+
+**Verdict.** `avoid-arc-edge` against `avoid-arc`, paired, on REACHED, the exact one-sided sign test at p at most 0.05 either way (EDGE BEATS ARC / ARC BEATS EDGE / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck.
+
+**Predictions (scored held or missed, moving nothing).**
+* **D1**: the designated arm's exits are at most half the reference's. 55 percent.
+* **D2**: its collisions are at most the reference's plus 3 (the refused edge-ward headings leave fewer clear ones). 60 percent.
+* **D3**: its stuck fraction is higher than the reference's. 70 percent.
+* **D4**: the verdict is NO DIFFERENCE SHOWN. 55 percent; EDGE BEATS ARC 35.
+
+**What a result would not say.** FOLLOW-UP 9's list stands. The edge is the region's rectangle, which the planner's field already treats as a wall; this only stops the turn-away from undoing that.
