@@ -3289,10 +3289,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "rock-nav-follow-fix",
-        blocker: "OPEN -- not recommended yet: the harm is small (at most about 0.08 rock strikes a fight follow a fallback) and a paired round would most likely end at FLOOR; fly it only for a reason beyond the fallbacks",
+        blocker: "CLOSED -- 2026-11-26, rock nav Round E (brain/ROCK_NAV_WIP.md, registered first, read once): the empty-lane fix (an empty lane goal falls back to the plain goal) went into brain/spaceNav.mjs, and Round C flown again: THE FIXED FOLLOWING FIELD WINS, narrowly -- all rock strikes 143 against 121 (46 to 28, p 0.0474), damage no different, fallbacks 77,991 against 16,171. Weak (p just under 0.05, my registered expectation about 10%); a replication is filed as rock-nav-follow-replicate. The replays: Round A's DEV IDENTICAL after the fix; Round C's DEV differs only in arm F rows that met an empty lane, with no rock strike changed.",
         what: "OPENED 2026-11-26 from the fallback DIAGNOSTIC (brain/ROCK_NAV_WIP.md): brain/spaceNav.mjs's lane goal tests each cell's line to the field's ORIGIN, so when the following field is rebuilt round a ship whose centre lies in a blocked cell (near a rock) no cell passes and the goal is empty -- 70 of 795 builds in the diagnostic. Round C's arm F carried this.",
         how: "Test the lane against the nearest unblocked point on the way to the ship (end the line where it enters the origin's own blocked zone), or fall back to the plain goal for a build whose lane goal is empty; gate it in brain/spaceNav-selfcheck.mjs on a fixture with the origin inside a rock's reach; then, if flown, Round C again (L against the fixed F) on fresh seeds with Round C's verdict.",
         why: "Round C's null was measured with a defect in the arm it tested; a fixed re-run is the honest form of the question, if the question is still wanted.",
+    },
+    {
+        id: "rock-nav-follow-replicate",
+        blocker: "OPEN",
+        what: "OPENED 2026-11-26 from rock nav Round E: the fixed following field (brain/spaceNav.mjs followingField, rebuilt round the ship every 60 ticks, lane goal with the empty-lane fall-back) beat the lane built once on rock strikes, 143 against 121 on 360 HELD pairs, at p 0.0474 -- under the line by a hair, on the fifth paired round of the series, against a registered expectation of about 10%.",
+        how: "Register a replication before any code: Round E's arms, checks and verdict word for word, on fresh space seeds (DEV for checks only, HELD 360 pairs), with Round E's effect (about 15% fewer strikes) as the stated expectation. Only if it replicates should the page or the default layer follow the ship, and then with the build cost measured on the page (about 34 builds a fight).",
+        why: "A p of 0.047 on a result nobody expected is the shape that most often fails to replicate; the default layer should not move on it alone.",
     },
     {
         id: "space-battleship-nav-cap",

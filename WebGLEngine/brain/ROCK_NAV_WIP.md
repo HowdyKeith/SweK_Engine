@@ -583,3 +583,46 @@ The two replays were run in the cloud session after the fix, through tools/ship/
   - the rock strikes did not change in any of them;
   - the damage on the ship moved both ways (54 more, 100 less, and so on).
 - This is Round C's DEV, already read; it moves no verdict. It agrees with the diagnostic: the defect sent fighters to the doctrine, and the doctrine did not walk them into rocks on these fights.
+
+## ROUND E, RESULT (2026-11-26): THE FIXED FOLLOWING FIELD WINS -- narrowly (p 0.047)
+
+**DEV** (3901-3930, 120 pairs): all six checks passed.
+- The hand-back was exact on 497,752 calls.
+- There were 4,245 builds in FX, each centred exactly on the ship.
+- 267 empty-lane builds fell back, and no build was left without a goal (check 6).
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (4001-4090 x 4 kinds, 360 pairs; flown once, the files committed before the read; `brain/rig-results/rock-nav/heldE-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| | L (lane, built once) | FX (fixed following field) |
+|---|---|---|
+| all rock strikes | 143 | 121 |
+| before arriving | 20 | 14 |
+| after arriving | 123 | 107 |
+| arrived | 2757 | 2771 |
+| shot before arriving | 95 | 93 |
+| mean damage on the ship | 252.7 | 270.8 |
+| ship destroyed | 1 | 0 |
+| doctrine fallbacks | 77,991 | 16,171 |
+
+- FX made 34.4 builds a fight. There were 481 empty-lane builds that fell back, in 51 of 360 fights.
+- **V1 THE ROCKS:** FOLLOW BETTER. Following was better in 46 fights, worse in 28, tied in 286; **p 0.0474**.
+- **V2 THE DAMAGE:** NO DIFFERENCE SHOWN (175 against 156, p 0.32). So it is not L BETTER.
+- **Reported:**
+  - Strikes before arriving: FLOOR (10 against 4).
+  - Strikes after arriving: NO DIFFERENCE SHOWN (44 against 31, p 0.17).
+  - Fallbacks fell by 79%.
+
+**Against the expectations (written first):**
+- FOLLOW BETTER, about 10%: it happened. NO DIFFERENCE SHOWN was my about-60% call.
+- V2 not L BETTER, about 90: YES.
+- Fallbacks lower by more than half, about 85: YES (79%).
+- At least one empty-lane build in DEV, about 80: YES (267).
+
+**WHAT THIS MEANS, AND HOW MUCH WEIGHT IT TAKES.**
+- With the empty-lane defect fixed, re-centring the field on the drifting ship lowers the rock losses by about 15% (143 to 121).
+- The verdict line is cleared by a hair: p 0.047 against 0.05, on the fifth paired round of this series. Neither part alone (before or after arriving) shows a difference.
+- **Read it as SUPPORTED BUT WEAK.** I did not expect it (about 10%). Round C's null was measured with the defect.
+- The price is about 34 field builds a fight, about 12 s of CPU in the sandbox. That is cheap in a study, and perhaps not on a page that rebuilds it live.
+- **Nothing is replaced:** the registration replaced nothing, and the shipped layer (the page, Rounds B and D) stays the lane built once.
+- A replication on fresh seeds, registered with this result as its expectation, is filed (backlog rock-nav-follow-replicate) before any default changes.
