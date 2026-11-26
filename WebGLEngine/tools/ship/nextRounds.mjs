@@ -3020,8 +3020,8 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-26 -- after stations rounds 19-20 and the LPLC2 subunit round: four more, so another chat can pick any one up.
     {
         id: "aquarium-hold-by-hull",
-        blocker: "OPEN",
-        what: "Rounds 16 and 20 (brain/SUB_STATIONS_WIP.md sections 37 and 42) found the best rule per hull on hard-leak dives: HOLD on the default vessel (96 of 96), HOLD-R on the high rider (76 of 96). The Sub Aquarium seats COND only on couriers; a breached sub that is not a courier gets no default captain.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26: DONE for the hull the aquarium has. render/subAquariumSim.mjs seats HOLD (a new captain kind, round 16's HOLD_KNOBS) by default at a BREACH on a needs sub that is not a courier, never over a choice (off included), a seated captain or the advisor; couriers keep COND; the menu offers hold. The aquarium has one needs hull (the needs-task vessel), so round 20's HOLD-R for the high rider has no hull to go on. render/subAquariumCaptain-selfcheck section 4e: breached at 7 %, the default keeps the boat 300 s where off loses it; at 15 % charge HOLD fires and keeps it where TRIAGE loses it; 9 mutants, 8 red and 1 declared equivalent. Was: Rounds 16 and 20 (brain/SUB_STATIONS_WIP.md sections 37 and 42) found the best rule per hull on hard-leak dives: HOLD on the default vessel (96 of 96), HOLD-R on the high rider (76 of 96). The Sub Aquarium seats COND only on couriers; a breached sub that is not a courier gets no default captain.",
         how: "render/subAquariumSim.mjs: a sub with needs that is NOT a courier gets HOLD (or HOLD-R on a high-rider hull) seated by default, by the same rule as defaultCaptain (never over a choice, off included, or the advisor); the list line says (default). Gate rows in render/subAquariumCaptain-selfcheck.mjs, mutants.",
         why: "The largest result of the stations series, in what a person sees.",
     },

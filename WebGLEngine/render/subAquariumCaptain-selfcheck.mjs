@@ -23,6 +23,10 @@
 // 2026-11-25 -- COND AS THE DEFAULT COURIER CAPTAIN (section 4d): 11 mutants, every one red by name: Q01 no default on setNav | Q02 none on setNeeds | Q03 the choice not marked | Q04 the choice not cleared with the needs |
 //   Q05 the advisor overridden | Q06 the default for any sub with needs | Q07 the default TRIAGE | Q08 byDefault always false | Q09 the default re-seating a captain already flying | Q10 the view dropping "(default)".
 //   Q09 WENT 0 RED FIRST (re-seating COND over a default COND looks the same in a snapshot) and got a row: a breached courier keeps its breach latch across a new arm.
+// 2026-11-26 -- HOLD AT A BREACH (section 4e): 9 mutants: H01 no default at the breach | H02 the choice ignored | H04 the advisor overridden | H05 a default HOLD re-seated by a second breach | H06 hold flown with
+//   TRIAGE's knobs | H07 the default TRIAGE | H08 hold not accepted | H09 no hold in the menu -- every one red by name (final pass); H03 (no courier check in the default) is EQUIVALENT: a courier with needs already
+//   has COND seated, or a choice or the advisor, and those guards stop it first. H05 and H06 WENT 0 RED FIRST (HOLD and TRIAGE both keep a 7 % boat at full charge; nothing breached twice) and got rows: a low charge
+//   (15 %) where HOLD's trigger fires and TRIAGE loses the boat, and a second breach keeping the same captain.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -47,7 +51,7 @@ console.log("subAquariumCaptain-selfcheck -- a captain over the stations, and a 
 sec("1. the API");
 guarded("section 1", () => {
     const t = tankWith(["a", "b"]); run(t, 5); t.setNeeds("a", "battery");
-    const bad = [["a captain that is not fixed, triage, route, cond or null", () => t.setCaptain("a", "admiral"), /^subAquariumSim\.setCaptain: a captain is "fixed", "triage", "route", "cond" or null, got "admiral"/],
+    const bad = [["a captain that is not fixed, triage, route, cond, hold or null", () => t.setCaptain("a", "admiral"), /^subAquariumSim\.setCaptain: a captain is "fixed", "triage", "route", "cond", "hold" or null, got "admiral"/],
         ["a captain on a sub with no needs", () => t.setCaptain("b", "triage"), /setCaptain: the sub has no needs/], ["a breach of 0", () => t.breach("a", 0), /^subAquariumSim\.breach: a leak is a fraction of the weight above 0 and at most 0\.2, got 0/],
         ["a breach over 0.2", () => t.breach("a", 0.25), /got 0\.25/], ["a breach that is not a number", () => t.breach("a", "x"), /got "x"/], ["a breach on a sub with no needs", () => t.breach("b", 0.05), /breach: the sub has no needs/]];
     for (const [what, f, re] of bad) { const e = throws(f); ok(`refuses ${what}, by name`, e !== null && re.test(e), e || "did not throw"); }
@@ -83,13 +87,14 @@ guarded("section 3", () => {
 sec("4. in the tank: breached at 7 %");
 guarded("section 4", () => {
     const fly = (cap) => {
-        const t = tankWith(); run(t, 20); t.setNeeds("a", "battery"); if (cap) t.setCaptain("a", cap); const lost0 = snap(t).lost, d0 = snap(t).depth; t.breach("a", 0.07);
+        // 2026-11-26 -- "no captain" is CHOSEN (off): since aquarium-hold-by-hull a breach seats HOLD by default on a needs sub that is not a courier, and an explicit off is the one thing the default never overrides
+        const t = tankWith(); run(t, 20); t.setNeeds("a", "battery"); t.setCaptain("a", cap || null); const lost0 = snap(t).lost, d0 = snap(t).depth; t.breach("a", 0.07);
         let lostAt = null, cons = new Set(); for (let k = 0; k < 60; k++) { run(t, 5); const s = snap(t); if (s.needs && s.needs.captain) cons.add(s.needs.captain.con); if (s.lost > lost0 && lostAt === null) lostAt = (k + 1) * 5; }
         return { lostAt, d0, d: snap(t).depth, cons: [...cons], event: snap(t).event };
     };
     const none = fly(null), fixed = fly("fixed"), triage = fly("triage");
     console.log(`    none: ${J(none)}\n    fixed: ${J(fixed)}\n    triage: ${J(triage)}`);
-    ok("with no captain the breached boat is LOST (crushed and put back) within 120 s", none.lostAt !== null && none.lostAt <= 120, J(none));
+    ok("with no captain (off, chosen) the breached boat is LOST (crushed and put back) within 120 s", none.lostAt !== null && none.lostAt <= 120, J(none));
     ok("FIXED keeps it 300 s", fixed.lostAt === null && fixed.event === "needs", J(fixed));
     ok("TRIAGE keeps it 300 s, takes the con as BREACH, and ends shallower than it started and than FIXED", triage.lostAt === null && triage.cons.includes("breach") && triage.d < triage.d0 - 5 && triage.d < fixed.d - 5, J([triage.d0, triage.d, fixed.d]));
     ok("FIXED never takes the con as breach (it has no such station)", !fixed.cons.includes("breach"), J(fixed.cons));
@@ -172,6 +177,40 @@ guarded("section 4d", () => {
     ok("the list line names the default", /CAPTAIN cond \(default\): /.test(needsLine({ needs: { cls: "battery", frac: 0.5, watts: 3000, strain: 0.1, collapseDepth: 60, damage: 0, flood: 0, advisor: { on: false }, leak: 0, captain: { kind: "cond", con: "mission", overrides: [], latch: null, byDefault: true } } })));
 });
 
+sec("4e. HOLD AT A BREACH (2026-11-26, backlog aquarium-hold-by-hull): round 16's winner seated by default on a breached needs sub that is not a courier");
+guarded("section 4e", () => {
+    const capOf = (t, id) => { const n = snap(t, id).needs; return n && n.captain ? n.captain.kind + (n.captain.byDefault ? " (default)" : "") : null; };
+    const t = tankWith(["a", "b", "c", "d", "e"]); t.setScene(7); run(t, 20);
+    for (const id of ["a", "b", "c", "d"]) t.setNeeds(id, "battery");
+    ok("before any breach a needs sub that is not a courier has no captain (the refill trip flies it, as before)", capOf(t, "a") === null);
+    t.breach("a", 0.07); run(t, 1);
+    ok("!! AT A BREACH it is seated under HOLD, marked as the default", capOf(t, "a") === "hold (default)", String(capOf(t, "a")));
+    t.setCaptain("b", "fixed"); t.breach("b", 0.07); run(t, 1);
+    ok("a CHOSEN captain is kept at the breach", capOf(t, "b") === "fixed", String(capOf(t, "b")));
+    t.setCaptain("c", null); t.breach("c", 0.07); run(t, 1);
+    ok("an explicit OFF is a choice: the breach does not seat HOLD", capOf(t, "c") === null, String(capOf(t, "c")));
+    t.setAdvisor("d", true); t.breach("d", 0.07); run(t, 1);
+    ok("with the ADVISOR on the breach seats no captain over it", capOf(t, "d") === null && snap(t, "d").needs.advisor.on === true, String(capOf(t, "d")));
+    t.setNav("e", "any+predict"); t.setNeeds("e", "battery"); run(t, 1); t.breach("e", 0.03); run(t, 1);
+    ok("a COURIER keeps COND at its breach (HOLD is for a boat that is not a courier: round 19 found it halves the courier's goals)", capOf(t, "e") === "cond (default)", String(capOf(t, "e")));
+    const mk = () => { const x = tankWith(["a"]); run(x, 20); x.setNeeds("a", "battery"); x.setCaptain("a", "hold"); return x; };
+    ok("HOLD chosen explicitly reads as chosen, and flies the held blow's knobs (its snapshot carries the breach latch, as a triage captain does)", (() => { const x = mk(); run(x, 1); return capOf(x, "a") === "hold" && snap(x).needs.captain.latch !== null; })());
+    // the default flies: section 4's boat (7 % at 20 s), the default HOLD against an explicit off -- the same start, the same leak
+    const fly = (off) => { const x = tankWith(); run(x, 20); x.setNeeds("a", "battery"); if (off) x.setCaptain("a", null); const lost0 = snap(x).lost; x.breach("a", 0.07); let lostAt = null;
+        for (let k = 0; k < 60; k++) { run(x, 5); if (snap(x).lost > lost0 && lostAt === null) lostAt = (k + 1) * 5; } return { lostAt, cap: capOf(x, "a"), event: snap(x).event }; };
+    const off = fly(true), def = fly(false);
+    ok("!! THE DEFAULT KEEPS THE BOAT: breached at 7 %, the default HOLD keeps it 300 s where the same boat with the captain switched off is lost", off.lostAt !== null && def.lostAt === null && def.cap === "hold (default)" && def.event === "needs", J({ off, def }));
+    // HOLD against TRIAGE where they differ: a low charge (cut to 15 % of the battery before the breach), so NEED's trigger fires -- the battery would empty before the climb reached 3 m
+    const low = (kind) => { const x = tankWith(); run(x, 20); x.setNeeds("a", "battery"); if (kind) x.setCaptain("a", kind); x.subs.get("a").needs.energy *= 0.15; const lost0 = snap(x).lost; x.breach("a", 0.07);
+        let held = false; for (let k = 0; k < 60; k++) { run(x, 5); const cp = x.subs.get("a").captainPilot; if (cp && cp.held) held = true; } return { held, lost: snap(x).lost - lost0, cap: capOf(x, "a") }; };
+    const lowDef = low(null), lowTri = low("triage");
+    ok("!! HOLD IS NOT TRIAGE: on a low charge (15 %) the default HOLD fires and HOLDS the blow and keeps the boat; TRIAGE chosen on the same boat holds nothing and loses it", lowDef.held && lowDef.lost === 0 && lowDef.cap === "hold (default)" && !lowTri.held && lowTri.lost === 1, J({ lowDef, lowTri }));
+    const twice = tankWith(); run(twice, 20); twice.setNeeds("a", "battery"); twice.subs.get("a").needs.energy *= 0.15; twice.breach("a", 0.07); run(twice, 60); const firstCap = twice.subs.get("a").captainPilot, heldBefore = firstCap.held;
+    twice.breach("a", 0.07); run(twice, 1);
+    ok("a SECOND breach does not re-seat a default HOLD already flying: the same captain, its held blow kept (a fresh one would have forgotten it)", heldBefore && twice.subs.get("a").captainPilot === firstCap && firstCap.held, J({ heldBefore }));
+    ok("the list line names the default hold", /CAPTAIN hold \(default\): /.test(needsLine({ needs: { cls: "battery", frac: 0.5, watts: 3000, strain: 0.1, collapseDepth: 60, damage: 0, flood: 0, advisor: { on: false }, leak: 0.07, captain: { kind: "hold", con: "breach", overrides: [], latch: null, byDefault: true } } })));
+});
+
 sec("5. the list line");
 guarded("section 5", () => {
     const row = (n) => ({ needs: { cls: "battery", frac: 0.5, watts: 3000, strain: 0.1, collapseDepth: 60, damage: 0, flood: 0, advisor: { on: false }, leak: 0, captain: null, ...n } });
@@ -189,7 +228,7 @@ guarded("section 5", () => {
 sec("6. the page");
 guarded("section 6", () => {
     const html = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
-    ok("the page has the captain menu (off, fixed, triage, route and cond for a courier) and the breach button, both disabled until the sub has needs", /<select id="captainSel" disabled><option value="">off<\/option><option value="fixed">fixed<\/option><option value="triage">triage<\/option><option value="route"[^>]*>route \(courier\)<\/option><option value="cond"[^>]*>cond \(courier\)<\/option><\/select>/.test(html) && /<button id="breachBtn" disabled /.test(html));
+    ok("the page has the captain menu (off, fixed, triage, route and cond for a courier, hold) and the breach button, both disabled until the sub has needs", /<select id="captainSel" disabled><option value="">off<\/option><option value="fixed">fixed<\/option><option value="triage">triage<\/option><option value="route"[^>]*>route \(courier\)<\/option><option value="cond"[^>]*>cond \(courier\)<\/option><option value="hold"[^>]*>hold<\/option><\/select>/.test(html) && /<button id="breachBtn" disabled /.test(html));
     ok("the menu calls tank.setCaptain with the choice (off as null) and puts the menu back to off when it is refused", /\$\("captainSel"\)\.onchange = \(\) => \{ if \(!selected\) return; try \{ tank\.setCaptain\(selected, \$\("captainSel"\)\.value \|\| null\); \} catch \(e\) \{[^}]*\$\("captainSel"\)\.value = ""; \} \};/.test(html));
     ok("the button breaches the selected sub at 7 % and says so", /\$\("breachBtn"\)\.onclick = [^\n]*tank\.breach\(selected, 0\.07\)/.test(html) && /"hull breached: a leak of "/.test(html));
     ok("every snapshot sets the menu from the sub's own captain and enables both only with needs", /\$\("captainSel"\)\.disabled = \$\("breachBtn"\)\.disabled = !on; \$\("captainSel"\)\.value = on && me\.needs\.captain \? me\.needs\.captain\.kind : "";/.test(html));
