@@ -71,3 +71,35 @@ four at a time: about 20 minutes, in the sandbox.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyCompassError.mjs run` -> `brain/flyCompassErrorRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyCompassError.mjs read` prints the checks and the reading.
+
+## 10. The result (the whole results file committed unread at 38fe3522, then read once)
+One start, 21.5 minutes on four processes, 49 records (sha256 b8c649c2d5946ece...). **The checks hold**: the
+compass-noise round's file as committed and passing its own checks; 48 flies each once, its arm's committed weights, as
+trained every fly's committed course score to the bit; HOMEP draw 1 the same twice.
+* **W: THE COMPASS ERRS MORE IN THE WIND THAN IN THE CALM** (48 of 48).
+* **L: MOST OF A GUST STAYS UNCORRECTED** (48 of 48; a fly's share left from 0.71 to 0.92).
+* **K1: LEANING HARDER ON THE SCENE CATCHES GUSTS FASTER** (48 of 48).
+* **K2: LEANING HARDER ON THE SCENE ERRS MORE IN THE CALM** (48 of 48).
+* **K3: LEANING HARDER ON THE SCENE FINDS HOME WORSE** (47 of 48; HOME16's draw 12 the other way).
+
+| arm | as trained: calm / wind error, share left | at x4: calm error, home | home as trained |
+|---|---|---|---|
+| HOMEP | 0.297 / 0.784, 0.79 | 0.863, 0.415 | 0.550 |
+| COURSE64 | 0.207 / 0.766, 0.85 | 0.637, 0.469 | 0.554 |
+| HOME16 | 0.280 / 0.776, 0.79 | 0.821, 0.428 | 0.552 |
+| H16BYC | 0.218 / 0.764, 0.84 | 0.667, 0.461 | 0.555 |
+
+**Every expectation came**: W above (99), L above (95), K1 below (95), K2 above (95), K3 below (95). So, as section 5 put
+it, **the compass errs mostly by the gusts it cannot feel, and keeps most of each one; the fly could catch the gusts by
+leaning on the scene, and does not, because the scene as its compass reads it is not trustworthy enough**: what limits
+the compass, and so the tally, is the reading of the scene, not the strength of its use.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** the fly's landmark weight
+(p_c) sets the trade almost alone: it goes with the calm error at 0.97 and with the share of a gust left at -0.98. **The
+two choosers settle on different sides of it**: the flies whose point the homing score chose (HOMEP and HOME16) lean
+harder on the scene, err more in the calm and catch more of each gust than the flies the course score chose (calm error
+ranks 795 of a middle 588, p 6e-6). Across the 48, home goes with the calm error at -0.30.
+
+**What it does not mean.** Section 7 holds. It says this model's compass is held back by its reading of a scene of two
+landmarks through ring neurons whose preferred directions were drawn, not by how much the fly trusts it; a truer
+reading of the scene is what a better tally would need, and this round does not try one. Nothing here is of the animal.

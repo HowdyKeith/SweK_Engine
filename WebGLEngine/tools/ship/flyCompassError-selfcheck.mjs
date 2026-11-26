@@ -8,6 +8,8 @@
 //   2  THE MEASURES             the error, the calm and the wind, the gusts (found by the life's own gust clock) and their share left, by hand; the gain; one fly's record by hand
 //   3  THE RECORDS              48 flies and a second one; W, L and K1 to K3
 //   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   5  THE VERDICT              the results file as committed unread at 38fe3522, read from the file: the checks, W, L, K1 to K3, the arms, the description after the reading (the
+//                               landmark weight and the two choosers), a re-audit, the expectations, the note's result
 // SABOTAGE LOG (2026-11-26) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone for the library's and the note's, this gate and
 // tools/ship/voxelHome-selfcheck.mjs (which probes the command as a process) for the command's; every one red by name but ONE, a finding (the number is the rows red):
 //   THE MEASURES: E1 the error against the goal 1 | E2 the calm to tick 250 1 | E3 every tick a gust 1 | E4 the share left 20 ticks on 2 | E5 the share left the mean 1 | E6 the gain on the first
@@ -18,6 +20,9 @@
 //   second fly recorded as a fly 1 | K6 reads without the committed files 1.   THE NOTE: M1 its gain x2 1 | M2 its calm before 250 1 | M3 it drops HOMEP draw 1 again 1
 //   THE FINDING: section 3's second fly that fails was of another draw, different in every measure, so the check of its trained measures alone caught it; a second fly differing only in its
 //   home at x4 was added, and F7 was run again: 1 red.
+// THE VERDICT'S SABOTAGES (2026-11-26, after the reading, the same runner, this gate alone): V1 a fly's calm error changed in a digit the double holds 1 (the file's hash alone) | V2 L
+//   against one third 1 | V3 K3 against x4's course 3 | V4 BETTER and WORSE swapped 3 | V5 the note's K3 says BETTER 1 | V6 the note's expectation of K3 is 85 1 | V7 the note names another
+//   commit 1 | V8 the note drops that every expectation came 1 | V9 the note's p_c correlation 0.79 1. None went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -28,6 +33,9 @@ import * as T from "./flyTrainedHome.mjs";
 import * as H from "./flyHome.mjs";
 import * as V from "./flyCompass.mjs";
 import * as CE from "../../brain/rl/compassEnv.mjs";
+import { createHash } from "node:crypto";
+import * as P from "./flyHomeCoursePredicts.mjs";
+import { rankSum } from "./paintingFly.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -103,6 +111,29 @@ section(() => {
     const me = src("tools/ship/flyCompassError-selfcheck.mjs"), calls = [...me.matchAll(/E\.flyOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one fly is measured on 1 course life and 2 homing lives, not the round's; it starts no process; the file's size and time are what they were",
         J(calls) === J(['"COURSE64", 4, F, [TWO[0]], TWO']) && !TWO.some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at 38fe3522 before it was read, and is read here from the file)");
+section(() => {
+    const nr = (a, b, e = 5e-5) => Math.abs(a - b) < e, mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const bytes = fs.readFileSync(path.join(ENG, E.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = E.reading(lines, F), A = R.arms, fl = lines.filter((r) => r.kind === "fly");
+    ok("!! the results file is the one the run wrote: 49 records, sha256 b8c649c2d5946ece... (one start, 21.5 minutes on four processes)", lines.length === 49 && createHash("sha256").update(bytes).digest("hex") === "b8c649c2d5946ece9f0fa7ae717ef4a86a177bc9a5d99b66658ca0c2c7cccd8a");
+    ok("!! THE CHECKS HOLD: the compass-noise round's file as committed and passing its own checks; 48 flies each once, its arm's weights, as trained its committed course score to the bit; HOMEP draw 1 the same twice", R.checks.length === 0);
+    ok("!! *** W -- MORE ERROR IN THE WIND (48 of 48); L -- MOST OF A GUST STAYS (48 of 48); K1 -- x4 CATCHES GUSTS FASTER (48 of 48); K2 -- x4 ERRS MORE IN THE CALM (48 of 48); K3 -- x4 FINDS HOME WORSE (47 of 48, HOME16 draw 12 the other way) ***",
+        R.W.word === E.WORDS.W[0] && R.W.above === 48 && R.L.word === E.WORDS.L[0] && R.L.above === 48 && R.K1.word === E.WORDS.K1[1] && R.K1.below === 48 && R.K2.word === E.WORDS.K2[0] && R.K2.above === 48 &&
+        R.K3.word === E.WORDS.K3[1] && R.K3.below === 47 && J(fl.filter((r, i) => R.K3.diffs[i] > 0).map((r) => r.arm + " " + r.s)) === J(["HOME16 12"]));
+    ok("!! the arms' means as trained (calm, wind, share left) and at x4 (calm, home): HOMEP 0.2970 0.7835 0.7880, 0.8631 0.4154 | COURSE64 0.2067 0.7656 0.8541, 0.6373 0.4685 | HOME16 0.2798 0.7759 0.7943, 0.8213 0.4278 | H16BYC 0.2180 0.7636 0.8444, 0.6665 0.4606",
+        [["HOMEP", 0.2970, 0.7835, 0.7880, 0.8631, 0.4154], ["COURSE64", 0.2067, 0.7656, 0.8541, 0.6373, 0.4685], ["HOME16", 0.2798, 0.7759, 0.7943, 0.8213, 0.4278], ["H16BYC", 0.2180, 0.7636, 0.8444, 0.6665, 0.4606]].every(([a, c, w, sh, c4, h4]) => nr(A[a].trained.calm, c) && nr(A[a].trained.wind, w) && nr(A[a].trained.share, sh) && nr(A[a].x4.calm, c4) && nr(A[a].x4.home, h4)));
+    const pc = fl.map((r) => N.committedOf(r.arm, r.s, F).weights[2]), home = fl.map((r) => N.committedOf(r.arm, r.s, F).home), hc = (a) => fl.filter((r) => a.includes(r.arm)), g1 = rankSum(hc(["HOMEP", "HOME16"]).map((r) => r.trained.calm), hc(["COURSE64", "H16BYC"]).map((r) => r.trained.calm));
+    ok("!! DESCRIBED AFTER THE READING, NOT REGISTERED: the landmark weight p_c goes with the calm error at 0.97 and with the share left at -0.98; the homing-chosen flies (HOMEP, HOME16) err more in the calm than the course-chosen (ranks 795 of a middle 588, p 6e-6); home goes with the calm error at -0.30",
+        P.spearman(pc, fl.map((r) => r.trained.calm)).toFixed(2) === "0.97" && P.spearman(pc, fl.map((r) => r.trained.share)).toFixed(2) === "-0.98" && g1.sumA === 795 && g1.p < 1e-5 && P.spearman(fl.map((r) => r.trained.calm), home).toFixed(2) === "-0.30");
+    const r3 = fl.find((r) => r.arm === "H16BYC" && r.s === 3), c3 = N.committedOf("H16BYC", 3, F);
+    ok("!! RE-AUDITED AFTER THE READING: H16BYC draw 3 at x4 gives its home score again to the bit", H.homeScore(T.flyOf("HOMEP", 3, E.gained(c3.weights, 4)), E.AUDIT) === r3.x4.home);
+    const note = src("brain/FLY_COMPASS_ERROR_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 10. The result"));
+    ok("the expectations, written before the code, against what came -- every one", /W: \*\*above about 99\*\*\. L: \*\*above about 95\*\*\. K1: \*\*below about 95\*\*\. K2: \*\*above about 95\*\*\. K3: \*\*below about 95\*\*\./.test(flat) && R.W.above === 48 && R.L.above === 48 && R.K1.below === 48 && R.K2.above === 48 && R.K3.below === 47);
+    ok("the registration's RESULT SECTION (section 10) carries the five readings' words, the commit the file was read at, that every expectation came, the description after the reading said as such, and what it does not mean",
+        /## 10\. The result/.test(note) && ["W", "L", "K1", "K2", "K3"].every((k) => res.includes(`**${k}: ${R[k].word}**`)) && /38fe3522/.test(res) && /\*\*Every expectation came\*\*/.test(res) &&
+        /\*\*Described after the reading, not registered \(the gate recomputes it from the records\):\*\*/.test(res) && /0\.97/.test(res) && /ranks 795/.test(res) && /\*\*What it does not mean\.\*\*/.test(res));
 });
 
 console.log(`\nflyCompassError-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
