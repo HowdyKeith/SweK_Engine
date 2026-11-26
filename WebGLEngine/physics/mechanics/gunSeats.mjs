@@ -94,7 +94,10 @@ export function stepSeat(seat, st, body, cmd, dt, owner = 0) {
  */
 export function fitTrack(entries) {
     const n = entries.length; if (n < 3) return null;
-    const tm = entries.reduce((a, e) => a + e.t, 0) / n, pm = [0, 1, 2].map((i) => entries.reduce((a, e) => a + e.pos[i], 0) / n);
+    // the sums in the order reduce() adds them (from 0, first entry first), as plain loops: the same bits, without a closure and two arrays a call
+    let st = 0, sx = 0, sy = 0, sz = 0;
+    for (let k = 0; k < n; k++) { const e = entries[k]; st += e.t; sx += e.pos[0]; sy += e.pos[1]; sz += e.pos[2]; }
+    const tm = st / n, pm = [sx / n, sy / n, sz / n];
     let stt = 0; const stp = [0, 0, 0];
     for (const e of entries) { const dt = e.t - tm; stt += dt * dt; for (let i = 0; i < 3; i++) stp[i] += dt * (e.pos[i] - pm[i]); }
     if (!(stt > 1e-12)) return null;
@@ -127,13 +130,18 @@ export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 4
         const cur = muzzleOfSeat(seat, st, body); let best = null;
         for (const tg of targets) {
             const key = seat.id + "|" + tg.id;
-            if (norm(sub(tg.pos, body.pos)) > maxRange) { seen.delete(key); continue; }
+            // the range test without Math.hypot where the answer is plain (SPEED, NOT A CHANGE OF RESULT: hypot is the slow part of this loop): the squared distance
+            // against maxRange widened and narrowed by far more than hypot's error decides every target but one a hair from the line, which still asks hypot
+            const ex = tg.pos[0] - body.pos[0], ey0 = tg.pos[1] - body.pos[1], ez = tg.pos[2] - body.pos[2], q2 = ex * ex + ey0 * ey0 + ez * ez;
+            const out = q2 > maxRange * maxRange * (1 + 1e-9) ? true : q2 < maxRange * maxRange * (1 - 1e-9) ? false : norm(sub(tg.pos, body.pos)) > maxRange;
+            if (out) { seen.delete(key); continue; }
             let h = seen.get(key); if (!h) seen.set(key, h = []);
             let was, age, now;
             if (observe) {
                 const orng = mulberry((seed * 15485863 + Math.round(t * 1000) * 32452843 + hash(key)) >>> 0), range = norm(sub(tg.pos, body.pos)), sig = Math.max(observe.floor ?? 0.5, (observe.sigmaRange ?? 0.01) * range);
                 h.push({ t, pos: [tg.pos[0] + gauss(orng) * sig, tg.pos[1] + gauss(orng) * sig, tg.pos[2] + gauss(orng) * sig] });
-                const lo = t - delay - (observe.window ?? 0.6) - 1e-9, hi = t - delay + 1e-9, win = h.filter((e) => e.t >= lo && e.t <= hi);
+                const lo = t - delay - (observe.window ?? 0.6) - 1e-9, hi = t - delay + 1e-9, win = [];
+                for (let k = 0; k < h.length; k++) { const e = h[k]; if (e.t >= lo && e.t <= hi) win.push(e); }   // h.filter's entries in h's order, without its closure
                 while (h.length && h[0].t < lo - 0.1) h.shift();
                 const fit = fitTrack(win); if (!fit) continue;
                 age = t - fit.t; now = add(fit.pos, mul(fit.vel, age)); was = { vel: fit.vel };

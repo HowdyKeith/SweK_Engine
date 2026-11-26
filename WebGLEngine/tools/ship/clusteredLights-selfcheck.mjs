@@ -115,9 +115,10 @@ const pageChecks = (title, file, stateVar, args) => section(async () => {
         await p.waitForFunction((v) => window[v] && (window[v].ready || window[v].error), stateVar, { timeout: 90000 });
         const r = await p.evaluate(async (v) => { const s = window[v]; if (s.error) return { error: s.error }; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, stats: s.stats, lights: s.lights, pillars: s.pillars, camera: s.camera, error: s.error }; }, stateVar); await p.close();
         if (r.error) throw new Error(`${file}${q}: ${r.error}`);
+        r.px = Array.from(Buffer.from(r.b64, "base64")); delete r.b64;   // the page sends its pixels as base64 (one string, not a JSON array of numbers)
         if (r.topDown) { const flip = new Array(r.px.length); for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w * 4; x++) flip[(r.h - 1 - y) * r.w * 4 + x] = r.px[y * r.w * 4 + x]; r.px = flip; }   // WebGPU's rows top first: turned to WebGL2's
         return r; };
-    const cl = await grab(""), br = await grab("&brute=1"), off = await grab("&shadows=0"), wcl = await grab("&clusters=world"), noCookie = await grab("&shadows=0&cookie=0");
+    const [cl, br, off, wcl, noCookie] = await Promise.all([grab(""), grab("&brute=1"), grab("&shadows=0"), grab("&clusters=world"), grab("&shadows=0&cookie=0")]);   // the five pages load side by side: each is its own shader compile on SwiftShader
     await browser.close(); srv.close();
     let worst = 0; for (let i = 0; i < cl.px.length; i++) if (i % 4 !== 3) worst = Math.max(worst, Math.abs(cl.px[i] - br.px[i]));
     let worstW = 0; for (let i = 0; i < cl.px.length; i++) if (i % 4 !== 3) worstW = Math.max(worstW, Math.abs(wcl.px[i] - br.px[i]));

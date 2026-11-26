@@ -72,6 +72,7 @@ export const VENDORED = Object.freeze([
             "the only one here that constrains RENAMING rather than copying." },
     { path: "vendor/gifenc",    kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/web-ocean", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4880 spike: noniv/web-ocean ocean.html, byte-identical, pinned by tools/ship/oceanSpikePage-selfcheck.mjs
+    { path: "vendor/smaa",      kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4933: SMAA's two lookup tables as PlayCanvas ships them (playcanvas/engine, MIT, "Copyright (c) 2011-2026 PlayCanvas Ltd."), decoded once into smaaLookup.mjs; vendor/smaa/PROVENANCE.md says what was taken
     { path: "vendor/snowflow", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4895 snowflow lift: Noniv/snowflow_demo, five files byte for byte, pinned by tools/ship/snowflowVendor-selfcheck.mjs
     { path: "vendor/grass",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     // v4498 -- the core of guillermolg00/morphicons (three files, no DOM, no dependencies), vendored when physics/mesh/strokeMorph.mjs's

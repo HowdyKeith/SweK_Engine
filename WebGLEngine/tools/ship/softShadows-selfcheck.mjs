@@ -70,6 +70,7 @@ const grabber = (browser, file, stateVar, errors) => async (q) => {
     await p.waitForFunction((v) => window[v] && (window[v].ready || window[v].error), stateVar, { timeout: 90000 });
     const r = await p.evaluate(async (v) => { const s = window[v]; if (s.error) return { error: s.error }; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, pillars: [...s.pillars, ...(s.boards || [])], lights: s.lights, fogParams: s.fogParams, error: s.error }; }, stateVar); await p.close();
     if (r.error) throw new Error(`${file}${q}: ${r.error}`);
+    r.px = Array.from(Buffer.from(r.b64, "base64")); delete r.b64;   // the page sends its pixels as base64 (one string, not a JSON array of numbers)
     if (!r.topDown) { const flip = new Array(r.px.length); for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w * 4; x++) flip[(r.h - 1 - y) * r.w * 4 + x] = r.px[y * r.w * 4 + x]; r.px = flip; }   // WebGL2's rows bottom first: turned top first
     return r;
 };
@@ -85,7 +86,7 @@ const footDist = (p, b) => Math.hypot(Math.max(0, Math.abs(p[0] - b.position[0])
 const softChecks = (title, file, stateVar, args) => section(async () => {
     const browser = await chromium.launch({ args, ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [], grab = grabber(browser, file, stateVar, errors);
     // one moving light (not 64) and no cookie: the shadows' edges stand out
-    const hard = await grab("&n=1&cookie=0"), soft = await grab("&n=1&cookie=0&soft=1"), off = await grab("&n=1&cookie=0&shadows=0");
+    const [hard, soft, off] = await Promise.all([grab("&n=1&cookie=0"), grab("&n=1&cookie=0&soft=1"), grab("&n=1&cookie=0&shadows=0")]);   // side by side: three shader compiles at once
     await browser.close();
     const w = hard.w, h = hard.h, N = w * h, cls = new Int8Array(N), LH = new Float32Array(N), LS = new Float32Array(N);   // cls: 1 shadowed, 0 lit, -1 neither
     for (let k = 0; k < N; k++) { LH[k] = lum(hard.px, k * 4); LS[k] = lum(soft.px, k * 4); const d = lum(off.px, k * 4) - LH[k]; cls[k] = d >= 6 ? 1 : Math.abs(d) <= 1 ? 0 : -1; }
@@ -120,7 +121,7 @@ await section(async () => {
     const a = fogCPU(P0, ray), b = fogCPU(P0, { ...ray, shadowOf: () => 1 }), c = fogCPU(P0, { ...ray, shadowOf: () => 0 }), d = fogCPU({ ...P0, lightColor: [0, 0, 0] }, ray);
     ok("!! ON THE CPU: THE SHAFTS' MARCH WITH NOTHING HIDDEN IS THE CLOSED FORM; WITH ALL HIDDEN, THE AMBIENT ALONE", a.every((v, i) => Math.abs(v - b[i]) < 1e-12) && c.every((v, i) => Math.abs(v - d[i]) < 1e-12) && c[0] < a[0], `${b.map((v) => v.toFixed(4))} / ${c.map((v) => v.toFixed(4))}`);
     const browser = await chromium.launch({ args: [...PRESENT_ARGS], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [], grab = grabber(browser, "lights-gpu.html", "__lightsGpu", errors);
-    const shafts = await grab("&fog=1"), flat = await grab("&fog=1&shafts=0"), clear = await grab("&canopy=1");   // the same scene, canopy and all, without the fog
+    const [shafts, flat, clear] = await Promise.all([grab("&fog=1"), grab("&fog=1&shafts=0"), grab("&canopy=1")]);   // the same scene, canopy and all, without the fog
     await browser.close();
     const w = shafts.w, h = shafts.h, N = w * h; let brighter = 0, darker = 0;
     for (let k = 0; k < N; k++) { const dl = lum(shafts.px, k * 4) - lum(flat.px, k * 4); if (dl > 1) brighter++; if (dl < -3) darker++; }

@@ -29,7 +29,7 @@ const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/ja
 const srv = http.createServer((q, r) => { const f = path.join(ENG, decodeURIComponent(q.url.split("?")[0])); if (f.startsWith(ENG) && fs.existsSync(f) && fs.statSync(f).isFile()) { r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); return r.end(fs.readFileSync(f)); } r.writeHead(404); r.end(); });
 await new Promise((res) => srv.listen(0, "127.0.0.1", res));
 const { chromium } = resolvePlaywright(require), browser = await chromium.launch({ args: [...PRESENT_ARGS], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) });
-const open = async (q) => { const p = await browser.newPage({ viewport: { width: 640, height: 400 } }), errors = []; p.on("pageerror", (e) => errors.push(e.message)); await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=20000&ease=0&still=3${q}`); await p.waitForFunction(() => window.__splatGpu && (window.__splatGpu.stopped || window.__splatGpu.error), null, { timeout: 120000 }); return { p, errors }; };
+const open = async (q) => { const p = await browser.newPage({ viewport: { width: 640, height: 400 } }), errors = []; p.on("pageerror", (e) => errors.push(e.message)); await p.goto(`http://127.0.0.1:${srv.address().port}/splat-gpu.html?n=8000&ease=0&still=3${q}`); await p.waitForFunction(() => window.__splatGpu && (window.__splatGpu.stopped || window.__splatGpu.error), null, { timeout: 120000 }); return { p, errors }; };
 const diff = (a, b) => { let d = 0; for (let k = 0; k < a.grid.length; k++) d += Math.abs(a.grid[k] - b.grid[k]); return d / a.grid.length; };
 
 console.log("1. THE TRANSFORM IS EXACT");

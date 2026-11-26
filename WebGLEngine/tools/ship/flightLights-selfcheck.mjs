@@ -51,8 +51,8 @@ const open = async (q, until = "L.frames > 40") => {
 const shot = (p, set = {}) => p.evaluate(async (set) => {
     const L = window.__flightLights; Object.assign(L, set);
     const f0 = L.frames; await new Promise((res) => { const t = () => (L.frames >= f0 + 3 ? res() : requestAnimationFrame(t)); t(); });
-    return L.capture();
-}, set);
+    const c = await L.capture(); return c;
+}, set).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));   // the page sends its pixels as base64 (a JS array of millions of numbers cost most of this gate)
 const lum = (px, i) => 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
 
 console.log("1. IT RUNS");

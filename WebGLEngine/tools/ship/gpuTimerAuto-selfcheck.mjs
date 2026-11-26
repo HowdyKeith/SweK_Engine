@@ -128,7 +128,7 @@ await section(async () => {
         await p.close(); return { ...r, errs };
     };
     const rows = [];
-    for (let i = 0; i < carriers.length; i += 4) rows.push(...await Promise.all(carriers.slice(i, i + 4).map(async (pg) => { const on = await open(pg, ""), off = await open(pg, "?gputimer=0"); return { pg, on, off, extra: on.errs.filter((e) => !off.errs.includes(e)) }; })));
+    for (let i = 0; i < carriers.length; i += 4) rows.push(...await Promise.all(carriers.slice(i, i + 4).map(async (pg) => { const [on, off] = await Promise.all([open(pg, ""), open(pg, "?gputimer=0")]);   /* the page with the line and without it, side by side: they share nothing */ return { pg, on, off, extra: on.errs.filter((e) => !off.errs.includes(e)) }; })));
     const extra = rows.filter((r) => r.extra.length);
     ok(`!! ALL ${rows.length} PAGES LOAD WITH NO PAGE ERROR THE LINE BRINGS (any error a page has, it has with ?gputimer=0 too)`, extra.length === 0, extra.map((r) => `${r.pg}: ${r.extra[0]}`).join("; "));
     const ask = rows.filter((r) => ON_ASK.includes(r.pg)), badAsk = ask.filter((r) => r.on.state !== "no WebGL2 context" || r.on.box);

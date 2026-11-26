@@ -131,12 +131,13 @@ export function stepQuat(q, w, dt) {
 
 /** Rotate a BODY vector into the WORLD frame by the quaternion. */
 export function rotateByQuat(q, v) {
-    const [w, x, y, z] = q;
-    const t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
+    // the same arithmetic in the same order as `t = [...]` then the three sums, without the two temporary arrays (the arena calls this every seat, every tick)
+    const w = q[0], x = q[1], y = q[2], z = q[3];
+    const t0 = 2 * (y * v[2] - z * v[1]), t1 = 2 * (z * v[0] - x * v[2]), t2 = 2 * (x * v[1] - y * v[0]);
     return [
-        v[0] + w * t[0] + (y * t[2] - z * t[1]),
-        v[1] + w * t[1] + (z * t[0] - x * t[2]),
-        v[2] + w * t[2] + (x * t[1] - y * t[0]),
+        v[0] + w * t0 + (y * t2 - z * t1),
+        v[1] + w * t1 + (z * t0 - x * t2),
+        v[2] + w * t2 + (x * t1 - y * t0),
     ];
 }
 

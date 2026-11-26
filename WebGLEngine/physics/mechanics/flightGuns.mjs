@@ -97,8 +97,15 @@ export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY, 
     for (const r of rounds) {
         const n = stepRound(r, dt, g);
         let best = null;
+        // SPEED, NOT A CHANGE OF RESULT (the gates' fights were 22% in here): the round's tick and the target's, as sweepHit forms them, and an axis on which
+        // the round cannot come within R this tick -- |d0| - |dv| on that axis beyond R with a margin far wider than the float error of sweepHit's
+        // quadratic -- is no hit without the quadratic. Everything that passes is handed to sweepHit unchanged, so a hit's t is the same bits.
+        const p0 = r.pos, p1 = n.pos, s0 = p1[0] - p0[0], s1 = p1[1] - p0[1], s2 = p1[2] - p0[2];
         for (const tg of targets) {
             if (tg.id === r.owner) continue;
+            const c0 = tg.from, c1 = tg.to, R = tg.radius * (1 + 1e-6) + 1e-6;
+            if (Math.abs(p0[0] - c0[0]) - Math.abs(s0 - (c1[0] - c0[0])) > R || Math.abs(p0[1] - c0[1]) - Math.abs(s1 - (c1[1] - c0[1])) > R ||
+                Math.abs(p0[2] - c0[2]) - Math.abs(s2 - (c1[2] - c0[2])) > R) continue;
             const t = sweepHit(r.pos, n.pos, tg.from, tg.to, tg.radius);
             if (t !== null && (best === null || t < best.t)) best = { t, target: tg.id, part: tg.part };
         }
