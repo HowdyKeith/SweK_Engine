@@ -626,3 +626,35 @@ The two replays were run in the cloud session after the fix, through tools/ship/
 - The price is about 34 field builds a fight, about 12 s of CPU in the sandbox. That is cheap in a study, and perhaps not on a page that rebuilds it live.
 - **Nothing is replaced:** the registration replaced nothing, and the shipped layer (the page, Rounds B and D) stays the lane built once.
 - A replication on fresh seeds, registered with this result as its expectation, is filed (backlog rock-nav-follow-replicate) before any default changes.
+
+# ROUND F -- the replication of Round E (Keith 2026-11-26: "lets keep going and do the next round"; backlog rock-nav-follow-replicate; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## Why
+Round E's FOLLOW BETTER cleared its line by a hair (p 0.0474), on the fifth paired round of the series, against my registered expectation of about 10%. Before the default layer or the page follows the ship, the result must show again on seeds it has never seen.
+
+## The round: Round E's, word for word
+* **Arms:** L (the lane built once) and FX (the fixed following field, every 60 ticks), on the library as it stands at this registration (the empty-lane fix in).
+* **DEV checks:** Round E's six.
+* **V1 / V2 and the four bottom lines:** Round E's.
+* **No design survey:** the design is Round E's, and nothing is chosen.
+
+## SETS
+* DEV: 4101-4130 x 4 kinds, checks only.
+* HELD: 4201-4290 x 4 kinds, flown once.
+* Gate seeds 41-50.
+
+## THE REPLICATION LINE (added; it moves nothing in Round E's verdict)
+* V1 FOLLOW BETTER and V2 not L BETTER: `ROUND E REPLICATES`.
+* Otherwise: `ROUND E DOES NOT REPLICATE (<V1's verdict>)`.
+* Only REPLICATES lets backlog rock-nav-follow-replicate propose moving the page or the default to the following field. That move, with its build cost on the page measured, is then a step of its own.
+
+## Expectations, recorded before any code
+* Round E's effect as the stated expectation: about 15% fewer rock strikes under FX (143 to 121).
+* FX's total strikes lower than L's: about 70%.
+* ROUND E REPLICATES (FOLLOW BETTER at p <= 0.05 again): about 35%. A result that cleared at p 0.047 is about even odds to clear again at the same size if its effect is real, and it may not be.
+* V2 not L BETTER: about 90%.
+
+## What will be built
+* Arm sets and the modes devF, devF-read, heldF and heldF-read in tools/ship/rockNavStudy*.mjs.
+* readHeldF: Round E's reading plus the replication line.
+* Gate rows and sabotages.
