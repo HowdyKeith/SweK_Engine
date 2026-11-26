@@ -247,3 +247,76 @@ Keith asked for the layer "also steering during the strafing passes". The design
 - **Still open, not weighed:**
   - The field is built once round the ship's start. The ship drifts about 520 units, and 70-78 thousand pilot calls a round fall back to the doctrine because a fighter sits inside the stale goal but more than 220 from the ship.
   - A field re-centred on the ship as it moves is the next candidate round. It is not registered.
+
+# ROUND C -- the field that follows the ship (Keith 2026-11-26: "lets do A field that follows the ship"; REGISTERED 2026-11-26, before any code for it and before any of its seeds is flown)
+
+## What is already known, said first: the survey points AGAINST it
+The design survey flew throwaway space seeds 9990013-9990018 (24 fights, in no set; a scratch prototype, never committed). L is Round B's lane field, built once. F is the same field REBUILT round the ship's current position every K ticks.
+
+| | L | F, K=30 | F, K=60 | F, K=150 |
+|---|---|---|---|---|
+| rock strikes after arriving | 6 | 12 | 11 | 12 |
+| rock strikes before arriving | 3 | 2 | 3 | 3 |
+| damage on the ship | 5,026 | 5,168 | 5,310 | 5,284 |
+| doctrine fallbacks | 7,592 | 5,411 | 4,640 | 5,360 |
+
+* **Why the fallbacks happen** (a diagnostic on L, 9990013-9990015): 4,085 of 4,817 fallback calls are the stale goal. The fighter sits in a goal cell of the start-centred field but more than 220 from the ship's current centre. 289 are at the sphere's edge (cell rounding), and 443 are cells with no lower neighbour.
+* **Following fixes part of what it targets:** fallbacks fall by about a third, not to zero, because between rebuilds the goal is stale again.
+* **It costs about 0.32 s a rebuild.**
+* **It did not lower the strikes:** 11-12 after arriving against L's 6, on 24 fights.
+* **K = 60 (2 s) is fixed from the survey.** All three intervals looked alike, and 60 is the middle. Nothing is tuned on DEV.
+* **The round is flown because Keith asked for it, and the survey is small.** My expectation leans to NO DIFFERENCE or L BETTER, and that is recorded below, before any seed.
+
+## The arms (Round B's library; one option added)
+* brain/spaceNav.mjs gains `followingField(arenaOf, rocks, { every, lane })`. It returns a function that hands back the current field, rebuilding it round the ship's CURRENT centre on the first call at or after every `every` ticks (the first build is at the first call).
+* navPilot accepts a field or such a function. An aim cached under one field is not reused under another.
+* **L:** Round B's arm exactly: the lane field, built once at t = 0.
+* **F:** followingField with lane true and every = 60.
+* Everything else is unchanged: rocks, starts, regular gunners, margin 20, re-aim 15 ticks, and the hand-back.
+
+## Endpoints
+Round A's per-fighter endpoints, plus each fight's total rock strikes (struck).
+
+## SETS
+* DEV: 3501-3530 x 4 kinds, checks only.
+* HELD: 3601-3690 x 4 kinds, flown once.
+* Gate seeds 41-50. The survey: 9990013-9990018.
+
+## DEV: checks only (a failure stops the round)
+1. **SAME FIELD:** identical rocks and starts.
+2. **THE HAND-BACK** is exact in both arms.
+3. **IT FOLLOWS:**
+   * In F, every fight longer than 2 s has at least 2 builds.
+   * Every build is centred on the ship's position at the tick it was built (recorded, deviation 0).
+   * L has exactly 1 build per fight.
+4. **THE FIELD IS SOUND:**
+   * No aim flown lies in a blocked cell of the field it was drawn from.
+   * Every rock centre is blocked in every build.
+5. **EVERY FIGHT ENDS.**
+
+## HELD: the verdict (pairs by (seed, kind), F against L; the sign verdict of Rounds A and B)
+* **V1, THE ROCKS:** d = L.struck - F.struck (all rock strikes, before and after arriving).
+  * FOLLOW BETTER: wins > losses, p <= 0.05, and F's total is lower.
+  * L BETTER is the mirror; FLOOR is under 20 non-tied pairs; otherwise NO DIFFERENCE SHOWN.
+* **V2, THE DAMAGE:** d = F.damageOnShip - L.damageOnShip. It must not be L BETTER.
+* **BOTTOM LINE:**
+  * V1 FOLLOW BETTER and V2 not L BETTER: `THE FOLLOWING FIELD WINS`.
+  * V1 FOLLOW BETTER and V2 L BETTER: `THE FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS`.
+  * V1 L BETTER: `THE FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS`.
+  * Otherwise: `THE FOLLOWING FIELD DOES NOT WIN (<V1's verdict>)`.
+* **Reported, not weighed:**
+  * the strikes before and after arriving, each with its sign test;
+  * arrivals, approach shot, median arrival, R and ship deaths;
+  * fallbacks and NEAR aims;
+  * builds per fight and the build time.
+
+## Expectations, recorded before any code
+* V1 FOLLOW BETTER: about 15%. V1 L BETTER: about 35%. NO DIFFERENCE SHOWN: about 50%.
+* V2 not L BETTER: about 80%.
+* Fallbacks lower under F: about 95%.
+
+## What will be built
+* followingField and the field-or-function form of navPilot in brain/spaceNav.mjs, with gate rows and sabotages.
+* Arm "F" in tools/ship/rockNavStudy.mjs, with readHeldC and devChecksC.
+* The command's modes devC, devC-read, heldC and heldC-read.
+* Gate rows and sabotages in the study gate.
