@@ -2819,6 +2819,10 @@ export const INSTRUMENTS = [
       measures: "do fighters that fly the 3-D navigation layer (brain/spaceNav.mjs) through the rock field lose fewer of their number to the rocks than today's doctrine? Round A: the layer outside the strafe range only, the approach (rock strikes before a fighter first reaches the strafe range) scored on its own, paired by (seed, kind) with the exact sign test",
       key: "DEV (space seeds 3101-3130 x 4 kinds) is checks only (same field, the layer steers, the hand-back is exact, the field is sound, every fight ends); HELD (3201-3290) is flown ONCE; V1 the approach, V2 arrivals must not be worse; strikes after arrival are reported (Round B's question)",
       gate: "tools/ship/rockNavStudy-selfcheck.mjs" },
+    { id: "strong-gunners", page: "instrument-bench.html", name: "THE SPACE DOCTRINE AGAINST STRONG GUNNERS (brain/SPACE_DOCTRINE_WIP.md, ROUND 3)", area: "brain",
+      measures: "does a fighter that caps its closing speed lose to the ace and perfect gunners, and is there a cap that does not? R per preset by the exact sign test on (seed, kind) pairs, with strafe-seconds (the time on the passes at the ship) as the mechanism, because R ties at 0 in most fights against strong gunners",
+      key: "DEV (space seeds 4301-4330 x 4 kinds x ace and perfect) chooses the cap from 12, 16, 20, 25, 30 by the highest mean R; HELD (4401-4460) is flown ONCE with the doctrine, the chosen cap and cap 12 (Round 2's choice, reported as the entry's first question)",
+      gate: "tools/ship/strongGunnersStudy-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
