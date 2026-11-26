@@ -128,5 +128,27 @@ console.log("\n5. FOLLOW-UP 9: EACH HEADING TESTED ALONG THE TURNING ARC");
     const ra = safe(() => A.flyAvoid(pilot, sc, A.ARC_REFERENCE, { seconds: 60 }));
     ok("...and it is not the reference: the two arms' turn counts or paths differ on that flight (the arc test is actually used)", !!ra && !!r1 && (ra.turns !== r1.turns || ra.stuck !== r1.stuck || ra.path !== r1.path), JSON.stringify(ra && { f: ra.fires, t: ra.turns, k: ra.stuck }));
 }
+console.log("\n6. FOLLOW-UP 10: THE ARC RULE KEPT OFF THE REGION'S EDGE");
+{
+    ok("!! the edge arm and its reference, HELD10 = 8901 to 8960 disjoint from HELD8 and HELD9; the band is subHardNav's EDGE_EXTRA (20 m)", same(A.EDGE_ARMS, ["any+predict+edge+avoid-arc", "any+predict+edge+avoid-arc-edge"]) && A.EDGE_REFERENCE === "any+predict+edge+avoid-arc"
+        && A.EDGE_DESIGNATED === "any+predict+edge+avoid-arc-edge" && A.HELD10.length === 60 && A.HELD10[0] === 8901 && A.HELD10[59] === 8960 && !A.HELD10.some((x) => A.HELD8.includes(x) || A.HELD9.includes(x)) && H.EDGE_EXTRA === 20);
+    const R = N.REGION, mid = [(R.x0 + R.x1) / 2, (R.y0 + R.y1) / 2];
+    ok("in the middle of the region with nothing near, a heading has no edge conflict; with edge off the test is FOLLOW-UP 9's", A.conflictArc(mid[0], mid[1], 0, 0, 0, [], -Infinity, { edge: true }) === false && A.conflictArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity) === false);
+    ok("!! a heading that runs to the edge within the look conflicts: 30 m from the east edge heading east (3 m/s: past the 20 m band in 4 s), and not heading west", A.conflictArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity, { edge: true }) === true
+        && A.conflictArc(R.x1 - 30, mid[1], 0, Math.PI, Math.PI, [], -Infinity, { edge: true }) === false);
+    ok("...the band is 20 m, not the region itself: 40 m from the north edge (y1) heading toward it at pi/2 is a conflict only via the band (the path reaches y1 - 20 after 7 s and y1 after 14 s; both inside the look) -- and 100 m off with a 25 s look (75 m) is not", A.conflictArc(mid[0], R.y0 + 40, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === true
+        && A.conflictArc(mid[0], R.y0 + 100, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === false);
+    // the trigger is NOT edge-tested: on the plan's own heading toward the edge with no ship, nothing fires
+    const q = A.avoidHeadingArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity, { edge: true });
+    ok("!! the TRIGGER is not edge-tested (the plan's heading keeps off the edge by the field): heading at the edge with no ship near, the rule does not fire", q.fired === false && q.heading === 0);
+    // a candidate refused for the edge: a ship dead ahead near the east edge; the edge version skips candidates that turn toward the edge
+    // the vessel 30 m inside the SOUTH edge (y0 + 30), heading east, a still ship 90 m ahead (at 60 m every turn passes within its clearance and the rule is stuck; at 120 m it is out of the look): the offsets go starboard first (+, toward -y, toward the south edge). The first fixture sat near the EAST edge, where the
+    //   candidate taken never reached the band in 25 s, so nothing was refused and the row said nothing.
+    const at = [mid[0], R.y0 + 30], ships = [ship(at[0] + 90, at[1], 0, 0)], plain = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity), edged = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity, { edge: true });
+    ok("!! a ship ahead 30 m inside the south edge: the plain arc rule turns starboard toward the edge, the edge-kept rule refuses that and turns to port, and what it takes keeps off the band",
+        plain.turned && plain.heading > 0 && edged.turned && edged.heading < 0 && !A.conflictArc(at[0], at[1], 0, 0, edged.heading, ships, -Infinity, { ships: true, statics: true, edge: true }), JSON.stringify({ plain: plain.heading, edged: edged.heading }));
+    const sc = H.hardScenario(1, "hard-traffic"), e1 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 })), e2 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 }));
+    ok("the edge arm flies (DEV seed 1, 60 s), names itself, and is deterministic", !!e1 && e1.arm === A.EDGE_DESIGNATED && same(e1, e2), JSON.stringify(e1 && { s: e1.status, f: e1.fires, t: e1.turns, k: e1.stuck }));
+}
 console.log(fails === 0 ? "\nall checks pass" : `\n${fails} FAIL`);
 process.exit(fails === 0 ? 0 : 1);

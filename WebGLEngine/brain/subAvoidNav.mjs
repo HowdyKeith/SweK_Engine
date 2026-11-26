@@ -14,10 +14,13 @@ export const SHIP_CLEAR = 30, SHIP_LOOK_S = 25, AVOID_STEP = Math.PI / 12, AVOID
 export const HELD8 = Object.freeze(N.range(801, 860)), SETS = Object.freeze({ dev: H.HARD_SETS.dev, held8: HELD8 });
 // the arm's name in subHardNav's table, and whether the turn is on
 const BASE = Object.freeze({ "any+predict+edge+yield": ["any+predict+edge+yield", false], "any+predict+edge+avoid": ["any+predict+edge", true], "any+predict+edge+yield+avoid": ["any+predict+edge+yield", true],
-    "any+predict+edge+avoid-arc": ["any+predict+edge", true, "arc"] });   // FOLLOW-UP 9: FOLLOW-UP 8's designated rule, every heading tested along the turning arc
+    "any+predict+edge+avoid-arc": ["any+predict+edge", true, "arc"], "any+predict+edge+avoid-arc-edge": ["any+predict+edge", true, "arc-edge"] });   // FOLLOW-UP 10: candidates also kept off the region's edge   // FOLLOW-UP 9: FOLLOW-UP 8's designated rule, every heading tested along the turning arc
 /** FOLLOW-UP 9 (registered first): the arc arm, its reference, the turning radius (subCurrentNav's R_TURN, 35 m) and HELD9. */
 export const ARC_ARMS = Object.freeze(["any+predict+edge+avoid", "any+predict+edge+avoid-arc"]), ARC_REFERENCE = "any+predict+edge+avoid", ARC_DESIGNATED = "any+predict+edge+avoid-arc";
 export const R_TURN = 35, HELD9 = Object.freeze(N.range(8801, 8860));
+/** FOLLOW-UP 10 (registered first): the edge arm, its reference, and HELD10. The edge band is subHardNav's EDGE_EXTRA (20 m). */
+export const EDGE_ARMS = Object.freeze(["any+predict+edge+avoid-arc", "any+predict+edge+avoid-arc-edge"]), EDGE_REFERENCE = "any+predict+edge+avoid-arc", EDGE_DESIGNATED = "any+predict+edge+avoid-arc-edge";
+export const HELD10 = Object.freeze(N.range(8901, 8960));
 let MODEL = null;
 const navModel = () => MODEL || (MODEL = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 })));
 
@@ -45,7 +48,8 @@ export function arcPos(x, y, hc, h, k, V = N.CRUISE) {
     const [ex, ey] = at(T), rest = k - T; return [ex + V * rest * Math.cos(h), ey - V * rest * Math.sin(h)];
 }
 /** FOLLOW-UP 9: conflictHeading's test along the arc from the current heading `hc` (the same obstacles, clearances, depth rule and whole seconds 0..SHIP_LOOK_S). */
-export function conflictArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE, ships = true, statics = false } = {}) {
+export function conflictArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE, ships = true, statics = false, edge = false } = {}) {
+    if (edge) { const R = N.REGION, E = H.EDGE_EXTRA; for (let k = 0; k <= SHIP_LOOK_S; k++) { const [px, py] = arcPos(x, y, hc, h, k, V); if (px < R.x0 + E || px > R.x1 - E || py < R.y0 + E || py > R.y1 - E) return true; } }   // FOLLOW-UP 10
     for (const o of obstacles) {
         if (!(o.keel + H.VMARGIN > minDepth)) continue;
         const isShip = o.type === "ship";
@@ -56,11 +60,11 @@ export function conflictArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE,
     return false;
 }
 /** FOLLOW-UP 9: avoidHeading with every test along the arc from the current heading hc; the same offsets, order and stuck rule. */
-export function avoidHeadingArc(x, y, t, hc, h0, obstacles, minDepth) {
+export function avoidHeadingArc(x, y, t, hc, h0, obstacles, minDepth, { edge = false } = {}) {   // edge: FOLLOW-UP 10 -- candidates (not the trigger) also refused within EDGE_EXTRA of the region's edge
     if (!conflictArc(x, y, t, hc, h0, obstacles, minDepth)) return { heading: h0, fired: false, turned: false, stuck: false };
     for (const d of OFFSETS) {
         const h = h0 + d;
-        if (!conflictArc(x, y, t, hc, h, obstacles, minDepth, { ships: true, statics: true })) return { heading: h, fired: true, turned: true, stuck: false };
+        if (!conflictArc(x, y, t, hc, h, obstacles, minDepth, { ships: true, statics: true, edge })) return { heading: h, fired: true, turned: true, stuck: false };
     }
     return { heading: h0, fired: true, turned: false, stuck: true };
 }
@@ -76,7 +80,7 @@ export function avoidHeading(x, y, t, h0, obstacles, minDepth) {
 
 /** Fly one hard-traffic scenario under an arm of AVOID_ARMS; the record of flyHard plus { fires, turns, stuck, hit }. */
 export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.DT, model = navModel(), ladder = H.MARGIN_LADDER, yieldSpeed = H.YIELD_SPEED, horizon = H.HORIZON_S } = {}) {
-    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${[...AVOID_ARMS, ARC_DESIGNATED].join(", ")})`);
+    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${[...AVOID_ARMS, ARC_DESIGNATED, EDGE_DESIGNATED].join(", ")})`);
     const [arm, turn, how] = BASE[armName], spec = H.ARM_SPEC[arm], total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(H.REPLAN_S / dt)), mode = "predict";
     let field = H.buildLadderField(H.planShapes(sc, 0, { mode, blind: false, horizon }), sc.goal, st, { ladder, edgeExtra: spec.edge }), replans = 0;
     const field0 = field, sc0 = N.cellOf(field, st.x, st.y), noRoute = !(sc0 && field.dist[sc0.i] < N.BIG);
@@ -87,7 +91,7 @@ export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.
         if (i > 0 && i % every === 0) { field = H.buildLadderField(H.planShapes(sc, i * dt, { mode, blind: false, horizon }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder, own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); replans++; }
         let target = H.hardTarget(arm, s, field, sc.goal, { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: sc.minDepth, yieldSpeed });
         if (turn) {
-            const a = how === "arc" ? avoidHeadingArc(s.pos[0], s.pos[1], i * dt, S.attitude(s).heading, target.heading, sc.obstacles, sc.minDepth) : avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
+            const a = how === "arc" || how === "arc-edge" ? avoidHeadingArc(s.pos[0], s.pos[1], i * dt, S.attitude(s).heading, target.heading, sc.obstacles, sc.minDepth, { edge: how === "arc-edge" }) : avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
             if (a.fired) fires++; if (a.turned) turns++; if (a.stuck) stuck++;
             target = { ...target, heading: a.heading };
         }
