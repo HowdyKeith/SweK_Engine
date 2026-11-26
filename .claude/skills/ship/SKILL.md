@@ -282,6 +282,45 @@ Other things the rig needs every time:
 
 *** PUBLISHING FROM THE RIG. *** The panel's `Clone -> verify` (step 3) clones into a folder named after the version; if the verified clone you made by hand already has that name it refuses ("already exists", nothing changed) -- do not delete the clone. The engine launched by `START_NODE_Engine.bat` FROM THE VERIFIED CLONE is the folder the panel's `Release current engine` zips, which is then exactly the verified tree; that is the safe use of the shortcut the first paragraph of this step warns about (it is unsafe only when the running folder is not the pushed, verified commit). Before pressing it: `git status -sb` shows nothing but the untracked timing file, and any file a gate rewrote during the verdict (v4908: `tools/ship/tsl-emitted-wide.json`, one line) is restored with `git checkout -- <path>` so the zip equals the commit. After it: check the tag points at the ship commit (the releases page, or `get_tag` for the version), then `refreshReleases.mjs --write`, `releaseLedger-selfcheck.mjs`, and commit ONLY `WebGLEngine/tools/ship/releases.json`. The panel's shortcut writes the release body as `Engine build vNNNN`; the notes are edited on the releases page if they matter.
 
+### 7c. The same route from a Command Prompt, without the GitHub panel -- what the v4935 publish cost four attempts to learn
+
+The panel's buttons are these commands. Run them on the rig, in a NEW folder each time (never a clone that has been committed in before):
+
+    cd /d C:\SweK_src
+    git clone --branch main https://github.com/HowdyKeith/SweK_Engine.git vNNNNx      & rem full, not --depth 1
+    cd /d C:\SweK_src\vNNNNx\WebGLEngine
+    git log --oneline -1                                                               & rem must be the commit you mean to ship
+    cd tools\render-qa && npm install --no-audit --no-fund && cd ..\..
+    node tools/ship/ensureBrowserGatesCmd.mjs
+    node tools/ship/ensureDxc.mjs --write
+    copy /Y <last verified clone>\WebGLEngine\tools\ship\sweep-timings.local.json tools\ship\
+    copy /Y <last verified clone>\WebGLEngine\tools\ship\sweep-rotation.local.json tools\ship\
+    dir tools\ship\*.local.json                                                        & rem BOTH must be listed
+    node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"
+    echo exit=%ERRORLEVEL%
+    node tools/ship/afterVerdict.mjs
+    echo exit=%ERRORLEVEL%
+    git checkout -- tools/ship/tsl-emitted-wide.json                                   & rem and anything else `git status -s` lists as M
+    node tools/ship/packRelease.mjs --out C:\SweK_Engine_release                       & rem outside the clone, or it refuses
+    gh release create vNNNN C:\SweK_Engine_release\SweK_Engine_vNNNN.zip --repo HowdyKeith/SweK_Engine --title vNNNN --notes "Engine build vNNNN -- cloned, verified, then published" --target <FULL 40-character SHA>
+    node tools/ship/refreshReleases.mjs --write
+    node tools/ship/releaseLedger-selfcheck.mjs
+    git status -s                                                                      & rem ONLY "M tools/ship/releases.json"
+    git add tools/ship/releases.json
+    git commit -m "vNNNN: record the release"
+    git show --stat HEAD                                                               & rem ONLY that one file, a few lines
+    git push origin main
+
+*** THE TWO CHECKS BEFORE THE PUSH ARE THE STEP. *** At v4935 the record commit was made in a clone whose index was empty, and it DELETED ALL 11,562 FILES from main
+(`aaaf2ec45`); nothing in the commit command said so. `git show --stat HEAD` would have printed 11562 deletions. Main was reset to the verified commit by Keith's choice, because a
+revert on top left five history-reading gates red (`history-gates-content-not-commits` in tools/ship/nextRounds.mjs). If either check shows anything else, do not push.
+
+*** THE OTHER THREE, EACH ONE VERDICT OR ONE RELEASE ATTEMPT. *** (1) Without the two `.local.json` files the verdict took 82 minutes, called 480 gates over budget and capped
+duplicateFiles -- the gate list came from the Linux owner's record. (2) `gh release create --target 74ff9896f` was refused with HTTP 422 `target_commitish is invalid`: the API takes
+a branch name or the FULL SHA, never a short one (`git rev-parse HEAD` prints it). Pinning the target is the reason to use it: the panel passes none, so GitHub tags whatever main's
+head is at that moment. (3) `rtPipeline-selfcheck` went red inside afterVerdict and green alone; re-time it with
+`node tools\ship\sweepRotation.mjs --gate physics/render/rtPipeline-selfcheck.mjs --cap-s 300 --write` and run afterVerdict again rather than publishing past a red.
+
 ## Never
 
 - Push to any branch other than the designated feature branch and `main` by fast-forward.
