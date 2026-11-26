@@ -18,7 +18,7 @@ const cp = require("child_process");
 
 const PREFIX = "/peerjobs";
 const ENGINE = path.join(__dirname, "..");
-const PEER = /^[A-Za-z0-9][\w.-]{0,39}$/, URLRE = /^[A-Za-z0-9_\/~.\\][\w.\/:@~+\\-]{0,299}$/, JOBID = /^[a-z0-9][a-z0-9-]{2,62}$/, ROUND = /^\d{1,3}$/, TEXT = /^[\x20-\x7e]{0,200}$/, CPU = /^[\w .()@-]{1,40}$/, SHA = /^[0-9a-f]{40}$/;
+const STUDY = /^[a-z0-9][a-z0-9-]{2,62}$/, PEER = /^[A-Za-z0-9][\w.-]{0,39}$/, URLRE = /^[A-Za-z0-9_\/~.\\][\w.\/:@~+\\-]{0,299}$/, JOBID = /^[a-z0-9][a-z0-9-]{2,62}$/, ROUND = /^\d{1,3}$/, TEXT = /^[\x20-\x7e]{0,200}$/, CPU = /^[\w .()@-]{1,40}$/, SHA = /^[0-9a-f]{40}$/;
 const GPUS = ["auto", "yes", "no"], TARGETS = ["any", "required", "forbidden"];
 const DEFAULTS = Object.freeze({ enabled: false, url: "", name: "", gpu: "auto", intervalS: 120, engineUrl: "" });
 const LOG_MAX = 65536, RESTART_MS = 30000, MAX_FAST_FAILS = 5;
@@ -44,7 +44,11 @@ function submitArgs(b) {
     if (typeof b.id !== "string" || !JOBID.test(b.id)) return { error: "id must be 3 to 63 characters of a-z, 0-9 and -" };
     const a = ["--id", b.id];
     if (b.kind === "selftest") a.push("--selftest");
-    else {
+    else if (b.kind === "study") {   // 2026-11-26: a study names one entry of tools/ship/studyJobs.mjs (the runner at the job's commit refuses a name it does not hold)
+        if (typeof b.study !== "string" || !STUDY.test(b.study)) return { error: "study must be 3 to 63 characters of a-z, 0-9 and -, starting with a letter or digit" };
+        if (b.rounds !== undefined) return { error: "a study takes no rounds" };
+        a.push("--study", b.study);
+    } else {
         if (!Array.isArray(b.rounds) || b.rounds.length < 1 || b.rounds.length > 8 || !b.rounds.every((r) => typeof r === "string" && ROUND.test(r))) return { error: "rounds must be 1 to 8 strings of 1 to 3 digits" };
         a.push("--rounds", b.rounds.join(","));
     }

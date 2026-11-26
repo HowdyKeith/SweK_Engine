@@ -48,6 +48,22 @@ node tools/ship/peerJobsCmd.mjs cancel --id h69-search
 - **What is running, and where.** `status` (and the Queue button in the SweK server's panel) lists every claimed job with its peer and host and last beat, and every peer: idle, running which job at which round and phase, or not seen for N minutes.
 - **Order.** The highest priority is taken first, then the oldest, then the smaller id. `plan` turns a plan file into one job per round with the plan's priorities, so free peers take different rounds at once and a single peer takes them in the plan's order. The order in the repository is `tools/ship/rigOrder.json`; its gate row fails if the order a lone peer takes differs from the one written.
 
+## Studies: reports other than the head-to-head rounds (2026-11-26)
+A third job kind, `study`, runs one entry of a closed registry, `WebGLEngine/tools/ship/studyJobs.mjs`. The job carries only the study's NAME. The peer builds `node tools/ship/studyRunner.mjs --study <name> --workers N`, and the runner at the job's commit refuses a name its registry does not hold, so the commands are always the reviewed ones.
+- **List them:** `node tools/ship/studyRunner.mjs --list`.
+- **Submit one:** `node tools/ship/peerJobsCmd.mjs submit --id rn-c-replay --study rock-nav-c-dev-replay --gpu any`, or fill the panel's study box. A filled box is sent instead of the rounds.
+- **Replay studies** fly a registered set again into a scratch folder and compare it row for row with the committed files:
+  - The verdict is IDENTICAL, DIFFERS (with the first differing row named) or INCOMPLETE.
+  - Timing fields are taken out first.
+  - Each row is compared on the committed row's own fields. Fields the code learned to record later are listed, not compared.
+  - A difference is a finding, not a failed job.
+- **Results** come back like a round's: `rig-out/<study>-report.json`, `rig-out/<study>-part<k>.log`, and each produced file as `rig-out/<study>--<file>`.
+- **Registered now:** `rock-nav-a-dev-replay` and `rock-nav-c-dev-replay` (`brain/ROCK_NAV_WIP.md`). The first was run by hand in the cloud session: 70 s on 4 cores, IDENTICAL on all 240 rows.
+- **A "fly" study** (a registered round flown for the first time on the rig) is added to the registry in the commit that registers the round.
+- **Limits:**
+  - A study does not resume. A failed run is retried from the start, which is fine for minutes-long studies.
+  - The `plan` command still makes only rounds jobs.
+
 ## Can the registered runs go through the GPU Brain interface? (measured 2026-11-23)
 **As peers, yes; as GPU compute, no.** A GPU box is already a peer (`--gpu required` targets it, `--gpu forbidden` keeps a job off it), and its CPU cores run the rounds like any other peer's. Sending the flights themselves to the GPU does not pay, for three measured reasons:
 - A head-to-head flight is the tank simulation (`render/subAquariumSim.mjs`, 4800 ticks of 1/30 s for 160 s), not a network. Timed on this machine: 49 ms per flight with a four-weight law and 62 ms with the 963-weight network, so **the network is about 13 ms (21 percent) of a flight and the other 79 percent is the simulation, which the GPU Brain does not touch**. Free inference would save at most about a fifth.
