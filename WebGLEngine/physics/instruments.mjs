@@ -2823,6 +2823,10 @@ export const INSTRUMENTS = [
       measures: "does a fighter that caps its closing speed lose to the ace and perfect gunners, and is there a cap that does not? R per preset by the exact sign test on (seed, kind) pairs, with strafe-seconds (the time on the passes at the ship) as the mechanism, because R ties at 0 in most fights against strong gunners",
       key: "DEV (space seeds 4301-4330 x 4 kinds x ace and perfect) chooses the cap from 12, 16, 20, 25, 30 by the highest mean R; HELD (4401-4460) is flown ONCE with the doctrine, the chosen cap and cap 12 (Round 2's choice, reported as the entry's first question)",
       gate: "tools/ship/strongGunnersStudy-selfcheck.mjs" },
+    { id: "adaptive-cap", page: "instrument-bench.html", name: "THE ADAPTIVE CAP (brain/SPACE_DOCTRINE_WIP.md, ROUND 4)", area: "brain",
+      measures: "can one rule keep cap 12's win against weak gunners (regular, green) and take cap 20's against strong ones (ace, perfect)? ADAPT starts at 12 and latches the team to 20 once a fighter is lost with the ship unhurt; R per preset by the exact sign test on (seed, kind) pairs against fixed 12 (the weak side) and fixed 20 (the strong side)",
+      key: "K = 1 fixed from a survey on throwaway seeds; DEV (space seeds 4501-4530 x 4 kinds x 4 presets) is checks only; HELD (4601-4660) is flown ONCE",
+      gate: "tools/ship/adaptiveCapStudy-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
