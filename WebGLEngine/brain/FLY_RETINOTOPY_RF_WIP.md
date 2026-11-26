@@ -88,3 +88,50 @@ Read in full now: all of Klapoetke's main figures (1 to 5) and Extended Data 1 t
 * Klapoetke's Supplementary Videos and Supplementary Tables, and the main-text claims about Figure 5k's receptive-field images (the pixel data); the values quoted from plots in Part 3 are read off the figures, not tabulated, and are approximate.
 * The original MATLAB model (ModelDB, Yale SenseLab 230400) and the W_i1 tension; whether the model carries to other loom positions (it has no spatial term: the Giant Fiber was recorded for a disk centred at 11 degrees elevation and 50 degrees azimuth).
 * Layer sub-field offsets for all 185 LPLC2 cells (measured for 61); proofreading status; the sources of the two inhibitory components.
+
+## Part 4. Klapoetke et al. 2017's stimulus definitions, read from the text (2026-11-26)
+
+Read: the HHMI author manuscript, https://pmc.ncbi.nlm.nih.gov/articles/PMC7457385 (PubMed 29120418, doi 10.1038/nature24626): the Results, the Figure 3 and 4 legends, and the Methods ("Visual stimulation", "Directional tuning", "Calculation of fluorescence", "Statistics"). Quoted where the text gives the value; everything else is ONLY in the figure images and is marked as this round's assumption below.
+
+**From the text (quoted):**
+* Bars: "Bar stimuli have 10° fixed width and 20°/s edge speed unless otherwise specified" (Figure 4 legend). Figure 3e,f: "Directional tuning with 10° (e) or 60° (f) 1D bar expansion".
+* The cross: "LPLC2 neurons responded to the outward motion of expanding bars in a cross formation and did not respond to inward bar motion (Fig. 4a,b)"; "Single-cell cross stimuli contained a static 10° square at the receptive field center throughout the entire stimulus duration" (Methods).
+* Single arms and two arms: "Outward edge motion along single arms generated detectable, but small responses (Fig. 4c i,ii,d), whereas expansion along two arms (Fig. 4c iii) produced responses greater than the summed responses to motion along two individual arms (Fig. 4d and Extended Data Fig. 5a,b)".
+* Inhibition: "We combined outward motion along one cardinal axis with inward motion along the orthogonal axis" (Figure 4c v).
+* Orientation: "The measured cardinal axis directions (consistently at 45° offset from the horizontal) were used to orient single-cell visual stimuli"; directional tuning by "symmetric bar expansions (edge speed 20°/s) centered on each neuron's receptive field, rotating the axis in 15° increments". Figure 4e,f: "Effects of bar width on expansion between cardinal axes".
+* Contrast and timing: background 50 %, foreground dark 0 % or bright 100 %; "All stimuli included a 2 second pre- and post-motion holding window"; the right eye only, 180 Hz, a coverage of 90°.
+* The reference: single axons were normalized "by the peak response of the axon to a dark disc expansion" (5° to 60° at 10°/s); a peak is "a 300 ms window around the maximum fluorescence response". n = 10 neurons, N = 7 flies.
+
+**Only in the figure images (not quotable, so NOT used as numbers):** the length the arms reach, the wide bar's width in Figure 4e,f, every response percentage (the values in Part 2 were read off the plots and are not a test), and the sizes of the nonlinear-summation effect.
+
+**Correction to Part 2:** its "one outward and one inward arm together about 45 %" was read off Figure 4c-d without the panel's normalization, which the text does not give; it is not used as a number anywhere below.
+
+## Part 5. THE LPLC2 SUBUNIT ROUND, REGISTERED (2026-11-26, before its code and before any stimulus is run)
+
+Keith, 2026-11-26: "Let's do ... item 7" -- backlog `fly-lplc2-subunit-model`.
+
+**THE MODEL (FIXED NOW).** One LPLC2 cell on a 90 x 90 frame at 1 degree a pixel (the paper's 90 degree coverage), its receptive field centred, the frame's axes taken as the cell's cardinal axes (the paper rotates its stimuli to the cell's axes; the model is drawn in them).
+* **Layer 1:** `brain/flyEmdLplc2Gf.mjs`'s motion detectors, unchanged (its `createModel` with `keepMaps`: Zhao et al. 2023's high-pass, ON/OFF rectifiers and low-pass delays, 10 ms steps), giving each frame's horizontal and vertical local motion.
+* **Four subunits:** disks of radius 15 degrees centred 10 degrees from the cell's centre along +x, -x, +y and -y (two lattice units at the 5 degrees a column the code already assumes, the middle of Part 1's measured 1.6 to 2.4; 10 + 15 = 25 degrees, inside the paper's 60 degree upper bound). Each subunit's drive is the motion OUTWARD along its own axis summed over its disk, LESS the motion inward along it (the published opponency: one weight for both signs).
+* **The cell:** R(t) = [ sum of the four drives ]+ squared -- the drives summed BEFORE the rectification (so inward motion on one axis can cut what another axis gives), then squared (the published "nonlinear integration"; squaring is the simplest form that makes two arms more than the sum of each). No threshold, nothing fitted. A stimulus's response is the largest 300 ms mean of R (the paper's peak window).
+
+**THE STIMULI (FIXED NOW; dark 0 on a 0.5 background, each with a 2 s hold before and after the motion, edges drawn with fractional coverage).** The text's values where it has them; ASSUMED where only the figure does: the arms and bars run from the centre square's edge (5 degrees) to 30 degrees from the centre (the 60 degree bound).
+* S1 the outward cross (the static 10 degree centre square, four 10 degree wide arms growing at 20 degrees/s); S2 the inward cross (S1 in reverse);
+* S3r, S3l one arm outward (+x alone, -x alone, the centre square kept); S4 one axis outward (+x and -x together);
+* S5 S4 with the orthogonal axis's two arms moving INWARD at the same time;
+* S6 wide-field translation: 10 degree dark bars every 20 degrees over the whole frame moving +x at 20 degrees/s;
+* S7 the reference, a dark disc growing from 5 to 60 degrees across at 10 degrees/s edge speed; S8 the same receding;
+* S9 a 10 degree wide bar expanding symmetrically along the DIAGONAL (between the cardinal axes) at 20 degrees/s; S10 the same 60 degrees wide.
+
+**THE PREDICTIONS (registered; each passes or fails, the model is deterministic and run ONCE).**
+* P1: S1 > 0 and S2 below 10 % of S1 (outward cross, not inward).
+* P2: S3r > 0 and S3l > 0 (single arms "detectable"), each below S4.
+* P3: S4 > S3r + S3l (two arms more than the sum of each alone).
+* P4: S5 < S4 (inward motion on the orthogonal axis cuts the response).
+* P5: S6 below 10 % of S1 (no response to wide-field translation).
+* P6: S7 > 0 and S8 below 10 % of S7 (looming, not receding).
+* P7: S10 < S9 (between the cardinal axes a 60 degree bar is below a 10 degree bar).
+
+**THE VERDICT.** SUPPORTED iff all seven hold; otherwise NOT SUPPORTED, naming each failure. Reported beside it, not in the verdict: the same ten stimuli through `flyEmdLplc2Gf.mjs`'s own multiplicative cross unit (Zhao et al.), whose product of four arms gives zero for any single arm -- the case the text calls "detectable".
+
+**EXPECTATION.** P1, P3, P5 and P6 hold by the model's construction about 85 percent each (the opponent sum cancels uniform motion; the square makes two arms more than one); P2 is the riskiest -- one arm's 15 degree disk sees the moving edge only near its centre, about 65 percent; P7 about 60 percent (a wide bar's long edges move across the subunits, inhibiting). SUPPORTED overall about 35 percent.
