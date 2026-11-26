@@ -1055,3 +1055,18 @@ Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-co
 **Seen on DEV and recorded because it was seen (DEV only, not a result), BEFORE HELD:** COND kept 19 of 24 and delivered 51 goals; HOLD-CR kept 22 and delivered 44. **HOLD-CR's hold CHATTERS:** 46,500 latches and 46,482 releases over the 24 runs. With the charge at or above half, NEED's trigger can still fire (the battery would run out before the climb at the current rate), so the hold latches and is let go on the next tick, over and over. That is the rule as registered ("cleared ... and re-armed"); it is left as written and flown as registered. A release that is not re-armed at once would be a different rule and a different registration.
 
 **Nothing was tuned.** HELD: COND, HOLD-CR and HOLD-C on 225001 to 225096 to `brain/courierReleaseHeld.<part>.jsonl` (with each run's latches and releases), committed unread, then read once.
+
+## 48. ROUND 22 RESULT (2026-11-26; `brain/courierReleaseHeld.{0,1,2,3}.jsonl`, committed unread at `16be85891`, then read ONCE)
+
+**THE VERDICT (registered, `verdict15` with HOLD-CR in PRICED's place): COND BEATS HOLD-CR on the mission value,** 57 runs to 20 (p = 1.5e-5; mean value 2.15 against 1.48).
+* Goals: **COND BEATS HOLD-CR** (57 to 16; 2.41 a run against 1.59).
+* Survival: **HOLD-CR BEATS COND** (20 to 7, p = 0.010): HOLD-CR keeps 87 boats (5 broached, 4 crushed), COND 74 (21 crushed, 1 broached).
+
+**Reported:** HOLD-C (round 19's hold, no release) on the same runs: 90 boats kept, 1.29 goals a run, value 1.18 -- below COND on value and goals, as in round 19. The hold fired on 95 of 96 runs for both hold crews; HOLD-CR's chattered as DEV showed (171,745 latches and 171,664 releases over the 96 runs).
+
+**What it says.**
+* Letting go once the charge is back recovers part of what round 19's hold cost (1.59 goals against HOLD-C's 1.29) and keeps most of its survival (87 against 90) -- but at the registered price COND's deliveries are still worth more than the 13 boats the hold saves.
+* The rule chattered: re-armed at once, NEED's trigger relatched it tick after tick above half charge, so HOLD-CR spent much of its time alternating between a forced blow and the helm. A hold that waits before re-arming would be a different rule; whether it changes the verdict is not known.
+* Across rounds 19 and 22 the courier's choice is stable: COND's mission beats every hold tried on the price a lost boat costs (2.42 goals per 1,200 s). Only a higher price on a boat would change that.
+
+**Status: round 22 CLOSED.** Backlog `stations-courier-hold-release` is closed with this result.

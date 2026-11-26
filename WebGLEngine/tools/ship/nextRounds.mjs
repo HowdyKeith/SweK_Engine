@@ -3034,8 +3034,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stations-courier-hold-release",
-        blocker: "OPEN",
-        what: "Round 19 (section 42): on the breached courier the held blow keeps boats (92 against COND's 73) but halves the goals (1.14 against 2.29 a run), because nothing releases it; COND won on the mission value. The flight did not record how often the hold fired.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-26 as round 22 (brain/SUB_STATIONS_WIP.md sections 46-48): COND BEATS HOLD-CR on the mission value (57 to 20) and goals (2.41 against 1.59), HOLD-CR keeps more boats (87 against 74). The release recovered part of round 19's lost goals but chattered (re-armed at once); COND's mission beats every hold tried at the registered price. Was: Round 19 (section 42): on the breached courier the held blow keeps boats (92 against COND's 73) but halves the goals (1.14 against 2.29 a run), because nothing releases it; COND won on the mission value. The flight did not record how often the hold fired.",
         how: "Register first one release (for example: let go once the charge is back above a stated level, or once the boat is within the surface band), COND with it against COND on round 15's mission value, fresh seeds, and record the hold's firings and releases in the HELD records.",
         why: "It asks whether a courier can keep the hold's survival without paying its goals.",
     },
