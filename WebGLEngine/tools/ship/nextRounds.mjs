@@ -3117,6 +3117,21 @@ export const NEXT_ROUNDS = [
         how: "Register first one change: the arc rule's candidates also refused when their arc leaves the region (or comes within the plan's edge margin of it) within the look, on fresh hard-traffic seeds, the arc arm as the reference.",
         why: "The arc rule removed the collisions; the exits are now the whole of its loss.",
     },
+    // ---- 2026-11-26 -- after the Santon raw data and follow-up 9.
+    {
+        id: "stealth-criteria-audit",
+        blocker: "OPEN",
+        what: "Rounds 13, 29 and 30's criteria C1-C4 were set from values read off Santon et al.'s Figure 2; the raw data is now in vendor/santon2025.",
+        how: "A reading, no runs: each criterion's claim about the animal checked against the per-contrast response rates and the within-crab paired tests; any the data does not back is corrected by a registered amendment before the model is tested again.",
+        why: "It fixes what the next stealth round tests.",
+    },
+    {
+        id: "capability-map-stations",
+        blocker: "OPEN",
+        what: "docs/BRAIN-CAPABILITY-MAP.md (generated from brain/capabilityMap.mjs, every cell cited) does not carry stations rounds 16-22: the held blow per hull, the aquarium's defaults, COND against every courier hold at any boat price.",
+        how: "Add the rows to brain/capabilityMap.mjs with their citations (brain/SUB_STATIONS_WIP.md sections 37-49) and regenerate; the map's gate checks every quote is in its cited file.",
+        why: "The stations line is largely settled; the map is where that is visible.",
+    },
     {
         id: "fly-gf-input-signs",
         blocker: "UPSTREAM -- needs the neuPrint male-cns service (neuprint.janelia.org, and a token)",
