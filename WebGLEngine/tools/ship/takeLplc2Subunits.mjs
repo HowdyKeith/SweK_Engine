@@ -11,7 +11,7 @@ import * as L from "../../brain/lplc2Subunits.mjs";
 
 const cli = parseOrExit("takeLplc2Subunits", { flags: ["--write"] });
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), out = path.join(ENG, "brain", "lplc2SubunitsRun.json");
-if (!cli.flags["--write"]) { console.log(`[takeLplc2Subunits] would run ${L.STIMULI.length} stimuli and write ${path.relative(ENG, out)}; pass --write to run (once: the round is registered)`); process.exit(0); }
+if (!cli.flags.has("--write")) { console.log(`[takeLplc2Subunits] would run ${L.STIMULI.length} stimuli and write ${path.relative(ENG, out)}; pass --write to run (once: the round is registered)`); process.exit(0); }
 const M = L.masks(), responses = {}, zhao = {};
 for (const name of L.STIMULI) {
     const s = L.stimulus(name);
