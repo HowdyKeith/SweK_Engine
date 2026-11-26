@@ -3024,6 +3024,50 @@ export const NEXT_ROUNDS = [
         how: "Check nothing else reads `waiting` (a peer page, a bridge, a gate), then drop it from render/subAquariumSim.mjs's snapshot and from render/subAquariumSim-selfcheck.mjs's field list, or keep it and say why in the snapshot's comment. Small; one gate run.",
         why: "Two fields for one fact drift apart; the merge left the decision for later on purpose.",
     },
+    // ---- 2026-11-26 -- after the v4935 publish: the next suggestions from stations rounds 16-18, stealth Round 30 and the publish itself. Written so another chat can pick any one up; none is registered here. (The other two suggested
+    //      with them are already entries: fly-lplc2-subunit-model and nav-avoid-turn-radius.)
+    {
+        id: "stations-hold-breached-courier",
+        blocker: "OPEN",
+        what: "Round 16 (brain/SUB_STATIONS_WIP.md section 37) held the blow on the plain hard-leak dives only, where it kept all 96 boats on the default vessel. Whether a held blow helps the breached COURIER (round 7's task, COND the best captain at 2.42 goals per 1,200 s) is not known: holding the boat up may cost the goals that COND delivers.",
+        how: "Register first: COND with blowHold (brain/subStations.mjs's latch) against COND on the breached courier (brain/breachCourierTask.mjs), the mission value as round 15 priced it (learnedCourier.verdict15's test with HOLD in PRICED's place), a DEV non-degeneracy check, fresh seed blocks, HELD once. If it wins, the Sub Aquarium's default courier captain (render/subAquariumSim.mjs defaultCaptain) is the next change.",
+        why: "Round 16 was the largest effect of the series; this is where it would change what a person sees in the aquarium.",
+    },
+    {
+        id: "stations-hold-surface-release",
+        blocker: "OPEN",
+        what: "On the high rider every held blow BROACHED (round 16, V1: TRIAGE BEATS HOLD 41 to 0), because nothing releases the blow as the hull nears the surface. A release rule was named in section 37 and not tested.",
+        how: "Register first: HOLD with one release rule (for example: flood back when the depth is above a stated line and the boat is rising), its constants fixed before DEV, against TRIAGE and against HOLD on both vessels on fresh seeds; the registered task's scoring unchanged (any status but submerged is a loss). DEV non-degeneracy, freeze, HELD once, read once.",
+        why: "It says whether the big-tank hull, which section 37 found unnecessary on the default vessel, can be made to work at all.",
+    },
+    {
+        id: "stations-learner-features",
+        blocker: "OPEN",
+        what: "Round 18 (section 39) learned to spend boats for goals and landed level with COND on the mission value (NO DIFFERENCE SHOWN). A bigger budget moved the learner as far as it went; the open question is the learner itself.",
+        how: "Register first ONE change: a lost boat priced above the mission's own rate, or the held blow given to the learner as a third unit. Round 18's ES and sets as a template with fresh seed blocks; the same verdict against COND (learnedCourier.verdict15).",
+        why: "Two rounds say the hand rule is hard to beat; only worth doing if the learning question still matters.",
+    },
+    {
+        id: "stealth-contrast-gain",
+        blocker: "OPEN",
+        what: "Stealth Round 30 (brain/STEALTH_ROUNDS_WIP.md) replicated Round 29's low-contrast miss on held-out numbers (C2 -0.078): the g 300 drift gain lowers MOVING stripes at low contrast but not STATIC ones, while the animal lowers both. The gap is systematic, so it is the mechanism, not noise.",
+        how: "Register first a contrast-dependent gain (one form, its constants fixed before any run), with Rounds 28-30's criteria lines word for word and held-out numbers as in Round 30; run with the branch's worker scripts (brain/crabOrder30.mjs takes the azimuth and r/v as arguments).",
+        why: "It is the one part of the drift-gain account that does not reproduce the animal.",
+    },
+    {
+        id: "ship-skill-cli-publish-route",
+        blocker: "OPEN",
+        what: "The v4935 publish was done from the rig's command line without the GitHub panel and took four attempts: an empty-index commit that deleted all 11,562 files from main (reset by Keith's choice), a fresh clone without the rig's timing records (an 82-minute verdict, 480 gates over budget), `gh release create --target` refused a short SHA (HTTP 422), and the verdict's rewrite of tools/ship/tsl-emitted-wide.json nearly went into the record commit.",
+        how: "Add a section to .claude/skills/ship/SKILL.md: the panel's steps as commands (clone full, npm install in tools/render-qa, ensureBrowserGatesCmd, ensureDxc --write, copy sweep-timings.local.json and sweep-rotation.local.json from the last verified clone, shipVerdict, afterVerdict, restore rewritten files, packRelease --out outside the clone, gh release create with the FULL 40-character SHA), and the two checks before pushing the record: `git status -s` shows only releases.json, `git show --stat HEAD` lists one file.",
+        why: "Every one of those cost a round trip; a written route costs nothing to follow.",
+    },
+    {
+        id: "history-gates-content-not-commits",
+        blocker: "OPEN",
+        what: "Five gates went red on v4935's verified tree after a commit that deleted every file and a revert that restored them byte for byte: tools/ship/mechanical-selfcheck, operators-selfcheck and mutationScore-selfcheck ask `git log --name-only <run>..HEAD` which commits TOUCHED their files; reportFresh dates a gate by its last commit; roughDiffuseWired walks back to a revision where its file did not exist. All five asked whether history moved, not whether content did. Main was reset to clear it; that is not always possible.",
+        how: "Ask git for the NET change (`git diff --name-only <run> HEAD -- <paths>`) where the question is whether a file changed since a run; date a report by the last commit that changed the gate's CONTENT (skip commits whose tree entry for the file equals its parent's after a revert pair, or compare blob ids). Fixture: a temporary repository with an add, a delete-all and a revert. Sabotage each gate's old query back in and watch it go red by name.",
+        why: "One wrong commit on the rig turned five gates red with no defect in the tree.",
+    },
     {
         id: "fish-vestibular-data-arrived-partial",
         blocker: "UPSTREAM -- 2026-11-19: the correction stands; the only open part is a RECURRENT 4b circuit, which needs the CATMAID export (zf.hms.harvard.edu) the sandbox cannot reach. Everything the feed-forward data allows is done and summed up in brain/RUNG_4B_CLOSEOUT.md.",
