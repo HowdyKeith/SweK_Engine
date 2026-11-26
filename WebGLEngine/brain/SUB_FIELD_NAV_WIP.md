@@ -1061,3 +1061,23 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 * keels the vessel must sense rather than know;
 * drafts deeper than the hull may go (here every keel was at most 60 m, against a damage depth of 80);
 * the smaller vertical clearance, if a real vessel wanted a larger one.
+
+## FOLLOW-UP 9 [SERIES B]: THE TURN-AWAY RULE, EACH HEADING TESTED ALONG THE VESSEL'S OWN TURN (backlog `nav-avoid-turn-radius`; Keith, 2026-11-26: "add them to the backlog and work through them"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 8's rule tested each candidate heading as a straight line from an instant turn; the vessel turns on a 35 m radius (`subCurrentNav.R_TURN`), so the flown path is worse than the rule's own test, and 28 percent of its fires found no safe heading at all. Does testing each heading along the vessel's real turn change the choice, or only show the rule was optimistic?
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc`: FOLLOW-UP 8's designated rule exactly, with every heading test (the trigger on the plan's heading h0, and each candidate) made along an ARC -- from the vessel's CURRENT heading, a circle of radius R_TURN = 35 m at the cruise speed (3 m/s) turning the shorter way to the tested heading, then straight on it -- at the same whole seconds 0..25 and with the same clearances (SHIP_CLEAR 30 m for ships, STATIC_CLEAR 12 m for statics on candidates). The offsets, their order, the 90 degree limit and the stuck rule are unchanged. FOLLOW-UP 8's arms and `avoidHeading` are not edited.
+
+**Arms flown:** `any+predict+edge+avoid` (FOLLOW-UP 8's designated, now the REFERENCE) and `any+predict+edge+avoid-arc` (**designated**). HELD5's world as FOLLOW-UP 8 (`hard-traffic`, ships hold course, velocity told exactly, 260 s).
+
+**The set.** NEW: **HELD9, seeds 8801 to 8860 of hard-traffic (60 scenarios, 120 flights), flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run, not a result; the one amendment allowed before HELD9 is read: if DEV shows the arc rule degenerate (it never fires, or never turns), it is amended and written here.
+
+**Designated comparison and verdict.** `avoid-arc` against `avoid`, paired on the same seeds, on REACHED: the exact one-sided sign test on the discordant seeds (arc reaches where the reference does not, and the reverse), p at most 0.05: **ARC BEATS AVOID**; the reverse direction at p at most 0.05: **AVOID BEATS ARC**; else **NO DIFFERENCE SHOWN**. Reported beside it: collisions by kind, exits, the fires / turns / stuck counts and the stuck fraction.
+
+**Predictions, written before DEV and HELD9 (scored held or missed, moving nothing).**
+* **B1**: the verdict is NO DIFFERENCE SHOWN. 55 percent.
+* **B2**: the arc rule's stuck fraction (stuck / fires) is HIGHER than the reference's 28 percent (an arc reaches fewer clear headings). 70 percent.
+* **B3**: the arc arm's ship collisions are at most the reference's. 50 percent.
+* **B4**: the arc arm reaches at least as many as the reference. 45 percent.
+
+**What a result would not say.** FOLLOW-UP 8's list stands, except the instant turn, which this round removes from the TEST only: the vessel still flies its autopilot's own turn, and the arc is the planner's model of it (a circle at cruise speed), not the hull's measured turn. The 90 degree limit, the 15 degree step and the clearances are not swept.
