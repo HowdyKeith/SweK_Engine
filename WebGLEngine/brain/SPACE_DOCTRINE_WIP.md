@@ -508,3 +508,40 @@ FIXED12, FIXED20 (Round 4's) and SIGNAL. Nothing in the arena is edited.
 * tools/ship/signalCapStudy.mjs (the arms, the signal, the checks and the verdict).
 * tools/ship/signalCapStudyCmd.mjs (export-free; modes dev, dev-read, held, held-read; results in brain/rig-results/signal-cap/).
 * tools/ship/signalCapStudy-selfcheck.mjs, with a mutation pass.
+
+## ROUND 5, RESULT (2026-11-26): THE SIGNAL CAP PAYS ON THE WEAK SIDE (regular) -- and is within 2-6% of the better fixed cap everywhere
+
+**DEV** (4701-4730 x 4 kinds x 4 presets x 3 arms, checks only; read once): all three checks passed.
+- THE SIGNAL DECIDES: all 480 SIGNAL fights decided at 4 s, by the damage read; it chose 20 in 240.
+- THE CAP IS APPLIED: 3,143,781 decisions, none with thrust over the cap. The 240 SIGNAL fights that kept 12 equal FIXED12's, fight for fight.
+- EVERY FIGHT ENDS.
+- DEV was committed before any HELD seed was flown.
+
+**HELD** (4801-4920, 120 seeds x 4 kinds x 4 presets x 3 arms; flown once, the files committed before the read; `brain/rig-results/signal-cap/held-report.json`). SAME SCENARIOS and EVERY FIGHT ENDS passed.
+
+| preset | mean R FIXED12 / FIXED20 / SIGNAL | ships destroyed | the signal chose 20 | SIGNAL vs FIXED12 | SIGNAL vs FIXED20 |
+|---|---|---|---|---|---|
+| regular | 1588.8 / 1088.6 / 1562.7 | 470 / 15 / 448 | 22 of 480 (wrong) | FIXED12 BETTER (0 to 22, 458 tied) | SIGNAL BETTER (445 to 13) |
+| green | 1595.2 / 1196.5 / 1595.2 | 480 / 40 / 480 | 0 of 480 | FLOOR (all 480 tied: the same fights) | SIGNAL BETTER (449 to 31) |
+| ace | 1.6 / 30.6 / 28.9 | 0 / 0 / 0 | 469 of 480 | SIGNAL BETTER (162 to 5) | FLOOR (0 to 8) |
+| perfect | 0.0 / 6.2 / 6.2 | 0 / 0 / 0 | 480 of 480 | SIGNAL BETTER (49 to 0) | FLOOR (all tied) |
+
+- **The signal was right in 98.3%** of HELD fights (the survey said 98.4%).
+- **THE STRONG SIDE HOLDS** under both presets. SIGNAL is not worse than FIXED20, and it beats FIXED12 beyond the floor under both. This is where Round 4 failed.
+- **THE WEAK SIDE HOLDS under green** (the signal never chose 20) and **FAILS under regular.** In the 22 regular fights it called strong (4.6%), the slower cap cost about 530 of R each, and nothing on the weak side gives anything back. 22 losses with no wins is significant, though the means differ by 1.6% (1562.7 against 1588.8).
+
+**Against the expectations (written first):**
+- The signal right in at least 95% of fights, about 85: YES (98.3%).
+- The weak side holds under both, about 75: NO (regular).
+- The strong side holds under ace, about 50: YES. Under perfect, about 45: YES.
+- HAS BOTH, about 30: NO, by the regular miscalls alone.
+
+**WHAT THIS MEANS.**
+- Reading the damage taken by 4 s comes within 2% of the best fixed cap against weak gunners and within 6% against strong ones, with no knowledge of the gunners in advance.
+- That is the best rule measured: Round 4's latch lost about 10% against regular and a third of 20's gain against ace.
+- It is NOT what the registered verdict asked for. Every miscall is a pure loss, and against regular gunners about 1 fight in 22 is a miscall.
+- **The open lever is the miscall rate under regular.** Two options, both trading a little of the strong side:
+  - a later decision (the survey's 6 s at 40 called 99.0%);
+  - a higher threshold.
+- That is filed as backlog space-cap-signal-tune, to be chosen on throwaway seeds against regular's miscalls specifically.
+- **Nothing is replaced:** the page's cap box stays 12, which is right for the regular gunners it flies against.

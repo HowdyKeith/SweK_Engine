@@ -1,0 +1,223 @@
+{
+ "pairs": {
+  "regular": {
+   "vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 0,
+    "losses": 22,
+    "ties": 458,
+    "n": 22,
+    "p": 4.76837158203125e-7,
+    "median": -532.6333333333333
+   },
+   "vs20": {
+    "verdict": "SIGNAL BETTER",
+    "wins": 445,
+    "losses": 13,
+    "ties": 22,
+    "n": 458,
+    "p": 1.4602730178601377e-113,
+    "median": 485.9666666666667
+   },
+   "f20vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 13,
+    "losses": 467,
+    "ties": 0,
+    "n": 480,
+    "p": 6.449126732592963e-120,
+    "median": -494.9333333333334
+   }
+  },
+  "green": {
+   "vs12": {
+    "verdict": "FLOOR",
+    "wins": 0,
+    "losses": 0,
+    "ties": 480,
+    "n": 0,
+    "p": 1,
+    "median": null
+   },
+   "vs20": {
+    "verdict": "SIGNAL BETTER",
+    "wins": 449,
+    "losses": 31,
+    "ties": 0,
+    "n": 480,
+    "p": 4.083923714464094e-96,
+    "median": 371.4
+   },
+   "f20vs12": {
+    "verdict": "FIXED12 BETTER",
+    "wins": 31,
+    "losses": 449,
+    "ties": 0,
+    "n": 480,
+    "p": 4.083923714464094e-96,
+    "median": -371.4
+   }
+  },
+  "ace": {
+   "vs12": {
+    "verdict": "SIGNAL BETTER",
+    "wins": 162,
+    "losses": 5,
+    "ties": 313,
+    "n": 167,
+    "p": 1.1236266833741416e-41,
+    "median": 54
+   },
+   "vs20": {
+    "verdict": "FLOOR",
+    "wins": 0,
+    "losses": 8,
+    "ties": 472,
+    "n": 8,
+    "p": 0.0078125,
+    "median": -54
+   },
+   "f20vs12": {
+    "verdict": "FIXED20 BETTER",
+    "wins": 170,
+    "losses": 5,
+    "ties": 305,
+    "n": 175,
+    "p": 5.553488622610475e-44,
+    "median": 54
+   }
+  },
+  "perfect": {
+   "vs12": {
+    "verdict": "SIGNAL BETTER",
+    "wins": 49,
+    "losses": 0,
+    "ties": 431,
+    "n": 49,
+    "p": 3.552713678800501e-15,
+    "median": 36
+   },
+   "vs20": {
+    "verdict": "FLOOR",
+    "wins": 0,
+    "losses": 0,
+    "ties": 480,
+    "n": 0,
+    "p": 1,
+    "median": null
+   },
+   "f20vs12": {
+    "verdict": "FIXED20 BETTER",
+    "wins": 49,
+    "losses": 0,
+    "ties": 431,
+    "n": 49,
+    "p": 3.552713678800501e-15,
+    "median": 36
+   }
+  }
+ },
+ "weakFails": [
+  "regular"
+ ],
+ "strongFails": [],
+ "bottom": "THE SIGNAL CAP PAYS ON THE WEAK SIDE (regular)",
+ "means": {
+  "regular FIXED12": {
+   "n": 480,
+   "R": 1588.82513888889,
+   "shipDead": 470
+  },
+  "regular FIXED20": {
+   "n": 480,
+   "R": 1088.5821527777778,
+   "shipDead": 15
+  },
+  "regular SIGNAL": {
+   "n": 480,
+   "R": 1562.6708333333345,
+   "shipDead": 448
+  },
+  "green FIXED12": {
+   "n": 480,
+   "R": 1595.1908333333326,
+   "shipDead": 480
+  },
+  "green FIXED20": {
+   "n": 480,
+   "R": 1196.4799999999998,
+   "shipDead": 40
+  },
+  "green SIGNAL": {
+   "n": 480,
+   "R": 1595.1908333333326,
+   "shipDead": 480
+  },
+  "ace FIXED12": {
+   "n": 480,
+   "R": 1.65,
+   "shipDead": 0
+  },
+  "ace FIXED20": {
+   "n": 480,
+   "R": 30.6,
+   "shipDead": 0
+  },
+  "ace SIGNAL": {
+   "n": 480,
+   "R": 28.9125,
+   "shipDead": 0
+  },
+  "perfect FIXED12": {
+   "n": 480,
+   "R": 0,
+   "shipDead": 0
+  },
+  "perfect FIXED20": {
+   "n": 480,
+   "R": 6.225,
+   "shipDead": 0
+  },
+  "perfect SIGNAL": {
+   "n": 480,
+   "R": 6.225,
+   "shipDead": 0
+  }
+ },
+ "choices": {
+  "regular": {
+   "n": 480,
+   "decided": 480,
+   "chose20": 22,
+   "right": 458,
+   "meanDamage": 3.75
+  },
+  "green": {
+   "n": 480,
+   "decided": 480,
+   "chose20": 0,
+   "right": 480,
+   "meanDamage": 0.1875
+  },
+  "ace": {
+   "n": 480,
+   "decided": 480,
+   "chose20": 469,
+   "right": 469,
+   "meanDamage": 70.47916666666667
+  },
+  "perfect": {
+   "n": 480,
+   "decided": 480,
+   "chose20": 480,
+   "right": 480,
+   "meanDamage": 106.64583333333333
+  }
+ },
+ "accuracy": 0.9828125,
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

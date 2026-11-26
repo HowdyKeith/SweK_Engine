@@ -3310,10 +3310,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "space-cap-signal",
-        blocker: "OPEN -- a survey first: no round until a signal is found on throwaway seeds",
+        blocker: "CLOSED -- 2026-11-26: the survey found the signal (the team's damage by 4 s calls weak against strong gunners right in 98.4% of fights) and the space doctrine's ROUND 5 (brain/SPACE_DOCTRINE_WIP.md, registered first, read once) tested it: THE SIGNAL CAP PAYS ON THE WEAK SIDE (regular). It held the strong side under ace and perfect and the weak side under green, and was right in 98.3% of 1,920 HELD fights, within 2% of the best fixed cap against weak gunners and 6% against strong ones; but its 22 miscalls in 480 regular fights cost about 530 of R each with nothing given back (0 to 22). Follow-on filed: space-cap-signal-tune.",
         what: "OPENED 2026-11-26 from the space doctrine's ROUND 4: a cap that latches from 12 to 20 at the first loss with the ship unhurt lands between the fixed caps under every preset, because weak gunners still kill a fighter before the first hit in 20-40% of fights and strong gunners need the faster approach from the start.",
         how: "On throwaway space seeds, measure candidate signals the fighters could read before or early in the approach -- the gunners' hit rate on the leading fighter at range, the rounds per second the ship puts out, the turret count in reach -- and how cleanly each separates {regular, green} from {ace, perfect} by the time the leading fighter is 400 units out. Register a round only for a signal that separates them in at least 90% of fights.",
         why: "Round 3 showed the best cap differs by the opposition by a factor of several in R; a fighter that read its opposition early could have both.",
+    },
+    {
+        id: "space-cap-signal-tune",
+        blocker: "OPEN -- a survey first, on throwaway seeds",
+        what: "OPENED 2026-11-26 from the space doctrine's ROUND 5: the signal cap (cap 20 at 4 s if the team has taken 20 or more damage, else 12) failed its weak side only by its miscalls against regular gunners -- 22 of 480 fights, 4.6%, each a pure loss of about 530 R. The strong side held.",
+        how: "On throwaway space seeds, measure the miscall rate under regular and the cost under ace for a grid of decision times (4-6 s) and thresholds; choose the pair that brings regular's miscalls under about 1% while keeping ace's mean R within 10% of fixed 20's; then register Round 5 again with that pair, its verdict word for word, on fresh seeds.",
+        why: "One tuned number may turn the best rule measured into one that has both; the cost of finding out is one survey and one round.",
     },
     {
         id: "space-battleship-nav-cap",
