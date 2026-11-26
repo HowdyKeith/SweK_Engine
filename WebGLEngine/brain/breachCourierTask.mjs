@@ -23,6 +23,9 @@ export const R10_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 19
 /** ROUND 19 (section 40): COND with round 12's NEED trigger (NEED-C) and with round 16's held blow on it (HOLD-C); their sets. */
 export const NEEDC_KNOBS = Object.freeze({ ...COND_KNOBS, blowNeed: true, blowAbove: 3, needWindowS: 10 }), HOLDC_KNOBS = Object.freeze({ ...NEEDC_KNOBS, blowHold: true });
 export const R19_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 218001 + i)), R19_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 219001 + i));
+/** ROUND 22 (section 46): HOLD-C with the hold cleared once the battery is half full (HOLD-CR); its sets. */
+export const HOLDCR_KNOBS = Object.freeze({ ...HOLDC_KNOBS, holdUntilFrac: 0.5 });
+export const R22_DEV_SET = Object.freeze(Array.from({ length: 24 }, (_, i) => 224001 + i)), R22_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 225001 + i));
 const MODEL = NT.model();
 
 /** The breach of a seed: { leak, at }. The battery is round 4's (courierTask.chargeOf). */
@@ -41,6 +44,7 @@ export function crew(name, ctx) {
     if (name === "TRIAGE") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE });
     if (name === "COMBINED") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: FROZEN_TRIAGE, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });
     if (name === "COND") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: COND_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 10; not in CREWS (round 7's registered four)
+    if (name === "HOLD-CR") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: HOLDCR_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 22; not in CREWS
     if (name === "NEED-C" || name === "HOLD-C") return SS.triageCaptain({ pilot, model: MODEL, read: ctx.read, knobs: name === "HOLD-C" ? HOLDC_KNOBS : NEEDC_KNOBS, more: [CT.legsStation({ ...ctx, route: true })], energyAllow: shut });   // round 19; not in CREWS
     throw new Error(`breachCourierTask.crew: no crew named ${JSON.stringify(name)} (${CREWS.join(", ")})`);
 }
