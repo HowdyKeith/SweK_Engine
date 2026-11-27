@@ -14,13 +14,17 @@ export const SHIP_CLEAR = 30, SHIP_LOOK_S = 25, AVOID_STEP = Math.PI / 12, AVOID
 export const HELD8 = Object.freeze(N.range(801, 860)), SETS = Object.freeze({ dev: H.HARD_SETS.dev, held8: HELD8 });
 // the arm's name in subHardNav's table, and whether the turn is on
 const BASE = Object.freeze({ "any+predict+edge+yield": ["any+predict+edge+yield", false], "any+predict+edge+avoid": ["any+predict+edge", true], "any+predict+edge+yield+avoid": ["any+predict+edge+yield", true],
-    "any+predict+edge+avoid-arc": ["any+predict+edge", true, "arc"], "any+predict+edge+avoid-arc-edge": ["any+predict+edge", true, "arc-edge"] });   // FOLLOW-UP 10: candidates also kept off the region's edge   // FOLLOW-UP 9: FOLLOW-UP 8's designated rule, every heading tested along the turning arc
+    "any+predict+edge+avoid-arc": ["any+predict+edge", true, "arc"], "any+predict+edge+avoid-arc-edge": ["any+predict+edge", true, "arc-edge"],
+    "any+predict+edge+avoid-arc-edge-least": ["any+predict+edge", true, "arc-edge-least"] });   // FOLLOW-UP 12: stuck, the least bad heading   // FOLLOW-UP 10: candidates also kept off the region's edge   // FOLLOW-UP 9: FOLLOW-UP 8's designated rule, every heading tested along the turning arc
 /** FOLLOW-UP 9 (registered first): the arc arm, its reference, the turning radius (subCurrentNav's R_TURN, 35 m) and HELD9. */
 export const ARC_ARMS = Object.freeze(["any+predict+edge+avoid", "any+predict+edge+avoid-arc"]), ARC_REFERENCE = "any+predict+edge+avoid", ARC_DESIGNATED = "any+predict+edge+avoid-arc";
 export const R_TURN = 35, HELD9 = Object.freeze(N.range(8801, 8860));
 /** FOLLOW-UP 10 (registered first): the edge arm, its reference, and HELD10. The edge band is subHardNav's EDGE_EXTRA (20 m). */
 export const EDGE_ARMS = Object.freeze(["any+predict+edge+avoid-arc", "any+predict+edge+avoid-arc-edge"]), EDGE_REFERENCE = "any+predict+edge+avoid-arc", EDGE_DESIGNATED = "any+predict+edge+avoid-arc-edge";
 export const HELD10 = Object.freeze(N.range(8901, 8960));
+/** FOLLOW-UP 12 (registered first): the least-bad arm, its reference, and HELD12 (9701-9760, corrected before any code from 9301-9360, which subNavRoute uses). */
+export const LEAST_ARMS = Object.freeze(["any+predict+edge+avoid-arc-edge", "any+predict+edge+avoid-arc-edge-least"]), LEAST_REFERENCE = "any+predict+edge+avoid-arc-edge", LEAST_DESIGNATED = "any+predict+edge+avoid-arc-edge-least";
+export const HELD12 = Object.freeze(N.range(9701, 9760));
 let MODEL = null;
 const navModel = () => MODEL || (MODEL = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 })));
 
@@ -59,13 +63,24 @@ export function conflictArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE,
     }
     return false;
 }
+/** FOLLOW-UP 12: the arc's minimum clearance over the look: distance to an obstacle less its required clearance (ships SHIP_CLEAR, statics STATIC_CLEAR; obstacles passed beneath skipped), over obstacles and whole seconds 0..SHIP_LOOK_S. Infinity with none. */
+export function minClearArc(x, y, t, hc, h, obstacles, minDepth, { V = N.CRUISE } = {}) {
+    let m = Infinity;
+    for (const o of obstacles) {
+        if (!(o.keel + H.VMARGIN > minDepth)) continue;
+        const need = o.r + N.HULL_HALF + (o.type === "ship" ? SHIP_CLEAR : STATIC_CLEAR);
+        for (let k = 0; k <= SHIP_LOOK_S; k++) { const [ox, oy] = H.posAt(o, t + k), [px, py] = arcPos(x, y, hc, h, k, V), d = Math.hypot(px - ox, py - oy) - need; if (d < m) m = d; }
+    }
+    return m;
+}
 /** FOLLOW-UP 9: avoidHeading with every test along the arc from the current heading hc; the same offsets, order and stuck rule. */
-export function avoidHeadingArc(x, y, t, hc, h0, obstacles, minDepth, { edge = false } = {}) {   // edge: FOLLOW-UP 10 -- candidates (not the trigger) also refused within EDGE_EXTRA of the region's edge
+export function avoidHeadingArc(x, y, t, hc, h0, obstacles, minDepth, { edge = false, least = false } = {}) {   // least: FOLLOW-UP 12 -- stuck, the heading (plan's or an offset, in order) with the largest minClearArc   // edge: FOLLOW-UP 10 -- candidates (not the trigger) also refused within EDGE_EXTRA of the region's edge
     if (!conflictArc(x, y, t, hc, h0, obstacles, minDepth)) return { heading: h0, fired: false, turned: false, stuck: false };
     for (const d of OFFSETS) {
         const h = h0 + d;
         if (!conflictArc(x, y, t, hc, h, obstacles, minDepth, { ships: true, statics: true, edge })) return { heading: h, fired: true, turned: true, stuck: false };
     }
+    if (least) { let best = h0, bm = minClearArc(x, y, t, hc, h0, obstacles, minDepth); for (const d of OFFSETS) { const m = minClearArc(x, y, t, hc, h0 + d, obstacles, minDepth); if (m > bm) { bm = m; best = h0 + d; } } return { heading: best, fired: true, turned: false, stuck: true }; }
     return { heading: h0, fired: true, turned: false, stuck: true };
 }
 /** The heading to fly: { heading, fired (h0 conflicts with a ship), turned (a candidate was taken), stuck (fired and none qualified) }. */
@@ -80,7 +95,7 @@ export function avoidHeading(x, y, t, h0, obstacles, minDepth) {
 
 /** Fly one hard-traffic scenario under an arm of AVOID_ARMS; the record of flyHard plus { fires, turns, stuck, hit }. */
 export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.DT, model = navModel(), ladder = H.MARGIN_LADDER, yieldSpeed = H.YIELD_SPEED, horizon = H.HORIZON_S } = {}) {
-    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${[...AVOID_ARMS, ARC_DESIGNATED, EDGE_DESIGNATED].join(", ")})`);
+    if (!BASE[armName]) throw new Error(`subAvoidNav.flyAvoid: unknown arm "${armName}" (${[...AVOID_ARMS, ARC_DESIGNATED, EDGE_DESIGNATED, LEAST_DESIGNATED].join(", ")})`);
     const [arm, turn, how] = BASE[armName], spec = H.ARM_SPEC[arm], total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(H.REPLAN_S / dt)), mode = "predict";
     let field = H.buildLadderField(H.planShapes(sc, 0, { mode, blind: false, horizon }), sc.goal, st, { ladder, edgeExtra: spec.edge }), replans = 0;
     const field0 = field, sc0 = N.cellOf(field, st.x, st.y), noRoute = !(sc0 && field.dist[sc0.i] < N.BIG);
@@ -91,7 +106,7 @@ export function flyAvoid(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.
         if (i > 0 && i % every === 0) { field = H.buildLadderField(H.planShapes(sc, i * dt, { mode, blind: false, horizon }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder, own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); replans++; }
         let target = H.hardTarget(arm, s, field, sc.goal, { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: sc.minDepth, yieldSpeed });
         if (turn) {
-            const a = how === "arc" || how === "arc-edge" ? avoidHeadingArc(s.pos[0], s.pos[1], i * dt, S.attitude(s).heading, target.heading, sc.obstacles, sc.minDepth, { edge: how === "arc-edge" }) : avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
+            const a = how === "arc" || how === "arc-edge" || how === "arc-edge-least" ? avoidHeadingArc(s.pos[0], s.pos[1], i * dt, S.attitude(s).heading, target.heading, sc.obstacles, sc.minDepth, { edge: how !== "arc", least: how === "arc-edge-least" }) : avoidHeading(s.pos[0], s.pos[1], i * dt, target.heading, sc.obstacles, sc.minDepth);
             if (a.fired) fires++; if (a.turned) turns++; if (a.stuck) stuck++;
             target = { ...target, heading: a.heading };
         }

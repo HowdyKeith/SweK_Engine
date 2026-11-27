@@ -159,5 +159,22 @@ console.log("\n6. FOLLOW-UP 10: THE ARC RULE KEPT OFF THE REGION'S EDGE");
     const sc = H.hardScenario(1, "hard-traffic"), e1 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 })), e2 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 }));
     ok("the edge arm flies (DEV seed 1, 60 s), names itself, and is deterministic", !!e1 && e1.arm === A.EDGE_DESIGNATED && same(e1, e2), JSON.stringify(e1 && { s: e1.status, f: e1.fires, t: e1.turns, k: e1.stuck }));
 }
+console.log("\n7. FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING");
+{
+    ok("!! the least arm and its reference, HELD12 = 9701 to 9760 (above subNavRoute's held87, which ends at 9700), disjoint from HELD8 to HELD10", same(A.LEAST_ARMS, ["any+predict+edge+avoid-arc-edge", "any+predict+edge+avoid-arc-edge-least"])
+        && A.LEAST_REFERENCE === "any+predict+edge+avoid-arc-edge" && A.LEAST_DESIGNATED === "any+predict+edge+avoid-arc-edge-least" && A.HELD12.length === 60 && A.HELD12[0] === 9701 && A.HELD12[59] === 9760
+        && !A.HELD12.some((x) => A.HELD8.includes(x) || A.HELD9.includes(x) || A.HELD10.includes(x)));
+    ok("!! minClearArc: a still ship dead ahead at 100 m on the straight line is met at 25 s, 25 m off, its need 10 + half-hull + 30 = 44: -19; nothing near is Infinity; a ship passed beneath is skipped",
+        A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity) === -19 && A.minClearArc(0, 0, 0, 0, 0, [], -Infinity) === Infinity && A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0, 10, 5)], 30) === Infinity);
+    ok("...and a static's need is STATIC_CLEAR, not SHIP_CLEAR: an iceberg (r 5) dead ahead at 100 m is 25 - (5 + half-hull + 12)", A.minClearArc(0, 0, 0, 0, 0, [berg(100, 0, 5)], -Infinity) === 25 - (5 + HH + 12));
+    const wall = []; for (let k = 0; k < 12; k++) wall.push(ship(150 * Math.cos(k * Math.PI / 6), -150 * Math.sin(k * Math.PI / 6), 0, 0, 120));
+    const w2 = [...wall, ship(60, 0, 0, 0)], plain = A.avoidHeadingArc(0, 0, 0, 0, 0, w2, -Infinity), least = A.avoidHeadingArc(0, 0, 0, 0, 0, w2, -Infinity, { least: true });
+    const all = [0, ...A.OFFSETS].map((d) => ({ d, m: A.minClearArc(0, 0, 0, 0, d, w2, -Infinity) })), top = Math.max(...all.map((x) => x.m)), firstTop = all.find((x) => x.m === top).d;
+    ok("!! STUCK (a ring of big ships and one close ahead): without least the plan's heading comes back; with least, the heading with the largest minimum clearance, the first in order on a tie (here +90: -69.1 against the plan's -79.0)",
+        plain.stuck && plain.heading === 0 && least.stuck && !least.turned && least.heading === firstTop && least.heading !== 0 && Math.abs(top - (-69.1)) < 0.05, JSON.stringify({ least: least.heading, top }));
+    ok("...and when a candidate clears, least changes nothing (the turn is taken as before)", same(A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { least: true }), A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity)));
+    let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEAST_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
+    ok("!! GOLDEN: the least arm on DEV seeds 1-6 fires 3781, turns 3107, stuck 674, statuses lrrrrr (the edge arm's golden, section 6, is unchanged)", same({ f, t, k, st }, { f: 3781, t: 3107, k: 674, st: "lrrrrr" }), JSON.stringify({ f, t, k, st }));
+}
 console.log(fails === 0 ? "\nall checks pass" : `\n${fails} FAIL`);
 process.exit(fails === 0 ? 0 : 1);
