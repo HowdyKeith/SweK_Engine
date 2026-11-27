@@ -3156,8 +3156,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-avoid-stuck-fallback",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 10's edge rule is stuck twice as often (35.6 % of fires) and, stuck, flies the plan's heading into the ship: collisions 3 to 6, 4 with ships.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27 as FOLLOW-UP 12 (brain/SUB_FIELD_NAV_WIP.md): NO DIFFERENCE SHOWN (47 against 48, 7 to 8); collisions 9 to 1 (ships 7 to 1) but exits 3 to 12 -- the least-bad heading ignores the edge. Over FOLLOW-UPS 10-12 the rule trades exits and collisions within a budget of about 11 of 60 while arrivals stay 47-49. Was: FOLLOW-UP 10's edge rule is stuck twice as often (35.6 % of fires) and, stuck, flies the plan's heading into the ship: collisions 3 to 6, 4 with ships.",
         how: "Register first one change: when stuck, the candidate with the largest minimum clearance over the look (the least bad) instead of the plan's heading; the edge arm as the reference, fresh seeds.",
         why: "It is where the edge rule's added collisions come from.",
     },
@@ -3174,6 +3174,13 @@ export const NEXT_ROUNDS = [
         what: "The turn-away rule along the real turn and off the edge (FOLLOW-UP 10) is in brain/subAvoidNav.mjs only; the Sub Aquarium's couriers do not use it.",
         how: "If the replication holds: a gated change putting the edge arm's heading test into the aquarium courier's navigator (render/subAquariumSim.mjs), off by default or as the default by the same never-over-a-choice rule as the captains; rows and mutants.",
         why: "Where a person would see the improvement.",
+    },
+    {
+        id: "nav-avoid-least-with-edge",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 12: the least-bad fallback cut collisions 9 to 1 and raised exits 3 to 12, because its clearance measure leaves out the edge band. Over FOLLOW-UPS 10-12 the turn-away rule moves about 11 losses in 60 between ships and the edge.",
+        how: "Register first one change: the least-bad measure also counts the edge -- the clearance to the region's boundary less the 20 m band, minimised with the obstacles' -- on fresh seeds, the least arm as the reference. The question is whether the loss budget shrinks or only splits.",
+        why: "It is the one fallback that sees both losses at once.",
     },
     {
         id: "fly-gf-input-signs",

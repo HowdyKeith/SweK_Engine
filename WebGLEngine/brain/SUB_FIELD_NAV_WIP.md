@@ -1192,3 +1192,14 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **DEV sanity run (seeds 1 to 30, both arms):** NOT degenerate -- the least-bad heading changes the flights (stuck ticks 4,924 against the reference's 8,653; the rule fires 21,042 times against 24,903) -- so no amendment. The reference reproduces FOLLOW-UP 10's DEV counts exactly (24,903 fires, 16,250 turns, 8,653 stuck). Read for sanity, not tuned on: the reference reached 26 of 30 (2 exits, 2 collisions, 1 with a ship); the least arm 23 of 30 (7 exits, no collision).
 
 **Nothing was tuned.** HELD12 (9701 to 9760) is flown once, both arms, to `brain/subAvoidHeld12.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING (2026-11-27; `brain/subAvoidHeld12.{0,1,2,3}.jsonl`, HELD12 = seeds 9701 to 9760, 120 flights, committed unread at `eb48a753b`, read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | stuck / fires |
+|---|---|---|---|---|
+| any+predict+edge+avoid-arc-edge (reference) | 48 / 60 | 9 (7) | 3 | 45.4 % |
+| any+predict+edge+avoid-arc-edge-least (designated) | 47 / 60 | **1 (1)** | **12** | 32.3 % |
+
+**The verdict (registered):** the least arm arrives where the reference does not on 7 seeds and the reverse on 8 -- **NO DIFFERENCE SHOWN** (p 0.70 and 0.50).
+**Predictions.** **F1 held** (1 ship collision against 7). **F2 MISSED** (12 exits, more than the reference's 3 plus 3). **F3 held** (NO DIFFERENCE SHOWN).
+**What it says.** The fallback did what it was built to do -- collisions fell from 9 to 1 -- and paid for it in exits, 3 to 12, because the least-bad heading was registered without the edge band. Across FOLLOW-UPS 10 to 12 the turn-away rule has traded the same two losses back and forth (exits for collisions, collisions for exits) while arrivals stayed between 47 and 49 of 60: **the loss is now a single budget of about 11 flights in 60 that the rule moves between the ships and the region's edge, and no one-term change has shrunk it.** A least-bad heading that also prices the edge would be the obvious next form; whether it shrinks the budget or only splits it is the question it would ask.
