@@ -196,3 +196,6 @@ process.exit(fails === 0 ? 0 : 1);
 // past it, so a ship at the frame's edge is still lit (the edge check added for it passes either way); the eye not written -- it feeds only the specular term, too faint here
 // to cross a threshold. THE FIRST SWEEP FOUND THE GATE FLAKY: under load the battle had run on before the freeze and other ships, wholly in shadow, sat in the frame -- the
 // ships are now told by what the unshadowed sun lights, not by what the shadowed sun lights.
+// 2026-11-27, THE SHAFTS (section 5): 4 mutants of flight-gpu.html. ALL 4 RED -- the shafts' fog made without the lighting, the live switch ignored, the switch inverted,
+// the shafts off by default. BEFORE THE SABOTAGE the section found the first framing wrong: from the orbit a ship's 50-unit shadow crosses a ray for 50 units of 12000 and
+// changes nothing; looking past a ship toward the sun its shadow runs along the rays, and the shafts show.

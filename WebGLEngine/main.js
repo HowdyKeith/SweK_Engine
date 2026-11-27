@@ -22494,6 +22494,23 @@ window.swekExport = {
         return { ok: true, name, stats: r.stats };
     },
 
+    // 2026-11-27 -- *** THE SAME WORLD AS A .usdz, SO AN iPHONE OPENS IT IN AR QUICK LOOK *** (tools/export/usdz.mjs; Keith: "lets do 1 through 6",
+    // 6 being USDZ export). The very meshes .glb() writes; their per-vertex palette becomes one material per colour, because Quick Look shows no
+    // vertex colours. swekExport.usdz() -- everything loaded; swekExport.usdz({ name: "harbour" })
+    async usdz(o = {}) {
+        const [{ worldMeshes }, { meshesToUsdz }] = await Promise.all([import("./world/worldGlbExport.js"), import("./tools/export/usdz.mjs")]);
+        const meshes = worldMeshes(world, o);
+        if (!meshes.length) { const error = "nothing to export -- no loaded chunk produced any geometry"; console.warn("[swekExport]", error); return { ok: false, error }; }
+        const r = meshesToUsdz(meshes, { name: o.name || "SweK_world" }), name = (o.name || "swek-world") + ".usdz";
+        try {
+            const url = URL.createObjectURL(new Blob([r.bytes], { type: "model/vnd.usdz+zip" })), a = document.createElement("a");
+            a.href = url; a.download = name; a.style.display = "none"; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 10000);   // on a timer, as .glb() does
+        } catch (e) { console.warn("[swekExport] save failed:", e?.message || e); return { ok: false, error: String(e?.message || e) }; }
+        console.log("[swekExport] " + name + " -- " + r.stats.triangles.toLocaleString() + " triangles, " + r.stats.materials + " colours, " + (r.bytes.length / 1048576).toFixed(2) + " MB");
+        return { ok: true, name, stats: r.stats };
+    },
+
     // v4176 -- *** THE SAME WORLD, BUT AS A SCENE: WHERE YOU WERE STANDING AND WHAT THE AIR LOOKED LIKE. ***
     // .glb() above answers "give me this world as a model" -- correct for Blender or a printer, and useless
     // on a TV across the room, where the file lands and the viewer has no idea which way to face in a world

@@ -8,12 +8,14 @@
 // (window.__ocean.lit) are thrown on ONE frame, so two pictures differ only by the switch:
 //
 //   1  IT RUNS          lights and fog: no page error; nine lights (the sun, five lamps, three searchlights), six atlas tiles (three cascades, three spots), none without room;
+//                       each lamp over a buoy, each searchlight on a mast with its pool near it;
 //                       without ?lights the page has no lit state and draws as before
 //   2  THE SEARCHLIGHTS switched off and on: what changes is water inside the searchlights' cones (each pixel's ray met with the sea's level, a cone's angle and range)
 //   3  THE LAMPS        likewise, within a lamp's range of the pixel's water
 //   4  THE SHADOWS      a searchlight a gate adds, aimed past the middle buoy; the buoys left out of the atlas: brighter only beyond the buoy in that cone, darker nowhere
 //                       (the low sun's own buoy shadows on dusk water are about a level: the water's albedo is 0.04)
-//   5  THE HAZE         without shadows in it: where no water was drawn the pixel is fogCPU's closed form (height fog along the ray to 420 m) over the clear colour, to 2 levels
+//   5  THE HAZE         without shadows in it: where no water was drawn the pixel is fogCPU's closed form (height fog along the ray to 420 m) over the clear colour, to 2 levels;
+//                       over the water, the closed form at the water's distance over the unfogged picture, to 4 levels
 //   6  THE BEAMS        switched on: they only add light, and what they light is a ray that passes through a searchlight's cone within its range
 //   7  THE SHAFTS       the sun's shadow in the haze only takes light away
 //
@@ -66,6 +68,10 @@ await section(async () => {
     const r = await shot(p, {}); L0 = r; await p.close();
     const kinds = r.lights.reduce((m, l) => ({ ...m, [l.type]: (m[l.type] || 0) + 1 }), {});
     ok("!! lights and fog: no page error; the sun, five lamps and three searchlights; three cascades and three spot tiles in the atlas, none left without room, no cell over its cap", errors.length === 0 && !r.error && kinds.directional === 1 && kinds.point === 5 && kinds.spot === 3 && r.stats.faces === 6 && r.stats.cascades === 3 && r.stats.unshadowed === 0 && r.stats.overflow === 0, `${JSON.stringify(kinds)}; ${JSON.stringify(r.stats)}${errors[0] ? "; " + errors[0] : ""}`);
+    // where the lights are: each lamp about 3 m over a buoy; each searchlight's axis meets the water near its mast (it lights the sea round its buoy, not the horizon)
+    const BUOYS = [[0, 0], [22, -14], [-30, 18], [45, 40], [-55, -38]], lampsOk = r.lights.filter((l) => l.type === "point").every((l) => BUOYS.some(([x, z]) => Math.hypot(l.position[0] - x, l.position[2] - z) < 2) && l.position[1] > 1.5 && l.position[1] < 5.5);
+    const spotsOk = r.lights.filter((l) => l.type === "spot").every((l) => { const d = norm(l.direction), t = -l.position[1] / d[1], h = [l.position[0] + d[0] * t, l.position[2] + d[2] * t]; return d[1] < 0 && t > 0 && Math.hypot(h[0] - l.position[0], h[1] - l.position[2]) < 25 && BUOYS.some(([x, z]) => Math.hypot(l.position[0] - x, l.position[2] - z) < 2); });
+    ok("!! THE LIGHTS ARE WHERE THE PAGE SAYS: each lamp 1.5 to 5.5 m over a buoy; each searchlight on a buoy's mast, its axis meeting the water within 25 m of it", lampsOk && spotsOk, JSON.stringify(r.lights.filter((l) => l.type !== "directional").map((l) => l.position.map((v) => +v.toFixed(1)))));
     const q = await open(""), plain = await q.p.evaluate(() => ({ lit: window.__ocean.lit, capture: typeof window.__ocean.capture, frames: window.__ocean.frames, error: window.__ocean.error })); await q.p.close();
     ok("!! without ?lights the page has no lit state and no capture, and runs as it did", plain.lit === undefined && plain.capture === "undefined" && plain.frames > 5 && !plain.error && q.errors.length === 0, JSON.stringify(plain));
 });
@@ -95,7 +101,7 @@ await section(async () => {
 console.log("5. THE HAZE, 6. THE BEAMS, 7. THE SHAFTS");
 await section(async () => {
     const { p, errors } = await open("&lights=1&fog=1");
-    const flat = await shot(p, { shaftsOn: false }), shafts = await shot(p, { shaftsOn: true, beamsOn: false }), beams = await shot(p, { beamsOn: true }); await p.close();
+    const clearPic = await shot(p, { fogOn: false }), flat = await shot(p, { fogOn: true, shaftsOn: false }), flatDark = await shot(p, { searchlights: false }), shafts = await shot(p, { searchlights: true, shaftsOn: true, beamsOn: false }), beams = await shot(p, { beamsOn: true }); await p.close();
     const inv = invert4(flat.vp), P = flat.fogParams, clear = [0.05, 0.06, 0.1], spots = flat.lights.filter((l) => l.type === "spot");
     // where no water was drawn: the ray rises, or meets the sea's level beyond the 300 m square (a band either side of its edge left out)
     let sky = 0, match = 0, worst = 0;
@@ -104,6 +110,17 @@ await section(async () => {
         const want = fogCPU(P, { origin: flat.eye, dir: d, distance: 1e9, color: clear, px: x, py: flat.h - 1 - y }).map((v) => Math.min(255, Math.max(0, v * 255))), k = (y * flat.w + x) * 4;
         const e = Math.max(...[0, 1, 2].map((i) => Math.abs(flat.px[k + i] - want[i]))); sky++; if (e <= 2) match++; worst = Math.max(worst, e);
     }
+    // and over the water: the haze at the water's distance (the ray met with the sea's level; the waves a metre or two off it) on the clear picture's pixel
+    let wn = 0, wok = 0;
+    for (let y = 1; y < flat.h; y += 3) for (let x = 1; x < flat.w; x += 3) {
+        const d = rayOf(flat, inv, x, y), h = seaHit(flat, d); if (!h || Math.max(Math.abs(h[0]), Math.abs(h[2])) > 140) continue;
+        const k = (y * flat.w + x) * 4, want = fogCPU(P, { origin: flat.eye, dir: d, distance: Math.hypot(...h.map((v, i) => v - flat.eye[i])), color: [0, 1, 2].map((i) => clearPic.px[k + i] / 255), px: x, py: flat.h - 1 - y }).map((v) => v * 255);
+        wn++; if (Math.max(...[0, 1, 2].map((i) => Math.abs(flat.px[k + i] - want[i]))) <= 4) wok++;
+    }
+    ok("!! OVER THE WATER TOO: the haze without shadows is the closed form at the water's distance over the unfogged picture, 9 in 10 pixels to 4 levels (the waves stand off the level)", wn > 2000 && wok >= 0.9 * wn, `${wok} of ${wn}`);
+    // the haze without shadows knows nothing of the lights: switching the searchlights changes only the water in their pools (seen through the haze), never the air
+    const fd = diffs(flatDark, flat, 3), fw = (() => { let inside = 0, sea = 0; for (const c of fd) { const h = seaHit(flat, rayOf(flat, inv, c.x, c.y)); if (!h) continue; sea++; if (flat.lights.filter((l) => l.type === "spot").some((l) => inCone(l, h, 0.12))) inside++; } return { inside, sea }; })();
+    ok("!! AND IT KNOWS NOTHING OF THE LIGHTS: with it, switching the searchlights changes only water inside their cones (19 in 20 pixels), no beam in the air", fd.length > 100 && fw.inside >= 0.95 * fw.sea, `${fd.length} changed, ${fw.inside} of ${fw.sea} in a cone`);
     ok("!! THE SEA-LEVEL HAZE IS THE CLOSED FORM: where no water was drawn, the pixel is fogCPU's height fog over 420 m on the clear colour, to 2 levels (97 in 100, a 2-pixel lattice)", sky > 500 && match >= 0.97 * sky && errors.length === 0, `${match} of ${sky}; worst ${worst.toFixed(1)}${errors[0] ? "; " + errors[0] : ""}`);
     const bd = diffs(shafts, beams, 3), along = (c) => { const d = rayOf(beams, inv, c.x, c.y), h = seaHit(beams, d), far = h ? Math.hypot(...h.map((v, i) => v - beams.eye[i])) : P.maxDistance; for (let s = 0.5; s < far; s += 0.5) { const q = beams.eye.map((e, i) => e + d[i] * s); if (spots.some((l) => inCone(l, q, 0.03))) return true; } return false; };
     const sample = bd.filter((_, i) => i % 7 === 0), through = sample.filter(along).length;
@@ -116,4 +133,9 @@ await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-27): 10 mutants of ocean-default.html, each in a hard-linked copy of the tree. ALL 10 RED -- the searchlights not added, no casters in the atlas,
+// the lighting bound before the atlas was drawn, the haze from the wrong eye or the wrong depth range, the beams switch ignored, the clustered light left out of the water;
+// and, after three were GREEN at first: the lamps 30 m off their buoys and the searchlights aimed level (the gate read the lights' places from the page itself, so a light
+// put in the wrong place was consistent with itself -- now each lamp must hang over a buoy and each pool lie near its mast), and the plain haze given the lighting (the beams
+// were 0.3% of the water, inside a 9-in-10 bar -- now switching the searchlights under the plain haze may change only the water in their pools). BEFORE THE SABOTAGE the gate
+// found the buoys' sun shadows on dusk water worth about a level (albedo 0.04), so the shadows are held under a searchlight aimed past a buoy.

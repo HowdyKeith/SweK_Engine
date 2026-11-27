@@ -66,4 +66,5 @@ await section(async () => {
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-27): 5 mutants of tools/lightingCost.mjs. ALL 5 RED -- a cost not less its base, software never refused, software never detected, the WebGL2
+// timer's labels not read, a variant's query not applied.
