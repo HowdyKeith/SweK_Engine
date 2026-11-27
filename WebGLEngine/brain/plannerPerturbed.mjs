@@ -97,6 +97,9 @@ export function perturbedSeat(params, err = {}, plan = {}) {
             return { surface, station, cap: q.cap, pump, repair };
         };
         Object.defineProperty(seat, "stats", { get: () => stats });
+        // 2026-11-21 (Round 43 of brain/NEEDS_AND_LIMITS.md): a READ-ONLY view of the last plan -- { values (a copy), order (a copy or null), t } -- or null before the first.
+        // It decides nothing; the look-ahead circuit reads it. Gated: the shipped seat still flies the dives Round 42's audit recorded before this getter existed.
+        Object.defineProperty(seat, "plan", { get: () => (plan_ ? { values: { ...plan_.values }, order: plan_.order ? [...plan_.order] : null, t: lastPlanT } : null) });
         return seat;
     };
 }

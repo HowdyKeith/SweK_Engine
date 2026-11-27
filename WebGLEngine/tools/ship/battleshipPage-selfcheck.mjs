@@ -90,6 +90,7 @@ import * as PB from "../../brain/peerBrain.mjs";
 import * as P6 from "../../brain/pilot6dofPolicy.mjs";
 import * as AP from "../../brain/autopilot6dof.mjs";
 import * as BS from "../../brain/battleshipFight.mjs";
+import * as RN from "./rockNavStudy.mjs";   // 2026-11-26: the NAV block holds the page to the study's arm L
 import * as SA from "../../brain/spaceArena.mjs";
 import * as CS from "../../physics/mechanics/capitalShip.mjs";
 import * as GS from "../../physics/mechanics/gunSeats.mjs";
@@ -407,6 +408,52 @@ else {
               B.newFight({ ...base });
             }
             // ==== HELM-END (browser)
+
+            // ==== ROCKS-BEGIN (browser): the rock field (2026-11-25, brain/spaceRocks.mjs) ----
+            {
+              globalThis.__swekStep = "the rock field";
+              const f6 = document.createElement("iframe"); f6.style.width = "1100px"; f6.style.height = "900px"; f6.src = "/space-battleship.html?rocks=1&kind=bow&seed=2"; document.body.appendChild(f6);
+              await new Promise((res) => { f6.onload = res; }); const t6 = performance.now(); while (performance.now() - t6 < 40000 && !f6.contentWindow.__battleship) await wait(200);
+              const B6 = f6.contentWindow.__battleship; await B6.ready; B6.hold(true); const s6 = B6.state(), d6 = f6.contentWindow.document;
+              out.rocks = { url: { rocks: s6.rocks, meshes: s6.rockMeshes, checked: d6.getElementById("rocks").checked, kind: s6.scenario.kind, seed: s6.scenario.seed } };
+              B6.step(3600, false); B6.step(0, true); const e6 = B6.state();   // one frame rendered, so the card shows the end of the fight
+              out.rocks.fight = { tally: B6.tally(), stopped: e6.roundsStopped, struckLog: e6.log.filter((l) => /STRUCK A ROCK/.test(l)).length, card: d6.getElementById("card1").textContent, done: e6.done };
+              f6.remove();
+              B.newFight({ ...base }); out.rocks.off = { rocks: B.state().rocks, meshes: B.state().rockMeshes, checked: sel("rocks").checked, struck: "struck" in B.tally() };
+              set("rocks", true); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true })); out.rocks.on = { tick: B.state().tick, rocks: B.state().rocks, meshes: B.state().rockMeshes };
+              set("rocks", false); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true })); out.rocks.back = { rocks: B.state().rocks, meshes: B.state().rockMeshes };
+              B.newFight({ ...base });
+            }
+            // ==== ROCKS-END (browser)
+            // ==== NAV-BEGIN (browser): the navigation layer (2026-11-26, brain/spaceNav.mjs; brain/ROCK_NAV_WIP.md Round B's lane) ----
+            {
+              globalThis.__swekStep = "the navigation layer";
+              const f7 = document.createElement("iframe"); f7.style.width = "1100px"; f7.style.height = "900px"; f7.src = "/space-battleship.html?rocks=1&nav=1&kind=bow&seed=2"; document.body.appendChild(f7);
+              await new Promise((res) => { f7.onload = res; }); const t7 = performance.now(); while (performance.now() - t7 < 40000 && !f7.contentWindow.__battleship) await wait(200);
+              const B7 = f7.contentWindow.__battleship; await B7.ready; B7.hold(true); const s7 = B7.state(), d7 = f7.contentWindow.document;
+              out.nav = { url: { nav: s7.nav, field: s7.navField, checked: d7.getElementById("rocknav").checked, pilotDisabled: d7.getElementById("pilotF").disabled, logged: s7.log.some((l) => /NAVIGATION LAYER/.test(l)), rocks: s7.rocks } };
+              B7.step(3600, false); const e7 = B7.state();
+              out.nav.fight = { tally: B7.tally(), aimed: e7.navAimed, handBack: e7.navHandBack, done: e7.done };
+              f7.remove();
+              B.newFight({ ...base }); set("rocknav", true); sel("rocknav").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.noRocks = { nav: B.state().nav, checked: sel("rocknav").checked, pilotDisabled: sel("pilotF").disabled };
+              set("rocks", true); set("rocknav", true); sel("rocks").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.withRocks = { nav: B.state().nav, field: B.state().navField, tick: B.state().tick, pilotDisabled: sel("pilotF").disabled };
+              set("rocknav", false); sel("rocknav").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.off = { nav: B.state().nav, field: B.state().navField, pilotDisabled: sel("pilotF").disabled };
+              set("rocks", false); B.newFight({ ...base });
+              // the cap on the layer (2026-11-26, rock nav Round D)
+              const f8 = document.createElement("iframe"); f8.style.width = "1100px"; f8.style.height = "900px"; f8.src = "/space-battleship.html?rocks=1&nav=1&navcap=1&kind=bow&seed=2"; document.body.appendChild(f8);
+              await new Promise((res) => { f8.onload = res; }); const t8 = performance.now(); while (performance.now() - t8 < 40000 && !f8.contentWindow.__battleship) await wait(200);
+              const B8 = f8.contentWindow.__battleship; await B8.ready; B8.hold(true); const s8 = B8.state(), d8 = f8.contentWindow.document;
+              out.nav.cap = { url: { cap: s8.navCap, checked: d8.getElementById("navcap").checked, logged: s8.log.some((l) => /CAPPED at a closing speed of 12/.test(l)) } };
+              B8.step(3600, false); const e8 = B8.state(); out.nav.cap.fight = { tally: B8.tally(), cut: e8.navCapCut, done: e8.done };
+              f8.remove();
+              set("rocknav", false); set("navcap", true); sel("navcap").dispatchEvent(new win.Event("change", { bubbles: true }));
+              out.nav.cap.noNav = { cap: B.state().navCap, checked: sel("navcap").checked, disabled: sel("navcap").disabled };
+              set("navcap", false); B.newFight({ ...base });
+            }
+            // ==== NAV-END (browser)
 
             // ==== PEER-BEGIN (browser): a peer's brain from a FILE, through the page's own file input ----
             {
@@ -741,6 +788,48 @@ else {
                 F.ctl.formation.tick === 0 && F.ctl.formation.formation === true && F.ctl.formation.sel === true && F.ctl.collide.tick === 0 && F.ctl.collide.shipCollisions === true && F.ctl.collide.sel === true && F.url.formation === true && F.url.shipCollisions === true && F.url.ships === 2 && F.url.sel.join() === "true,true,2");
         }
         // ==== SHIPFORM-END (node)
+
+        // ==== ROCKS-BEGIN (node): the rock field ----
+        // 2026-11-25 SABOTAGED, space-battleship.html restored byte-identical each time: the rock meshes not drawn -> 1 red (the field row); the struck-a-rock log line dropped -> 1 red (the
+        // engine-fight row). FOUND WRITING IT: the first fixture (bow, seed 3) strikes NO fighter in the engine either -- the row then failed on its own premise, not on the page; it flies bow, seed 2 (4 struck).
+        {
+            const K = r.rocks, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3, rocks: 24 }, ref = BS.fight(2, "bow", O);   // bow seed 2: 4 fighters struck (seed 3 strikes none, and the first draft of this row picked it)
+            ok("!! ?rocks=1 STARTS A FIGHT IN A ROCK FIELD AND DRAWS IT: 24 rocks in the arena, 24 rock meshes in the scene, the box ticked; without it there are none, and ticking the box starts a fight (tick 0) with the field, unticking ends it",
+                !!K && K.url.rocks === 24 && K.url.meshes === 24 && K.url.checked === true && K.off.rocks === 0 && K.off.meshes === 0 && K.off.checked === false && K.off.struck === false && K.on.tick === 0 && K.on.rocks === 24 && K.on.meshes === 24 && K.back.rocks === 0 && K.back.meshes === 0,
+                K ? JSON.stringify({ url: K.url, on: K.on, back: K.back }) : "no result");
+            ok("!! THE PAGE FLIES THE ENGINE'S ROCK FIGHT: bow, seed 2, the page's tally equals battleshipFight.fight() with rocks 24 in every count, the struck fighters are logged and carded, and rounds were stopped by rocks",
+                !!K && K.fight.done && same(K.fight.tally, ref) && ref.struck > 0 && K.fight.struckLog >= ref.struck && new RegExp(ref.struck + " struck a rock").test(K.fight.card) && K.fight.stopped > 0,
+                K ? `struck ${K.fight.tally.struck}, stopped ${K.fight.stopped}, logged ${K.fight.struckLog}` : "");
+        }
+        // ==== ROCKS-END (node)
+        // ==== NAV-BEGIN (node): the navigation layer ----
+        // 2026-11-26 SABOTAGED, space-battleship.html restored byte-identical each time: P1 the layer never flown (the pilot choice kept) -> 1 red (the lane-fight row); P2 the field built
+        // without the lane -> 1 red (the lane-fight row: the damage moves); P3 the layer on without rocks -> 2 red (the toggle row, and a page error on the empty field); P4 the pilot choice not set
+        // aside -> 1 red (the toggle row); P5 the log line dropped -> 1 red (the toggle row); P6 the box not wired to a new fight -> 1 red (the toggle row). The fixture strikes no fighter in either
+        // run (struck 0 = 0), so the lane-fight row's teeth are the damage on the ship (226) and the layer's own counts.
+        // THE CAP (2026-11-26, rock nav Round D on the page), sabotaged the same way: P7 the cap never applied -> 1 red (the capped-fight row); P8 the cap at 15 -> 1 red (the capped-fight row);
+        // P9 the cap on without the layer -> 1 red (the cap-box row); P10 the cap box not wired -> 1 red (the cap-box row); P11 the cap's log words dropped -> 1 red (the cap-box row).
+        {
+            const N = r.nav, ref = RN.flyOne({ seed: 2, kind: "bow", arm: "L" });   // the study's arm L: Round B's lane layer on the same fight (8 fighters, regular gunners, 24 rocks, the defaults)
+            ok("!! ?rocks=1&nav=1 FLIES THE NAVIGATION LAYER: the box ticked, the field built, the pilot choice set aside and the log saying so; ticking it WITHOUT rocks does nothing; with rocks it starts a fight (tick 0) with the field; unticking it gives the pilot choice back",
+                !!N && N.url.nav === true && N.url.field === true && N.url.checked === true && N.url.pilotDisabled === true && N.url.logged === true && N.url.rocks === 24
+                && N.noRocks.nav === false && N.noRocks.checked === false && N.noRocks.pilotDisabled === false && N.withRocks.nav === true && N.withRocks.field === true && N.withRocks.tick === 0 && N.withRocks.pilotDisabled === true
+                && N.off.nav === false && N.off.field === false && N.off.pilotDisabled === false,
+                N ? JSON.stringify({ url: N.url, noRocks: N.noRocks, withRocks: N.withRocks, off: N.off }) : "no result");
+            ok("!! THE PAGE FLIES THE STUDY'S LANE FIGHT: bow, seed 2 with the layer -- the page's struck fighters and damage on the ship equal rockNavStudy's arm L on the same fight, and the layer both steered and handed back",
+                !!N && N.fight.done && N.fight.tally.struck === ref.struck && N.fight.tally.damageOnShip === ref.damageOnShip && N.fight.aimed > 0 && N.fight.handBack > 0,
+                N ? `page struck ${N.fight.tally.struck}, damage ${N.fight.tally.damageOnShip}; study struck ${ref.struck}, damage ${ref.damageOnShip}; aimed ${N.fight.aimed}, hand-back ${N.fight.handBack}` : "");
+        }
+        {
+            const C = r.nav && r.nav.cap, refC = RN.flyOne({ seed: 2, kind: "bow", arm: "LC" });   // the study's arm LC: the lane with the doctrine's cap, on the same fight
+            ok("!! ?nav=1&navcap=1 CAPS THE LAYER: the box ticked and the log saying so; the cap box does nothing (unticked, disabled) without the nav layer",
+                !!C && C.url.cap === true && C.url.checked === true && C.url.logged === true && C.noNav.cap === false && C.noNav.checked === false && C.noNav.disabled === true,
+                C ? JSON.stringify({ url: C.url, noNav: C.noNav }) : "no result");
+            ok("!! THE PAGE FLIES THE STUDY'S CAPPED LANE FIGHT: bow, seed 2 -- the page's struck fighters and damage on the ship equal rockNavStudy's arm LC, the cap cut thrust, and the cap moved the fight (the damage differs from the uncapped lane's)",
+                !!C && C.fight.done && C.fight.tally.struck === refC.struck && C.fight.tally.damageOnShip === refC.damageOnShip && C.fight.cut > 0 && !!r.nav && C.fight.tally.damageOnShip !== r.nav.fight.tally.damageOnShip,
+                C ? `page struck ${C.fight.tally.struck}, damage ${C.fight.tally.damageOnShip}; study ${refC.struck}, ${refC.damageOnShip}; cut ${C.fight.cut}; uncapped damage ${r.nav ? r.nav.fight.tally.damageOnShip : "-"}` : "");
+        }
+        // ==== NAV-END (node)
 
         // ==== HELM-BEGIN (node): a network at the ships' helm ----
         {

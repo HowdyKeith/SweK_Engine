@@ -1,0 +1,66 @@
+{
+ "checks": {
+  "sameField": {
+   "ok": true,
+   "n": 120
+  },
+  "steers": {
+   "ok": true,
+   "aimed": 651915,
+   "calls": 916359
+  },
+  "handBack": {
+   "ok": true,
+   "handBack": 243169,
+   "mismatches": 0
+  },
+  "fieldSound": {
+   "ok": true,
+   "aimBlocked": 0
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 240
+  }
+ },
+ "sameScenarios": true,
+ "allOk": true,
+ "totals": {
+  "N": {
+   "fights": 120,
+   "approachStruck": 4,
+   "approachShot": 34,
+   "arrived": 921,
+   "combatStruck": 91,
+   "struck": 95,
+   "medianArrivalT": 15.766666666666666,
+   "meanR": 273.1,
+   "meanDamage": 273.1,
+   "shipDead": 0,
+   "maxDrift": 384.23956276246236
+  },
+  "D": {
+   "fights": 120,
+   "approachStruck": 81,
+   "approachShot": 7,
+   "arrived": 872,
+   "combatStruck": 96,
+   "struck": 177,
+   "medianArrivalT": 14.533333333333333,
+   "meanR": 141.6,
+   "meanDamage": 141.6,
+   "shipDead": 0,
+   "maxDrift": 50.68881633750121
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 36,
+   "losses": 30,
+   "ties": 54,
+   "n": 66,
+   "p": 0.5385827752459464
+  },
+  "fallbacks": 21275,
+  "near": 36175
+ }
+}

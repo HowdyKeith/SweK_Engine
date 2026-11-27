@@ -7,6 +7,7 @@
 // THE GUARDS (each a gate row): the dives may not be a seed any registered audit uses or any seed reserved for the language-model audit (Round 3's, Round 4's, and 171-222); the expected number of calls is printed first and `--dry-run` stops there; `--max-calls` (default 200) is a hard ceiling checked BEFORE
 // each call; every paid answer is appended to a calls log the moment it arrives, so a killed run is resumed from it and pays nothing twice.
 // This file does not decide how good a model's advice is: it scores a practice run with the brain alone beside it and says so. The registered language-model audit is a later round and its seeds are not touched here.
+// SETTLED at v4907 -- the registered language-model audit (Round 5) was built and flown: tools/ship/advisorLlmAudit.mjs flyAudits, read in brain/NEEDS_AND_LIMITS.md.
 "use strict";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";

@@ -183,8 +183,13 @@ sec("6. THE AUDIT AND THE COMMAND");
     ok("notHurts is not-HURTS (a mean below -2 se is the only miss)", X.notHurts({ mean: -0.01, se: 0.01 }) && !X.notHurts({ mean: -0.03, se: 0.01 }) && X.notHurts({ mean: 0.03, se: 0.01 }));
     const sl = X.scoredLine({ pilotFor: (w) => w, evaluate: (w) => ({ score: w[0], sound: 1, biased: 2 }) }, null)({ at: 0, weights: [0.1234567] });
     ok("scoredLine scores a checkpoint on held-out at its SIX-DECIMAL weights, as the champion will fly them", sl.heldOut === Math.fround(0.123457) && sl.heldOutSound === 1 && sl.heldOutBiased === 2);
-    const t1 = Date.now(), prof = X.profileSame((await import("../../render/subAquariumCircuit.mjs")).circuitSeat), ship = X.shippedSame();
-    ok("!! CUR IS THE AQUARIUM'S CIRCUIT PROFILE and SEAT-04 IS THE SHIPPED SEAT, on the gate's dives", prof && ship, `${((Date.now() - t1) / 1000).toFixed(1)} s`);
+    // RESTATED 2026-11-21, Round 42's replacement made: the audit's check (CUR IS THE AQUARIUM'S CIRCUIT PROFILE) was PASS when flown -- the committed report says so -- and
+    // the profile has flown the planner circuit's champion (the start, i.e. the shipped seat) since. CUR stays Round 40's net, reachable as circuitSeat("circuit", CIRCUIT_CHAMPION).
+    const AQ = await import("../../render/subAquariumCircuit.mjs"), t1 = Date.now();
+    const was = X.profileSame((p) => AQ.circuitSeat(p, AQ.CIRCUIT_CHAMPION)), now = X.profileSame(AQ.circuitSeat), ship = X.shippedSame();
+    const rep42 = fs.readFileSync(path.join(ENG, "brain", "rig-results", "planner-circuit-report.json"), "utf8");
+    ok("!! CUR WAS THE AQUARIUM'S CIRCUIT PROFILE (Round 40's net, still reachable; PASS in the committed report) and is not since Round 42's replacement; SEAT-04 IS THE SHIPPED SEAT",
+        was && !now && ship && /PASS CUR IS THE AQUARIUM'S CIRCUIT PROFILE/.test(rep42), `${((Date.now() - t1) / 1000).toFixed(1)} s`);
     const nw0 = { REF: { score: 0, runs: [], crashed: 0, stranded: 0 }, BIAS: { score: 0, runs: [], crashed: 0, stranded: 0 } };
     const rep = X.report({ NEW: nw0, "SEAT-04": nw0, CUR: nw0 }, [], { dives: 300 });
     ok("!! the report with a failed check says NOT WEIGHED and prints no verdict", rep.at(-1) === "BOTTOM LINE: NOT WEIGHED (a check failed)" && !rep.some((l) => /V1|V3/.test(l)) && rep.some((l) => /FAIL SIZES/.test(l)));

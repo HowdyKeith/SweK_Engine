@@ -1,0 +1,2129 @@
+{
+ "round": "rock-nav A",
+ "set": "dev",
+ "part": [
+  1,
+  4
+ ],
+ "seeds": [
+  3101,
+  3130
+ ],
+ "seconds": 54.486,
+ "rows": [
+  {
+   "seed": 3101,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.4,
+    13.033333333333333,
+    14.2,
+    14.6,
+    15.666666666666666,
+    16.4,
+    16.466666666666665
+   ],
+   "R": 90,
+   "damageOnShip": 90,
+   "shipDead": false,
+   "over": true,
+   "t": 22.666666666666668,
+   "drift": 26.045954933025882,
+   "fieldKey": "466a2fb0"
+  },
+  {
+   "seed": 3101,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    13.1,
+    15.6,
+    15.633333333333333,
+    16.233333333333334,
+    16.566666666666666,
+    16.733333333333334,
+    39.3
+   ],
+   "R": 234,
+   "damageOnShip": 234,
+   "shipDead": false,
+   "over": true,
+   "t": 40.2,
+   "drift": 80.66133931056866,
+   "fieldKey": "466a2fb0",
+   "probe": {
+    "calls": 5728,
+    "aimed": 4501,
+    "fallback": 0,
+    "near": 789,
+    "handBack": 1227,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3102,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 2,
+   "approachShot": 0,
+   "arrived": 6,
+   "combatStruck": 1,
+   "struck": 3,
+   "arrivalT": [
+    11.733333333333333,
+    12.566666666666666,
+    12.766666666666666,
+    14.266666666666666,
+    15.1,
+    16.1
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 21.7,
+   "drift": 23.976149496131303,
+   "fieldKey": "234aa2e4"
+  },
+  {
+   "seed": 3102,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    13.333333333333334,
+    15.133333333333333,
+    15.133333333333333,
+    16.433333333333334,
+    18.633333333333333,
+    18.633333333333333,
+    19.833333333333332
+   ],
+   "R": 990,
+   "damageOnShip": 990,
+   "shipDead": false,
+   "over": true,
+   "t": 47.43333333333333,
+   "drift": 95.0761916781,
+   "fieldKey": "234aa2e4",
+   "probe": {
+    "calls": 6509,
+    "aimed": 4654,
+    "fallback": 60,
+    "near": 1244,
+    "handBack": 1795,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3103,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    12.666666666666666,
+    14.166666666666666,
+    14.266666666666666,
+    14.299999999999999,
+    14.866666666666667,
+    15.066666666666666,
+    15.433333333333334,
+    16.366666666666667
+   ],
+   "R": 36,
+   "damageOnShip": 36,
+   "shipDead": false,
+   "over": true,
+   "t": 26.566666666666666,
+   "drift": 35.764371269930066,
+   "fieldKey": "b5a388b7"
+  },
+  {
+   "seed": 3103,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    14.333333333333334,
+    15.299999999999999,
+    15.5,
+    15.866666666666667,
+    16.2,
+    16.866666666666667,
+    17.4
+   ],
+   "R": 306,
+   "damageOnShip": 306,
+   "shipDead": false,
+   "over": true,
+   "t": 24.866666666666667,
+   "drift": 31.414432848100173,
+   "fieldKey": "b5a388b7",
+   "probe": {
+    "calls": 4943,
+    "aimed": 3782,
+    "fallback": 0,
+    "near": 373,
+    "handBack": 1161,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3104,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    11.533333333333333,
+    12.366666666666667,
+    12.866666666666667,
+    13.633333333333333,
+    14.766666666666666,
+    15.7,
+    16.166666666666668,
+    16.433333333333334
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 22.3,
+   "drift": 25.28095218321842,
+   "fieldKey": "da849752"
+  },
+  {
+   "seed": 3104,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    12.2,
+    13.2,
+    14.5,
+    14.7,
+    15.066666666666666,
+    16.5,
+    16.9,
+    16.966666666666665
+   ],
+   "R": 90,
+   "damageOnShip": 90,
+   "shipDead": false,
+   "over": true,
+   "t": 48.833333333333336,
+   "drift": 100.95580612712457,
+   "fieldKey": "da849752",
+   "probe": {
+    "calls": 5977,
+    "aimed": 4067,
+    "fallback": 90,
+    "near": 150,
+    "handBack": 1820,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3105,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    11.733333333333333,
+    12,
+    13.233333333333333,
+    13.633333333333333,
+    14.033333333333333,
+    14.966666666666667,
+    15.033333333333333,
+    16.333333333333332
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 23.366666666666667,
+   "drift": 27.691854045881918,
+   "fieldKey": "b77b297"
+  },
+  {
+   "seed": 3105,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    12.566666666666666,
+    13.466666666666667,
+    14,
+    14.233333333333333,
+    15.299999999999999,
+    16.53333333333333,
+    16.53333333333333,
+    17.466666666666665
+   ],
+   "R": 36,
+   "damageOnShip": 36,
+   "shipDead": false,
+   "over": true,
+   "t": 27.633333333333333,
+   "drift": 38.88622650552847,
+   "fieldKey": "b77b297",
+   "probe": {
+    "calls": 5031,
+    "aimed": 3603,
+    "fallback": 0,
+    "near": 191,
+    "handBack": 1428,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3106,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    12.666666666666666,
+    12.9,
+    13.766666666666666,
+    14.7,
+    14.799999999999999,
+    15,
+    15
+   ],
+   "R": 72,
+   "damageOnShip": 72,
+   "shipDead": false,
+   "over": true,
+   "t": 21.666666666666668,
+   "drift": 23.806887650213383,
+   "fieldKey": "60b52359"
+  },
+  {
+   "seed": 3106,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    12.966666666666667,
+    14.7,
+    14.799999999999999,
+    15.033333333333333,
+    15.333333333333334,
+    16.233333333333334,
+    17.53333333333333
+   ],
+   "R": 576,
+   "damageOnShip": 576,
+   "shipDead": false,
+   "over": true,
+   "t": 25.133333333333333,
+   "drift": 32.10783615335914,
+   "fieldKey": "60b52359",
+   "probe": {
+    "calls": 4562,
+    "aimed": 3528,
+    "fallback": 31,
+    "near": 150,
+    "handBack": 1003,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3107,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.9,
+    12.633333333333333,
+    12.666666666666666,
+    12.7,
+    14.766666666666666,
+    15.4,
+    16.066666666666666
+   ],
+   "R": 198,
+   "damageOnShip": 198,
+   "shipDead": false,
+   "over": true,
+   "t": 21.166666666666668,
+   "drift": 22.90643482421291,
+   "fieldKey": "268623e8"
+  },
+  {
+   "seed": 3107,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    13.6,
+    13.966666666666667,
+    14.6,
+    15.5,
+    15.766666666666666,
+    16.166666666666668,
+    16.366666666666667,
+    16.433333333333334
+   ],
+   "R": 522,
+   "damageOnShip": 522,
+   "shipDead": false,
+   "over": true,
+   "t": 25.833333333333332,
+   "drift": 34.07226348084243,
+   "fieldKey": "268623e8",
+   "probe": {
+    "calls": 4914,
+    "aimed": 3672,
+    "fallback": 0,
+    "near": 249,
+    "handBack": 1242,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3108,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.4,
+    11.433333333333334,
+    12.433333333333334,
+    12.5,
+    12.8,
+    15.799999999999999,
+    16.466666666666665
+   ],
+   "R": 252,
+   "damageOnShip": 252,
+   "shipDead": false,
+   "over": true,
+   "t": 22.1,
+   "drift": 24.89504173235918,
+   "fieldKey": "55d67caf"
+  },
+  {
+   "seed": 3108,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    11.733333333333333,
+    12.333333333333334,
+    12.933333333333334,
+    13.033333333333333,
+    15.733333333333333,
+    15.966666666666667,
+    17.03333333333333
+   ],
+   "R": 216,
+   "damageOnShip": 216,
+   "shipDead": false,
+   "over": true,
+   "t": 28.3,
+   "drift": 40.86057803491915,
+   "fieldKey": "55d67caf",
+   "probe": {
+    "calls": 5059,
+    "aimed": 3324,
+    "fallback": 0,
+    "near": 0,
+    "handBack": 1735,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3109,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    11.366666666666667,
+    11.633333333333333,
+    12.2,
+    13.233333333333333,
+    13.733333333333333,
+    15.266666666666666,
+    15.299999999999999,
+    16.166666666666668
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 21.866666666666667,
+   "drift": 24.07539552445803,
+   "fieldKey": "fc1c7539"
+  },
+  {
+   "seed": 3109,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 1,
+   "arrivalT": [
+    11.8,
+    14.299999999999999,
+    14.366666666666667,
+    15.433333333333334,
+    15.9,
+    16.433333333333334,
+    16.566666666666666
+   ],
+   "R": 306,
+   "damageOnShip": 306,
+   "shipDead": false,
+   "over": true,
+   "t": 40.6,
+   "drift": 71.93178713047188,
+   "fieldKey": "fc1c7539",
+   "probe": {
+    "calls": 5846,
+    "aimed": 3624,
+    "fallback": 4,
+    "near": 263,
+    "handBack": 2218,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3110,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 4,
+   "struck": 5,
+   "arrivalT": [
+    11.6,
+    12.3,
+    12.566666666666666,
+    12.9,
+    13.233333333333333,
+    13.4,
+    14.566666666666666
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 20.7,
+   "drift": 21.86712552255838,
+   "fieldKey": "a5c8ce5d"
+  },
+  {
+   "seed": 3110,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    11.866666666666667,
+    13.366666666666667,
+    13.6,
+    14.166666666666666,
+    14.299999999999999,
+    17.9,
+    18.466666666666665,
+    19.1
+   ],
+   "R": 334,
+   "damageOnShip": 334,
+   "shipDead": false,
+   "over": true,
+   "t": 87.73333333333333,
+   "drift": 171.31437863664382,
+   "fieldKey": "a5c8ce5d",
+   "probe": {
+    "calls": 8696,
+    "aimed": 5785,
+    "fallback": 195,
+    "near": 317,
+    "handBack": 2716,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3111,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    13.366666666666667,
+    13.799999999999999,
+    14.366666666666667,
+    14.6,
+    15.533333333333333,
+    15.533333333333333,
+    15.533333333333333,
+    15.566666666666666
+   ],
+   "R": 36,
+   "damageOnShip": 36,
+   "shipDead": false,
+   "over": true,
+   "t": 21.9,
+   "drift": 24.526056852345853,
+   "fieldKey": "c3833c5c"
+  },
+  {
+   "seed": 3111,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    13.866666666666667,
+    14.766666666666666,
+    15.666666666666666,
+    15.7,
+    16.7,
+    17.133333333333333,
+    17.366666666666667,
+    17.466666666666665
+   ],
+   "R": 162,
+   "damageOnShip": 162,
+   "shipDead": false,
+   "over": true,
+   "t": 78.06666666666666,
+   "drift": 161.049779062775,
+   "fieldKey": "c3833c5c",
+   "probe": {
+    "calls": 7162,
+    "aimed": 5124,
+    "fallback": 305,
+    "near": 124,
+    "handBack": 1733,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3112,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.433333333333334,
+    12.066666666666666,
+    12.266666666666666,
+    12.4,
+    12.933333333333334,
+    13.966666666666667,
+    14.9
+   ],
+   "R": 522,
+   "damageOnShip": 522,
+   "shipDead": false,
+   "over": true,
+   "t": 21.53333333333333,
+   "drift": 23.36686425017298,
+   "fieldKey": "4e2e6443"
+  },
+  {
+   "seed": 3112,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 2,
+   "arrived": 6,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    11.833333333333334,
+    12.466666666666667,
+    13.166666666666666,
+    14.666666666666666,
+    14.933333333333334,
+    15
+   ],
+   "R": 424,
+   "damageOnShip": 424,
+   "shipDead": false,
+   "over": true,
+   "t": 70.5,
+   "drift": 217.76651615061195,
+   "fieldKey": "4e2e6443",
+   "probe": {
+    "calls": 7624,
+    "aimed": 6405,
+    "fallback": 0,
+    "near": 135,
+    "handBack": 1219,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3113,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    12.1,
+    13.266666666666666,
+    13.833333333333334,
+    13.9,
+    14.533333333333333,
+    14.666666666666666,
+    15.9,
+    16.166666666666668
+   ],
+   "R": 72,
+   "damageOnShip": 72,
+   "shipDead": false,
+   "over": true,
+   "t": 23.03333333333333,
+   "drift": 26.80888275811675,
+   "fieldKey": "54140042"
+  },
+  {
+   "seed": 3113,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 2,
+   "arrived": 6,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    13.966666666666667,
+    14.9,
+    15,
+    16.466666666666665,
+    16.966666666666665,
+    20.2
+   ],
+   "R": 198,
+   "damageOnShip": 198,
+   "shipDead": false,
+   "over": true,
+   "t": 31.599999999999998,
+   "drift": 49.8234977574013,
+   "fieldKey": "54140042",
+   "probe": {
+    "calls": 5399,
+    "aimed": 4234,
+    "fallback": 0,
+    "near": 141,
+    "handBack": 1165,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3114,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 1,
+   "arrived": 6,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    13.6,
+    14.866666666666667,
+    14.933333333333334,
+    15.233333333333333,
+    16.3,
+    16.4
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 21.833333333333332,
+   "drift": 24.302604799062053,
+   "fieldKey": "d4d949db"
+  },
+  {
+   "seed": 3114,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    14.066666666666666,
+    14.299999999999999,
+    14.833333333333334,
+    15.566666666666666,
+    16.566666666666666,
+    16.6,
+    16.8,
+    17.3
+   ],
+   "R": 252,
+   "damageOnShip": 252,
+   "shipDead": false,
+   "over": true,
+   "t": 35.63333333333333,
+   "drift": 63.577209497253364,
+   "fieldKey": "d4d949db",
+   "probe": {
+    "calls": 5589,
+    "aimed": 3961,
+    "fallback": 15,
+    "near": 120,
+    "handBack": 1613,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3115,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 3,
+   "arrivalT": [
+    11.366666666666667,
+    12.1,
+    12.1,
+    12.633333333333333,
+    14.833333333333334,
+    14.966666666666667,
+    16.266666666666666
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 22.433333333333334,
+   "drift": 25.479563942658654,
+   "fieldKey": "160abd7d"
+  },
+  {
+   "seed": 3115,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    13.033333333333333,
+    13.566666666666666,
+    14.133333333333333,
+    15.133333333333333,
+    15.233333333333333,
+    16.3,
+    19
+   ],
+   "R": 432,
+   "damageOnShip": 432,
+   "shipDead": false,
+   "over": true,
+   "t": 90.33333333333333,
+   "drift": 232.59976421560054,
+   "fieldKey": "160abd7d",
+   "probe": {
+    "calls": 8301,
+    "aimed": 6203,
+    "fallback": 165,
+    "near": 184,
+    "handBack": 1933,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3116,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 3,
+   "approachShot": 0,
+   "arrived": 5,
+   "combatStruck": 2,
+   "struck": 5,
+   "arrivalT": [
+    11.9,
+    12.033333333333333,
+    13.033333333333333,
+    13.666666666666666,
+    15.799999999999999
+   ],
+   "R": 54,
+   "damageOnShip": 54,
+   "shipDead": false,
+   "over": true,
+   "t": 19.1,
+   "drift": 18.452028002621365,
+   "fieldKey": "babac867"
+  },
+  {
+   "seed": 3116,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    12.366666666666667,
+    12.666666666666666,
+    16.233333333333334,
+    16.666666666666668,
+    17,
+    17.266666666666666,
+    19.133333333333333
+   ],
+   "R": 216,
+   "damageOnShip": 216,
+   "shipDead": false,
+   "over": true,
+   "t": 45.9,
+   "drift": 99.27603860064042,
+   "fieldKey": "babac867",
+   "probe": {
+    "calls": 5649,
+    "aimed": 3701,
+    "fallback": 0,
+    "near": 222,
+    "handBack": 1948,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3117,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    11.266666666666666,
+    11.533333333333333,
+    12.133333333333333,
+    13.833333333333334,
+    14.633333333333333,
+    14.966666666666667,
+    15.6,
+    16.333333333333332
+   ],
+   "R": 162,
+   "damageOnShip": 162,
+   "shipDead": false,
+   "over": true,
+   "t": 22.5,
+   "drift": 25.455575487798132,
+   "fieldKey": "7aa7e9a6"
+  },
+  {
+   "seed": 3117,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    11.7,
+    12.5,
+    13.066666666666666,
+    15.299999999999999,
+    16.2,
+    16.333333333333332,
+    16.433333333333334,
+    16.666666666666668
+   ],
+   "R": 306,
+   "damageOnShip": 306,
+   "shipDead": false,
+   "over": true,
+   "t": 28.3,
+   "drift": 40.01971790156218,
+   "fieldKey": "7aa7e9a6",
+   "probe": {
+    "calls": 5146,
+    "aimed": 3546,
+    "fallback": 24,
+    "near": 253,
+    "handBack": 1576,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3118,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    12.633333333333333,
+    12.8,
+    12.8,
+    13.266666666666666,
+    15.2,
+    15.233333333333333,
+    15.966666666666667,
+    16.4
+   ],
+   "R": 72,
+   "damageOnShip": 72,
+   "shipDead": false,
+   "over": true,
+   "t": 22.266666666666666,
+   "drift": 25.115788671543704,
+   "fieldKey": "8d2cc1e0"
+  },
+  {
+   "seed": 3118,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    13,
+    13.566666666666666,
+    16.433333333333334,
+    16.8,
+    17.333333333333332,
+    17.333333333333332,
+    17.9,
+    21.9
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 71.83333333333333,
+   "drift": 142.03980364446764,
+   "fieldKey": "8d2cc1e0",
+   "probe": {
+    "calls": 7360,
+    "aimed": 5198,
+    "fallback": 141,
+    "near": 310,
+    "handBack": 2021,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3119,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 3,
+   "struck": 4,
+   "arrivalT": [
+    11.666666666666666,
+    13.366666666666667,
+    13.566666666666666,
+    15.333333333333334,
+    15.4,
+    15.733333333333333,
+    15.866666666666667
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 21.966666666666665,
+   "drift": 24.53269416441629,
+   "fieldKey": "9d00385"
+  },
+  {
+   "seed": 3119,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    13.9,
+    14.066666666666666,
+    15.2,
+    15.633333333333333,
+    16.2,
+    17.266666666666666,
+    18.166666666666668
+   ],
+   "R": 270,
+   "damageOnShip": 270,
+   "shipDead": false,
+   "over": true,
+   "t": 46.43333333333333,
+   "drift": 108.3302005472114,
+   "fieldKey": "9d00385",
+   "probe": {
+    "calls": 5964,
+    "aimed": 4706,
+    "fallback": 0,
+    "near": 1656,
+    "handBack": 1258,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3120,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 3,
+   "arrivalT": [
+    12.2,
+    12.433333333333334,
+    13.966666666666667,
+    14.466666666666667,
+    14.5,
+    16.166666666666668,
+    16.3
+   ],
+   "R": 126,
+   "damageOnShip": 126,
+   "shipDead": false,
+   "over": true,
+   "t": 21.066666666666666,
+   "drift": 22.437752369314357,
+   "fieldKey": "7ac03a02"
+  },
+  {
+   "seed": 3120,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    13.466666666666667,
+    14.466666666666667,
+    14.7,
+    14.9,
+    15.033333333333333,
+    16.466666666666665,
+    17.166666666666668,
+    17.866666666666667
+   ],
+   "R": 216,
+   "damageOnShip": 216,
+   "shipDead": false,
+   "over": true,
+   "t": 71.53333333333333,
+   "drift": 118.47249312212082,
+   "fieldKey": "7ac03a02",
+   "probe": {
+    "calls": 9095,
+    "aimed": 5598,
+    "fallback": 657,
+    "near": 224,
+    "handBack": 2840,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3121,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.7,
+    12.9,
+    13.6,
+    14.733333333333333,
+    14.966666666666667,
+    15.4,
+    15.433333333333334
+   ],
+   "R": 144,
+   "damageOnShip": 144,
+   "shipDead": false,
+   "over": true,
+   "t": 21.7,
+   "drift": 23.801875877334314,
+   "fieldKey": "ac97197"
+  },
+  {
+   "seed": 3121,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    14.533333333333333,
+    15.533333333333333,
+    16.03333333333333,
+    16.166666666666668,
+    16.2,
+    18.666666666666668,
+    21.366666666666667
+   ],
+   "R": 144,
+   "damageOnShip": 144,
+   "shipDead": false,
+   "over": true,
+   "t": 65.43333333333334,
+   "drift": 162.70999386403895,
+   "fieldKey": "ac97197",
+   "probe": {
+    "calls": 7641,
+    "aimed": 5503,
+    "fallback": 232,
+    "near": 337,
+    "handBack": 1906,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3122,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 1,
+   "arrivalT": [
+    13.633333333333333,
+    14,
+    14.1,
+    15.433333333333334,
+    16.2,
+    16.4,
+    16.4
+   ],
+   "R": 72,
+   "damageOnShip": 72,
+   "shipDead": false,
+   "over": true,
+   "t": 23.6,
+   "drift": 28.300231458738928,
+   "fieldKey": "39b08a5e"
+  },
+  {
+   "seed": 3122,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    13.433333333333334,
+    14.733333333333333,
+    16.03333333333333,
+    16.4,
+    16.666666666666668,
+    16.966666666666665,
+    17.066666666666666,
+    17.066666666666666
+   ],
+   "R": 262,
+   "damageOnShip": 262,
+   "shipDead": false,
+   "over": true,
+   "t": 116.73333333333333,
+   "drift": 144.97966715269362,
+   "fieldKey": "39b08a5e",
+   "probe": {
+    "calls": 10614,
+    "aimed": 8072,
+    "fallback": 345,
+    "near": 213,
+    "handBack": 2197,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3123,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 2,
+   "struck": 3,
+   "arrivalT": [
+    11.533333333333333,
+    12.533333333333333,
+    13.1,
+    14.633333333333333,
+    14.633333333333333,
+    15.733333333333333,
+    16.166666666666668
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 21.9,
+   "drift": 24.15254609435191,
+   "fieldKey": "f047a861"
+  },
+  {
+   "seed": 3123,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    12.5,
+    13.566666666666666,
+    14.9,
+    15,
+    15.4,
+    16.233333333333334,
+    18.53333333333333
+   ],
+   "R": 90,
+   "damageOnShip": 90,
+   "shipDead": false,
+   "over": true,
+   "t": 74.83333333333333,
+   "drift": 127.0270320535826,
+   "fieldKey": "f047a861",
+   "probe": {
+    "calls": 6650,
+    "aimed": 4670,
+    "fallback": 115,
+    "near": 17,
+    "handBack": 1865,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3124,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 1,
+   "arrivalT": [
+    12.3,
+    13.2,
+    13.6,
+    13.733333333333333,
+    14.4,
+    15.966666666666667,
+    16.166666666666668
+   ],
+   "R": 180,
+   "damageOnShip": 180,
+   "shipDead": false,
+   "over": true,
+   "t": 27.7,
+   "drift": 38.44758735042745,
+   "fieldKey": "78066047"
+  },
+  {
+   "seed": 3124,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    13.4,
+    13.766666666666666,
+    14.133333333333333,
+    14.5,
+    15.5,
+    16.1,
+    16.466666666666665,
+    27.099999999999998
+   ],
+   "R": 198,
+   "damageOnShip": 198,
+   "shipDead": false,
+   "over": true,
+   "t": 29.433333333333334,
+   "drift": 43.93990586792603,
+   "fieldKey": "78066047",
+   "probe": {
+    "calls": 5152,
+    "aimed": 3929,
+    "fallback": 0,
+    "near": 378,
+    "handBack": 1223,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3125,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 2,
+   "approachShot": 0,
+   "arrived": 6,
+   "combatStruck": 0,
+   "struck": 2,
+   "arrivalT": [
+    12.066666666666666,
+    12.6,
+    14.299999999999999,
+    14.6,
+    14.933333333333334,
+    15
+   ],
+   "R": 90,
+   "damageOnShip": 90,
+   "shipDead": false,
+   "over": true,
+   "t": 20,
+   "drift": 20.279069390933266,
+   "fieldKey": "331efaf2"
+  },
+  {
+   "seed": 3125,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 1,
+   "arrived": 7,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    12.233333333333333,
+    14.866666666666667,
+    15.1,
+    15.299999999999999,
+    16.066666666666666,
+    16.466666666666665,
+    17.466666666666665
+   ],
+   "R": 162,
+   "damageOnShip": 162,
+   "shipDead": false,
+   "over": true,
+   "t": 27.966666666666665,
+   "drift": 39.71072712238517,
+   "fieldKey": "331efaf2",
+   "probe": {
+    "calls": 4931,
+    "aimed": 3647,
+    "fallback": 29,
+    "near": 248,
+    "handBack": 1255,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3126,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    11.5,
+    13.066666666666666,
+    14.5,
+    14.533333333333333,
+    14.733333333333333,
+    15.4,
+    15.5
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 22.1,
+   "drift": 24.90252219241084,
+   "fieldKey": "e884391"
+  },
+  {
+   "seed": 3126,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 3,
+   "struck": 3,
+   "arrivalT": [
+    15.1,
+    15.5,
+    15.833333333333334,
+    15.9,
+    16.266666666666666,
+    17.866666666666667,
+    17.966666666666665,
+    18
+   ],
+   "R": 144,
+   "damageOnShip": 144,
+   "shipDead": false,
+   "over": true,
+   "t": 38.46666666666667,
+   "drift": 73.82995446685972,
+   "fieldKey": "e884391",
+   "probe": {
+    "calls": 5971,
+    "aimed": 3973,
+    "fallback": 0,
+    "near": 387,
+    "handBack": 1998,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3127,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    12.066666666666666,
+    12.233333333333333,
+    13.066666666666666,
+    15.2,
+    15.233333333333333,
+    15.7,
+    16.4
+   ],
+   "R": 72,
+   "damageOnShip": 72,
+   "shipDead": false,
+   "over": true,
+   "t": 22.766666666666666,
+   "drift": 26.28846985343366,
+   "fieldKey": "e4788863"
+  },
+  {
+   "seed": 3127,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    12.8,
+    13.733333333333333,
+    13.966666666666667,
+    15.866666666666667,
+    16.1,
+    16.133333333333333,
+    16.833333333333332,
+    17.7
+   ],
+   "R": 288,
+   "damageOnShip": 288,
+   "shipDead": false,
+   "over": true,
+   "t": 120,
+   "drift": 172.13364184058915,
+   "fieldKey": "e4788863",
+   "probe": {
+    "calls": 8683,
+    "aimed": 6399,
+    "fallback": 32,
+    "near": 280,
+    "handBack": 2252,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3128,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 3,
+   "approachShot": 0,
+   "arrived": 5,
+   "combatStruck": 2,
+   "struck": 5,
+   "arrivalT": [
+    11.266666666666666,
+    12.433333333333334,
+    13.933333333333334,
+    14.4,
+    15.2
+   ],
+   "R": 108,
+   "damageOnShip": 108,
+   "shipDead": false,
+   "over": true,
+   "t": 20.233333333333334,
+   "drift": 20.68778361424164,
+   "fieldKey": "f09e3e42"
+  },
+  {
+   "seed": 3128,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 1,
+   "struck": 1,
+   "arrivalT": [
+    13.066666666666666,
+    14.666666666666666,
+    15.2,
+    15.566666666666666,
+    16.5,
+    16.766666666666666,
+    17.066666666666666,
+    17.166666666666668
+   ],
+   "R": 216,
+   "damageOnShip": 216,
+   "shipDead": false,
+   "over": true,
+   "t": 72.43333333333334,
+   "drift": 148.82776791240954,
+   "fieldKey": "f09e3e42",
+   "probe": {
+    "calls": 8605,
+    "aimed": 5510,
+    "fallback": 725,
+    "near": 413,
+    "handBack": 2370,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3129,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 2,
+   "approachShot": 0,
+   "arrived": 6,
+   "combatStruck": 2,
+   "struck": 4,
+   "arrivalT": [
+    12.933333333333334,
+    13.266666666666666,
+    14,
+    14.7,
+    15.133333333333333,
+    15.966666666666667
+   ],
+   "R": 18,
+   "damageOnShip": 18,
+   "shipDead": false,
+   "over": true,
+   "t": 21.53333333333333,
+   "drift": 23.39077947327926,
+   "fieldKey": "5a402f71"
+  },
+  {
+   "seed": 3129,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 0,
+   "struck": 0,
+   "arrivalT": [
+    13.5,
+    14.033333333333333,
+    14.566666666666666,
+    14.766666666666666,
+    15.4,
+    15.966666666666667,
+    17.53333333333333,
+    17.966666666666665
+   ],
+   "R": 812,
+   "damageOnShip": 812,
+   "shipDead": false,
+   "over": true,
+   "t": 74.23333333333333,
+   "drift": 154.91760890043238,
+   "fieldKey": "5a402f71",
+   "probe": {
+    "calls": 7873,
+    "aimed": 4462,
+    "fallback": 791,
+    "near": 120,
+    "handBack": 2620,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  },
+  {
+   "seed": 3130,
+   "kind": "bow",
+   "arm": "D",
+   "approachStruck": 1,
+   "approachShot": 0,
+   "arrived": 7,
+   "combatStruck": 1,
+   "struck": 2,
+   "arrivalT": [
+    14.466666666666667,
+    14.5,
+    14.666666666666666,
+    14.833333333333334,
+    16.03333333333333,
+    16.166666666666668,
+    16.266666666666666
+   ],
+   "R": 0,
+   "damageOnShip": 0,
+   "shipDead": false,
+   "over": true,
+   "t": 22.066666666666666,
+   "drift": 24.637568835599524,
+   "fieldKey": "f491d627"
+  },
+  {
+   "seed": 3130,
+   "kind": "bow",
+   "arm": "N",
+   "approachStruck": 0,
+   "approachShot": 0,
+   "arrived": 8,
+   "combatStruck": 2,
+   "struck": 2,
+   "arrivalT": [
+    14.733333333333333,
+    14.866666666666667,
+    15.133333333333333,
+    15.166666666666666,
+    16.2,
+    16.4,
+    17.866666666666667,
+    19.833333333333332
+   ],
+   "R": 342,
+   "damageOnShip": 342,
+   "shipDead": false,
+   "over": true,
+   "t": 34,
+   "drift": 57.77958790257099,
+   "fieldKey": "f491d627",
+   "probe": {
+    "calls": 5529,
+    "aimed": 3906,
+    "fallback": 0,
+    "near": 281,
+    "handBack": 1623,
+    "handBackMismatch": 0,
+    "aimBlocked": 0,
+    "rockCentresBlocked": true,
+    "field": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "goalR": 220
+    }
+   }
+  }
+ ]
+}

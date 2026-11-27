@@ -28,6 +28,7 @@
 import * as SA from "./spaceArena.mjs";
 import * as CS from "../physics/mechanics/capitalShip.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
+import * as SR from "./spaceRocks.mjs";
 
 export const KINDS = Object.freeze(["bow", "beam", "stern", "swarm"]);
 export const SHIP_ID = 1, SECONDS = 120, FIGHTERS = 8, SHIP_SPACING = 140, MAX_ESCORTS = 12;
@@ -80,7 +81,7 @@ export function scenario(seed, kind, { fighters = FIGHTERS, ships = 1, escorts =
  * The arena for a seed and a kind. Options: fighters (8), gunners (a preset name or a handGunner options object; default `regular`), pilot (the fighters' pilot function, or an array of them one per fighter in turn; default the PD autopilot), seconds (120), behaviour ("face" | "hold"), cruise (0.3), friendlyFire (false: rounds hit every craft but their owner, spaceArena's option) and holdFire (true: the fighters' hold-fire rule and the seats' interlock, which only matter with friendlyFire), then wrecks (false: destroyed craft keep drifting and tumbling), impact (0: a round's mass, spaceArena.ROUND_MASS when on: hits push and spin the victim) and crew (false: the bridge crew and the gunners can die), then network (null: the gunners are the hand gunner; `{ module, weights }`, a seat-gunner library such as brain/seatGunnerPolicy.mjs or seatGunnerMlp.mjs and its weights, puts a network in every seat as the HAND behind the same hand gunner's SIGHT -- the setting above is still the sight's), then seatNetworks (null: a different network in the seats it names -- see the header), then formation, shipCollisions (the second ship keeps a station on the first; the ships' hulls collide) and helm (null: `{ module, weights }`, a network at each ship's helm).
  * Returns { arena, ship, scenario, gunners (what was asked for), gunnerOptions (what handGunner was given: the shared defaults, then the setting's own over them), network (what was asked for, or null), seatNetworks (what was asked for, or null), seatHands (per seat: { seat, from, net }), helm (what was asked for, or null) } with `arena` steppable (spaceArena.stepSpaceArena).
  */
-export function build(seed, kind, { fighters = FIGHTERS, gunners = DEFAULT_GUNNERS, pilot = undefined, seconds = SECONDS, behaviour = "face", cruise = 0.3, friendlyFire = false, holdFire = true, wrecks = false, impact = 0, crew = false, network = null, seatNetworks = null, formation = false, shipCollisions = false, helm = null, ships = 1, escorts = 0, escortPilot = undefined } = {}) {
+export function build(seed, kind, { fighters = FIGHTERS, gunners = DEFAULT_GUNNERS, pilot = undefined, seconds = SECONDS, behaviour = "face", cruise = 0.3, friendlyFire = false, holdFire = true, wrecks = false, impact = 0, crew = false, network = null, seatNetworks = null, formation = false, shipCollisions = false, helm = null, ships = 1, escorts = 0, escortPilot = undefined, rocks = 0 } = {}) {
     const opts = typeof gunners === "string" ? GUNNERS[gunners] : gunners;
     if (!opts || typeof opts !== "object") throw new Error(`battleshipFight.build: gunners must be one of ${Object.keys(GUNNERS).join(", ")} or a handGunner options object (got ${gunners})`);
     const NET_SHAPE = (name, n) => `${name} must be { module (a seat-gunner library: gunnerFactory and WEIGHT_COUNT), weights (WEIGHT_COUNT of them) } (got ${n && typeof n === "object" ? `a module ${typeof n.module?.gunnerFactory === "function" ? "with" : "without"} gunnerFactory and ${n.weights?.length} weights` : n})`;
@@ -108,7 +109,8 @@ export function build(seed, kind, { fighters = FIGHTERS, gunners = DEFAULT_GUNNE
     sc.fighters.forEach((f, i) => crafts.push({ id: SHIP_ID + 1 + i, team: 2, name: `fighter ${i + 1}`, kind: "fighter", state: { pos: f.pos, q: f.q }, holdFire, ...(pilot ? { pilot: Array.isArray(pilot) ? pilot[i % pilot.length] : pilot } : {}) }));
     if (ships === 2) crafts.push({ id: SHIP_ID + 1 + sc.fighters.length, team: 1, name: "second ship", kind: "capital", ship: CS.createCapitalShip(), state: sc.ships[1], ...(formation ? { behaviour: "station", leader: SHIP_ID, offset: sc.ships[1].pos.map((v, k) => v - sc.ships[0].pos[k]) } : { behaviour }), cruise, holdFire, gunner: gunnerFor(50), ...(helm ? { helmPilot: helm.module.helmFactory(helm.weights)() } : {}) });   // its gunners' seeds are the first ship's plus 50
     sc.escorts.forEach((f, i) => crafts.push({ id: SHIP_ID + 1 + sc.fighters.length + (ships - 1) + i, team: 1, name: `escort ${i + 1}`, kind: "fighter", state: { pos: f.pos, q: f.q }, holdFire, ...(escortPilot ? { pilot: Array.isArray(escortPilot) ? escortPilot[i % escortPilot.length] : escortPilot } : {}) }));
-    return { arena: SA.createSpaceArena({ crafts, seconds, friendlyFire, wrecks, impact, crew, shipCollisions }), ship, scenario: sc, gunners: opts, gunnerOptions, network, seatNetworks, seatHands, helm };
+    const field = rocks ? SR.rockField(seed, kind, { count: rocks }) : [];   // 2026-11-25: the rock field (a count; default 0, and then the fight is the fight it was)
+    return { arena: SA.createSpaceArena({ crafts, seconds, friendlyFire, wrecks, impact, crew, shipCollisions, ...(field.length ? { rocks: field } : {}) }), rocks: field, ship, scenario: sc, gunners: opts, gunnerOptions, network, seatNetworks, seatHands, helm };
 }
 
 /**
@@ -126,6 +128,7 @@ export function tally(arena) {
         ship: shipRow(s), ships: caps.map(shipRow),
         fighters: fs.map(fighterRow), escorts: mates.map(fighterRow),
         killed: fs.filter((c) => c.status === "destroyed").length, rammed: fs.filter((c) => c.status === "rammed").length, flying: fightersFlying,
+        ...(arena.rocks ? { struck: fs.filter((c) => c.status === "struck").length } : {}),
         damageOnShip: s.hpMax - Math.max(0, s.hp), damageOnShips: caps.reduce((a, c) => a + c.hpMax - Math.max(0, c.hp), 0),
         friendlyHits: caps.reduce((a, c) => a + c.friendlyHits, 0) + fs.reduce((a, c) => a + c.friendlyHits, 0) + mates.reduce((a, c) => a + c.friendlyHits, 0),
         winner: sideFlying > 0 && fightersFlying === 0 ? "ship" : sideFlying === 0 && fightersFlying > 0 ? "fighters" : "none",

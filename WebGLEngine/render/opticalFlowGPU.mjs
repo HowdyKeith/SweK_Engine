@@ -30,6 +30,7 @@ export class OpticalFlowGPU {
      * PyramidGPU.mjs exists and could do it, but then this runner's parity row would be comparing two
      * device chains and could not tell a flow defect from a pyramid one. The subject here is the SEARCH.
      * Wiring the device pyramid in is a later round and is named in the gate's closing line.
+     * SETTLED at v4740 by another route: render/opticalFlowTsl.mjs builds its pyramids on the device (makeLumaPyramid) and is the runtime path; this runner keeps CPU pyramids on purpose, for its parity row.
      */
     async flow({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true }) {
         if (!(block >= 2) || block !== Math.floor(block))

@@ -1,0 +1,26 @@
+{
+ "checks": {
+  "latchFires": {
+   "ok": true,
+   "byPreset": {
+    "regular": 55,
+    "green": 22,
+    "ace": 120,
+    "perfect": 120
+   },
+   "badLatch": 0
+  },
+  "capApplied": {
+   "ok": true,
+   "overCap": 3177816,
+   "notCut": 0,
+   "unlatched": 163,
+   "sameAsFixed": true
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 1440
+  }
+ },
+ "allOk": true
+}

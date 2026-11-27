@@ -25,6 +25,12 @@
 //   SECTION 4b (added when definitionGates named six exports no row drove), 5 more, all red: the cap test made strict (cappedPilot row);
 //   devChecks' slack widened by 1 (devChecks row); networkOf passing a plain array (networkOf row); readingsOf's gained and lost swapped (readings
 //   row); readHeld pairing C with C (2: readHeld and readings).
+//   ROUND 2 (2026-11-20, section 4c and the restated CAP_CHOSEN row), 9 mutants, all red, TWO only after a fix: the arena count inverted (live row); notCut
+//   ignored, no-decisions-over-the-cap accepted, the doctrine bite dropped (devChecks2 row, each); DEV2 on Round 1's seeds (sets row); the cap re-chosen as 15
+//   (3); CAP_CHOSEN set before DEV2 (the CAP_CHOSEN row); *** the measurement switched off CRASHED the gate on a detail string -- no verdict -- and now reds
+//   the live row; unmeasured C rows accepted went 0 RED: the fixture's only C row was unmeasured, so the decisions-exist test failed it first. A fixture
+//   with one measured and one unmeasured C row now reaches it. *** NOT GRADED HERE: the command's dev2 mode flying with probes (dev2-read's check 2
+//   needs every C fight probed and would read NOT WEIGHED without them).
 //   NOT A MUTANT, A TRUE NO-OP: the wrapper taking the ship (crafts[0]) instead of nearestFoe would pass every row, because
 //   with one ship and no escorts the nearest foe of every fighter IS the ship. Check 2 guards the code as written, not
 //   arenas with more foes.
@@ -179,6 +185,37 @@ sec("4b. THE PIECES THE COMMAND COMPOSES, EACH DRIVEN WHERE ITS ANSWER IS KNOWN"
     ok("reportLines names the grid, both sets and the cap's state", lines.length === 2 && /6, 9, 12, 15, 20, 25/.test(lines[1]) && /1901-1930/.test(lines[1]) && /2401-2460/.test(lines[1]) && (S.CAP_CHOSEN === null ? /not yet chosen/ : /CAP \d/).test(lines[1]));
 }
 
+sec("4c. ROUND 2: CAP 12 FROM ROUND 1's DEV, DEV2 FOR THE CHECKS, AND CHECK 3 READ OFF THE ARENA");
+{
+    const note = fs.readFileSync(path.join(ENG, "brain", "SPACE_DOCTRINE_WIP.md"), "utf8"), r2 = note.slice(note.indexOf("# ROUND 2"));
+    const rep1 = path.join(ENG, "brain", "rig-results", "space-doctrine", "dev-report.json"), R1 = fs.existsSync(rep1) ? JSON.parse(fs.readFileSync(rep1, "utf8")) : null;
+    const spent = Object.values(S.SPENT), inR = (x, [a, b]) => x >= a && x <= b;
+    ok("!! ROUND 2's sets: DEV2 = space seeds 2101-2130 x 4 kinds, disjoint from Round 1's DEV, from HELD89 and from every spent range; identity on 2101-2103; the note names them",
+        S.DEV2_SEEDS.length === 30 && S.DEV2_SEEDS[0] === 2101 && S.DEV2_SEEDS.at(-1) === 2130 && JSON.stringify(S.IDENTITY2_SEEDS) === "[2101,2102,2103]" &&
+        !S.DEV2_SEEDS.some((x) => S.DEV_SEEDS.includes(x) || S.HELD89_SEEDS.includes(x) || spent.some((r) => inR(x, r))) && /DEV2 = space seeds 2101-2130/.test(r2) && /HELD89 = space seeds 2401-2460 x 4 kinds, flown ONCE/.test(r2));
+    ok("!! ROUND 2's cap is 12 and IS Round 1's DEV choice, not re-chosen (Round 1's report names 12)", S.ROUND2_CAP === 12 && R1 !== null && R1.cap === 12 && /CAP = 12, TAKEN FROM ROUND 1's DEV/.test(r2));
+    const row = (o) => ({ cap: 12, peakClosing: 13.5, over: true, t: 60, probe: { calls: 9, mismatches: 0, nullFoe: 0 }, capApplied: { overCap: 40, notCut: 0 }, ...o });
+    const D = { cap: "D", peakClosing: 31, over: true, t: 120 };
+    const good = S.devChecks2([row(), D]);
+    ok("!! devChecks2: the cap is applied with decisions over it and none carrying thrust; ONE decision with thrust, NO decision over the cap, a C row that never measured, or a doctrine that never exceeds CAP + 5 each FAIL it",
+        good.capApplied.ok && good.sameFoe.ok && good.allEnd.ok && !S.devChecks2([row({ capApplied: { overCap: 40, notCut: 1 } }), D]).capApplied.ok &&
+        !S.devChecks2([row({ capApplied: { overCap: 0, notCut: 0 } }), D]).capApplied.ok && !S.devChecks2([row({ capApplied: undefined }), D]).capApplied.ok && !S.devChecks2([row(), row({ capApplied: undefined }), D]).capApplied.ok &&
+        !S.devChecks2([row(), { ...D, peakClosing: 16 }]).capApplied.ok && !S.devChecks2([row({ probe: undefined }), D]).sameFoe.ok);
+    ok("...and the overshoot is REPORTED, not a bar: a C fight 14.05 high (Round 1's failing fight) passes ROUND 2's check 3 and is counted over +2",
+        S.devChecks2([row({ peakClosing: 14.05 }), D]).capApplied.ok && S.devChecks2([row({ peakClosing: 14.05 }), D]).overshoot.overTwo === 1);
+    const c = S.flyOne({ seed: THROWAWAY, kind: "bow", preset: "regular", cap: S.ROUND2_CAP, probe: true });
+    // the negative control, measured the same way on a DOCTRINE fight: decisions over 12 that the arena recorded WITH thrust exist there, so the count can see one
+    const own = BF.build(THROWAWAY, "bow", { gunners: "regular" }).arena; let over = 0, withThrust = 0;
+    while (!own.done) {
+        const fl = own.crafts.filter((x) => x.kind === "fighter" && !x.dead), st = new Map();
+        for (const x of fl) { const f = SA.nearestFoe(own, x); if (f) st.set(x.id, S.closingSpeed(x.body, f.body)); }
+        SA.stepSpaceArena(own);
+        for (const x of fl) if (st.has(x.id) && st.get(x.id) >= S.ROUND2_CAP) { over++; if (!(x.last && x.last.thrust === 0)) withThrust++; }
+    }
+    ok("!! ROUND 2's check 3 LIVE on a throwaway seed: arm C reaches the cap and the arena recorded thrust 0 at every decision over it -- and the same count on the doctrine finds thrust over the cap (it can see a violation)",
+        c.capApplied && c.capApplied.overCap > 100 && c.capApplied.notCut === 0 && over > 0 && withThrust > 0, `C: ${c.capApplied ? c.capApplied.overCap : "NOT MEASURED"} decisions over 12, ${c.capApplied ? c.capApplied.notCut : "-"} with thrust; doctrine: ${over} over 12, ${withThrust} with thrust`);
+}
+
 sec("5. THE COMMAND REFUSES WHAT THE REGISTRATION FORBIDS");
 {
     const CMD = path.join(HERE, "spaceDoctrineStudyCmd.mjs"), cmdSrc = fs.readFileSync(CMD, "utf8");
@@ -194,8 +231,12 @@ sec("5. THE COMMAND REFUSES WHAT THE REGISTRATION FORBIDS");
     const rep = path.join(ENG, "brain", "rig-results", "space-doctrine", "dev-report.json");
     const R = fs.existsSync(rep) ? JSON.parse(fs.readFileSync(rep, "utf8")) : null;
     const failed = R && (!R.identity.ok || !R.checks.sameFoe.ok || !R.checks.capHolds.ok || !R.checks.allEnd.ok);
-    ok("!! a DEV that failed a check keeps CAP_CHOSEN null, so HELD89 cannot be flown on a round that is NOT WEIGHED",
-        R === null || (failed ? S.CAP_CHOSEN === null : S.CAP_CHOSEN === R.cap),
+    // RESTATED 2026-11-20 for ROUND 2: Round 1's DEV failed check 3, so Round 1 alone never sets the cap. CAP_CHOSEN may be non-null only when ROUND 2's DEV2
+    // report exists, passed every check, and names ROUND2_CAP -- and then it must equal it. Round 1's failure stays in the detail.
+    const rep2 = path.join(ENG, "brain", "rig-results", "space-doctrine", "dev2-report.json"), R2 = fs.existsSync(rep2) ? JSON.parse(fs.readFileSync(rep2, "utf8")) : null;
+    const r2ok = !!(R2 && R2.allOk && R2.cap === S.ROUND2_CAP && R2.identity.ok && R2.checks.sameFoe.ok && R2.checks.capApplied.ok && R2.checks.allEnd.ok);
+    ok("!! CAP_CHOSEN stays null unless ROUND 2's DEV2 passed every check (Round 1's DEV failed check 3 and cannot set it); when it passed, CAP_CHOSEN is its cap",
+        (R === null || failed) && (r2ok ? S.CAP_CHOSEN === S.ROUND2_CAP : S.CAP_CHOSEN === null) || (!failed && R !== null && S.CAP_CHOSEN === R.cap),
         R === null ? "DEV not yet read" : failed ? `DEV chose ${R.cap}; check 3 ${R.checks.capHolds.ok ? "passed" : "FAILED (peak " + R.checks.capHolds.cPeak.toFixed(2) + ")"}; CAP_CHOSEN ${S.CAP_CHOSEN}` : `DEV chose ${R.cap}, all checks passed; CAP_CHOSEN ${S.CAP_CHOSEN}`);
     ok("the command is export-free and the library's caller (the orphan census needs a non-gate caller)", !/^\s*export\b/m.test(cmdSrc) && /from "\.\/spaceDoctrineStudy\.mjs"/.test(cmdSrc));
 }

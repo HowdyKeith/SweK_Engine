@@ -79,15 +79,25 @@ export function outwardNormal(x, y, z, blobs, h = 0.01) {
  * is one read, and the march stops caring how many blobs made it. The closed form goes 9ms -> 880ms across
  * 7 -> 4096 blobs; the grid march does not move.
  */
-export function castIntoBlob(ox, oy, oz, dx, dy, dz, blobs, maxT = 8, h = 0.002) {
+export function castIntoBlob(ox, oy, oz, dx, dy, dz, blobs, maxT = 8, h = 0.002, { refine = REFINE_STEPS } = {}) {
     const L = Math.hypot(dx, dy, dz) || 1;
     const ux = dx / L, uy = dy / L, uz = dz / L;
+    const inside = (t) => insideBlob(ox + ux * t, oy + uy * t, oz + uz * t, blobs);
     for (let t = 0; t < maxT; t += h) {
-        const x = ox + ux * t, y = oy + uy * t, z = oz + uz * t;
-        if (insideBlob(x, y, z, blobs)) return { x, y, z, t, normal: outwardNormal(x, y, z, blobs) };
+        if (!inside(t)) continue;
+        // 2026-11-20 (backlog blob-cast-bisect): BISECT THE LAST INTERVAL. The march stops at the first sample inside, up to one step deep;
+        // [t - h, t] brackets the crossing (outside, inside), and `refine` halvings shrink it to h / 2^refine. The INSIDE end is returned,
+        // so the hit is still never outside the surface -- it is now ON it to that bound instead of up to a step in. A ray that STARTS
+        // inside (t = 0) has no outside end and returns its origin, as before.
+        let lo = Math.max(0, t - h), hi = t;
+        if (t > 0 && !inside(lo)) for (let k = 0; k < refine; k++) { const mid = 0.5 * (lo + hi); if (inside(mid)) hi = mid; else lo = mid; }
+        const x = ox + ux * hi, y = oy + uy * hi, z = oz + uz * hi;
+        return { x, y, z, t: hi, normal: outwardNormal(x, y, z, blobs) };
     }
     return null;
 }
+/** Halvings of the last march interval: 40 takes the default step 2e-3 to 1.8e-15, at the floor of a double near 1. */
+export const REFINE_STEPS = 40;
 
 /**
  * Push a point out of the universe if it is in it. This is the ONE thing a solver needs from a space, and it is

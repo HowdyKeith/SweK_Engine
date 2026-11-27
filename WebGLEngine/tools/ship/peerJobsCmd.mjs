@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/peerJobsCmd.mjs -- the command for tools/ship/peerJobs.mjs and tools/ship/peerJobsQueue.mjs (export-free on purpose). SweK PEER JOBS: a git branch as the queue for long runs.
 //   node tools/ship/peerJobsCmd.mjs init   --url <git url of the repo that holds the queue branch> [--dir <this peer's queue checkout>]
-//   node tools/ship/peerJobsCmd.mjs submit --id <job-id> --rounds 69,70 [--gpu any|required|forbidden] [--min-cores N] [--peers a,b] [--cpu-match Intel] [--priority N] [--after id,id] [--expires ISO] [--workers N] [--no-zip] [--commit <sha>] [--note "..."] | --selftest
+//   node tools/ship/peerJobsCmd.mjs submit --id <job-id> --rounds 69,70 [--gpu any|required|forbidden] [--min-cores N] [--peers a,b] [--cpu-match Intel] [--priority N] [--after id,id] [--expires ISO] [--workers N] [--no-zip] [--commit <sha>] [--note "..."] | --selftest | --study <name>   (a study is one entry of tools/ship/studyJobs.mjs: node tools/ship/studyRunner.mjs --list)
 //   node tools/ship/peerJobsCmd.mjs plan --file tools/ship/rigOrder.json [--dry-run] [--commit <sha>]     submit a whole ORDERED plan: one job per round, priority = the order (peers take the highest priority first, free peers take different rounds at once)
 //   node tools/ship/peerJobsCmd.mjs status                  every job with what this peer would do with it, WHAT IS RUNNING AND ON WHICH PEER (claims and every peer's presence), the attempts, the results
 //   node tools/ship/peerJobsCmd.mjs cancel --id <job-id>    ask the peers to stop wanting it
@@ -91,8 +91,9 @@ if (cmd === "init") {
 } else if (cmd === "submit") {
     const k = key(); if (!k) { console.error(`no signing key: put one in ${keyFile} or SWEK_PEERJOBS_KEY`); process.exit(2); }
     const c = caps(), head = io.git(["rev-parse", "HEAD"], { cwd: engine() }).stdout.trim();
-    const spec = { version: P.VERSION, id: val("--id", ""), kind: has("--selftest") ? "selftest" : "rounds", target: { gpu: val("--gpu", "any"), ...(val("--min-cores") ? { minCores: Number(val("--min-cores")) } : {}), ...(val("--peers") ? { peers: val("--peers").split(",") } : {}), ...(val("--cpu-match") ? { cpuMatch: val("--cpu-match") } : {}) }, created: new Date().toISOString().replace(/\.\d+Z$/, "Z"), commit: val("--commit", head), by: c.name };
+    const spec = { version: P.VERSION, id: val("--id", ""), kind: has("--selftest") ? "selftest" : val("--study") ? "study" : "rounds", target: { gpu: val("--gpu", "any"), ...(val("--min-cores") ? { minCores: Number(val("--min-cores")) } : {}), ...(val("--peers") ? { peers: val("--peers").split(",") } : {}), ...(val("--cpu-match") ? { cpuMatch: val("--cpu-match") } : {}) }, created: new Date().toISOString().replace(/\.\d+Z$/, "Z"), commit: val("--commit", head), by: c.name };
     if (spec.kind === "rounds") spec.rounds = val("--rounds", "").split(",").filter(Boolean);
+    if (spec.kind === "study") spec.study = val("--study");
     if (val("--priority")) spec.priority = Number(val("--priority")); if (val("--after")) spec.after = val("--after").split(","); if (val("--expires")) spec.expires = val("--expires"); if (val("--workers")) spec.workers = Number(val("--workers")); if (has("--no-zip")) spec.zip = false; if (val("--note")) spec.note = val("--note");
     const r = Q.submit(io, q, spec, k); say(r.ok ? `submitted ${spec.id} at commit ${spec.commit.slice(0, 10)}` : `NOT submitted: ${r.why}`); process.exitCode = r.ok ? 0 : 1;
 } else if (cmd === "plan") {

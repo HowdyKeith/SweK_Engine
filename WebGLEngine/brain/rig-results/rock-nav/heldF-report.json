@@ -1,0 +1,78 @@
+{
+ "v1": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 44,
+  "losses": 49,
+  "ties": 267,
+  "n": 93,
+  "p": 0.6785320136533248
+ },
+ "v2": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 177,
+  "losses": 149,
+  "ties": 34,
+  "n": 326,
+  "p": 0.13468908550606512
+ },
+ "bottom": "THE FIXED FOLLOWING FIELD DOES NOT WIN (NO DIFFERENCE SHOWN)",
+ "reported": {
+  "L": {
+   "fights": 360,
+   "approachStruck": 17,
+   "approachShot": 89,
+   "arrived": 2768,
+   "combatStruck": 144,
+   "struck": 161,
+   "medianArrivalT": 16,
+   "meanR": 254.96666666666667,
+   "meanDamage": 254.96666666666667,
+   "shipDead": 0,
+   "fallbacks": 81837,
+   "near": 128931,
+   "meanBuilds": 1,
+   "buildS": 0
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 7,
+   "losses": 5,
+   "ties": 348,
+   "n": 12,
+   "p": 0.7744140625
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 39,
+   "losses": 48,
+   "ties": 273,
+   "n": 87,
+   "p": 0.39119096530075287
+  },
+  "FX": {
+   "fights": 360,
+   "approachStruck": 15,
+   "approachShot": 71,
+   "arrived": 2792,
+   "combatStruck": 148,
+   "struck": 163,
+   "medianArrivalT": 16.03333333333333,
+   "meanR": 263.02222222222224,
+   "meanDamage": 263.02222222222224,
+   "shipDead": 0,
+   "fallbacks": 16750,
+   "near": 119086,
+   "meanBuilds": 34.419444444444444,
+   "buildS": 4452.025,
+   "laneEmptyBuilds": 377,
+   "fightsWithEmpty": 41,
+   "buildsWithoutGoal": 0
+  }
+ },
+ "replication": "ROUND E DOES NOT REPLICATE (NO DIFFERENCE SHOWN)",
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

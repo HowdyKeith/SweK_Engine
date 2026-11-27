@@ -26,7 +26,7 @@ import * as SS from "../../brain/surveySeat.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as TN from "./trainNeedsCircuit.mjs";
 import * as X from "./circuitRetrain.mjs";
-import { circuitSeat, PLAIN_CHAMPION } from "../../render/subAquariumCircuit.mjs";
+import { circuitSeat, PLAIN_CHAMPION, CIRCUIT_CHAMPION } from "../../render/subAquariumCircuit.mjs";
 const t0 = Date.now();
 console.log("circuitRetrain-selfcheck -- Round 40, the decision-circuit net retrained with a biased gauge\n");
 
@@ -112,7 +112,8 @@ sec("5. FLIGHT (the gate's two seeds)");
     // 2026-11-19, the replacement made: the audit's check (profileSame) was PASS when flown (the committed report says so); since then the profile IS the retrained NEW, not C06
     const champW = X.championWeights([0, 1, 2, 3].map((k) => JSON.parse(fs.readFileSync(new URL(`../../brain/rig-results/circuit-retrain/search-${k}.json`, import.meta.url), "utf8"))));
     ok("!! *** THE REPLACEMENT MADE: the aquarium's circuit profile now flies NEW (the champion on -0.04), not C06; profileSame() was PASS in the committed report and is false since; SEAT-04 is the shipped seat ***",
-        fps(T.flyDecision(circuitSeat("circuit")), X.BIASED) === fps(X.pilotOf("NEW", { weights: Array.from(champW) }), X.BIASED) && X.profileSame(circuitSeat) === false && X.shippedSame() &&
+        // RESTATED 2026-11-21: Round 40's NEW was the profile until Round 42 replaced it with the planner circuit (the shipped seat); it is reached by name now, CIRCUIT_CHAMPION
+        fps(T.flyDecision(circuitSeat("circuit", CIRCUIT_CHAMPION)), X.BIASED) === fps(X.pilotOf("NEW", { weights: Array.from(champW) }), X.BIASED) && X.profileSame(circuitSeat) === false && X.shippedSame() &&
         /PASS C06 IS THE AQUARIUM'S CIRCUIT PROFILE/.test(fs.readFileSync(new URL("../../brain/rig-results/circuit-retrain-report.json", import.meta.url), "utf8")));
     ok("!! NEW flies the weights it is handed on the -0.04 seat: the start's weights fly R04's dives", fps(X.pilotOf("NEW", { weights: Array.from(hand) }), X.BIASED) === fps(P.pilotFor(hand), X.BIASED));
     ok("  refusals: NEW without weights, an unknown arm or condition", throws(() => X.pilotOf("NEW"), /needs the champion's weights/) && throws(() => X.pilotOf("C04"), /unknown arm/) && throws(() => X.auditJob("C06", "DROP", "0"), /unknown condition/));

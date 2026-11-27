@@ -1,0 +1,62 @@
+{
+ "v1": {
+  "verdict": "LAYER BETTER",
+  "wins": 173,
+  "losses": 10,
+  "ties": 177,
+  "n": 183,
+  "p": 1.5636357671987787e-39
+ },
+ "v2": {
+  "verdict": "LAYER BETTER",
+  "wins": 161,
+  "losses": 53,
+  "ties": 146,
+  "n": 214,
+  "p": 7.465140422058208e-14
+ },
+ "bottom": "THE LAYER WINS THE APPROACH",
+ "reported": {
+  "N": {
+   "fights": 360,
+   "approachStruck": 26,
+   "approachShot": 87,
+   "arrived": 2760,
+   "combatStruck": 211,
+   "struck": 237,
+   "medianArrivalT": 15.9,
+   "meanR": 337.1694444444444,
+   "meanDamage": 337.1694444444444,
+   "shipDead": 0,
+   "maxDrift": 456.1402904815954
+  },
+  "D": {
+   "fights": 360,
+   "approachStruck": 260,
+   "approachShot": 30,
+   "arrived": 2590,
+   "combatStruck": 238,
+   "struck": 498,
+   "medianArrivalT": 14.366666666666667,
+   "meanR": 145.55,
+   "meanDamage": 145.55,
+   "shipDead": 0,
+   "maxDrift": 188.9860118582286
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 106,
+   "losses": 95,
+   "ties": 159,
+   "n": 201,
+   "p": 0.4806879226368221
+  },
+  "fallbacks": 62629,
+  "near": 152621
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

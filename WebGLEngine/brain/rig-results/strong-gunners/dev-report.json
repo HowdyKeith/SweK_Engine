@@ -1,0 +1,59 @@
+{
+ "cap": 20,
+ "means": [
+  {
+   "cap": 12,
+   "n": 240,
+   "meanR": 1.8,
+   "meanStrafeS": 0.20069444444444443
+  },
+  {
+   "cap": 16,
+   "n": 240,
+   "meanR": 11.025,
+   "meanStrafeS": 1.208333333333333
+  },
+  {
+   "cap": 20,
+   "n": 240,
+   "meanR": 17.925,
+   "meanStrafeS": 2.4145833333333337
+  },
+  {
+   "cap": 25,
+   "n": 240,
+   "meanR": 10.35,
+   "meanStrafeS": 3.4927777777777758
+  },
+  {
+   "cap": 30,
+   "n": 240,
+   "meanR": 5.25,
+   "meanStrafeS": 3.8848611111111127
+  }
+ ],
+ "checks": {
+  "sameFoe": {
+   "ok": true,
+   "probed": 240,
+   "calls": 732155
+  },
+  "capApplied": {
+   "ok": true,
+   "overCap": 187201,
+   "notCut": 0,
+   "doctrinePeak": 33.35507401837446
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 1440
+  },
+  "overshoot": {
+   "worst": 0.6545239735997512,
+   "p95": 0.5610591951547441,
+   "overTwo": 0,
+   "of": 240
+  }
+ },
+ "allOk": true
+}

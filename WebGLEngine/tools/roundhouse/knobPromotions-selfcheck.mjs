@@ -71,6 +71,7 @@ const order = async (config) => await ising.build({ mode: "order", config });
     ok("!! escapeV is BIT-IDENTICAL under the registered knob, which v2906's rule calls SUSPECT",
        vs[0] === vs[1] && vs[1] === vs[2],
        "*** A NUISANCE KNOB THAT MOVES NOTHING AT ALL CANNOT DISTINGUISH A DEVICE THAT IS INVARIANT FROM ONE THAT NEVER READ THE PARAMETER. The likely cause is that escapeV is QUANTISED BY ITS OWN escTol = 1e-4 bisection tolerance, so what criterion 2 is measuring is the tolerance rather than the physics -- v3083's distinction, where a control rules out a perturbation that never arrived and c2 is what separates a quantised observable. SWEEPING escTol IS ITS OWN ROUND AND IS NOT DONE HERE. ***");
+       // SETTLED at v3514 -- sweeping escTol was that round: tools/roundhouse/escTolKnob-selfcheck.mjs (1e-4, 1e-5, 1e-6) promoted it to a refinement knob.
 
     const moved = [];
     for (const dt of [0.02, 0.005]) moved.push((await bh.build({ mode: "escape", config: { dt, escSteps: 200000 } })).escapeV);

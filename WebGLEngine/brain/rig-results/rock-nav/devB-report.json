@@ -1,0 +1,70 @@
+{
+ "checks": {
+  "sameField": {
+   "ok": true,
+   "n": 120
+  },
+  "handBack": {
+   "ok": true,
+   "handBack": 494130,
+   "mismatches": 0
+  },
+  "laneSound": {
+   "ok": true,
+   "laneGoalCells": 1191645,
+   "laneBlocked": 0,
+   "plainGoalCells": 1223318,
+   "plainBlocked": 31673
+  },
+  "fieldSound": {
+   "ok": true,
+   "aimBlocked": 0
+  },
+  "allEnd": {
+   "ok": true,
+   "n": 240
+  }
+ },
+ "sameScenarios": true,
+ "allOk": true,
+ "totals": {
+  "L": {
+   "fights": 120,
+   "approachStruck": 7,
+   "approachShot": 38,
+   "arrived": 915,
+   "combatStruck": 39,
+   "struck": 46,
+   "medianArrivalT": 15.866666666666667,
+   "meanR": 243.66666666666666,
+   "meanDamage": 243.66666666666666,
+   "shipDead": 0,
+   "maxDrift": 446.3283435306019,
+   "fallbacks": 31594,
+   "near": 41831
+  },
+  "N": {
+   "fights": 120,
+   "approachStruck": 9,
+   "approachShot": 33,
+   "arrived": 918,
+   "combatStruck": 101,
+   "struck": 110,
+   "medianArrivalT": 15.866666666666667,
+   "meanR": 277.1166666666667,
+   "meanDamage": 277.1166666666667,
+   "shipDead": 0,
+   "maxDrift": 471.643966862062,
+   "fallbacks": 22118,
+   "near": 39206
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 4,
+   "losses": 2,
+   "ties": 114,
+   "n": 6,
+   "p": 0.6875
+  }
+ }
+}

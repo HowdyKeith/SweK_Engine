@@ -1,0 +1,77 @@
+{
+ "v1": {
+  "verdict": "FOLLOW BETTER",
+  "wins": 46,
+  "losses": 28,
+  "ties": 286,
+  "n": 74,
+  "p": 0.04739297550405179
+ },
+ "v2": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 175,
+  "losses": 156,
+  "ties": 29,
+  "n": 331,
+  "p": 0.32248546169252096
+ },
+ "bottom": "THE FIXED FOLLOWING FIELD WINS",
+ "reported": {
+  "L": {
+   "fights": 360,
+   "approachStruck": 20,
+   "approachShot": 95,
+   "arrived": 2757,
+   "combatStruck": 123,
+   "struck": 143,
+   "medianArrivalT": 15.766666666666666,
+   "meanR": 252.83740740740743,
+   "meanDamage": 252.68333333333334,
+   "shipDead": 1,
+   "fallbacks": 77991,
+   "near": 125963,
+   "meanBuilds": 1,
+   "buildS": 0
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 10,
+   "losses": 4,
+   "ties": 346,
+   "n": 14,
+   "p": 0.1795654296875
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 44,
+   "losses": 31,
+   "ties": 285,
+   "n": 75,
+   "p": 0.16542794172425668
+  },
+  "FX": {
+   "fights": 360,
+   "approachStruck": 14,
+   "approachShot": 93,
+   "arrived": 2771,
+   "combatStruck": 107,
+   "struck": 121,
+   "medianArrivalT": 15.833333333333334,
+   "meanR": 270.81666666666666,
+   "meanDamage": 270.81666666666666,
+   "shipDead": 0,
+   "fallbacks": 16171,
+   "near": 122326,
+   "meanBuilds": 34.391666666666666,
+   "buildS": 4875.744,
+   "laneEmptyBuilds": 481,
+   "fightsWithEmpty": 51,
+   "buildsWithoutGoal": 0
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

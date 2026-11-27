@@ -1,0 +1,74 @@
+{
+ "v1": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 47,
+  "losses": 48,
+  "ties": 265,
+  "n": 95,
+  "p": 1
+ },
+ "v2": {
+  "verdict": "NO DIFFERENCE SHOWN",
+  "wins": 167,
+  "losses": 151,
+  "ties": 42,
+  "n": 318,
+  "p": 0.4002959555475868
+ },
+ "bottom": "THE FOLLOWING FIELD DOES NOT WIN (NO DIFFERENCE SHOWN)",
+ "reported": {
+  "F": {
+   "fights": 360,
+   "approachStruck": 21,
+   "approachShot": 84,
+   "arrived": 2771,
+   "combatStruck": 120,
+   "struck": 141,
+   "medianArrivalT": 16.066666666666666,
+   "meanR": 240.4,
+   "meanDamage": 240.4,
+   "shipDead": 0,
+   "fallbacks": 75031,
+   "near": 126113,
+   "meanBuilds": 34.986111111111114,
+   "buildS": 4563.623
+  },
+  "L": {
+   "fights": 360,
+   "approachStruck": 32,
+   "approachShot": 95,
+   "arrived": 2745,
+   "combatStruck": 115,
+   "struck": 147,
+   "medianArrivalT": 16,
+   "meanR": 239.72222222222223,
+   "meanDamage": 239.72222222222223,
+   "shipDead": 0,
+   "fallbacks": 86901,
+   "near": 130277,
+   "meanBuilds": 1,
+   "buildS": 0
+  },
+  "approachStruck": {
+   "verdict": "FLOOR",
+   "wins": 13,
+   "losses": 3,
+   "ties": 344,
+   "n": 16,
+   "p": 0.021270751953125
+  },
+  "combatStruck": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 40,
+   "losses": 49,
+   "ties": 271,
+   "n": 89,
+   "p": 0.39657015814551605
+  }
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

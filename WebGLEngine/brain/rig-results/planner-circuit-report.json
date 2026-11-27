@@ -1,0 +1,29 @@
+{
+ "report": [
+  "ROUND 42 TRAINING: 4 searches of the planner circuit on TRAIN_SET (both gauges), checkpointed every 50 children, chosen on HELD_OUT_SET",
+  "  search 0 (seed 97700): held-out by checkpoint 0.9044 0.9043 0.9013 0.8956 0.8900 0.8709 0.8747; chose child 0 (held-out 0.9044, start 0.9044); pool crushed 0 (start 0) ELIGIBLE; 0 resume(s)",
+  "  search 1 (seed 97701): held-out by checkpoint 0.9044 0.9006 0.8928 0.8966 0.9016 0.8909 0.8797; chose child 0 (held-out 0.9044, start 0.9044); pool crushed 0 (start 0) ELIGIBLE; 0 resume(s)",
+  "  search 2 (seed 97702): held-out by checkpoint 0.9044 0.9025 0.8928 0.8859 0.8675 0.8859 0.8666; chose child 0 (held-out 0.9044, start 0.9044); pool crushed 0 (start 0) ELIGIBLE; 0 resume(s)",
+  "  search 3 (seed 97703): held-out by checkpoint 0.9044 0.8969 0.9044 0.8994 0.9003 0.8925 0.8855; chose child 0 (held-out 0.9044, start 0.9044); pool crushed 0 (start 0) ELIGIBLE; 0 resume(s)",
+  "CHAMPION: search 0, child 0 (held-out 0.9044) -- THE START, i.e. THE SHIPPED SEAT: the training bought nothing measurable on held-out dives, 4 of 4 eligible",
+  "ROUND 42 AUDIT: NEW, SEAT-04, CUR under REF and +0.10 BIAS; seeds 56001-56300, both",
+  "  PASS GENERATOR: the scenarios are needsTask.scenario's on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in both conditions: true",
+  "  PASS ALIGNED: every arm and condition flies the same scenarios in the same order: true",
+  "  PASS THE FAULT REACHES THE PILOT: every arm's BIAS dives differ from its REF dives on at least one dive: true",
+  "  PASS THE ARMS DIFFER: NEW EQUALS SEAT-04 (the champion is the start, so it must equal it); every other pair differs: true",
+  "  PASS THE LEDGER IS COMPLETE: 4 searches of 7 checkpoints, draws rising, one recipe, one start; 0 resume(s)",
+  "  PASS NEW'S START IS THE SHIPPED SEAT: the untrained policy against surveyPilot() on the gate's dives, both gauges, full length, fingerprint and command for command: true",
+  "  PASS CUR IS THE AQUARIUM'S CIRCUIT PROFILE: CUR against subAquariumCircuit.circuitSeat(\"circuit\") on the gate's dives (full BIAS dives): true",
+  "  PASS SEAT-04 IS THE SHIPPED SEAT: SEAT-04 against surveyPilot() on the gate's dives: true",
+  "  NEW      REF 0.8115 (0/0)  BIAS 0.8381 (2/0)",
+  "  SEAT-04  REF 0.8115 (0/0)  BIAS 0.8381 (2/0)",
+  "  CUR      REF 0.7847 (0/0)  BIAS 0.8016 (8/1)",
+  "  V1 NEW'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S UNDER BIAS (2 against 2)",
+  "  V2 NEW'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S AT REF (0 against 0)",
+  "  V3 THE SCORE LINE: NEW minus SEAT-04 at REF +0.0000 (se 0.0000) LOSES clears; under BIAS +0.0000 (se 0.0000) LOSES clears",
+  "  V4 (for the claim only) NEW does not beat THE SEAT beyond 2 se at both gauges",
+  "REPORTED, NOT WEIGHED: NEW minus CUR at REF +0.0268 (se 0.0047) KEEPS, under BIAS +0.0365 (se 0.0088) KEEPS; station overrides at REF 0 of 300 dives, 0 ticks, under BIAS 0 of 300 dives, 0 ticks",
+  "BOTTOM LINE: THE PLANNER CIRCUIT HOLDS ITS HULL AND ITS SCORE: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE -- AND IT IS THE SHIPPED SEAT: THE TRAINING BOUGHT NOTHING"
+ ]
+}

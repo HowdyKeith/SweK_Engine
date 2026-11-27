@@ -1689,3 +1689,144 @@ Round 41's nine, adapted: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT
   - It writes `brain/rig-results/planner-circuit/ledger-K.jsonl` (a line every 50 children) and `search-K.json` (when a search is done).
   - **A killed run is restarted with the same command.** Each search resumes from its last whole line, and loses at most 50 children.
   - Send the four `search-K.json` and four `ledger-K.jsonl` files. They are committed before any audit seed is flown. The audit (about 48 CPU minutes) is flown here and read once.
+
+## Round 42, RESULT (2026-11-21): THE PLANNER CIRCUIT HOLDS ITS HULL AND ITS SCORE: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE -- AND IT IS THE SHIPPED SEAT: THE TRAINING BOUGHT NOTHING
+
+**The training** ran on Keith's rig: `plannerCircuitCmd.mjs train --workers 4`, four searches of 300 children, no resume needed. The ledger is `brain/rig-results/planner-circuit/`, committed before any audit seed was flown. Every record matches its ledger line for line, and the ledger checks pass.
+- **Every search chose child 0.** The start scored 0.9044 on held-out dives, and every later checkpoint scored below it or tied (search 3, child 100, tied at 0.9044 and lost the tie to the earlier).
+- The champion is therefore the start: the untrained net, which IS the shipped seat.
+
+**The audit** (`plannerCircuitCmd.mjs audit --jobs 4`; 24 jobs, 1,800 dives on 56001-56300 `both`; read once; `brain/rig-results/planner-circuit-report.json`). All nine checks passed, including THE ARMS DIFFER in its isStart form: NEW equals SEAT-04 exactly.
+
+| arm | REF score (crushed/stranded) | BIAS score (crushed/stranded) |
+|---|---|---|
+| NEW (the start: the shipped seat) | 0.8115 (0/0) | 0.8381 (2/0) |
+| SEAT-04 (surveyPilot) | 0.8115 (0/0) | 0.8381 (2/0) |
+| CUR (Round 40's circuit profile) | 0.7847 (0/0) | 0.8016 (8/1) |
+
+- V1 and V2 (hull): no worse.
+- V3 (score): NEW minus the seat is +0.0000 (se 0.0000) at both gauges, so it clears.
+- V4: no claim.
+- Reported: NEW minus CUR is +0.0268 (se 0.0047) at REF and +0.0365 (se 0.0088) under BIAS, both KEEPS. There were 0 station overrides on all 600 NEW dives.
+
+**Against the expectations of section 7 (written first):**
+- The champion is the start, about 55: YES.
+- V1 about 85, V2 about 95, V3 about 80: all held.
+- V4 about 10: no.
+- Station residuals train poorly, about 75: held. No search moved the start on held-out.
+
+**THE REPLACEMENT, MADE as the registration committed.** render/subAquariumCircuit.mjs's `circuit` profile is now the planner circuit at its champion: brain/plannerCircuitSeat.mjs with a zero readout, PLANNER_CHAMPION. **It flies exactly as the planner profile `standard` does**, and sub-aquarium.html now says so in the profile's tooltip and option label.
+- Round 40's net stays reachable by name, as `circuitSeat("circuit", CIRCUIT_CHAMPION)`. It is what the profile WAS.
+- The gates that held the old profile are restated with dated lines: subAquariumCircuit, subAquariumEvents, circuitRetrain, circuitRetrain2 and plannerCircuit. subAquariumCircuit's new section 4b holds the new default to the shipped seat's full dive at both gauges; sabotaged, 2 red.
+
+**WHAT THIS MEANS.**
+- The decision-circuit line has reached the seat and not passed it. A net on the rule base could not match the seat (Round 41). A net on the planner base, given the seat's own decisions as its start, found nothing to improve on held-out dives.
+- The aquarium's circuit profile is now the safest pilot measured: 2 crushed under the biased gauge, against Round 40's 8.
+- It also no longer shows anything the `standard` profile does not.
+- Whether a circuit can BEAT the seat would need a different design (other inputs, the look-ahead values, or a different task). That is not this round, and it is Keith's call.
+
+# Round 43 -- the look-ahead circuit: the planner circuit, given the planner's own rollout values as inputs (REGISTERED 2026-11-21, before any code, any training and any of its seeds is flown)
+
+## 1. Why
+Keith, 2026-11-21: "lets do 'giving the net the planner's look-ahead values'".
+
+Round 42's net, on the planner base, found nothing to improve on held-out dives. Its only view of the planner was the one-hot of the station the planner chose, and that is nearly constant. The planner knows much more:
+- every order it scored;
+- by how much the best beat the rest;
+- what each first station is worth.
+
+**This round changes one thing: the net's inputs gain the values of the planner's last plan.** The base, the outputs, the recipe, the sets, the selection, the champion rule and the hull and score lines are Round 42's.
+
+## 2. Exposing the values (the one edit to brain/plannerPerturbed.mjs)
+- perturbedSeat's seat gains a READ-ONLY getter, `plan`: { values (a copy), order, t } of its last plan, or null before the first. Nothing else in that file changes, and it makes no decision differently.
+- The gate holds this two ways. Fresh flights of the shipped seat must reproduce the SEAT-04 fingerprints Round 42's committed audit recorded, flown before the edit. And plannerPerturbed's own gate stays green.
+
+## 3. The seat and the net
+brain/plannerCircuitSeat.mjs gains a look-ahead variant. It has the same base, cadence and outputs as Round 42's seat. At each net step (every STEP_TICKS ticks, after the planner has decided that tick), x has 35 features:
+- The 21 pilotNeedsCircuit features and Round 42's 3 one-hot features (the planner's position k < 3 in obs.stations).
+- Then **11 look-ahead features** from the plan the getter returns, all 0 before the first plan:
+  - L1 the best value among all scored orders (nearest-first included);
+  - L2 the nearest-first value;
+  - L3 = L1 - L2, the planner's gain over the rule's order;
+  - L4-L6: for stations k = 0, 1, 2 of obs.stations, the best value of any scored permutation that STARTS at k, 0 if none does;
+  - L7-L9: the matching masks, 1 if some permutation starts at k;
+  - L10: the best value minus the second best (0 with a single order);
+  - L11: the plan's age, min(1, (t - plan.t) / 120).
+- Values are rollout scores in [0, 1], used raw.
+- **The policy:** a plain relu net 35 -> 84 -> 7 (3,619 weights), Round 42's shape with 35 inputs, the readout starting at zero. **The untrained net is the shipped seat, decision for decision.**
+
+## 4. The training (Round 42's, unchanged but for the inputs; ON THE RIG)
+- TRAIN_SET fitness, both gauges.
+- (1+1)-ES, 4 x 300 children, sigma 0.3, 1-4 weights a child, **search seeds 97800-97803**.
+- Checkpoints every 50 children, scored on HELD_OUT_SET. A search's result is its best held-out checkpoint, ties to the earlier.
+- Eligibility on POOL. The champion rule is Round 42's.
+- Resumable and exact, as Round 42's.
+- Rig command: `lookaheadCircuitCmd.mjs train --workers 4`. The ledger is committed before any audit seed is flown.
+
+## 5. The audit
+- **Arms:** **NEW** (the champion) and **SEAT-04** (`surveyPilot()`). Round 42's CUR arm is dropped: the aquarium's circuit profile IS the shipped seat since Round 42, so it would equal SEAT-04.
+- **Conditions:** REF and BIAS (+0.10).
+- **Seeds: 57001-57300, kind `both`, 300 dives per arm and condition**, 1,200 dives. The gate flies only 57901-57902.
+- 57000 and 58000 appear in the tree as denoiser scene seeds, a different generator; no needs seed range touches 57xxx.
+
+## 6. Checks (a failure: NOT WEIGHED, nothing is replaced)
+- Round 42's, for two arms: GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT; THE LEDGER IS COMPLETE; SEAT-04 IS THE SHIPPED SEAT.
+- THE ARMS DIFFER: NEW must EQUAL SEAT-04 when the champion is the start, and must differ otherwise.
+- NEW'S START IS THE SHIPPED SEAT: 57901-57902, both gauges, full length, fingerprint and command for command.
+- And: **THE GETTER IS PASSIVE**, as in section 2.
+
+## 7. The verdicts
+- V1, V2 (hull), V3 (the score line, not HURTS) and V4 (KEEPS against the seat at REF and under BIAS): Round 42's.
+- **The bottom line:**
+  - V1 + V2 + V3 + **V4** -> `THE LOOK-AHEAD CIRCUIT BEATS THE SEAT: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE`. The shipped seat itself is NOT replaced in this round; that would be Keith's call on this result.
+  - Otherwise -> `THE LOOK-AHEAD CIRCUIT DOES NOT BEAT THE SEAT (<which>): NOTHING IS REPLACED`. The profile stays Round 42's, i.e. the seat. **Unlike Round 42, clearing V3 without V4 replaces nothing**: a net that only equals the seat is not worth a profile that already is the seat.
+  - If the champion is the start, the line adds `-- THE CHAMPION IS THE START: THE TRAINING BOUGHT NOTHING`.
+- Reported, not weighed: arm means and counts, the chosen checkpoints, the station overrides a dive, and the mean |output| of each residual on NEW's dives.
+
+## 8. Expectations, recorded BEFORE any training
+- The champion is the start: about 45%.
+- Some search's best held-out checkpoint beats the start: about 55%.
+- V1 about 85%. V2 about 95%. V3 about 85%.
+- **V4 (beats the seat beyond 2 se at both gauges): about 10%.**
+- The bottom line replaces the profile: about 10%.
+
+## 9. What will be built
+- The `plan` getter in brain/plannerPerturbed.mjs.
+- The look-ahead seat and its 35-input policy in brain/plannerCircuitSeat.mjs.
+- tools/ship/lookaheadCircuit.mjs, which reuses Round 42's search, record, ledger and verdict code with this round's seeds, policy and arms.
+- tools/ship/lookaheadCircuitCmd.mjs, export-free.
+- tools/ship/lookaheadCircuit-selfcheck.mjs, with a mutation pass.
+- **Not in this round:** other net shapes, the planner's orders as features beyond their values, replacing the seat.
+
+## Round 43, RESULT (2026-11-25): THE LOOK-AHEAD CIRCUIT DOES NOT BEAT THE SEAT (V1 the hull under BIAS; V3 the score under BIAS; V4): NOTHING IS REPLACED
+
+**The training** ran on Keith's rig: four searches of 300 children, no resume. The ledger (`brain/rig-results/lookahead-circuit/`) was committed before any audit seed was flown.
+- Search 0 chose child 150 (held-out 0.9128 against the start's 0.9044); search 3 chose child 50 (0.9072); searches 1 and 2 chose child 0.
+- The champion is search 0, child 150. All four were eligible (pool crushed 0, the start's 0).
+- So, unlike Round 42, the look-ahead inputs DID let a search move above the start on held-out dives.
+
+**The audit** (seeds 57001-57300 `both`; read once; `brain/rig-results/lookahead-circuit-report.json`). All nine checks passed, including NEW'S START IS THE SHIPPED SEAT and THE GETTER IS PASSIVE (the seat reproduces Round 42's recorded SEAT-04 dives).
+
+| arm | REF score (crushed/stranded) | BIAS score (crushed/stranded) |
+|---|---|---|
+| NEW (search 0, child 150) | 0.8078 (3/0) | 0.8186 (14/1) |
+| SEAT-04 (the shipped seat) | 0.8113 (0/0) | 0.8585 (0/0) |
+
+- V1: NEW's hull is WORSE than the seat's under BIAS, 15 against 0.
+- V2: no worse at REF (3 against 0).
+- V3: NEW minus the seat is -0.0035 (se 0.0060) at REF, LOSES, clears; -0.0399 (se 0.0106) under BIAS, HURTS.
+- V4: no.
+- Reported, not weighed: station overrides on 1 of 300 dives at REF (20 ticks) and 3 of 300 under BIAS (35 ticks).
+- **Not reported, and said plainly:** section 7 registered the mean |output| of each residual on NEW's dives. The command does not print it. It is not computed after the read.
+
+**Against the expectations of section 8 (written first):**
+- The champion is the start, about 45: NO.
+- Some search beats the start on held-out, about 55: YES (two of four).
+- V1 about 85: FAILED. V2 about 95: held. V3 about 85: missed under BIAS.
+- V4 about 10, and the profile replaced about 10: no.
+
+**WHAT THIS MEANS.**
+- The held-out gain (+0.0084 over the start) did not survive a fresh audit. On new dives the trained net is below the seat at both gauges, and under the biased gauge it loses hulls the seat does not lose.
+- The likeliest reading is that a +0.008 gain chosen as the best of 28 checkpoints is selection noise, and the moves it bought cost robustness to the gauge fault. The training set includes BIAS dives, so this is not a condition the search never saw.
+- The aquarium's circuit profile stays Round 42's: the shipped seat. Nothing in the tree changes but the record.
+- The decision-circuit line has now tried three bases (rules, the seat, the seat plus its own look-ahead) and has not passed the seat. A further circuit round would need a reason beyond more inputs; that is Keith's call.

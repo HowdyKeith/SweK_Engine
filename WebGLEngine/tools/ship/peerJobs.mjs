@@ -5,7 +5,7 @@
 // THIS FILE IS THE PURE HALF: what a job is, who may run it, whether this peer should, and in what order. It reads and writes nothing; the queue operations hand it the files.
 //
 //   THE FOLDER (a dedicated branch, `peer-jobs`, never the working branch):   jobs/<id>.json   a signed job      claims/<id>.json   who is running it, with a heartbeat      cancel/<id>.json   a request to stop wanting it      results/<id>/done.json (+ the result files)   finished
-//   *** A JOB FILE IS NOT A COMMAND. *** Whoever can push to the branch could otherwise run anything on every peer. So a job names a KIND from a closed list (`rounds`: tools/ship/rigRunner.mjs --rounds ..., or `selftest`), the round numbers (digits only), a target and a commit; THE PEER BUILDS THE
+//   *** A JOB FILE IS NOT A COMMAND. *** Whoever can push to the branch could otherwise run anything on every peer. So a job names a KIND from a closed list (`rounds`: tools/ship/rigRunner.mjs --rounds ..., `selftest`, or `study`: tools/ship/studyRunner.mjs --study <a name from tools/ship/studyJobs.mjs's registry>), the round numbers (digits only), a target and a commit; THE PEER BUILDS THE
 //   COMMAND LINE ITSELF from those fields (argvFor), refuses any field it does not know, and refuses a job whose HMAC-SHA256 signature (a secret each peer holds) does not verify. A job text is data.
 //   THE CLAIM IS THE PUSH: two peers that both write claims/<id>.json and push cannot both succeed, so the one whose push is refused has lost and goes on to the next job. A claim carries a heartbeat; one that has missed STALE_BEATS beats is dead and may be taken over.
 "use strict";
@@ -14,9 +14,9 @@ import crypto from "node:crypto";
 export const VERSION = 1, QUEUE_BRANCH = "peer-jobs", BEAT_S = 600, STALE_BEATS = 3, MAX_ROUNDS = 8, MAX_AFTER = 8;
 // A failed run is tried again (the runner resumes where it stopped) up to MAX_ATTEMPTS times, RETRY_S apart; a result file above RESULT_MAX_BYTES is left out (a git host refuses 100 MB); a saved state file above STATE_MAX_BYTES is not shared.
 export const MAX_ATTEMPTS = 3, RETRY_S = 600, RESULT_MAX_BYTES = 90e6, STATE_MAX_BYTES = 40e6, PRESENCE_FRESH_S = 1800;
-export const KINDS = Object.freeze(["rounds", "selftest"]), GPU = Object.freeze(["any", "required", "forbidden"]);
-const ID = /^[a-z0-9][a-z0-9-]{2,62}$/, ROUND = /^\d{1,3}$/, SHA = /^[0-9a-f]{40}$/, ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/, PEER = /^[A-Za-z0-9][\w.-]{0,39}$/, TEXT = /^[\x20-\x7e]{0,200}$/, CPU = /^[\w .()@-]{1,40}$/;
-const FIELDS = new Set(["version", "id", "kind", "rounds", "workers", "zip", "target", "priority", "created", "expires", "after", "commit", "by", "note", "sig"]), TARGET_FIELDS = new Set(["gpu", "minCores", "peers", "cpuMatch"]);
+export const KINDS = Object.freeze(["rounds", "selftest", "study"]), GPU = Object.freeze(["any", "required", "forbidden"]);
+const ID = /^[a-z0-9][a-z0-9-]{2,62}$/, STUDY = /^[a-z0-9][a-z0-9-]{2,62}$/, ROUND = /^\d{1,3}$/, SHA = /^[0-9a-f]{40}$/, ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/, PEER = /^[A-Za-z0-9][\w.-]{0,39}$/, TEXT = /^[\x20-\x7e]{0,200}$/, CPU = /^[\w .()@-]{1,40}$/;
+const FIELDS = new Set(["version", "id", "kind", "rounds", "study", "workers", "zip", "target", "priority", "created", "expires", "after", "commit", "by", "note", "sig"]), TARGET_FIELDS = new Set(["gpu", "minCores", "peers", "cpuMatch"]);
 const isInt = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
 /** JSON with the keys of every object sorted, so a signature does not depend on the order a file was written in. */
 export function canonical(v) {
@@ -43,6 +43,11 @@ export function validateJob(spec) {
     if (spec.kind === "rounds") {
         if (!Array.isArray(spec.rounds) || spec.rounds.length < 1 || spec.rounds.length > MAX_ROUNDS || !spec.rounds.every((r) => typeof r === "string" && ROUND.test(r)) || new Set(spec.rounds).size !== spec.rounds.length) e.push(`rounds must be 1 to ${MAX_ROUNDS} different strings of 1 to 3 digits`);
     } else if (spec.kind === "selftest" && spec.rounds !== undefined && !(Array.isArray(spec.rounds) && spec.rounds.length === 0)) e.push("a selftest takes no rounds");
+    // 2026-11-26 -- a STUDY names one entry of tools/ship/studyJobs.mjs's closed registry; the name is all it carries, and the runner at the job's commit refuses a name its registry does not hold
+    if (spec.kind === "study") {
+        if (typeof spec.study !== "string" || !STUDY.test(spec.study)) e.push("study must be 3 to 63 characters of a-z, 0-9 and -, starting with a letter or digit");
+        if (spec.rounds !== undefined && !(Array.isArray(spec.rounds) && spec.rounds.length === 0)) e.push("a study takes no rounds");
+    } else if (spec.study !== undefined) e.push("only a study job names a study");
     if (spec.workers !== undefined && !isInt(spec.workers, 1, 64)) e.push("workers must be an integer from 1 to 64");
     if (spec.zip !== undefined && typeof spec.zip !== "boolean") e.push("zip must be true or false");
     const t = spec.target;
@@ -69,6 +74,7 @@ export function argvFor(spec, caps) {
     if (bad.length) throw new Error("peerJobs.argvFor: " + bad[0]);
     const workers = Math.max(1, Math.min(spec.workers || caps.cores, caps.cores));
     if (spec.kind === "selftest") return ["tools/ship/rigRunner.mjs", "--selftest"];
+    if (spec.kind === "study") return ["tools/ship/studyRunner.mjs", "--study", spec.study, "--workers", String(workers)];
     return ["tools/ship/rigRunner.mjs", "--rounds", spec.rounds.join(","), "--workers", String(workers), ...(spec.zip === false ? [] : ["--zip"])];
 }
 /** { ok, why }: whether a peer with `caps` = { name, cores, gpu, cpu } is one the target asks for. */

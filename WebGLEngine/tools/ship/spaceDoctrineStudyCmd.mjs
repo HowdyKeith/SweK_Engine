@@ -4,6 +4,8 @@
 //
 //   node tools/ship/spaceDoctrineStudyCmd.mjs dev --preset regular        DEV: arm D and every grid cap, one preset (writes dev-<preset>.json once)
 //   node tools/ship/spaceDoctrineStudyCmd.mjs dev-read                    merge DEV, choose CAP, run checks 1-3 and 6 (writes dev-report.json)
+//   node tools/ship/spaceDoctrineStudyCmd.mjs dev2 --preset regular       ROUND 2's DEV2: arm D and arm C at CAP 12, one preset, for the checks only (writes dev2-<preset>.json once)
+//   node tools/ship/spaceDoctrineStudyCmd.mjs dev2-read                   ROUND 2: checks 1, 2, 3 (the cap is applied) and 6 on DEV2 (writes dev2-report.json); nothing is chosen
 //   node tools/ship/spaceDoctrineStudyCmd.mjs held --preset regular       HELD89 at CAP_CHOSEN, one preset (writes held-<preset>.json ONCE)
 //   node tools/ship/spaceDoctrineStudyCmd.mjs held --network              HELD89, green sight + the shipped MLP (reported; held-green-mlp.json)
 //   node tools/ship/spaceDoctrineStudyCmd.mjs held-read                   the verdict (writes held-report.json)
@@ -58,6 +60,31 @@ if (mode === "dev") {
     console.log(`  check 3 THE CAP HOLDS at ${cap}: C peak ${fmt(checks.capHolds.cPeak, 2)} <= ${cap + S.CAP_SLACK}, doctrine peak ${fmt(checks.capHolds.doctrinePeak, 2)} > ${cap + S.DOCTRINE_MARGIN}: ${checks.capHolds.ok ? "PASS" : "FAIL"}`);
     console.log(`  check 6 EVERY FIGHT ENDS by 120 s (${checks.allEnd.n} fights): ${checks.allEnd.ok ? "PASS" : "FAIL"}`);
     write("dev-report.json", { cap, means, identity: { ok: identityOk, n: identity.length }, checks, cpuSeconds: all.reduce((a, f) => a + f.seconds, 0) });
+} else if (mode === "dev2") {
+    const preset = presetArg(), name = `dev2-${preset}.json`; refuse(name);
+    const t0 = Date.now(), rows = [];
+    for (const { seed, kind } of S.scenariosOf(S.DEV2_SEEDS)) {
+        rows.push(S.flyOne({ seed, kind, preset }));
+        rows.push(S.flyOne({ seed, kind, preset, cap: S.ROUND2_CAP, probe: true }));
+    }
+    const identity = S.scenariosOf(S.IDENTITY2_SEEDS).map(({ seed, kind }) => ({ seed, kind, same: S.tallyOf({ seed, kind, preset }) === S.tallyOf({ seed, kind, preset, cap: Infinity }) }));
+    write(name, { round: "space-approach-doctrine", part: "ROUND 2", set: "DEV2", preset, cap: S.ROUND2_CAP, seeds: [S.DEV2_SEEDS[0], S.DEV2_SEEDS.at(-1)], seconds: (Date.now() - t0) / 1000, identity, rows });
+} else if (mode === "dev2-read") {
+    const files = S.PRESETS.map((p) => `dev2-${p}.json`), missing = files.filter((f) => !fs.existsSync(out(f)));
+    if (missing.length) { console.error(`[space-doctrine] DEV2 is incomplete: ${missing.join(", ")}`); process.exit(2); }
+    const all = files.map(readJson), rows = all.flatMap((f) => f.rows), cap = S.ROUND2_CAP, checks = S.devChecks2(rows, cap);
+    const identity = all.flatMap((f) => f.identity.map((x) => ({ ...x, preset: f.preset })));
+    const identityOk = identity.length === S.IDENTITY2_SEEDS.length * S.KINDS.length * S.PRESETS.length && identity.every((x) => x.same);
+    const meanR = (a) => { const rs = rows.filter((r) => r.cap === a); return rs.reduce((x, r) => x + r.R, 0) / rs.length; };
+    console.log(`[space-doctrine] ROUND 2 DEV2 at CAP ${cap} (nothing is chosen; reported: mean R D ${fmt(meanR("D"), 1)}, C ${fmt(meanR(cap), 1)})`);
+    console.log(`  check 1 IDENTITY (cap Infinity == no pilot, ${identity.length} tallies): ${identityOk ? "PASS" : "FAIL"}`);
+    console.log(`  check 2 SAME FOE (${checks.sameFoe.probed} probed fights, ${checks.sameFoe.calls} decisions): ${checks.sameFoe.ok ? "PASS" : "FAIL"}`);
+    console.log(`  check 3 THE CAP IS APPLIED: ${checks.capApplied.overCap} decisions at or over ${cap}, ${checks.capApplied.notCut} with thrust; doctrine peak ${fmt(checks.capApplied.doctrinePeak, 2)} > ${cap + S.DOCTRINE_MARGIN}: ${checks.capApplied.ok ? "PASS" : "FAIL"}`);
+    console.log(`  check 6 EVERY FIGHT ENDS by 120 s (${checks.allEnd.n} fights): ${checks.allEnd.ok ? "PASS" : "FAIL"}`);
+    console.log(`  reported: overshoot worst ${fmt(checks.overshoot.worst, 2)}, 95th ${fmt(checks.overshoot.p95, 2)}, ${checks.overshoot.overTwo} of ${checks.overshoot.of} fights over +2 (Round 1's bar)`);
+    const allOk = identityOk && checks.sameFoe.ok && checks.capApplied.ok && checks.allEnd.ok;
+    console.log(`[space-doctrine] ROUND 2 DEV2: ${allOk ? "ALL CHECKS PASS -- commit CAP_CHOSEN = " + cap + " and the result, then fly HELD89 once" : "A CHECK FAILED -- NOT WEIGHED; HELD89 stays unflown"}`);
+    write("dev2-report.json", { round: 2, cap, identity: { ok: identityOk, n: identity.length }, checks, allOk, cpuSeconds: all.reduce((a, f) => a + f.seconds, 0) });
 } else if (mode === "held") {
     if (S.CAP_CHOSEN === null) { console.error("[space-doctrine] REFUSED: CAP_CHOSEN is null -- fly and read DEV, then commit the cap in spaceDoctrineStudy.mjs and the note, before any HELD89 seed"); process.exit(2); }
     const net = cli.flags.has("--network"), preset = net ? "green" : presetArg(), name = net ? "held-green-mlp.json" : `held-${preset}.json`; refuse(name);

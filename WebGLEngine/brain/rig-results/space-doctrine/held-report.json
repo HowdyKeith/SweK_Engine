@@ -1,0 +1,258 @@
+{
+ "cap": 12,
+ "byPreset": {
+  "perfect": {
+   "verdict": "FLOOR",
+   "wins": 1,
+   "losses": 9,
+   "ties": 230,
+   "n": 10,
+   "p": 0.021484375,
+   "median": 0,
+   "readings": {
+    "C": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 240,
+      "fighters": 0,
+      "none": 0
+     },
+     "meanR": 0.3,
+     "losses": 1920,
+     "passes": 8,
+     "aliveS": 24831.26666666667,
+     "peakClosing": 13.475764319497799,
+     "shipDamagePerRound": 1.0381926816886007
+    },
+    "D": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 240,
+      "fighters": 0,
+      "none": 0
+     },
+     "meanR": 1.05,
+     "losses": 1920,
+     "passes": 466,
+     "aliveS": 22910.13333333333,
+     "peakClosing": 33.46451354714938,
+     "shipDamagePerRound": 1.1764705882352942
+    },
+    "dpss": {
+     "n": 6,
+     "medianC": 0,
+     "medianD": 0
+    },
+    "fewerLosses": {
+     "gained": 0,
+     "lost": 0,
+     "p": 1
+    }
+   }
+  },
+  "ace": {
+   "verdict": "NO DIFFERENCE SHOWN",
+   "wins": 7,
+   "losses": 35,
+   "ties": 198,
+   "n": 42,
+   "p": 0.000015097200957825407,
+   "median": 0,
+   "readings": {
+    "C": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 240,
+      "fighters": 0,
+      "none": 0
+     },
+     "meanR": 3.6,
+     "losses": 1920,
+     "passes": 88,
+     "aliveS": 28719.899999999983,
+     "peakClosing": 13.849837451972057,
+     "shipDamagePerRound": 0.9236305775899529
+    },
+    "D": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 240,
+      "fighters": 0,
+      "none": 0
+     },
+     "meanR": 5.625,
+     "losses": 1920,
+     "passes": 867,
+     "aliveS": 25780.40000000002,
+     "peakClosing": 33.57982854153233,
+     "shipDamagePerRound": 1.0777400852011656
+    },
+    "dpss": {
+     "n": 51,
+     "medianC": 0,
+     "medianD": 0
+    },
+    "fewerLosses": {
+     "gained": 0,
+     "lost": 0,
+     "p": 1
+    }
+   }
+  },
+  "regular": {
+   "verdict": "CAP BETTER",
+   "wins": 240,
+   "losses": 0,
+   "ties": 0,
+   "n": 240,
+   "p": 1.131959884853339e-72,
+   "median": 1466.6166666666668,
+   "readings": {
+    "C": {
+     "shipDestroyed": 233,
+     "wins": {
+      "ship": 7,
+      "fighters": 233,
+      "none": 0
+     },
+     "meanR": 1584.855,
+     "losses": 723,
+     "passes": 1798,
+     "aliveS": 47219.26666666669,
+     "peakClosing": 14.125722438044857,
+     "shipDamagePerRound": 0.6402925561804067
+    },
+    "D": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 240,
+      "fighters": 0,
+      "none": 0
+     },
+     "meanR": 155.925,
+     "losses": 1920,
+     "passes": 1901,
+     "aliveS": 39322.10000000003,
+     "peakClosing": 33.620245131964474,
+     "shipDamagePerRound": 1.3666875130289764
+    },
+    "dpss": {
+     "n": 240,
+     "medianC": 39.113436331356475,
+     "medianD": 2.7281104898648953
+    },
+    "fewerLosses": {
+     "gained": 233,
+     "lost": 0,
+     "p": 1.448908652612274e-70
+    }
+   }
+  },
+  "green": {
+   "verdict": "CAP BETTER",
+   "wins": 240,
+   "losses": 0,
+   "ties": 0,
+   "n": 240,
+   "p": 1.131959884853339e-72,
+   "median": 1434.1166666666666,
+   "readings": {
+    "C": {
+     "shipDestroyed": 240,
+     "wins": {
+      "ship": 0,
+      "fighters": 240,
+      "none": 0
+     },
+     "meanR": 1594.928055555555,
+     "losses": 120,
+     "passes": 1783,
+     "aliveS": 47243.03333333335,
+     "peakClosing": 14.03860067006094,
+     "shipDamagePerRound": 0.3421602787456446
+    },
+    "D": {
+     "shipDestroyed": 0,
+     "wins": {
+      "ship": 0,
+      "fighters": 0,
+      "none": 240
+     },
+     "meanR": 183.675,
+     "losses": 744,
+     "passes": 5342,
+     "aliveS": 168247.46666666662,
+     "peakClosing": 33.620245131964474,
+     "shipDamagePerRound": 0.82156893673515
+    },
+    "dpss": {
+     "n": 240,
+     "medianC": 38.92733564013841,
+     "medianD": 2.225666330012356
+    },
+    "fewerLosses": {
+     "gained": 227,
+     "lost": 1,
+     "p": 1.0617602606342744e-66
+    }
+   }
+  }
+ },
+ "overall": "SUPPORTED",
+ "harmful": false,
+ "network": {
+  "verdict": "CAP BETTER",
+  "wins": 240,
+  "losses": 0,
+  "ties": 0,
+  "n": 240,
+  "p": 1.131959884853339e-72,
+  "median": 1449.7333333333333,
+  "readings": {
+   "C": {
+    "shipDestroyed": 240,
+    "wins": {
+     "ship": 0,
+     "fighters": 240,
+     "none": 0
+    },
+    "meanR": 1594.693333333333,
+    "losses": 203,
+    "passes": 1784,
+    "aliveS": 47212.23333333332,
+    "peakClosing": 14.093734462422079,
+    "shipDamagePerRound": 0.18309471980976477
+   },
+   "D": {
+    "shipDestroyed": 0,
+    "wins": {
+     "ship": 17,
+     "fighters": 0,
+     "none": 223
+    },
+    "meanR": 175.35,
+    "losses": 1241,
+    "passes": 3328,
+    "aliveS": 132911.43333333338,
+    "peakClosing": 33.620245131964474,
+    "shipDamagePerRound": 0.23694046883247305
+   },
+   "dpss": {
+    "n": 240,
+    "medianC": 38.94418730058868,
+    "medianD": 2.342136853330449
+   },
+   "fewerLosses": {
+    "gained": 237,
+    "lost": 1,
+    "p": 1.0821536499197921e-69
+   }
+  },
+  "shipKilledByC": 1
+ },
+ "checks": {
+  "sameScenarios": true,
+  "allEnd": true
+ },
+ "notWeighed": false
+}

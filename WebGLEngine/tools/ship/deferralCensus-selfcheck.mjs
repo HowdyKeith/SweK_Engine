@@ -41,6 +41,11 @@
 //      answer to follow -- the same "run the branch, do not argue about it" move v4478 needed for its
 //      unanswerable GPU case.
 //
+// ---- THE 2026-11-26 MERGE (main's v4935 into the claude/code-review-nr3a0i line) -- 2 edits, 2 red by name -------------
+//   M1 OVERLAP set to 0 (the depthProject hit both lines settled counted twice): 1 red (the tranches account for the record's move).
+//   M2 the reach matcher made to name every file (unnamed emptied): 1 red (REACH). The row's size floor was lowered from 100 to > 0 at this
+//      merge, with its reason at the row; this edit shows the lowered row still refuses a matcher that names everything.
+//
 // ---- SECTION 6 SABOTAGE LOG (after v4928) -- 7 edits, 7 red by name, none 0 red ---------------------------
 // hydrostatic's marker moved two lines down (2: the census row names satisfied 21 -> 20, and the adjacency row);
 // HoleFillGPU's export renamed (1: the declaration row); the record's satisfied falsified to 22 (2: the census
@@ -48,6 +53,12 @@
 // crash); primeTrellis un-exported (1 here, the declaration row, and 1 in deferralAudit's restated Trellis row);
 // SpaceSuit's marker moved to the PREVIOUS line (2: the window is directional); freeRotation's marker version
 // changed to v4911 (1: the marker must name the version the tranche records).
+// ---- SECTION 6b SABOTAGE LOG (after v4930) -- 2 edits, both red, ONE 0 RED FIRST -------------------------------------
+// fsrContent's marker removed (2: the census row names satisfied 26 -> 25, and the adjacency row). *** FRAG_SRC_DEPTH renamed to FRAG_SRC_DEPTHX went
+// 0 RED: the declaration regex was a PREFIX and still matched. *** Bounded with \b; re-run: 1 red (the declaration row). The first tranche's
+// readAngularVelocities and stabilityRate regexes are prefixes of the same kind and are left as written, said here.
+// 2026-11-20, the backlog's one (render/fireColour.mjs, SETTLED_BY_BACKLOG): its marker removed -> 2 red (the census row, 27 -> 26, and its own row).
+// 2026-11-20, the backlog's second (render/opticalFlowGPU.mjs, by v4740's TSL flow): makeLumaPyramid renamed -> 1 red (the backlog row).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -197,7 +208,7 @@ sec("3. *** THE RECORD THAT STOPPED BEING RE-READ WAS THE ONE FOR RECORDS THAT S
         found.reachOf118 === 0 && reach.matchedByBacklog >= REC.backlogAfter.reach &&
         reach.files.length > 0 && reach.files.length <= reach.matchedByBacklog &&   // v4884: files, not rows -- main's backlog is sixteen times the size it was and several undecided rows share a file (65 rows, 37 files)
         reach.files.every((f) => backlogText.includes(f)) &&
-        unnamed.length === C.undecided.length - reach.matchedByBacklog && unnamed.length > 100,
+        unnamed.length === C.undecided.length - reach.matchedByBacklog && unnamed.length > 0,   // 2026-11-26 merge: the floor was 100, a size check, not the discrimination (that is the equality before it, which a stub matching everything fails). Settlement moved it legitimately: 39 settled, 189 undecided, 93 named by the backlog, so 96 unnamed. Lowered to > 0, which still refuses a matcher that names every file
         `0 of ${C.counts.undecided} before v4479, ${REC.backlogAfter.reach} after it, ` +
         `${reach.matchedByBacklog} now. A backlog entry NAMES THE FILE carrying the prose note it answers -- ` +
         "that link is the whole of this metric, and the number is not a boast, it is the size of what is " +
@@ -307,10 +318,39 @@ sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A D
     // 13 above; 2 files are in both, so the merged record moves by 13 + 12 = 25 and not 26, and the 12 are named by their count here.
     const LEDGER_PASS_NEW = 12;
     const V4934_NEW_UNDECIDED = 3;   // the three ratchet-raise comments in definitionGates-selfcheck, filed as nextRounds entry name-branch-exports
-    ok("the tranche accounts for the record's move EXACTLY: satisfied +25 and undecided -25 (main's 13 plus the ledger pass's 12 not in it), from the counts v4906 left",
-        REC.satisfied - 8 === T.length + LEDGER_PASS_NEW && 217 - REC.undecided + V4934_NEW_UNDECIDED === T.length + LEDGER_PASS_NEW,
+    // 2026-11-26 MERGE of main (v4935) into the claude/code-review-nr3a0i line: that line's second tranche (5) and the backlog's two (fireColour,
+    // opticalFlowGPU) join main's 13 + 12. The record below is re-derived from this gate's own reading of the merged tree.
+    // ONE hit is in both: tools/ship/depthProject-selfcheck.mjs's "answer key" line, which main's ledger pass marked SETTLED at v3938 and this line's second
+    // tranche marked SETTLED at v3064 (the gl_FragDepth wiring, held to its declaration). The merge kept the declared line; the hit is counted once.
+    const OVERLAP = 1;
+    const BRANCH_LINE = D.SETTLED_TRANCHE_TWO.length + D.SETTLED_BY_BACKLOG.length - OVERLAP;
+    ok("the tranches account for the record's move EXACTLY: main's 13 plus the ledger pass's 12, plus this line's second tranche (5) and the backlog's 2, less the one hit both settled, from the counts v4906 left",
+        REC.satisfied - 8 === T.length + LEDGER_PASS_NEW + BRANCH_LINE && 217 - REC.undecided + V4934_NEW_UNDECIDED === T.length + LEDGER_PASS_NEW + BRANCH_LINE,
         `satisfied 8 -> ${REC.satisfied}, undecided 217 -> ${REC.undecided}. The other seventeen were read and are still open; ` +
         "they stay undecided because nothing structural decides them, and the ones no entry named were filed as backlog entries");
+}
+
+// ---- 6b. THE SECOND TRANCHE, AFTER v4930 ----------------------------------------------------------------------
+sec("6b. *** THIRTY MORE READ, FIVE SETTLED -- EACH HELD AGAINST A DECLARATION ***");
+{
+    const T2 = D.SETTLED_TRANCHE_TWO, T1 = D.SETTLED_TRANCHE_AFTER_V4928, TB = D.SETTLED_BY_BACKLOG;
+    const readRel = (rel) => { try { return fs.readFileSync(path.join(HERE, "../..", rel), "utf8"); } catch { return null; } };
+    const unmarked = T2.filter((t) => {
+        const src = readRel(t.file); if (src === null) return true;
+        const L = src.split("\n"), tag = new RegExp("SETTLED at " + t.settledAt + "\\b");
+        return !L.some((l, i) => D.TIGHT.test(l) && D.classifyLine(t.file, l, L[i - 1] || "", L[i + 1] || "") === D.CLASS.SATISFIED && (tag.test(l) || tag.test(L[i + 1] || "")));
+    });
+    ok("!! five settled notes carry SETTLED at <version> on the claim's line or the next, where the census sees it -- none of them a file of the first tranche",
+        T2.length === 5 && new Set(T2.map((t) => t.file)).size === 5 && !T2.some((t) => T1.some((u) => u.file === t.file)) && unmarked.length === 0,
+        unmarked.length ? "not adjacent or not classed satisfied: " + unmarked.map((t) => t.file).join(", ") : T2.map((t) => t.file.split("/").pop() + " " + t.settledAt).join("; "));
+    const missing = T2.flatMap((t) => t.decl.filter(([rel, re]) => { const src = readRel(rel); return src === null || !new RegExp(re).test(src); }).map(([rel, re]) => t.file + " -> " + rel + " /" + re + "/"));
+    const unmarkedB = TB.filter((t) => { const src = readRel(t.file); if (src === null) return true; const L = src.split("\n"), tag = new RegExp("SETTLED at " + t.settledAt + "\\b");
+        return !L.some((l, i) => D.TIGHT.test(l) && D.classifyLine(t.file, l, L[i - 1] || "", L[i + 1] || "") === D.CLASS.SATISFIED && (tag.test(l) || tag.test(L[i + 1] || ""))); });
+    const missingB = TB.flatMap((t) => t.decl.filter(([rel, re]) => { const src = readRel(rel); return src === null || !new RegExp(re).test(src); }).map(([rel]) => t.file + " -> " + rel));
+    ok("!! and the two settled from the backlog (render/fireColour.mjs by v4425's demosReach; render/opticalFlowGPU.mjs by v4740's TSL flow) are marked beside their claims and held against declarations",
+        TB.length === 2 && unmarkedB.length === 0 && missingB.length === 0, unmarkedB.length || missingB.length ? "unmarked: " + unmarkedB.map((t) => t.file).join(", ") + "; missing: " + missingB.join("; ") : "hiddenGates, collisions and the recorded decision that the scans stay narrow; makeLumaPyramid and the frame generator that runs it");
+    ok("!! *** and every one is held against a DECLARATION in the tree ***", missing.length === 0 && T2.every((t) => t.decl.length > 0),
+        missing.length ? "the work a marker points at is gone: " + missing.join("; ") : T2.reduce((n, t) => n + t.decl.length, 0) + " declarations: chunk inBounds and its air read, the escTol sweep and its knob, flyAudits, FRAG_SRC_DEPTH and gl_FragDepth, the folds7 result");
 }
 
 console.log();
