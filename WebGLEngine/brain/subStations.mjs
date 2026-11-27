@@ -113,15 +113,22 @@ export function captain({ helm, stations = [] } = {}) {
 //   gone -- a leak bigger than the weight. Damage control itself is silent once the weight is gone (its stage reads 'gone'), so the latch asks the same test. Off by default.
 // v4930 (round 12) -- T5 by NEED, blowNeed: blow when, at the charge spent per second over the last needWindowS seconds, the battery would be empty before the current climb reaches blowAbove (a climb of 0 or less never
 //   arrives), on a breached boat whose weight is gone, deeper than blowAbove. Off by default.
+// 2026-11-26 (round 22, section 46) -- holdUntilFrac: with blowHold, the hold is CLEARED (no longer forced, and re-armed for NEED's trigger) once the battery reads at least holdUntilFrac; null (the default)
+//   never clears it. `.holds` counts the latches and the releases.
+// 2026-11-26 (round 21, section 43) -- releaseRise: with blowHold, the held blow is also NOT forced while the boat is rising faster than releaseRise m/s (vel[2] > it: up is +); null (the default) never releases on
+//   speed. The latch is never cleared.
+// 2026-11-26 (round 20, section 40) -- holdBelow: with blowHold, the held blow is forced only while the boat is DEEPER than holdBelow m; shallower, the helm's own ballast stands. The latch is never cleared. null (the
+//   default) forces it at every depth, as round 16 registered.
 // 2026-11-25 (round 16, brain/SUB_STATIONS_WIP.md section 35) -- blowHold: once NEED's trigger (blowNeed) fires, ballast is HELD at -1 on every later tick; nothing releases it. Off by default (section 32: re-read every tick, the gate
 //   flickered and the helm flooded the tank back between blows).
-export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false, blowNeed: false, needWindowS: 10, blowHold: false });
+export const TRIAGE_OFF = Object.freeze({ thrustFull: null, thrustFloor: 0, earlyDropBelow: null, unrationSink: null, surfaceOnBreach: false, blowClimb: null, blowAbove: 3, latchOnSecond: false, blowNeed: false, needWindowS: 10, blowHold: false, holdBelow: null, releaseRise: null, holdUntilFrac: null });
 // v4930 (round 7) -- `more`: extra target stations asked FIRST (round 7's COMBINED puts ROUTE's legs station here); `energyAllow`: a gate on the energy station's surface claim (null: none; ROUTE shuts it). Both default to v4929's captain.
 export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOpts = {}, more = [], energyAllow = null } = {}) {
     if (!isFn(pilot) || !isFn(read)) throw new Error("subStations.triageCaptain: a pilot and a read() function are needed");
     const k = { ...TRIAGE_OFF, ...knobs }, helm = helmOf(pilot, { model }), energy = energyAllow ? gatedStation(energyStation({ read }), energyAllow) : energyStation({ read }), damage = damageStation(damageOpts), SD = model ? SP.surfacedDepth(model) : SP.SURFACED_DEPTH;
     const counts = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
     let breached = false, second = false, recovered = false, held = false;
+    const holds = { on: 0, off: 0 };   // round 22: how many times the hold latched, and how many times it was let go
     const fracs = [], dtGuess = 1 / 30;   // the readings of the last needWindowS seconds, a tick each (the tick is the vessel's DT)
     const latched = () => (k.latchOnSecond ? second : breached);
     // the stations are asked through the same captain() so the log, the watch and the aux are kept the same way; T3 swaps the helm for the tick, T1 and T2 edit the commands after it
@@ -154,10 +161,11 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
             const win = Math.round(k.needWindowS / dtGuess); fracs.push(r.frac); if (fracs.length > win + 1) fracs.shift();
             if (breached && state.tank && state.tank.released && -state.pos[2] > k.blowAbove && fracs.length === win + 1 && cmd.ballast > -1) {
                 const rate = (fracs[0] - r.frac) / k.needWindowS, tEmpty = rate > 0 ? r.frac / rate : Infinity, tArrive = state.vel[2] > 0 ? (-state.pos[2] - k.blowAbove) / state.vel[2] : Infinity;
-                if (tEmpty < tArrive) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; if (k.blowHold) held = true; }
+                if (tEmpty < tArrive) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; if (k.blowHold && !held) { held = true; holds.on++; } }
             }
         }
-        if (held && cmd.ballast > -1) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
+        if (held && k.holdUntilFrac !== null && r.frac >= k.holdUntilFrac) { held = false; holds.off++; }   // round 22: the hold let go once the charge is back (and re-armed)
+        if (held && cmd.ballast > -1 && (k.holdBelow === null || -state.pos[2] > k.holdBelow) && (k.releaseRise === null || !(state.vel[2] > k.releaseRise))) { cmd = sanitize({ ...cmd, ballast: -1 }); counts.T5++; }
         return cmd;
     };
     Object.defineProperty(out, "log", { get: () => run.log });
@@ -166,7 +174,8 @@ export function triageCaptain({ pilot, model, read, knobs = TRIAGE_OFF, damageOp
     Object.defineProperty(out, "triage", { get: () => ({ ...counts }) });
     // 2026-11-20 -- the breach latch as a reading (the Sub Aquarium names COND's state): breached (damage control has acted), second (a new sinking after the weight was gone), latched (the surface claim is on).
     Object.defineProperty(out, "latch", { get: () => ({ breached, second, latched: latched() }) });
-    Object.defineProperty(out, "held", { get: () => held });   // round 16: whether the blow is held
+    Object.defineProperty(out, "held", { get: () => held });
+    Object.defineProperty(out, "holds", { get: () => ({ ...holds }) });   // round 22: { on, off }   // round 16: whether the blow is held
     return out;
 }
 

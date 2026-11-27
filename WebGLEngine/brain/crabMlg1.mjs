@@ -21,7 +21,7 @@ export const PARAMS = Object.freeze({
     Cw: 4, dc: 0.01, Tg: 30,
     ci1: 0.5, ci2: 0.3, ca: 0.3, tau: 0.04,
     Ts: 0.7, nsp: 4, Na: 1, aFfi1: 0.5, TF0: 15, aFfi: 0.02,
-    mFromThresholded: true, polarity: "both", ffiPool: "segment", channels: "pooled", kappa: 0.5, driftGain: null, driftScope: "segment",       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
+    mFromThresholded: true, polarity: "both", ffiPool: "segment", channels: "pooled", kappa: 0.5, driftGain: null, driftScope: "segment", textureGain: null,       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
 });
 
 // the lateral inhibition kernel (eq. 5): the 8 neighbours, 1/8 at the corners and 1/4 at the edge midpoints, 0 at the centre
@@ -98,6 +98,14 @@ export function segmentDrift(L, Lprev, w, h) {
     return { s: n ? sum / n : 0, c2: Math.max(0, a2 / L.length - (a / L.length) * (a / L.length)) };
 }
 
+/** Round 33 (brain/STEALTH_ROUNDS_WIP.md, registered first): the patch's static texture S^ -- its mean squared VERTICAL luminance step over its luminance variance (dimensionless, contrast-free). 0 for a flat patch. */
+export function segmentTexture(L, w, h) {
+    let e = 0, n = 0; for (let y = 0; y < h - 1; y++) for (let x = 0; x < w; x++) { const d = L[(y + 1) * w + x] - L[y * w + x]; e += d * d; n++; }
+    let a = 0, a2 = 0; for (let i = 0; i < L.length; i++) { a += L[i]; a2 += L[i] * L[i]; }
+    const v = Math.max(0, a2 / L.length - (a / L.length) * (a / L.length));
+    return v > 1e-9 && n ? (e / n) / v : 0;
+}
+
 /** Eq. 17 and 18 with N_a = 1: F = a_1 F(t - 1) + (sum |P(t - 1)|) / n_cell and T_FFI = T_F0 + a_ffi T_FFI(t - 1). Returns { F, Tffi }. */
 export function ffiStep(F, Tffi, absP, ncell, { aFfi1, TF0, aFfi }) { return { F: aFfi1 * F + absP / ncell, Tffi: TF0 + aFfi * Tffi }; }
 
@@ -124,6 +132,7 @@ export function createNetwork({ W, H, params = {} }) {
     const P = { ...PARAMS, ...params }, n = P.segments;
     if (!["segment", "global"].includes(P.ffiPool)) throw new Error(`crabMlg1.createNetwork: ffiPool is segment or global, got ${JSON.stringify(P.ffiPool)}`);
     if (P.driftGain !== null && !(P.driftGain >= 0)) throw new Error(`crabMlg1.createNetwork: driftGain is null or a number at least 0, got ${P.driftGain}`);
+    if (P.textureGain !== null && !(P.textureGain >= 0)) throw new Error(`crabMlg1.createNetwork: textureGain is null or a number at least 0, got ${P.textureGain}`);
     if (!["segment", "global"].includes(P.driftScope)) throw new Error(`crabMlg1.createNetwork: driftScope is segment or global, got ${JSON.stringify(P.driftScope)}`);
     if (!["pooled", "sum", "max", "dominance"].includes(P.channels)) throw new Error(`crabMlg1.createNetwork: channels is pooled, sum, max or dominance, got ${JSON.stringify(P.channels)}`);
     if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`crabMlg1.createNetwork: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
@@ -152,7 +161,8 @@ export function createNetwork({ W, H, params = {} }) {
             if (P.channels === "pooled") {
                 m = groupingM(Sg, sw, H, { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded, polarity: P.polarity }).m;   // eq. 7 to 12
                 s.c = adaptC(s.c, m, s.m1, s.m2, P);                                                      // eq. 14 to 16
-                M = sigmoidM(s.c, m / (1 + (P.driftGain === null ? 0 : P.driftGain) * Dhat[j]), ncell);   // eq. 13 (Round 24: the drive divided by 1 + g D^)
+                const tex = P.textureGain === null ? 0 : P.textureGain * segmentTexture(L, sw, H);       // Round 33: + h S^, the static texture
+                M = sigmoidM(s.c, m / (1 + (P.driftGain === null ? 0 : P.driftGain) * Dhat[j] + tex), ncell);   // eq. 13 (Round 24: the drive divided by 1 + g D^; Round 33: + h S^)
             } else {                                                                                      // Round 23: two channels, two adaptive coefficients
                 const gp = { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded };
                 mOn = groupingM(Sg, sw, H, { ...gp, polarity: "on" }).m; mOff = groupingM(Sg, sw, H, { ...gp, polarity: "off" }).m;

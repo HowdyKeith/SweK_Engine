@@ -28,7 +28,8 @@ import * as NP from "../brain/needsPilot.mjs";
 import * as AV from "../brain/needsAdvisor.mjs";
 import * as SST from "../brain/subStations.mjs";   // 2026-11-19: a captain over the stations (brain/SUB_STATIONS_WIP.md): FIXED or TRIAGE on a sub with needs, and the breach it was registered against
 import { FROZEN_TRIAGE } from "../brain/stationsTask.mjs";
-import { COND_KNOBS } from "../brain/breachCourierTask.mjs";   // 2026-11-20: the COND captain (round 10: ROUTE's legs with TRIAGE, the surface latched only on a second sinking after the weight is gone)
+import { COND_KNOBS } from "../brain/breachCourierTask.mjs";
+import { HOLD_KNOBS } from "../brain/stationsTask.mjs";   // 2026-11-26 (backlog aquarium-hold-by-hull): round 16's HOLD -- TRIAGE with NEED's trigger and the blow held once it fires (96 of 96 hard-leak boats kept on the default vessel)   // 2026-11-20: the COND captain (round 10: ROUTE's legs with TRIAGE, the surface latched only on a second sinking after the weight is gone)
 import { legsStation } from "../brain/courierTask.mjs";   // v4930: the ROUTE captain (rounds 4-5: charge between legs, by the planned route)
 import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
@@ -231,7 +232,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     //   later explicit choice (off included) always wins and is never overridden. Starting the needs again clears both, as it always cleared the captain.
     function seatCaptain(id, kind) {
             const off = kind === null || kind === undefined || kind === "";
-            if (!off && kind !== "fixed" && kind !== "triage" && kind !== "route" && kind !== "cond") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage", "route", "cond" or null, got ${JSON.stringify(kind)}`);
+            if (!off && kind !== "fixed" && kind !== "triage" && kind !== "route" && kind !== "cond" && kind !== "hold") throw new Error(`subAquariumSim.setCaptain: a captain is "fixed", "triage", "route", "cond", "hold" or null, got ${JSON.stringify(kind)}`);
             const sub = subs.get(id); if (!sub) return null;
             if (!sub.needs) throw new Error("subAquariumSim.setCaptain: the sub has no needs (start them with setNeeds)");
             if (off) { sub.captainKind = null; sub.captainPilot = null; sub.aux = null; return null; }
@@ -244,11 +245,19 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             // 2026-11-20 -- COND (round 10, brain/SUB_STATIONS_WIP.md section 29: 2.42 goals and 76 of 96 boats on the breached courier): TRIAGE with ROUTE's legs station first and its energy claim shut, the breach latch only on a
             //   SECOND sinking after the weight is gone (COND_KNOBS, as frozen). The same legs station over the same proxy as ROUTE; damage control on the tank's room.
             if (kind === "cond") { sub.captainPilot = SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: COND_KNOBS, damageOpts: RESCUE, more: [legsStation({ read, nav: navProxy, pos: () => [sub.state.pos[0], sub.state.pos[1]], route: true })], energyAllow: () => false }); sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind; }
-            sub.captainPilot = kind === "triage" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: FROZEN_TRIAGE, damageOpts: RESCUE })
+            sub.captainPilot = kind === "hold" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: HOLD_KNOBS, damageOpts: RESCUE })
+                : kind === "triage" ? SST.triageCaptain({ pilot, model: sub.eventModel, read, knobs: FROZEN_TRIAGE, damageOpts: RESCUE })
                 : SST.captain({ helm: SST.helmOf(pilot, { model: sub.eventModel }), stations: [SST.energyStation({ read }), SST.damageStation(RESCUE)] });
             sub.captainKind = kind; sub.advisor = false; sub.advice = null; return kind;
 }
     /** COND (round 10's winner) for a courier with needs, unless a captain or the advisor was chosen for it, or the sub is not both. Seated, not chosen. */
+    // 2026-11-26 (backlog aquarium-hold-by-hull) -- AND AT A BREACH a needs sub that is NOT a courier gets HOLD (round 16: the blow, once NEED's trigger fires, held), by the same rule: never over a choice (off
+    //   included), a seated captain or the advisor. HOLD acts only after the breach and the weight are gone, so before that it flies as TRIAGE. (The aquarium has one hull for needs, the needs-task vessel; round 20's
+    //   HOLD-R is for the high rider, which it does not have.)
+    function defaultHold(sub) {
+        if (!sub || !sub.needs || sub.nav || sub.captainChosen || sub.captainPilot || sub.advisor) return null;
+        return seatCaptain(sub.id, "hold");
+    }
     function defaultCaptain(api, sub) {
         if (!sub || !sub.needs || !sub.nav || sub.captainChosen || sub.captainPilot || sub.advisor) return null;
         return seatCaptain(sub.id, "cond");
@@ -357,7 +366,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             if (!(Number.isFinite(leak) && leak > 0 && leak <= 0.2)) throw new Error(`subAquariumSim.breach: a leak is a fraction of the weight above 0 and at most 0.2, got ${JSON.stringify(leak)}`);
             const sub = subs.get(id); if (!sub) return null;
             if (!sub.needs) throw new Error("subAquariumSim.breach: the sub has no needs (start them with setNeeds)");
-            sub.breach = { leak, at: sub.eventT }; return leak;
+            sub.breach = { leak, at: sub.eventT }; defaultHold(sub); return leak;
         },
         /**
          * NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4). setScene(seed) puts a seeded sea of obstacles in the tank (brain/subTankNav.mjs tankScene: islands, icebergs with a keel, ships on lanes) and returns { seed, obstacles }; setScene(null) takes it away and every

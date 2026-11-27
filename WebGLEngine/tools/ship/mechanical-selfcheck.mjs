@@ -8,6 +8,8 @@
 // *** scan.mjs COULD NAME MECHANICAL MUTATIONS FROM THE DAY IT WAS WRITTEN AND NEVER APPLIED ONE. *** v4387
 // filed that as #151 after finding the hand-picked suite's score had been prose. This is the runner, the first
 // sweep, and the two things the first sweep found -- one about the tree, one about the tool.
+// 2026-11-26 -- THE QUESTION IS THE NET CHANGE (backlog history-gates-content-not-commits). PROVED ON A SCRATCH WORKTREE that re-made main's accident -- a commit deleting all 11,562 files and its byte-for-byte revert:
+//   the old query went red there as it did on Keith's rig, the new one is green; a REAL edit committed after it (brain/blobPolicyStore.js / a gate with a report) still goes red and names only that file.
 "use strict";
 import * as M from "../mutate/mechanical.mjs";
 import { SWEEP, tally, sweepFingerprint, filesOf, plausibleSurvivors } from "../mutate/mechanicalSweep.mjs";
@@ -193,7 +195,10 @@ console.log("\n8. THE SWEEP KNOWS WHICH TREE IT IS ABOUT");
     let changed = null;
     if (!shallow) try {
         const rel = filesOf(SWEEP.rows).map((f) => path.join("WebGLEngine", f));
-        const out = execFileSync("git", ["log", "--name-only", "--format=", `${SWEEP.commit}..HEAD`, "--", ...rel],
+        // 2026-11-26 -- THE NET CHANGE, NOT EVERY COMMIT THAT TOUCHED IT (backlog history-gates-content-not-commits). `git log --name-only <run>..HEAD` listed every file a commit touched, so a
+        //   commit that deleted the whole tree and the revert that restored it byte for byte (aaaf2ec45 and its revert, on main between v4935's verdict and its publish) made every file "changed"
+        //   and this row red on a tree identical to the one the run described. `git diff --name-only <run> HEAD` asks what the question means: does HEAD's content differ from the run's.
+        const out = execFileSync("git", ["diff", "--name-only", `${SWEEP.commit}`, "HEAD", "--", ...rel],
                                  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         changed = [...new Set(out.split("\n").map((s) => s.trim()).filter(Boolean))];
     } catch { changed = null; }

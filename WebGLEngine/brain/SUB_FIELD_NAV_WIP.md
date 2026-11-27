@@ -1285,3 +1285,191 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 * keels the vessel must sense rather than know;
 * drafts deeper than the hull may go (here every keel was at most 60 m, against a damage depth of 80);
 * the smaller vertical clearance, if a real vessel wanted a larger one.
+
+## FOLLOW-UP 9 [SERIES B]: THE TURN-AWAY RULE, EACH HEADING TESTED ALONG THE VESSEL'S OWN TURN (backlog `nav-avoid-turn-radius`; Keith, 2026-11-26: "add them to the backlog and work through them"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 8's rule tested each candidate heading as a straight line from an instant turn; the vessel turns on a 35 m radius (`subCurrentNav.R_TURN`), so the flown path is worse than the rule's own test, and 28 percent of its fires found no safe heading at all. Does testing each heading along the vessel's real turn change the choice, or only show the rule was optimistic?
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc`: FOLLOW-UP 8's designated rule exactly, with every heading test (the trigger on the plan's heading h0, and each candidate) made along an ARC -- from the vessel's CURRENT heading, a circle of radius R_TURN = 35 m at the cruise speed (3 m/s) turning the shorter way to the tested heading, then straight on it -- at the same whole seconds 0..25 and with the same clearances (SHIP_CLEAR 30 m for ships, STATIC_CLEAR 12 m for statics on candidates). The offsets, their order, the 90 degree limit and the stuck rule are unchanged. FOLLOW-UP 8's arms and `avoidHeading` are not edited.
+
+**Arms flown:** `any+predict+edge+avoid` (FOLLOW-UP 8's designated, now the REFERENCE) and `any+predict+edge+avoid-arc` (**designated**). HELD5's world as FOLLOW-UP 8 (`hard-traffic`, ships hold course, velocity told exactly, 260 s).
+
+**The set.** NEW: **HELD9, seeds 8801 to 8860 of hard-traffic (60 scenarios, 120 flights), flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run, not a result; the one amendment allowed before HELD9 is read: if DEV shows the arc rule degenerate (it never fires, or never turns), it is amended and written here.
+
+**Designated comparison and verdict.** `avoid-arc` against `avoid`, paired on the same seeds, on REACHED: the exact one-sided sign test on the discordant seeds (arc reaches where the reference does not, and the reverse), p at most 0.05: **ARC BEATS AVOID**; the reverse direction at p at most 0.05: **AVOID BEATS ARC**; else **NO DIFFERENCE SHOWN**. Reported beside it: collisions by kind, exits, the fires / turns / stuck counts and the stuck fraction.
+
+**Predictions, written before DEV and HELD9 (scored held or missed, moving nothing).**
+* **B1**: the verdict is NO DIFFERENCE SHOWN. 55 percent.
+* **B2**: the arc rule's stuck fraction (stuck / fires) is HIGHER than the reference's 28 percent (an arc reaches fewer clear headings). 70 percent.
+* **B3**: the arc arm's ship collisions are at most the reference's. 50 percent.
+* **B4**: the arc arm reaches at least as many as the reference. 45 percent.
+
+**What a result would not say.** FOLLOW-UP 8's list stands, except the instant turn, which this round removes from the TEST only: the vessel still flies its autopilot's own turn, and the arc is the planner's model of it (a circle at cruise speed), not the hull's measured turn. The 90 degree limit, the 15 degree step and the clearances are not swept.
+
+### DEV NOTE TO FOLLOW-UP 9 [SERIES B] (2026-11-26; made BEFORE HELD9 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `arcPos`, `conflictArc`, `avoidHeadingArc` and the `any+predict+edge+avoid-arc` arm in `brain/subAvoidNav.mjs` (FOLLOW-UP 8's arms and `avoidHeading` unedited), gated in `brain/subAvoidNav-selfcheck.mjs` section 5 (9 mutants, every one red; V8, candidates not tested against statics, went 0 red first and got a row).
+
+**DEV sanity run (seeds 1 to 30, both arms, 60 flights):** the arc rule is NOT degenerate -- it fires in 23,333 ticks and turns in 19,305 (stuck in 4,028, 17 percent) -- so the one amendment the registration allowed is not used. The reference arm reproduces FOLLOW-UP 8's own DEV counts exactly (26,472 fires, 18,794 turns, 7,678 stuck), so it is the same rule. Read for sanity, not tuned on: the reference reached 20 of 30 (8 collisions, 4 with ships, 2 exits); the arc arm 25 of 30 (1 collision, none with ships, 4 exits).
+
+**Nothing was tuned.** HELD9 (8801 to 8860) is flown once, both arms, to `brain/subAvoidHeld9.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 9: EACH HEADING TESTED ALONG THE TURN (2026-11-26; `brain/subAvoidHeld9.{0,1,2,3}.jsonl`, HELD9 = seeds 8801 to 8860 of hard-traffic, 120 flights, committed unread at `c94681286`, then read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | fires | stuck / fires |
+|---|---|---|---|---|---|
+| any+predict+edge+avoid (reference, FOLLOW-UP 8's) | 44 / 60 | 11 (10) | 5 | 63,985 | 24.0 % |
+| **any+predict+edge+avoid-arc** (designated) | 47 / 60 | **0 (0)** | **13** | 51,875 | 21.7 % |
+
+**The verdict (registered):** on REACHED, the arc arm arrives where the reference does not on 8 seeds and the reverse on 5 -- p = 0.29: **NO DIFFERENCE SHOWN.**
+
+**Predictions scored (moving nothing).** **B1 held** (NO DIFFERENCE SHOWN). **B2 MISSED**: the arc rule's stuck fraction is LOWER (21.7 % against 24.0 %), not higher -- testing from the current heading finds clear headings the instant-turn test missed as often as it loses them. **B3 held** (0 ship collisions against 10). **B4 held** (47 against 44).
+
+**Post hoc, from the 120 recorded flights (labelled: not registered, moves nothing).** On collisions the change is total: the reference collided on 11 seeds and the arc arm on none (a 11-to-0 split, exact two-sided p = 0.001 if it had been registered). The price is exits: 13 flights left the region against 5 -- the vessel that now sees its own turn takes wider headings, and some of them run it out of the region before it can come back.
+
+**What this says.** The instant-turn test was not only optimistic, it was the cause of the turn-away rule's ship collisions: tested along the 35 m turn the vessel actually flies, the same rule chose headings that kept it clear of every ship and every berg in 60 scenarios. It did not turn that into more arrivals, because the clear headings it found took 8 more flights out of the region. The next question is the region edge, not the ships: FOLLOW-UP 5's edge term in the plan does not see a turn-away's heading.
+
+**What this would not say.** FOLLOW-UP 8's list stands; the arc is the planner's model of the turn (a 35 m circle at cruise speed), not the hull's measured one; the 90 degree limit, 15 degree step and clearances were not swept.
+
+## FOLLOW-UP 10 [SERIES B]: THE ARC RULE THAT ALSO KEEPS OFF THE REGION'S EDGE (backlog `nav-avoid-arc-edge`; Keith, 2026-11-26; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 9's arc rule hit nothing in 60 scenarios but 13 flights left the region (against the straight test's 5), and its arrivals did not rise (47 against 44). Exits are its whole loss.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge`: FOLLOW-UP 9's arc rule exactly, with each CANDIDATE heading also refused when its arc comes within **EDGE_EXTRA = 20 m** (subHardNav's own edge band, the plan's +edge) of the region's boundary at any whole second of the same 25 s look. The trigger on the plan's heading is unchanged (the plan's heading already keeps off the edge by the field). Nothing else changes; FOLLOW-UP 8's and 9's arms are not edited.
+
+**Arms flown:** `any+predict+edge+avoid-arc` (FOLLOW-UP 9's designated, now the REFERENCE) and `any+predict+edge+avoid-arc-edge` (**designated**), HELD5's world.
+
+**The set.** NEW: **HELD10, seeds 8901 to 8960 of hard-traffic (60 scenarios, 120 flights), flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) once as a sanity run, not a result; the one amendment allowed before HELD10 is read: if DEV shows the rule degenerate (the edge test never refuses a candidate, or the rule never turns), it is amended and written here.
+
+**Verdict.** `avoid-arc-edge` against `avoid-arc`, paired, on REACHED, the exact one-sided sign test at p at most 0.05 either way (EDGE BEATS ARC / ARC BEATS EDGE / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck.
+
+**Predictions (scored held or missed, moving nothing).**
+* **D1**: the designated arm's exits are at most half the reference's. 55 percent.
+* **D2**: its collisions are at most the reference's plus 3 (the refused edge-ward headings leave fewer clear ones). 60 percent.
+* **D3**: its stuck fraction is higher than the reference's. 70 percent.
+* **D4**: the verdict is NO DIFFERENCE SHOWN. 55 percent; EDGE BEATS ARC 35.
+
+**What a result would not say.** FOLLOW-UP 9's list stands. The edge is the region's rectangle, which the planner's field already treats as a wall; this only stops the turn-away from undoing that.
+
+### DEV NOTE TO FOLLOW-UP 10 [SERIES B] (2026-11-26; made BEFORE HELD10 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `conflictArc`'s `edge` test (candidates only, the 20 m band), `avoidHeadingArc`'s `edge` option and the `any+predict+edge+avoid-arc-edge` arm; FOLLOW-UP 8's and 9's arms untouched. Gated in `brain/subAvoidNav-selfcheck.mjs` section 6 (7 mutants, every one red; E1, a 0 m band, and E5, the edge on the wrong arm, went 0 red first and got rows).
+
+**DEV sanity run (seeds 1 to 30, both arms):** the edge rule is NOT degenerate -- it refuses candidates (stuck 8,653 against the reference's 4,028) and still turns (16,250) -- so no amendment. The reference reproduces FOLLOW-UP 9's DEV counts exactly (23,333 fires, 19,305 turns, 4,028 stuck). Read for sanity, not tuned on: the reference reached 25 of 30 (4 exits, 1 collision); the edge arm 26 of 30 (2 exits, 2 collisions, 1 with a ship).
+
+**Nothing was tuned.** HELD10 (8901 to 8960) is flown once, both arms, to `brain/subAvoidHeld10.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 10: THE ARC RULE KEPT OFF THE EDGE (2026-11-26; `brain/subAvoidHeld10.{0,1,2,3}.jsonl`, HELD10 = seeds 8901 to 8960 of hard-traffic, 120 flights, committed unread at `45ec0b486`, then read ONCE): **EDGE BEATS ARC**
+
+| arm | reached | collided (with ships) | left | fires | stuck / fires |
+|---|---|---|---|---|---|
+| any+predict+edge+avoid-arc (reference, FOLLOW-UP 9's) | 42 / 60 | 3 (0) | 15 | 39,524 | 16.9 % |
+| **any+predict+edge+avoid-arc-edge** (designated) | **47 / 60** | 6 (4) | **7** | 46,851 | 35.6 % |
+
+**The verdict (registered):** the edge arm arrives where the reference does not on 5 seeds and never the reverse -- 5 to 0, p = 0.031: **EDGE BEATS ARC.**
+
+**Predictions scored (moving nothing).** **D1 held** (7 exits, at most half of 15). **D2 held** (6 collisions, the reference's 3 plus 3 -- on the line). **D3 held** (stuck 35.6 % against 16.9 %). **D4 MISSED** (the verdict was EDGE BEATS ARC, put at 35 %).
+
+**What this says.** The arc rule's exits were its whole loss, and keeping its candidates out of the plan's own edge band turns most of them into arrivals (15 exits to 7, 42 arrivals to 47). The price is visible: refusing edge-ward headings leaves the rule stuck twice as often, and when it is stuck it flies the plan's heading into the ship, so collisions rose from 3 to 6 (4 with ships, against none). Across FOLLOW-UPS 8 to 10 the turn-away rule has gone from 40 of 60 (instant turn) to 47 of 60, with a different seed set each time.
+
+**What this would not say.** FOLLOW-UP 9's list stands; the 20 m band is the plan's own, not swept; one set of 60.
+
+## FOLLOW-UP 11 [SERIES B]: FOLLOW-UP 10 ON A FRESH SET (backlog `nav-avoid-arc-edge-replicate`; Keith, 2026-11-27: "start with 1 and 3 together"; REGISTERED BEFORE ITS SET IS FLOWN)
+
+**What.** FOLLOW-UP 10 found EDGE BEATS ARC (5 to 0, p 0.031) on HELD10; the series moves about 9 flights from set to set. The same two arms (`any+predict+edge+avoid-arc` the reference, `any+predict+edge+avoid-arc-edge` designated), the same verdict word for word, on a fresh set; NO code changes.
+
+**The set.** NEW: **HELD11, seeds 9201 to 9260 of hard-traffic (60 scenarios, 120 flights), flown ONCE**, committed unread, read once. (9001 to 9040 belong to brain/subNav3d.mjs's sets, so they are not used; no file uses 9201 to 9260.) No DEV: nothing is built.
+
+**Predictions.** **R1**: EDGE BEATS ARC again (p at most 0.05). 40 percent. **R2**: the edge arm reaches at least as many as the reference. 70 percent. **R3**: the edge arm's exits are at most half the reference's. 50 percent. **R4**: the edge arm's collisions exceed the reference's. 65 percent.
+
+## RESULT OF FOLLOW-UP 11: FOLLOW-UP 10 ON A FRESH SET (2026-11-27; `brain/subAvoidHeld11.{0,1}.jsonl`, HELD11 = seeds 9201 to 9260, 120 flights, committed unread at `2ad418ca4`, read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | timeout |
+|---|---|---|---|---|
+| any+predict+edge+avoid-arc (reference) | 47 / 60 | 4 (1) | 8 | 1 |
+| any+predict+edge+avoid-arc-edge (designated) | 49 / 60 | 9 (6) | 2 | 0 |
+
+**The verdict (registered):** the edge arm arrives where the reference does not on 4 seeds and the reverse on 2 -- p = 0.34: **NO DIFFERENCE SHOWN.** FOLLOW-UP 10's EDGE BEATS ARC does not replicate at the registered bar.
+**Predictions.** **R1 MISSED** (not EDGE BEATS ARC). **R2 held** (49 against 47). **R3 held** (2 exits, at most half of 8). **R4 held** (9 collisions against 4).
+**What it says, across the two sets (120 scenarios).** The edge rule's effect is the same in direction both times -- exits fall sharply (15 to 7, 8 to 2) and collisions rise (3 to 6, 4 to 9; with ships 0 to 4, 1 to 6) -- and the net on arrivals is +5 and +2. The exits it saves are partly spent as collisions: stuck more often, the rule flies the plan's heading into the ship. So the next change is the stuck fallback (backlog `nav-avoid-stuck-fallback`), not the aquarium; `aquarium-courier-arc-edge` waits, by its own condition.
+
+## FOLLOW-UP 12 [SERIES B]: WHEN THE EDGE RULE IS STUCK, THE LEAST BAD HEADING (backlog `nav-avoid-stuck-fallback`; Keith, 2026-11-27; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** Over FOLLOW-UPS 10 and 11 the edge rule saved exits and spent part of them as collisions (3 to 6 and 4 to 9; with ships 0 to 4 and 1 to 6): stuck in 35 percent of its fires, it flies the plan's heading, into the ship.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge-least`: FOLLOW-UP 10's edge rule exactly, except WHEN STUCK. Then, instead of the plan's heading, it flies the heading -- the plan's own or one of the offsets, in the usual order -- whose arc keeps the LARGEST minimum clearance over the 25 s look: the clearance at a sample is the distance to an obstacle less its required clearance (r + half-hull + SHIP_CLEAR for ships, + STATIC_CLEAR for statics; obstacles passed beneath skipped, as before), minimised over obstacles and samples; the edge band is not in this measure; the first in order wins a tie. Nothing else changes.
+
+**Arms flown:** `any+predict+edge+avoid-arc-edge` (FOLLOW-UP 10's designated, the REFERENCE) and `any+predict+edge+avoid-arc-edge-least` (**designated**), HELD5's world.
+
+**The set.** NEW: **HELD12, seeds 9301 to 9360 of hard-traffic, flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) once as a sanity run; the one amendment allowed: if DEV shows the rule degenerate (the least-bad heading is never different from the plan's), it is amended and written here.
+
+**Verdict.** On REACHED, paired, the exact one-sided sign test at p at most 0.05 either way (LEAST BEATS EDGE / EDGE BEATS LEAST / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck.
+
+**Predictions.** **F1**: the designated arm's ship collisions are fewer than the reference's. 65 percent. **F2**: its exits are at most the reference's plus 3 (the least-bad heading ignores the edge). 60 percent. **F3**: NO DIFFERENCE SHOWN. 55 percent; LEAST BEATS EDGE 35.
+
+**CORRECTION TO FOLLOW-UP 12'S REGISTRATION (2026-11-27, written before any of its code and before any seed is flown).** Its set, 9301 to 9360, lies inside `brain/subNavRoute.mjs`'s range(9301, 9500); the seed check printed after the registration was written. **HELD12 is seeds 9701 to 9760** (no file uses them). Nothing else in the registration changes.
+
+### DEV NOTE TO FOLLOW-UP 12 [SERIES B] (2026-11-27; made BEFORE HELD12 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `minClearArc`, `avoidHeadingArc`'s `least` option and the `any+predict+edge+avoid-arc-edge-least` arm; FOLLOW-UPS 8 to 10's arms untouched (their goldens unchanged). Gated in `brain/subAvoidNav-selfcheck.mjs` section 7 (8 mutants, every one red; L7, the plan's own heading left out of the comparison, went 0 red first and got a row).
+
+**DEV sanity run (seeds 1 to 30, both arms):** NOT degenerate -- the least-bad heading changes the flights (stuck ticks 4,924 against the reference's 8,653; the rule fires 21,042 times against 24,903) -- so no amendment. The reference reproduces FOLLOW-UP 10's DEV counts exactly (24,903 fires, 16,250 turns, 8,653 stuck). Read for sanity, not tuned on: the reference reached 26 of 30 (2 exits, 2 collisions, 1 with a ship); the least arm 23 of 30 (7 exits, no collision).
+
+**Nothing was tuned.** HELD12 (9701 to 9760) is flown once, both arms, to `brain/subAvoidHeld12.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING (2026-11-27; `brain/subAvoidHeld12.{0,1,2,3}.jsonl`, HELD12 = seeds 9701 to 9760, 120 flights, committed unread at `eb48a753b`, read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | stuck / fires |
+|---|---|---|---|---|
+| any+predict+edge+avoid-arc-edge (reference) | 48 / 60 | 9 (7) | 3 | 45.4 % |
+| any+predict+edge+avoid-arc-edge-least (designated) | 47 / 60 | **1 (1)** | **12** | 32.3 % |
+
+**The verdict (registered):** the least arm arrives where the reference does not on 7 seeds and the reverse on 8 -- **NO DIFFERENCE SHOWN** (p 0.70 and 0.50).
+**Predictions.** **F1 held** (1 ship collision against 7). **F2 MISSED** (12 exits, more than the reference's 3 plus 3). **F3 held** (NO DIFFERENCE SHOWN).
+**What it says.** The fallback did what it was built to do -- collisions fell from 9 to 1 -- and paid for it in exits, 3 to 12, because the least-bad heading was registered without the edge band. Across FOLLOW-UPS 10 to 12 the turn-away rule has traded the same two losses back and forth (exits for collisions, collisions for exits) while arrivals stayed between 47 and 49 of 60: **the loss is now a single budget of about 11 flights in 60 that the rule moves between the ships and the region's edge, and no one-term change has shrunk it.** A least-bad heading that also prices the edge would be the obvious next form; whether it shrinks the budget or only splits it is the question it would ask.
+
+## THE LOSS AUDIT OF FOLLOW-UPS 10 TO 12 (2026-11-27; backlog `nav-avoid-loss-audit`; `brain/subAvoidLossAudit.mjs`): **POST-HOC, a reading of recorded flights, not a test**
+**What was read.** The 360 recorded HELD10-12 flights (`brain/subAvoidHeld10/11/12.*.jsonl`), already read once each for their registered verdicts. Every one of the 80 losses (31 of the arc arm, 36 of the edge arm, 13 of the least arm; CORRECTED from "85", which the audit's commit message `ec7dc23e6` also says, a miscount when writing up: the script has always printed 80) was flown again with a per-tick trace, by a copy of `flyAvoid`'s loop (the module is not touched). The copy reproduced every lost flight's status, hit, ticks and path exactly; the audit stops if it does not. For each loss, over its last 10 s: what was hit or crossed; the rule's state (stuck at least half the ticks, turning at least half, quiet = never fired, mixed otherwise); whether the PLAN's own heading, tested along the arc, was in trouble with a ship, a static obstacle or the edge band; and the distance to the goal.
+**The edge arm (`avoid-arc-edge`, flown in all three sets, 36 losses):**
+- **17 ship collisions, every one with the rule stuck 100 % of the last 10 s.** The edge band leaves no candidate, so the rule holds the plan's heading into the ship.
+- **10 exits with the rule QUIET** (it never fired in the last 10 s) **while the plan's own heading, along the arc, left the edge band.** The vessel was mid-turn: the commanded heading was 53 to 122 degrees from the actual one in 9 of the 10. The plan turns back near the edge and the 35 m turning circle carries the vessel out. The rule cannot see this, because it tests the plan's heading for ships only.
+- 7 berg hits: 4 while stuck on a ship, 2 quiet with the plan's own arc on a static obstacle, and 1 mixed. 2 exits mixed.
+**The least arm (`avoid-arc-edge-least`, HELD12 only, 13 losses):** 9 of its 12 exits came with the rule stuck or mixed on a ship. The least-bad heading was chosen without the edge band, as registered. 3 exits were quiet: 2 with the plan's arc on the edge (9723 and 9754, the same seeds where the edge arm also left) and 1 with it on a static obstacle (9729). There was 1 ship collision.
+**The arc arm (`avoid-arc`, HELD10-11, 31 losses):** 23 exits, 14 of them quiet with the plan on the edge; the rest are mixed or turning, taking a candidate toward the edge, which FOLLOW-UP 10 was built against.
+**Where the losses were.** The median distance to the goal at a loss was 240 m for collisions and 264 m for exits: early or mid route, not at the goal.
+**What it names (two levers, each for its own registered round).**
+1. **The stuck-ship class (17 of 36):** FOLLOW-UP 12 moved it to exits because the least-bad heading ignored the band. **FOLLOW-UP 13 (`nav-avoid-least-with-edge`) is the lever as already backlogged:** price the band in the fallback.
+2. **The quiet plan-edge class (10 of 36, the same seeds in both edge arms):** no fallback change touches it, because the rule never fires. **A new lever:** fire also when the plan's own arc leaves the band, and take the first candidate whose arc stays in. Backlogged as `nav-avoid-plan-edge`, to come after FOLLOW-UP 13.
+
+## FOLLOW-UP 13 [SERIES B]: THE LEAST BAD HEADING, PRICING THE EDGE (backlog `nav-avoid-least-with-edge`; Keith, 2026-11-27: "start with 1 and 3, and then 2 and 4"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 12's least-bad fallback cut ship collisions from 7 to 1 and raised exits from 3 to 12. The loss audit above found 9 of those 12 exits came while the rule was stuck or mixed on a ship. The fallback chose its heading without the edge band.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge-least-edge`. It is FOLLOW-UP 12's least arm exactly, except in the least-bad measure. At each sample of the arc, the measure also takes the **edge clearance**: the distance from the sample to the nearest side of the region, less the 20 m band, i.e. min(px - (x0 + 20), (x1 - 20) - px, py - (y0 + 20), (y1 - 20) - py). This is minimised together with the obstacles' clearances, over the same whole seconds 0 to 25. The other parts stay as they are: the same candidates in the same order, the first in order wins a tie, and nothing changes when the rule is not stuck.
+
+**Arms flown:** `any+predict+edge+avoid-arc-edge-least` (FOLLOW-UP 12's designated arm, the REFERENCE) and `any+predict+edge+avoid-arc-edge-least-edge` (**designated**), in HELD5's world.
+
+**The set.** NEW: **HELD13, seeds 9901 to 9960 of hard-traffic, flown ONCE**, after the change and its gate rows are sabotaged. No file uses these seeds as seeds. (The seed check also found that `tools/ship/plannerChoose.mjs`'s selection ranges, 8801-9100, 9201-9500 and 9601-9900, cover HELD9-12's seeds. Those are needs-task dives from a different generator, so no world is shared. This is noted, not changed.) DEV (seeds 1 to 30) is flown once as a sanity run. The one amendment allowed: if DEV shows the change degenerate (it never picks a different heading from the reference), it is amended and written here.
+
+**Verdict.** On REACHED, paired: the exact one-sided sign test at p at most 0.05 either way (LEAST-EDGE BEATS LEAST / LEAST BEATS LEAST-EDGE / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck, and how the designated arm's losses split under the audit's classes.
+
+**Predictions.** **G1**: the designated arm's exits are fewer than the reference's. 65 percent. **G2**: its ship collisions are at most the reference's plus 3. 60 percent. **G3**: NO DIFFERENCE SHOWN. 55 percent; LEAST-EDGE BEATS LEAST 35 percent. (The audit's quiet plan-edge exits are out of this change's reach by construction. They belong to `nav-avoid-plan-edge`.)
+
+### DEV NOTE TO FOLLOW-UP 13 [SERIES B] (2026-11-27; made BEFORE HELD13 was flown; DEV is not a result and nothing registered above is changed)
+**Built:** `minClearArc`'s `edge` option, `avoidHeadingArc`'s `leastEdge`, and the `any+predict+edge+avoid-arc-edge-least-edge` arm. FOLLOW-UPS 8 to 12's arms are untouched (their goldens are unchanged). It is gated in `brain/subAvoidNav-selfcheck.mjs` section 8. Of 8 mutants, every one went red on the first pass.
+**DEV sanity run (seeds 1 to 30, both arms):** NOT degenerate, so no amendment. Pricing the edge changes the flights: the rule fires 26,837 times against 21,042, and is stuck 10,222 ticks against 4,924. The reference reproduces FOLLOW-UP 12's DEV counts exactly (21,042 fires, 16,118 turns, 4,924 stuck). Read for sanity, not tuned on: the reference reached 23 of 30 (7 exits); the designated arm reached 29 of 30 (1 exit, no collision).
+**Nothing was tuned.** HELD13 (9901 to 9960) is flown once, both arms, to `brain/subAvoidHeld13.<part>.jsonl`, committed unread, then read once.
+
+## RESULT OF FOLLOW-UP 13: THE LEAST BAD HEADING, PRICING THE EDGE (2026-11-27; `brain/subAvoidHeld13.{0,1,2,3}.jsonl`, HELD13 = seeds 9901 to 9960, 120 flights, committed unread at `8422e9522`, read ONCE): **LEAST-EDGE BEATS LEAST**
+| arm | reached | exits | ship collisions | berg collisions | timeouts | fires | turns | stuck |
+|---|---|---|---|---|---|---|---|---|
+| `avoid-arc-edge-least` (reference) | 48 | 12 | 0 | 0 | 0 | 37,120 | 24,419 | 12,701 |
+| `avoid-arc-edge-least-edge` (designated) | **55** | 3 | 0 | 1 | 1 | 43,969 | 24,448 | 19,521 |
+
+**The verdict (registered):** the designated arm arrives where the reference does not on 9 seeds, and the reverse on 2. Exact one-sided sign test: **p = 0.033 for the designated arm** (p = 0.994 the other way). **LEAST-EDGE BEATS LEAST.**
+**Predictions.** **G1 held** (3 exits against 12). **G2 held** (no ship collisions in either arm). **G3 MISSED**: NO DIFFERENCE SHOWN was predicted at 55 percent; the 35 percent outcome came.
+**The losses under the audit's classes** (`node brain/subAvoidLossAudit.mjs 13`; the audit's copy of the loop reproduced every HELD13 loss). Of the designated arm's 5 losses:
+- **all 3 exits are quiet, with the plan's own arc leaving the band**: the class `nav-avoid-plan-edge` is aimed at;
+- 1 berg hit while stuck on a ship;
+- 1 timeout 34 m from the goal with the rule quiet.
+**What it says.** Pricing the edge into the fallback removed the stuck-ship exits without bringing back the collisions: the trade FOLLOW-UPS 10 to 12 kept making is gone on this set. One seed set, said plainly: FOLLOW-UP 11 showed how a first win can fail to replicate. What is left is mostly the class the rule never sees.

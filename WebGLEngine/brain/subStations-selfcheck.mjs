@@ -137,7 +137,7 @@ sec("5. the later rounds' parts, named here (each is driven in the gate of the r
 guarded("section 5", () => {
     ok("the parts of rounds 2 to 6 are exported functions: triageCaptain (brain/stationsTask-selfcheck), navigationStation, sonarStation, duelSide (brain/subStationsNavSonar-selfcheck), gatedStation (brain/duelStationsTask-selfcheck)",
         [SS.triageCaptain, SS.navigationStation, SS.sonarStation, SS.duelSide, SS.gatedStation].every((f) => typeof f === "function"));
-    ok("TRIAGE_OFF is every knob off (BLOW too, v4930; the held blow too, v4935) and frozen: with it the TRIAGE captain is the fixed one (brain/stationsTask-selfcheck flies the two side by side)", J(SS.TRIAGE_OFF) === '{"thrustFull":null,"thrustFloor":0,"earlyDropBelow":null,"unrationSink":null,"surfaceOnBreach":false,"blowClimb":null,"blowAbove":3,"latchOnSecond":false,"blowNeed":false,"needWindowS":10,"blowHold":false}' && Object.isFrozen(SS.TRIAGE_OFF));
+    ok("TRIAGE_OFF is every knob off (BLOW too, v4930; the held blow too, v4935; and the hold at every depth, round 20; and no release on speed, round 21; and none on the charge, round 22) and frozen: with it the TRIAGE captain is the fixed one (brain/stationsTask-selfcheck flies the two side by side)", J(SS.TRIAGE_OFF) === '{"thrustFull":null,"thrustFloor":0,"earlyDropBelow":null,"unrationSink":null,"surfaceOnBreach":false,"blowClimb":null,"blowAbove":3,"latchOnSecond":false,"blowNeed":false,"needWindowS":10,"blowHold":false,"holdBelow":null,"releaseRise":null,"holdUntilFrac":null}' && Object.isFrozen(SS.TRIAGE_OFF));
 });
 
 finished = true;

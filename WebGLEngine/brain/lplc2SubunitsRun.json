@@ -1,0 +1,55 @@
+{
+ "schema": 1,
+ "registered": "brain/FLY_RETINOTOPY_RF_WIP.md Part 5",
+ "frame": {
+  "w": 90,
+  "h": 90,
+  "degPerPx": 1,
+  "step": 0.01
+ },
+ "subunits": {
+  "offset": 10,
+  "radius": 15
+ },
+ "stim": {
+  "background": 0.5,
+  "dark": 0,
+  "holdS": 2,
+  "barWidth": 10,
+  "edgeSpeed": 20,
+  "centreSquare": 10,
+  "reach": 30,
+  "discFrom": 5,
+  "discTo": 60,
+  "discSpeed": 10,
+  "gratingPeriod": 20,
+  "wideBar": 60
+ },
+ "peakWindowS": 0.3,
+ "responses": {
+  "S1": 94014551946.19514,
+  "S2": 1.225585455726929e-12,
+  "S3r": 5875936794.126611,
+  "S3l": 5875909496.637196,
+  "S4": 23503637986.54878,
+  "S5": 14186960825.978743,
+  "S6": 0,
+  "S7": 382024669502.329,
+  "S8": 7.51528640040288e-14,
+  "S9": 52841953586.39974,
+  "S10": 479596395279.4922
+ },
+ "zhaoActiveFrames": {
+  "S1": 152,
+  "S2": 0,
+  "S3r": 0,
+  "S3l": 0,
+  "S4": 0,
+  "S5": 0,
+  "S6": 0,
+  "S7": 250,
+  "S8": 0,
+  "S9": 79,
+  "S10": 163
+ }
+}

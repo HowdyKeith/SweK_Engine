@@ -13,11 +13,23 @@
 //   The 18 left are EQUIVALENT or NOT REACHED: seabed 1000 -> 1001 (the floor never touches a flight at depth); the offsets' 1e-12 tolerance -> 1e-13 (the ninth step is exactly pi/2 or one ulp from it either way); `<` -> `<=` on a float tie (the look test, the clearance minimum, collision, four edges of the region test); `max(1, ..)` -> `max(2, ..)` on a replan interval of 150 ticks; the first plan built at t = 1 for t = 0 and the first clearance read at t = 1 and the replan test `i > 1` for `i > 0` (the replan is at multiples of 150, and the static map and the ships' schedule move little in one second: NOT REACHED by any DEV flight); `dist < BIG` -> `<=` and `&&` -> `||` in noRoute (no DEV scenario has no route); the obstacle struck read at the 4th state component or at clearance < 1 (the first struck is the same obstacle in all 30 flights); `&&` for `||` on the x lower and upper edges of the region (every DEV exit is through a y edge).
 //   NOT CHECKED, said plainly: the generator takes at most four mutants of an operator on a line; the golden freezes what the arm does today and does not say it is right.
 "use strict";
+// 2026-11-26 -- FOLLOW-UP 9 (section 5): 9 mutants of brain/subAvoidNav.mjs, every one red by name (final pass): V1 R_TURN 20 | V2 the longer way round | V3 the turn's sense reversed | V4 the arc's y sign |
+//   V5 the straight leg on the OLD heading | V6 the arc from the candidate, not the current heading | V7 the arc arm flying the straight test | V8 candidates not tested against statics | V9 HELD9 on HELD8's seeds.
+//   V8 WENT 0 RED FIRST and got a row (an iceberg on the first ship-clear candidate's path, at 25 s: at 10 s every candidate's turn passed it and the rule went stuck, which proved nothing).
+// 2026-11-26 -- FOLLOW-UP 10 (section 6): 7 mutants, every one red by name (final pass): E1 a 0 m band | E2 the south edge not tested | E3 the trigger edge-tested | E4 candidates not edge-tested | E5 the edge on the
+//   wrong arm | E6 HELD10 on HELD9's seeds | E7 a 3 s edge look. E1 and E5 WENT 0 RED FIRST: the band row started where the path crossed the edge anyway (now 85 m out, ending 10 m inside the band), and swapping the arms
+//   kept them different (a golden of both arms on six DEV seeds now pins each). The south-edge row's first fixture sat by the east edge, where nothing was refused.
+// 2026-11-27 -- FOLLOW-UP 12 (section 7): 8 mutants, every one red by name (final pass): L1 the last on a tie | L2 the MOST bad | L3 statics at SHIP_CLEAR | L4 obstacles passed beneath counted | L5 least never on |
+//   L6 HELD12 on subNavRoute's seeds | L7 the plan's own heading left out of the comparison | L8 the least arm without the edge. L7 WENT 0 RED FIRST (the stuck fixture's best was an offset); a fan where holding is
+//   least bad now pins it.
+// 2026-11-27 -- FOLLOW-UP 13 (section 8): 8 mutants, every one red by name, first pass: N1 the measure ignoring leastEdge | N2 a 0 m band | N3 the south side dropped | N4 the north side dropped |
+//   N5 the least arm also priced | N6 the new arm unpriced | N7 HELD13 on HELD12's seeds | N8 the edge priced at the arc's start only.
 import * as A from "./subAvoidNav.mjs";
 import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
 import * as AP from "./autopilotSub.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
+import * as CN from "./subCurrentNav.mjs";   // FOLLOW-UP 9: the turning radius the arc must share
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -95,6 +107,107 @@ console.log("\n4. THE FLIGHT");
     ok("!! a flight is deterministic", same(safe(() => A.flyAvoid(pilot, sc, A.DESIGNATED)), safe(() => A.flyAvoid(pilot, sc, A.DESIGNATED))));
     ok("!! a bad arm throws, naming the arms", (() => { try { A.flyAvoid(pilot, sc, "any+nothing"); return false; } catch (e) { return /any\+predict\+edge\+yield\+avoid/.test(e.message); } })());
     ok("!! a flight cut to 2 s ends 'timeout' with exactly 2 / DT ticks", (() => { const a = A.flyAvoid(pilot, sc, A.DESIGNATED, { seconds: 2 }); return a.status === "timeout" && a.ticks === Math.round(2 / S.DT); })());
+}
+console.log("\n5. FOLLOW-UP 9: EACH HEADING TESTED ALONG THE TURNING ARC");
+{
+    ok("!! the arc arm and its reference, R_TURN 35 m (subCurrentNav's own), HELD9 = 8801 to 8860, disjoint from HELD8; FOLLOW-UP 8's arm list unchanged",
+        same(A.ARC_ARMS, ["any+predict+edge+avoid", "any+predict+edge+avoid-arc"]) && A.ARC_REFERENCE === "any+predict+edge+avoid" && A.ARC_DESIGNATED === "any+predict+edge+avoid-arc" && A.R_TURN === 35 && A.R_TURN === CN.R_TURN
+        && A.HELD9.length === 60 && A.HELD9[0] === 8801 && A.HELD9[59] === 8860 && !A.HELD9.some((x) => A.HELD8.includes(x)) && same(A.AVOID_ARMS, ["any+predict+edge+yield", "any+predict+edge+avoid", "any+predict+edge+yield+avoid"]));
+    const near = (p, q, e = 1e-9) => Math.abs(p[0] - q[0]) < e && Math.abs(p[1] - q[1]) < e, T = (Math.PI / 2) * 35 / 3;
+    ok("!! arcPos: no turn is the straight line; a quarter turn RIGHT (0 to pi/2) ends at (35, -35) after (pi/2) 35 / 3 s and then runs straight toward -y; LEFT (0 to -pi/2) ends at (35, +35)",
+        near(A.arcPos(0, 0, 0.4, 0.4, 7), [21 * Math.cos(0.4), -21 * Math.sin(0.4)]) && near(A.arcPos(0, 0, 0, Math.PI / 2, T), [35, -35], 1e-9) && near(A.arcPos(0, 0, 0, Math.PI / 2, T + 10), [35, -65], 1e-9)
+        && near(A.arcPos(0, 0, 0, -Math.PI / 2, T), [35, 35], 1e-9), JSON.stringify(A.arcPos(0, 0, 0, Math.PI / 2, T)));
+    const sp = (k) => { const a = A.arcPos(0, 0, 0, Math.PI / 2, k), b = A.arcPos(0, 0, 0, Math.PI / 2, k + 1e-4); return Math.hypot(b[0] - a[0], b[1] - a[1]) / 1e-4; };
+    ok("...at the cruise speed throughout (3 m/s mid-turn and after), and the SHORTER way: from 0 to 3 pi/2 it turns LEFT a quarter, not right three", Math.abs(sp(5) - 3) < 1e-3 && Math.abs(sp(T + 3) - 3) < 1e-3 && near(A.arcPos(0, 0, 0, 1.5 * Math.PI, T), [35, 35], 1e-9));
+    const cA = (hc, h, obs, o) => safe(() => A.conflictArc(0, 0, 0, hc, h, obs, -Infinity, o), null), cH = (h, obs, o) => safe(() => A.conflictHeading(0, 0, 0, h, obs, -Infinity, o), null);
+    const fx = [[0, [ship(100, 0, 0, 0)]], [0, [ship(300, 0, 0, 0)]], [0, [ship(120, 0, -3, 0)]], [Math.PI / 2, [ship(0, -100, 0, 0)]]];
+    ok("with no turn (hc = h) the arc test IS the straight test, on four of section 2's fixtures", fx.every(([h, o]) => cA(h, h, o) === cH(h, o)));
+    const rock = [berg(40, -15, 5)];
+    ok("!! the arc MATTERS: from heading east, a candidate due 'south' (pi/2) clears an iceberg at (40, -15) on the instant-turn line but not on the 35 m turn, which swings out through about (25, -10)", cH(Math.PI / 2, rock, { statics: true }) === false && cA(0, Math.PI / 2, rock, { statics: true }) === true);
+    ok("avoidHeadingArc: nothing near is no fire; a ring of big ships is stuck with the plan's heading back", (() => { const q = A.avoidHeadingArc(0, 0, 0, 0, 0, [], -Infinity); return q.fired === false && q.heading === 0; })()
+        && (() => { const wall = []; for (let k = 0; k < 12; k++) wall.push(ship(150 * Math.cos(k * Math.PI / 6), -150 * Math.sin(k * Math.PI / 6), 0, 0, 120)); const q = A.avoidHeadingArc(0, 0, 0, 0, 0, wall, -Infinity); return q.stuck && q.fired && !q.turned && q.heading === 0; })());
+    // a candidate that clears every ship but runs through an iceberg must be passed over: the first offset clear of the ships alone, an iceberg put on ITS path at 25 s (past the turn: at 10 s every candidate's turn still passes it and the rule is stuck), and the rule asked again
+    const ships = [ship(100, 0, 0, 0)], firstShipClear = A.OFFSETS.find((d) => !A.conflictArc(0, 0, 0, 0, d, ships, -Infinity, { ships: true, statics: false }));
+    const [bx, by] = A.arcPos(0, 0, 0, firstShipClear, 25), withRock = [...ships, berg(bx, by, 5)], pick = A.avoidHeadingArc(0, 0, 0, 0, 0, withRock, -Infinity);
+    ok("!! candidates are tested against STATICS too: with an iceberg on the arc of the first ship-clear offset, that offset is passed over and the heading taken clears the iceberg as well",
+        firstShipClear !== undefined && pick.turned && pick.heading !== firstShipClear && !A.conflictArc(0, 0, 0, 0, pick.heading, withRock, -Infinity, { ships: true, statics: true }), JSON.stringify({ firstShipClear, taken: pick.heading }));
+    const sc = H.hardScenario(1, "hard-traffic"), r1 = safe(() => A.flyAvoid(pilot, sc, A.ARC_DESIGNATED, { seconds: 60 })), r2 = safe(() => A.flyAvoid(pilot, sc, A.ARC_DESIGNATED, { seconds: 60 }));
+    ok("!! the arc arm flies (DEV seed 1, 60 s), names itself, is deterministic, and its turn counts are coherent", !!r1 && r1.arm === A.ARC_DESIGNATED && same(r1, r2) && r1.turns <= r1.fires && r1.stuck <= r1.fires, JSON.stringify(r1 && { s: r1.status, f: r1.fires, t: r1.turns, k: r1.stuck }));
+    const ra = safe(() => A.flyAvoid(pilot, sc, A.ARC_REFERENCE, { seconds: 60 }));
+    ok("...and it is not the reference: the two arms' turn counts or paths differ on that flight (the arc test is actually used)", !!ra && !!r1 && (ra.turns !== r1.turns || ra.stuck !== r1.stuck || ra.path !== r1.path), JSON.stringify(ra && { f: ra.fires, t: ra.turns, k: ra.stuck }));
+}
+console.log("\n6. FOLLOW-UP 10: THE ARC RULE KEPT OFF THE REGION'S EDGE");
+{
+    ok("!! the edge arm and its reference, HELD10 = 8901 to 8960 disjoint from HELD8 and HELD9; the band is subHardNav's EDGE_EXTRA (20 m)", same(A.EDGE_ARMS, ["any+predict+edge+avoid-arc", "any+predict+edge+avoid-arc-edge"]) && A.EDGE_REFERENCE === "any+predict+edge+avoid-arc"
+        && A.EDGE_DESIGNATED === "any+predict+edge+avoid-arc-edge" && A.HELD10.length === 60 && A.HELD10[0] === 8901 && A.HELD10[59] === 8960 && !A.HELD10.some((x) => A.HELD8.includes(x) || A.HELD9.includes(x)) && H.EDGE_EXTRA === 20);
+    const R = N.REGION, mid = [(R.x0 + R.x1) / 2, (R.y0 + R.y1) / 2];
+    ok("in the middle of the region with nothing near, a heading has no edge conflict; with edge off the test is FOLLOW-UP 9's", A.conflictArc(mid[0], mid[1], 0, 0, 0, [], -Infinity, { edge: true }) === false && A.conflictArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity) === false);
+    ok("!! a heading that runs to the edge within the look conflicts: 30 m from the east edge heading east (3 m/s: past the 20 m band in 4 s), and not heading west", A.conflictArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity, { edge: true }) === true
+        && A.conflictArc(R.x1 - 30, mid[1], 0, Math.PI, Math.PI, [], -Infinity, { edge: true }) === false);
+    ok("...the band is 20 m, not the region itself: 40 m from the north edge (y1) heading toward it at pi/2 is a conflict only via the band (the path reaches y1 - 20 after 7 s and y1 after 14 s; both inside the look) -- and 100 m off with a 25 s look (75 m) is not", A.conflictArc(mid[0], R.y0 + 40, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === true
+        && A.conflictArc(mid[0], R.y0 + 100, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === false);
+    // the trigger is NOT edge-tested: on the plan's own heading toward the edge with no ship, nothing fires
+    const q = A.avoidHeadingArc(R.x1 - 30, mid[1], 0, 0, 0, [], -Infinity, { edge: true });
+    ok("!! the TRIGGER is not edge-tested (the plan's heading keeps off the edge by the field): heading at the edge with no ship near, the rule does not fire", q.fired === false && q.heading === 0);
+    // a candidate refused for the edge: a ship dead ahead near the east edge; the edge version skips candidates that turn toward the edge
+    // the vessel 30 m inside the SOUTH edge (y0 + 30), heading east, a still ship 90 m ahead (at 60 m every turn passes within its clearance and the rule is stuck; at 120 m it is out of the look): the offsets go starboard first (+, toward -y, toward the south edge). The first fixture sat near the EAST edge, where the
+    //   candidate taken never reached the band in 25 s, so nothing was refused and the row said nothing.
+    const at = [mid[0], R.y0 + 30], ships = [ship(at[0] + 90, at[1], 0, 0)], plain = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity), edged = A.avoidHeadingArc(at[0], at[1], 0, 0, 0, ships, -Infinity, { edge: true });
+    ok("!! a ship ahead 30 m inside the south edge: the plain arc rule turns starboard toward the edge, the edge-kept rule refuses that and turns to port, and what it takes keeps off the band",
+        plain.turned && plain.heading > 0 && edged.turned && edged.heading < 0 && !A.conflictArc(at[0], at[1], 0, 0, edged.heading, ships, -Infinity, { ships: true, statics: true, edge: true }), JSON.stringify({ plain: plain.heading, edged: edged.heading }));
+    ok("!! the band, not the edge itself, decides: 85 m from the south edge heading at it, the 25 s look ends 10 m from the edge -- inside the 20 m band (a conflict) but never past the edge (none without the band)",
+        A.conflictArc(mid[0], R.y0 + 85, 0, Math.PI / 2, Math.PI / 2, [], -Infinity, { edge: true }) === true && Math.abs(A.arcPos(mid[0], R.y0 + 85, Math.PI / 2, Math.PI / 2, 25)[1] - R.y0 - 10) < 1e-9);
+    // GOLDEN (a regression snapshot of this module's own flights, not a hand derivation): the two arms on six DEV seeds -- the edge arm refuses more and turns less, and the arc arm is FOLLOW-UP 9's, untouched
+    const gold = Object.fromEntries(A.EDGE_ARMS.map((arm) => { let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), arm)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; } return [arm, { f, t, k, st }]; }));
+    ok("!! GOLDEN: on DEV seeds 1-6 the arc arm fires 4638, turns 4497, stuck 141 and the edge arm fires 4571, turns 3819, stuck 752 (each arm flies its own test: swapping them moves both)",
+        same(gold[A.EDGE_REFERENCE], { f: 4638, t: 4497, k: 141, st: "rrrrrr" }) && same(gold[A.EDGE_DESIGNATED], { f: 4571, t: 3819, k: 752, st: "rrrrrr" }), JSON.stringify(gold));
+    const sc = H.hardScenario(1, "hard-traffic"), e1 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 })), e2 = safe(() => A.flyAvoid(pilot, sc, A.EDGE_DESIGNATED, { seconds: 60 }));
+    ok("the edge arm flies (DEV seed 1, 60 s), names itself, and is deterministic", !!e1 && e1.arm === A.EDGE_DESIGNATED && same(e1, e2), JSON.stringify(e1 && { s: e1.status, f: e1.fires, t: e1.turns, k: e1.stuck }));
+}
+console.log("\n7. FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING");
+{
+    ok("!! the least arm and its reference, HELD12 = 9701 to 9760 (above subNavRoute's held87, which ends at 9700), disjoint from HELD8 to HELD10", same(A.LEAST_ARMS, ["any+predict+edge+avoid-arc-edge", "any+predict+edge+avoid-arc-edge-least"])
+        && A.LEAST_REFERENCE === "any+predict+edge+avoid-arc-edge" && A.LEAST_DESIGNATED === "any+predict+edge+avoid-arc-edge-least" && A.HELD12.length === 60 && A.HELD12[0] === 9701 && A.HELD12[59] === 9760
+        && !A.HELD12.some((x) => A.HELD8.includes(x) || A.HELD9.includes(x) || A.HELD10.includes(x)));
+    ok("!! minClearArc: a still ship dead ahead at 100 m on the straight line is met at 25 s, 25 m off, its need 10 + half-hull + 30 = 44: -19; nothing near is Infinity; a ship passed beneath is skipped",
+        A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity) === -19 && A.minClearArc(0, 0, 0, 0, 0, [], -Infinity) === Infinity && A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0, 10, 5)], 30) === Infinity);
+    ok("...and a static's need is STATIC_CLEAR, not SHIP_CLEAR: an iceberg (r 5) dead ahead at 100 m is 25 - (5 + half-hull + 12)", A.minClearArc(0, 0, 0, 0, 0, [berg(100, 0, 5)], -Infinity) === 25 - (5 + HH + 12));
+    const wall = []; for (let k = 0; k < 12; k++) wall.push(ship(150 * Math.cos(k * Math.PI / 6), -150 * Math.sin(k * Math.PI / 6), 0, 0, 120));
+    const w2 = [...wall, ship(60, 0, 0, 0)], plain = A.avoidHeadingArc(0, 0, 0, 0, 0, w2, -Infinity), least = A.avoidHeadingArc(0, 0, 0, 0, 0, w2, -Infinity, { least: true });
+    const all = [0, ...A.OFFSETS].map((d) => ({ d, m: A.minClearArc(0, 0, 0, 0, d, w2, -Infinity) })), top = Math.max(...all.map((x) => x.m)), firstTop = all.find((x) => x.m === top).d;
+    ok("!! STUCK (a ring of big ships and one close ahead): without least the plan's heading comes back; with least, the heading with the largest minimum clearance, the first in order on a tie (here +90: -69.1 against the plan's -79.0)",
+        plain.stuck && plain.heading === 0 && least.stuck && !least.turned && least.heading === firstTop && least.heading !== 0 && Math.abs(top - (-69.1)) < 0.05, JSON.stringify({ least: least.heading, top }));
+    // the plan's heading can be the least bad: ships 60 m off on every candidate's side and a mild conflict dead ahead (115 m) -- holding is better than any turn (-28.4 against the best offset's -38.7)
+    const fan = [ship(115, 0, 0, 0)]; for (let j = 1; j <= 6; j++) for (const sg of [1, -1]) { const ang = sg * j * Math.PI / 12; fan.push(ship(60 * Math.cos(ang), -60 * Math.sin(ang), 0, 0)); }
+    const hold = A.avoidHeadingArc(0, 0, 0, 0, 0, fan, -Infinity, { least: true });
+    ok("!! the PLAN'S OWN heading is in the comparison: stuck in a fan of ships with a mild conflict ahead, least keeps the plan's heading because it has the largest minimum clearance", hold.stuck && hold.heading === 0
+        && A.minClearArc(0, 0, 0, 0, 0, fan, -Infinity) > Math.max(...A.OFFSETS.map((d) => A.minClearArc(0, 0, 0, 0, d, fan, -Infinity))), JSON.stringify(hold));
+    ok("...and when a candidate clears, least changes nothing (the turn is taken as before)", same(A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { least: true }), A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity)));
+    let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEAST_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
+    ok("!! GOLDEN: the least arm on DEV seeds 1-6 fires 3781, turns 3107, stuck 674, statuses lrrrrr (the edge arm's golden, section 6, is unchanged)", same({ f, t, k, st }, { f: 3781, t: 3107, k: 674, st: "lrrrrr" }), JSON.stringify({ f, t, k, st }));
+}
+console.log("\n8. FOLLOW-UP 13: THE LEAST BAD HEADING, PRICING THE EDGE");
+{
+    ok("!! the least-edge arm and its reference (FOLLOW-UP 12's designated), HELD13 = 9901 to 9960, disjoint from HELD8 to HELD12", same(A.LEASTEDGE_ARMS, ["any+predict+edge+avoid-arc-edge-least", "any+predict+edge+avoid-arc-edge-least-edge"])
+        && A.LEASTEDGE_REFERENCE === A.LEAST_DESIGNATED && A.LEASTEDGE_DESIGNATED === "any+predict+edge+avoid-arc-edge-least-edge" && A.HELD13.length === 60 && A.HELD13[0] === 9901 && A.HELD13[59] === 9960
+        && !A.HELD13.some((x) => [A.HELD8, A.HELD9, A.HELD10, A.HELD12].some((h) => h.includes(x)) || (x >= 9201 && x <= 9260)));
+    const V = N.CRUISE;
+    ok("!! minClearArc's edge: from (0, 0) heading east with nothing near, the nearest side is the west one, 40 m off less the 20 m band: 20 (Infinity without edge); from (400, 0) heading east the 25 s sample is 420 - (400 + 25 V)",
+        A.minClearArc(0, 0, 0, 0, 0, [], -Infinity, { edge: true }) === 20 && A.minClearArc(0, 0, 0, 0, 0, [], -Infinity) === Infinity && Math.abs(A.minClearArc(400, 0, 0, 0, 0, [], -Infinity, { edge: true }) - (20 - 25 * V)) < 1e-9,
+        A.minClearArc(400, 0, 0, 0, 0, [], -Infinity, { edge: true }));
+    ok("...it is MINIMISED with the obstacles': a ship dead ahead at 100 m (-19) far from every side gives -19 either way; by the east side (start 380, the ship at 480) the edge's 40 - 25 V wins", A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true }) === -19
+        && Math.abs(A.minClearArc(380, 0, 0, 0, 0, [ship(480, 0, 0, 0)], -Infinity, { edge: true }) - Math.min(-19, 40 - 25 * V)) < 1e-9);
+    ok("...the north side too (heading -90 degrees from (200, 100) runs to y = 100 + 25 V: 20 - 25 V)", Math.abs(A.minClearArc(200, 100, 0, -Math.PI / 2, -Math.PI / 2, [], -Infinity, { edge: true }) - (20 - 25 * V)) < 1e-9);
+    // stuck 100 m north of the south side: a ship 115 m ahead and a fan of ships 60 m off on the north side only. Every candidate conflicts (the south ones with the band). Without the edge in the
+    // measure the least-bad heading is +60 (obstacles -2.1, but 30.7 m past the band); with it, +30 (-13.0 overall).
+    const ox = 200, oy = -100, fan = [ship(ox + 115, oy, 0, 0)]; for (let j = 1; j <= 6; j++) { const ang = -j * Math.PI / 12; fan.push(ship(ox + 60 * Math.cos(ang), oy - 60 * Math.sin(ang), 0, 0)); }
+    const lo = A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, least: true }), le = A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, least: true, leastEdge: true });
+    ok("!! STUCK BY THE SOUTH SIDE: least flies +60 degrees toward the edge, least-edge flies +30 (the largest of the combined minimum clearances, first in order on a tie)", lo.stuck && le.stuck && !le.turned && Math.abs(lo.heading - Math.PI / 3) < 1e-12 && Math.abs(le.heading - Math.PI / 6) < 1e-12
+        && A.minClearArc(ox, oy, 0, 0, Math.PI / 6, fan, -Infinity, { edge: true }) === Math.max(...[0, ...A.OFFSETS].map((d) => A.minClearArc(ox, oy, 0, 0, d, fan, -Infinity, { edge: true }))), JSON.stringify({ least: lo.heading, leastEdge: le.heading }));
+    ok("...leastEdge changes nothing without least, nor when a candidate clears", same(A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, leastEdge: true }), A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true }))
+        && same(A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true, least: true, leastEdge: true }), A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true })));
+    let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEASTEDGE_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
+    ok("!! GOLDEN: the least-edge arm on DEV seeds 1-6 fires 5355, turns 3275, stuck 2080, statuses rrrrrr (the least arm's golden, section 7, is unchanged)", same({ f, t, k, st }, { f: 5355, t: 3275, k: 2080, st: "rrrrrr" }), JSON.stringify({ f, t, k, st }));
 }
 console.log(fails === 0 ? "\nall checks pass" : `\n${fails} FAIL`);
 process.exit(fails === 0 ? 0 : 1);

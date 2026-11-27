@@ -1,0 +1,180 @@
+// WebGLEngine/brain/lplc2Subunits-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time). Run: node brain/lplc2Subunits-selfcheck.mjs
+//
+// THE GATE OF brain/lplc2Subunits.mjs (brain/FLY_RETINOTOPY_RF_WIP.md Part 5, registered before the module): the constants as registered, the stimuli's geometry as Part 4 reads the text (and Part 5 assumes
+// where only the figure gives it), the subunit rule on HAND-MADE motion maps, the peak window and the predictions on fixtures. It runs NO registered stimulus through the model: the round is run once, by
+// tools/ship/takeLplc2Subunits.mjs, after this gate is green and committed.
+// SABOTAGED -- 16 mutants of brain/lplc2Subunits.mjs, each alone in place and restored, EVERY ONE RED BY NAME: U01 the offset 12 | U02 the -x drive's sign | U03 R not squared | U04 one rectification per arm |
+//   U05 40 degrees/s | U06 the reach 40 | U07 S2 outward | U08 S3l on +x | U09 S5's y arms outward | U10 S9 on the x axis | U11 a 100 ms window | U12 P3 against one arm | U13 P5 at 20 % | U14 S8 looming |
+//   U15 edges without coverage | U16 no hold before the motion. FIRST PASS: four rows of mine were wrong, not the module -- the grating's dark fraction (90 px is 4.5 periods), the overlapping disks (the
+//   registered geometry shares |x| < 5 between +x and -x), a spike placed within a window of the plateau, and a P3 fixture that also crossed P4; each row was corrected to what the registration says.
+// 2026-11-26 -- PART 7 (section 6): 8 mutants of lplc2Subunits.mjs, every one red by name (final pass): O1 cos alone (no |m|) | O2 the sign lost | O3 a y arm against the wrong second component | O4 cos2 never used |
+//   O5 S11 10 degrees wide | O6 P8 always true | O7 respond dropping the tuning | O8 no S11. O1, O3 and O7 WENT 0 RED FIRST: unit-sized motion makes cos and |m| cos^2 coincide, equal x and y components hide a
+//   wrong second component, and nothing ran respond with cos2 -- rows for each now (twice the motion, motion (2, 1), a diagonally moving square under both tunings).
+// 2026-11-26 -- PART 9 (section 7): 6 mutants, every one red by name: S1 weight 0.5 | S2 a 40 degree field | S3 the disks in the surround | S4 only x motion counted | S5 the surround ADDED | S6 respond dropping it.
+//   (A seventh I wrote multiplied its change by zero -- no mutant at all; discarded.) The respond row's first fixture drove no disk, so it read 0 either way; it has a square in the +x disk now.
+"use strict";
+import * as L from "./lplc2Subunits.mjs";
+
+let fails = 0, finished = false;
+const J = JSON.stringify;
+const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
+const sec = (t) => console.log("\n" + t);
+const guarded = (name, f) => { try { f(); } catch (e) { ok(`${name} ran to the end`, false, "THREW " + String((e && e.stack) || e).split("\n").slice(0, 2).join(" | ").slice(0, 300)); } };
+process.on("exit", () => { if (!finished) { console.log("\nlplc2Subunits-selfcheck: DID NOT FINISH"); process.exitCode = 1; } });
+
+sec("1. the constants as registered (Part 5) and read (Part 4)");
+guarded("section 1", () => {
+    ok("a 90 x 90 frame at 1 degree a pixel, 10 ms steps (the paper's 90 degree coverage)", L.FRAME.w === 90 && L.FRAME.h === 90 && L.FRAME.degPerPx === 1 && L.FRAME.step === 0.01 && Object.isFrozen(L.FRAME));
+    ok("four subunits: disks of radius 15 at 10 degrees from the centre", L.SUBUNITS.offset === 10 && L.SUBUNITS.radius === 15 && Object.isFrozen(L.SUBUNITS));
+    ok("the text's stimulus values: 10 degree bars at 20 degrees/s, dark 0 on 0.5, 2 s holds, the 10 degree centre square, the disc 5 to 60 degrees at 10 degrees/s, the wide bar 60; the assumed reach 30",
+        J(L.STIM) === J({ background: 0.5, dark: 0, holdS: 2, barWidth: 10, edgeSpeed: 20, centreSquare: 10, reach: 30, discFrom: 5, discTo: 60, discSpeed: 10, gratingPeriod: 20, wideBar: 60 }) && Object.isFrozen(L.STIM));
+    ok("the 300 ms peak window; the eleven stimuli of Part 5", L.PEAK_WINDOW_S === 0.3 && J(L.STIMULI) === J(["S1", "S2", "S3r", "S3l", "S4", "S5", "S6", "S7", "S8", "S9", "S10"]));
+});
+
+sec("2. the stimuli's geometry (drawn, never run through the model here)");
+guarded("section 2", () => {
+    const darkPx = (f) => f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0), ends = (n) => { const s = L.stimulus(n); return { s, a: darkPx(s.frames[0]), b: darkPx(s.frames[s.frames.length - 1]) }; };
+    const near = (x, y, tol = 1) => Math.abs(x - y) <= tol;
+    const s1 = ends("S1"), s2 = ends("S2");
+    ok("S1: 2 s still (200 frames), 1.25 s of motion, 2 s still; it starts as the 10 x 10 square (100 px) and ends with four 10 x 25 arms (1,100 px)",
+        s1.s.frames.length === 200 + 124 + 200 && near(s1.a, 100) && near(s1.b, 1100) && s1.s.motionS === 1.25, J({ n: s1.s.frames.length, a: s1.a, b: s1.b }));
+    ok("S2 is S1 in reverse (1,100 px to 100)", near(s2.a, 1100) && near(s2.b, 100));
+    const s3 = ends("S3r"), s3l = ends("S3l"), s4 = ends("S4"), s5 = ends("S5");
+    ok("S3r and S3l end with one arm (350 px), S4 with two (600); S5 starts with the y arms full (600) and ends with the x arms full (600)", near(s3.b, 350) && near(s3l.b, 350) && near(s4.b, 600) && near(s5.a, 600) && near(s5.b, 600), J([s3.b, s3l.b, s4.b, s5.a, s5.b]));
+    const r3 = L.stimulus("S3r").frames.at(-1), r3l = L.stimulus("S3l").frames.at(-1), at = (f, x, y) => f.data[(44.5 + y - 0.5) * 90 + (44.5 + x - 0.5)];
+    ok("...S3r's arm is on +x and S3l's on -x (a pixel 20 degrees right is dark in S3r and grey in S3l)", at(r3, 20, 0) === 0 && at(r3l, 20, 0) === 0.5 && at(r3l, -20, 0) === 0, J([at(r3, 20, 0), at(r3l, 20, 0), at(r3l, -20, 0)]));
+    const s6 = ends("S6");
+    // 90 px is 4.5 periods of 20, so the dark fraction moves between 0.44 and 0.56 with the bars' phase (first fixture claimed 0.5 +- 0.02 at the end: wrong, the grating had moved 25 degrees)
+    ok("S6: 10 degree bars every 20 over the whole frame, about half of it dark at the start and at the end (0.44 to 0.56: 90 is 4.5 periods)", s6.a / 8100 >= 0.44 && s6.a / 8100 <= 0.56 && s6.b / 8100 >= 0.44 && s6.b / 8100 <= 0.56, J([s6.a, s6.b]));
+    const s7 = ends("S7"), s8 = ends("S8");
+    ok("S7: a disc from 5 to 60 degrees across (pi 2.5^2 to pi 30^2 px) in 2.75 s; S8 the reverse",
+        near(s7.a, Math.PI * 6.25, 2) && near(s7.b, Math.PI * 900, 8) && L.stimulus("S7").motionS === 2.75 && near(s8.a, s7.b, 1) && near(s8.b, s7.a, 1), J([s7.a, s7.b, s8.a, s8.b]));
+    const s9 = ends("S9"), s10 = ends("S10");
+    ok("S9 ends as a 10 x 60 bar on the diagonal (600 px), S10 as 60 x 60 (3,600)", near(s9.b, 600, 6) && near(s10.b, 3600, 20), J([s9.b, s10.b]));
+    const f9 = L.stimulus("S9").frames.at(-1);
+    ok("...on the DIAGONAL: 20 degrees along +x+y is dark, 20 degrees along +x is grey", at(f9, 14, 14) === 0 && at(f9, 20, 0) === 0.5, J([at(f9, 14, 14), at(f9, 20, 0)]));
+    let threw = null; try { L.stimulus("S12"); } catch (e) { threw = e.message; }
+    ok("an unknown stimulus is refused by name", /no stimulus named "S12"/.test(threw || ""), threw);
+});
+
+sec("3. the subunit rule on hand-made motion maps");
+guarded("section 3", () => {
+    const M = L.masks(), n = 8100, X0 = 44.5, field = (f) => { const a = new Float64Array(n); for (let py = 0; py < 90; py++) for (let px = 0; px < 90; px++) a[py * 90 + px] = f(px - X0, py - X0); return a; };
+    const zero = new Float64Array(n), ones = field(() => 1);
+    ok("four disks of equal size, each centred 10 degrees out on its own axis", Object.values(M).every((a) => a.length === M["+x"].length && a.length > 600),
+        J(Object.fromEntries(Object.entries(M).map(([k, a]) => [k, a.length]))));
+    const t = L.cellFromMaps(ones, zero, M);
+    ok("!! UNIFORM MOTION CANCELS: motion toward +x everywhere drives +x as much as it drives -x against, and the cell is 0", t.drives["+x"] === -t.drives["-x"] && t.drives["+x"] > 0 && t.R === 0, J(t.drives));
+    const onlyX = new Float64Array(n); for (const i of M["+x"]) onlyX[i] = 1;
+    const one = L.cellFromMaps(onlyX, zero, M), len = M["+x"].length, shared = M["+x"].filter((i) => M["-x"].includes(i)).length;
+    // the registered disks OVERLAP (radius 15 at +-10: the band |x| < 5 is in both), so motion there feeds the opposite subunit too, with the opposite sign
+    ok("one arm's outward motion alone: R is the summed drives squared, not zero; the opposite disk shares the |x| < 5 band and takes it with the opposite sign",
+        one.drives["+x"] === len && one.drives["-x"] === -shared && shared > 0 && one.R === (len - shared) ** 2 && one.R > 0, J({ drives: one.drives, shared }));
+    const radial = (s) => [field((x) => s * Math.sign(x)), field((x, y) => s * Math.sign(y))];
+    const [ho, vo] = radial(1), [hi, vi] = radial(-1), out = L.cellFromMaps(ho, vo, M), inw = L.cellFromMaps(hi, vi, M);
+    ok("radial OUTWARD motion drives all four positive; radial INWARD drives all four negative and the cell is 0", Object.values(out.drives).every((d) => d > 0) && out.R > 0 && Object.values(inw.drives).every((d) => d < 0) && inw.R === 0,
+        J({ out: out.drives, inw: inw.drives }));
+    const xOut = L.cellFromMaps(field((x) => Math.sign(x)), zero, M), xOutYIn = L.cellFromMaps(field((x) => Math.sign(x)), field((x, y) => -Math.sign(y)), M);
+    ok("!! THE SUM COMES BEFORE THE RECTIFICATION: inward motion on the y axis cuts what outward motion on the x axis gives (one rectification per arm could not)", xOutYIn.R < xOut.R && xOut.R > 0, J({ xOut: xOut.R, xOutYIn: xOutYIn.R }));
+    const twoArms = new Float64Array(n); for (const i of M["+x"]) twoArms[i] = 1; for (const i of M["-x"]) twoArms[i] = -1;
+    ok("two arms' outward motion is MORE than the sum of each alone (the square): (2a)^2 > a^2 + a^2", L.cellFromMaps(twoArms, zero, M).R > 2 * one.R, J({ two: L.cellFromMaps(twoArms, zero, M).R, oneEach: one.R }));
+});
+
+sec("4. the peak window and the predictions, on fixtures");
+guarded("section 4", () => {
+    const tr = new Array(100).fill(0); for (let i = 40; i < 70; i++) tr[i] = 3; tr[99] = 100;   // the spike 30 samples past the plateau's end, so no window holds both
+    ok("the peak is the largest 300 ms (30-sample) mean, so one spike of 100 counts as 100/30 against a 30-sample plateau of 3", L.peakWindow(tr) === 100 / 30 && L.peakWindow([1, 2]) === 1.5, String(L.peakWindow(tr)));
+    const good = { S1: 100, S2: 1, S3r: 10, S3l: 10, S4: 40, S5: 20, S6: 2, S7: 80, S8: 3, S9: 30, S10: 10 };
+    const v = L.predictions(good);
+    ok("a fixture meeting every prediction is SUPPORTED, with seven predictions named P1 to P7", v.verdict === "SUPPORTED" && v.predictions.map((p) => p.id).join() === "P1,P2,P3,P4,P5,P6,P7");
+    const cases = [["P1", { S2: 11 }], ["P2", { S3l: 0 }], ["P3", { S4: 19, S5: 10 }], ["P4", { S5: 40 }], ["P5", { S6: 10 }], ["P6", { S8: 8 }], ["P7", { S10: 30 }]];
+    const named = cases.map(([id, ch]) => { const r = L.predictions({ ...good, ...ch }); return r.verdict === `NOT SUPPORTED (${id})` ? null : `${id}: ${r.verdict}`; }).filter(Boolean);
+    ok("!! each prediction fails ALONE when its own line is crossed, and the verdict names it (S2 at 11 % of S1; a silent arm; S4 at the arms' sum minus 1 (S5 below it); S5 = S4; S6 at 10 %; S8 at 10 %; S10 = S9)", named.length === 0, named.join(" | "));
+    let threw = null; try { L.predictions({ ...good, S7: NaN }); } catch (e) { threw = e.message; }
+    ok("a missing or non-finite response is refused by name", /no finite response for S7/.test(threw || ""), threw);
+});
+
+sec("5. draw, respond and respondZhao on a STILL grey frame sequence (no registered stimulus)");
+guarded("section 5", () => {
+    const f = L.draw((x, y) => Math.abs(x) <= 0.5 && Math.abs(y) <= 0.5), grey = Array.from({ length: 60 }, () => L.draw(() => false));
+    ok("draw: a 1 degree square at the centre darkens exactly the pixels it covers (1 px in all), with the frame's size", f.w === 90 && f.h === 90 && Math.abs(f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0) - 1) < 1e-9);
+    const r = L.respond(grey), z = L.respondZhao(grey);
+    ok("respond and respondZhao: a still grey screen gives the subunit cell 0 at every frame and Zhao's unit no active frame", r.trace.length === 60 && r.trace.every((v) => v === 0) && r.peak === 0 && z.activeFrames === 0, J({ peak: r.peak, zhao: z }));
+});
+
+sec("6. PART 7 (the oriented-arms round): the signed squared cosine, S11 and the clover, on hand-made maps and fixtures");
+guarded("section 6", () => {
+    ok("Part 7's stimuli are Part 5's and S11; the two tunings are component (Part 5) and cos2 (Part 7)", J(L.STIMULI7) === J([...L.STIMULI, "S11"]) && J(L.TUNINGS) === J(["component", "cos2"]) && Object.isFrozen(L.STIMULI7));
+    const M = L.masks(), n = 8100, X0 = 44.5, field = (f) => { const a = new Float64Array(n); for (let py = 0; py < 90; py++) for (let px = 0; px < 90; px++) a[py * 90 + px] = f(px - X0, py - X0); return a; };
+    const onlyX = (v) => { const a = new Float64Array(n); for (const i of M["+x"]) a[i] = v; return a; };
+    const zero = new Float64Array(n), len = M["+x"].length, shared = M["+x"].filter((i) => M["-x"].includes(i)).length;
+    const pureC = L.cellFromMaps(onlyX(1), zero, M), pureQ = L.cellFromMaps(onlyX(1), zero, M, { tuning: "cos2" });
+    ok("motion ALONG the arm is read the same by both tunings (cos 0 = cos^2 0 = 1)", pureC.drives["+x"] === len && pureQ.drives["+x"] === len, J([pureC.drives, pureQ.drives]));
+    const diagC = L.cellFromMaps(onlyX(1), onlyX(1), M).drives["+x"], diagQ = L.cellFromMaps(onlyX(1), onlyX(1), M, { tuning: "cos2" }).drives["+x"], mag = Math.SQRT2 * len;
+    ok("!! motion at 45 DEGREES to the arm: the component keeps cos 45 = 0.71 of |m|, the signed squared cosine HALF of it", Math.abs(diagC / mag - Math.SQRT1_2) < 1e-12 && Math.abs(diagQ / mag - 0.5) < 1e-12, J({ component: diagC / mag, cos2: diagQ / mag }));
+    const across = L.cellFromMaps(zero, onlyX(1), M, { tuning: "cos2" }).drives["+x"], back = L.cellFromMaps(onlyX(-1), zero, M, { tuning: "cos2" }).drives["+x"];
+    ok("...motion ACROSS the arm drives it not at all, and INWARD motion along it inhibits it by the same amount (the sign kept)", across === 0 && back === -len, J({ across, back }));
+    const twice = L.cellFromMaps(onlyX(2), zero, M, { tuning: "cos2" }).drives["+x"];
+    ok("the drive scales with the motion's size: twice the motion along the arm, twice the drive (|m| cos^2, not cos alone)", twice === 2 * len, String(twice));
+    const onlyY = (v) => { const a = new Float64Array(n); for (const i of M["+y"]) a[i] = v; return a; };
+    // asymmetric on purpose (x motion 2, y motion 1): with equal components a y arm reading the wrong second component gives the same number
+    const yOff = L.cellFromMaps(onlyY(2), onlyY(1), M, { tuning: "cos2" }).drives["+y"], yLen = M["+y"].length;
+    ok("...and the y arms read their own component against the FULL vector: motion (2, 1) on the +y disk drives it by 1 x 1 / sqrt 5 a pixel", Math.abs(yOff / yLen - 1 / Math.sqrt(5)) < 1e-12, String(yOff / yLen));
+    const t = L.cellFromMaps(field(() => 1), zero, M, { tuning: "cos2" });
+    ok("uniform motion still cancels under cos2 (+x and -x arms equal and opposite) and the cell is 0", t.R === 0 && t.drives["+x"] === -t.drives["-x"], J(t.drives));
+    let bad = null; try { L.cellFromMaps(zero, zero, M, { tuning: "cos3" }); } catch (e) { bad = e.message; }
+    ok("an unknown tuning is refused by name", /a tuning is component or cos2, got "cos3"/.test(bad || ""), bad);
+    // respond carries the tuning through: a small dark square moving diagonally across the +x disk (no registered stimulus), read by both tunings, gives two different peaks
+    const sq = Array.from({ length: 120 }, (_, k) => L.draw((x, y) => Math.abs(x - 2 - 0.1 * k) <= 3 && Math.abs(y - 0.1 * k) <= 3));
+    const pc = L.respond(sq, M).peak, pq = L.respond(sq, M, { tuning: "cos2" }).peak;
+    ok("respond passes the tuning to the cell: a diagonally moving square gives different peaks under the two tunings, both above 0", pc > 0 && pq > 0 && pc !== pq, J({ component: pc, cos2: pq }));
+    const s11 = L.stimulus("S11"), end = s11.frames.at(-1), at = (f, x, y) => f.data[(44.5 + y - 0.5) * 90 + (44.5 + x - 0.5)], darkPx = (f) => f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0);
+    const s10end = L.stimulus("S10").frames.at(-1);
+    ok("S11: the 60 degree bar along +x, from a half-length of 5 to 30 (600 px to 3,600), axis-aligned: a corner pixel at (28, 28) is dark in S11 and grey in S10 (S10 is the same bar on the diagonal)",
+        Math.abs(darkPx(s11.frames[0]) - 600) <= 2 && Math.abs(darkPx(end) - 3600) <= 4 && at(end, 28, 28) === 0 && at(s10end, 28, 28) === 0.5 && s11.motionS === 1.25, J([darkPx(s11.frames[0]), darkPx(end)]));
+    const good = { S1: 100, S2: 1, S3r: 10, S3l: 10, S4: 40, S5: 20, S6: 2, S7: 80, S8: 3, S9: 30, S10: 10, S11: 20 };
+    ok("predictions7: P1-P7 as Part 5's and P8 the clover; SUPPORTED on a fixture meeting all eight", L.predictions7(good).verdict === "SUPPORTED" && L.predictions7(good).predictions.map((p) => p.id).join() === "P1,P2,P3,P4,P5,P6,P7,P8");
+    ok("...P8 fails alone when the cardinal bar is not above the diagonal one; P7 still counts", L.predictions7({ ...good, S11: 10 }).verdict === "NOT SUPPORTED (P8)" && L.predictions7({ ...good, S10: 35, S11: 40 }).verdict === "NOT SUPPORTED (P7)");
+    let miss = null; try { L.predictions7({ ...good, S11: undefined }); } catch (e) { miss = e.message; }
+    ok("...and a missing S11 is refused by name", /no finite response for S11/.test(miss || ""), miss);
+});
+
+sec("7. PART 9 (the wide-suppression round): the surround, on hand-made maps");
+guarded("section 7", () => {
+    ok("the surround as registered: the 30 degree field (the paper's 60 degree diameter), weight 1", L.SURROUND.field === 30 && L.SURROUND.weight === 1 && Object.isFrozen(L.SURROUND));
+    const M = L.masks(), sur = L.surroundMask(M), n = 8100, X0 = 44.5, inDisk = new Set([...M["+x"], ...M["-x"], ...M["+y"], ...M["-y"]]);
+    const rOf = (i) => Math.hypot((i % 90) - X0, Math.floor(i / 90) - X0);
+    ok("the surround is every pixel within 30 degrees of the centre and in no disk: none of it in a disk, all of it inside 30, and with the disks it covers the field", sur.idx.length > 0 && sur.idx.every((i) => !inDisk.has(i) && rOf(i) <= 30)
+        && (() => { let field = 0; for (let i = 0; i < n; i++) if (rOf(i) <= 30) field++; return field === sur.idx.length + [...inDisk].filter((i) => rOf(i) <= 30).length; })(), `${sur.idx.length} px`);
+    const at = (x, y) => Math.round(y + X0) * 90 + Math.round(x + X0), set = new Set(sur.idx);
+    ok("...a pixel 28 degrees out on the diagonal is surround; one 20 degrees out on +x is a disk's, and one 40 degrees out is neither", set.has(at(20, 20)) && !set.has(at(20, 0)) && !set.has(at(40, 0)), J([set.has(at(20, 20)), set.has(at(20, 0)), set.has(at(40, 0))]));
+    const onlyX = new Float64Array(n); for (const i of M["+x"]) onlyX[i] = 1;
+    const zero = new Float64Array(n), plain = L.cellFromMaps(onlyX, zero, M, { tuning: "cos2", surround: sur });
+    ok("motion only inside a disk meets no surround: E = 0 and R as without one", plain.E === 0 && plain.R === L.cellFromMaps(onlyX, zero, M, { tuning: "cos2" }).R);
+    const out = new Float64Array(n); for (const i of sur.idx) out[i] = 0.001; for (const i of M["+x"]) out[i] = 1;
+    const withS = L.cellFromMaps(out, zero, M, { tuning: "cos2", surround: sur }), sumD = Object.values(withS.drives).reduce((a, b) => a + b, 0);
+    ok("!! THE SURROUND SUBTRACTS before the square: E is the surround's |m| summed, and R = (the drives' sum - E)^2", Math.abs(withS.E - 0.001 * sur.idx.length) < 1e-9 && Math.abs(withS.R - (sumD - withS.E) ** 2) < 1e-6, J({ E: withS.E, R: withS.R }));
+    const ydir = new Float64Array(n); for (const i of sur.idx) ydir[i] = 3; const e2 = L.cellFromMaps(zero, ydir, M, { tuning: "cos2", surround: sur }).E, e3 = L.cellFromMaps(ydir, ydir, M, { tuning: "cos2", surround: sur }).E;
+    ok("...of ANY direction: motion along y counts as along x, and (3, 3) as its length 3 sqrt 2", Math.abs(e2 - 3 * sur.idx.length) < 1e-9 && Math.abs(e3 - 3 * Math.SQRT2 * sur.idx.length) < 1e-9, J([e2, e3]));
+    const flood = new Float64Array(n); for (const i of sur.idx) flood[i] = 10; for (const i of M["+x"]) flood[i] = 1;
+    ok("...and enough surround motion silences the cell (rectified at 0)", L.cellFromMaps(flood, zero, M, { tuning: "cos2", surround: sur }).R === 0);
+    // two small squares (no registered stimulus): one moving out along +x through the +x disk (drive), one moving out along the diagonal through the surround (suppression). The first fixture had only the second,
+    //   which drives no disk, so the cell read 0 with or without the surround and the row said nothing.
+    const sq = Array.from({ length: 120 }, (_, k) => L.draw((x, y) => (Math.abs(x - 8 - 0.1 * k) <= 3 && Math.abs(y) <= 3) || (Math.abs(x - 18 - 0.1 * k) <= 3 && Math.abs(y - 18 - 0.1 * k) <= 3)));
+    const r0 = L.respond(sq, M, { tuning: "cos2" }), r1 = L.respond(sq, M, { tuning: "cos2", surround: sur });
+    ok("respond carries the surround through: with a square driving the +x disk and another moving through the surround, the surround's energy is read and the peak is lower with it than without", r1.eTrace.some((e) => e > 0) && r0.peak > 0 && r1.peak < r0.peak && r0.eTrace.every((e) => e === 0), J({ without: r0.peak, with: r1.peak }));
+});
+
+sec("8. the reach override (fly-lplc2-geometry-sensitivity, a reported check)");
+guarded("section 8", () => {
+    const darkPx = (f) => f.data.reduce((a, v) => a + (0.5 - v) / 0.5, 0);
+    const d = (r) => darkPx(L.stimulus("S1", { reach: r }).frames.at(-1));
+    ok("S1 ends with four 10 degree arms reaching 20, 30 (the default) or 40 degrees: 100 + 4 x 10 x (reach - 5) px; the default is unchanged", Math.abs(d(20) - 700) <= 1 && Math.abs(d(30) - 1100) <= 1 && Math.abs(d(40) - 1500) <= 1
+        && Math.abs(darkPx(L.stimulus("S1").frames.at(-1)) - 1100) <= 1 && L.stimulus("S1", { reach: 40 }).motionS === 1.75, J([d(20), d(30), d(40)]));
+    let bad = null; try { L.stimulus("S1", { reach: 50 }); } catch (e) { bad = e.message; }
+    ok("a reach past the frame is refused by name", /a reach is above 5 and at most 44 degrees/.test(bad || ""), bad);
+});
+
+finished = true;
+console.log(fails ? `\nlplc2Subunits-selfcheck: ${fails} FAILED` : "\nlplc2Subunits-selfcheck: all checks pass");
+process.exit(fails ? 1 : 0);

@@ -9,6 +9,8 @@
 // TREE: *** integer tick counts and a JSON indent, nudged by three percent, filed as constants nothing is
 // checking. It recorded that judgement as a hand annotation called `plausible` and said so. This is that
 // annotation becoming a function, and the measurement of what it changes.
+// 2026-11-26 -- THE QUESTION IS THE NET CHANGE (backlog history-gates-content-not-commits). PROVED ON A SCRATCH WORKTREE that re-made main's accident -- a commit deleting all 11,562 files and its byte-for-byte revert:
+//   the old query went red there as it did on Keith's rig, the new one is green; a REAL edit committed after it (brain/blobPolicyStore.js / a gate with a report) still goes red and names only that file.
 "use strict";
 import { roleOf, mutantsFor, roleCensus, ROLE, FORMAT_CALLS } from "../mutate/operators.mjs";
 import { SWEEP_BY_ROLE, verdictOf, operatorComparison } from "../mutate/mechanicalSweep.mjs";
@@ -206,7 +208,10 @@ console.log("\n8. THE RECORD KNOWS WHICH TREE IT IS ABOUT");
     let changed = null;
     if (!shallow) try {
         const rel = SWEEP_BY_ROLE.files.map((f) => path.join("WebGLEngine", f));
-        const out = execFileSync("git", ["log", "--name-only", "--format=", `${SWEEP_BY_ROLE.commit}..HEAD`, "--", ...rel],
+        // 2026-11-26 -- THE NET CHANGE, NOT EVERY COMMIT THAT TOUCHED IT (backlog history-gates-content-not-commits). `git log --name-only <run>..HEAD` listed every file a commit touched, so a
+        //   commit that deleted the whole tree and the revert that restored it byte for byte (aaaf2ec45 and its revert, on main between v4935's verdict and its publish) made every file "changed"
+        //   and this row red on a tree identical to the one the run described. `git diff --name-only <run> HEAD` asks what the question means: does HEAD's content differ from the run's.
+        const out = execFileSync("git", ["diff", "--name-only", `${SWEEP_BY_ROLE.commit}`, "HEAD", "--", ...rel],
                                  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         changed = [...new Set(out.split("\n").map((s) => s.trim()).filter(Boolean))];
     } catch { changed = null; }

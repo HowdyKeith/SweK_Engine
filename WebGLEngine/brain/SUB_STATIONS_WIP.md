@@ -895,3 +895,192 @@ Keith, 2026-11-25: "Can we do the open items before ship?" -- the OPEN entries o
 * Expectation (section 35) put NO DIFFERENCE at about 30 percent; COND BEATS at about 60.
 
 **Status: round 18 CLOSED.** The backlog entry stations-learner-budget is closed with this result. A further round would change the learner (features, or survival priced higher than the mission's own rate), not the budget, and would be registered first.
+
+## 40. ROUNDS 19 AND 20, REGISTRATIONS (2026-11-26, committed before any seed of their sets is flown and before their code)
+
+Keith, 2026-11-26: "Let's do 2, then 1" -- the backlog entries stations-hold-breached-courier (round 19) and stations-hold-surface-release (round 20), written after the v4935 publish. No stations file uses a seed from 218000 to 221999 (grep of the stations tasks, captains, the duel, the learned courier and this note, 2026-11-26).
+
+### ROUND 19: THE HELD BLOW ON THE BREACHED COURIER
+
+**THE QUESTION.** Round 16 held the blow on plain hard-leak dives and kept every boat on the default vessel. On round 7's breached courier, where COND is the best captain on record, does holding the blow keep boats COND loses -- and does it cost the goals COND delivers?
+
+**THE CREWS, FIXED NOW.**
+* **COND**: round 10's, unchanged (`COND_KNOBS`, the legs station on the planned route, the energy station shut).
+* **HOLD-C**: COND with round 16's rule added and nothing else: NEED's trigger (`blowNeed: true, blowAbove: 3, needWindowS: 10`: breached, the weight gone, deeper than 3 m, and at the charge spent over the last 10 s the battery would be empty before the climb reaches 3 m) and `blowHold: true` (once it fires, ballast is held at -1 on every later tick; nothing releases it).
+* Reported, not in the verdict: **NEED-C**, the same without `blowHold`.
+
+**THE TASK.** Round 7's breached courier (`brain/breachCourierTask.mjs`, the leak U(0.03, 0.08) of the weight from U(60, 600) s, 1,200 s), unchanged.
+
+**THE SETS.** DEV: 218001 to 218024. HELD: 219001 to 219096.
+
+**THE DEV CHECK (non-degeneracy, nothing chosen).** HOLD-C and COND must differ in goals or survival on at least 4 of the 24 DEV runs; otherwise round 19 is STOPPED AT DEV.
+
+**THE VERDICT (HELD, once).** Round 15's (`learnedCourier.verdict15`) with HOLD-C in PRICED's place: HOLD-C against COND on the MISSION VALUE (the goals, less 2.42 goals per 1,200 s for the time a lost boat had left), by the exact one-sided sign test at p at most 0.05; goals and survival reported the same way. Reported beside it: NEED-C on the same runs, and how often the hold fired.
+
+**EXPECTATION.** NO DIFFERENCE SHOWN about 50 percent (the courier's leak, 3-8 %, is milder than round 16's 6-8 %, and the hold acts only after the weight is gone); HOLD-C BEATS COND about 30; COND BEATS HOLD-C about 20 (a boat held up may deliver less).
+
+### ROUND 20: THE HELD BLOW WITH A SURFACE RELEASE
+
+**THE QUESTION.** On the high rider every held blow BROACHED (round 16, V1), because nothing releases the blow near the surface. With one release line, does the held blow keep the high rider's hard-leak boats without lifting them clear -- and does the release cost the default vessel anything?
+
+**THE RULE (HOLD-R), FIXED NOW.** Round 16's HOLD (`HOLD_KNOBS`) with ONE change: once held, ballast is forced to -1 **only while the boat is deeper than 10 m**; shallower than 10 m the helm's own ballast command stands. The latch itself is never cleared, so the blow returns as soon as the boat is deeper than 10 m again. (One constant, 10 m, fixed here: a third of round 2's 30 m mission depth, and well below the 3 m surface band.)
+
+**THE TASK.** Round 16's (round 2's task with `HARD_LEAK`), on both vessels (the needs-task vessel and `highRiderModel()`), unchanged.
+
+**THE SETS.** DEV: 220001 to 220048. HELD: 221001 to 221096.
+
+**THE DEV CHECKS (non-degeneracy, nothing chosen).** Each verdict goes to HELD iff its two crews differ in survival on at least 3 of the 48 DEV dives; a verdict whose check fails is STOPPED AT DEV.
+
+**THE VERDICTS (HELD, once; exact one-sided sign tests on the discordant dives, p at most 0.05).**
+* **V1:** HOLD-R against TRIAGE on the high rider.
+* **V2:** HOLD-R against HOLD on the default vessel (whether the release costs the vessel where the hold already kept every boat).
+* Reported, not in a verdict: HOLD-R on the high rider against HOLD-R on the default vessel; the statuses of every lost dive.
+
+**EXPECTATION.** V1: HOLD-R BEATS TRIAGE about 55 percent (the high rider's tank lifts a 6-8 % leak; the question is whether the helm's flooding above 10 m catches it before the surface); TRIAGE BEATS HOLD-R about 20 (it may still broach on momentum). V2: NO DIFFERENCE SHOWN or STOPPED AT DEV about 70 percent.
+
+## 41. ROUNDS 19 AND 20, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `breachCourierTask.mjs`'s NEED-C and HOLD-C crews (`NEEDC_KNOBS`, `HOLDC_KNOBS`) and round 19's sets; `triageCaptain`'s `holdBelow` (null by default: round 16's hold at every depth), `stationsTask.mjs`'s HOLD-R crew (`HOLDR_KNOBS`) and round 20's sets. Gated in `brain/breachCourierTask-selfcheck.mjs` section 9 and `brain/stationsTask-selfcheck.mjs` section 10 (12 mutants, every one red; two went 0 red first and the crews are now driven by name through the latch fixture).
+
+**DEV, the non-degeneracy checks only (all pass, so all go to HELD):**
+* Round 19 (218001 to 218024): HOLD-C and COND differ in goals or survival on 19 of 24 (4 needed).
+* Round 20 (220001 to 220048): V1, HOLD-R against TRIAGE on the high rider, differ in survival on 29 of 48; V2, HOLD-R against HOLD on the default vessel, on 12 of 48 (3 needed each).
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result):** round 19 -- COND kept 20 of 24 boats and delivered 65 goals, HOLD-C kept 22 and delivered 35. Round 20 -- on the high rider HOLD-R ended 40 submerged and 8 broached (HOLD: all 48 broached; TRIAGE: 27 submerged, 21 crushed); on the default vessel HOLD-R lost 12 crushed where HOLD lost none.
+
+**Nothing was tuned.** HELD: COND, HOLD-C and NEED-C on 219001 to 219096 to `brain/holdCourierHeld.<part>.jsonl`; HOLD-R, TRIAGE and HOLD on both vessels on 221001 to 221096 to `brain/holdReleaseHeld.<part>.jsonl`; each committed unread, then read once.
+
+## 42. ROUNDS 19 AND 20 RESULTS (2026-11-26; `brain/holdCourierHeld.{0,1,2}.jsonl` and `brain/holdReleaseHeld.0.jsonl`, committed unread at `a35e654d2`, then read ONCE)
+
+### ROUND 19: THE HELD BLOW ON THE BREACHED COURIER
+
+**THE VERDICT (registered, `verdict15` with HOLD-C in PRICED's place): COND BEATS HOLD-C on the mission value,** 68 runs to 21 (p = 3e-7; mean value 2.02 against 1.06).
+* Goals: **COND BEATS HOLD-C** (70 to 11, p = 6e-12; 2.29 a run against 1.14).
+* Survival: **HOLD-C BEATS COND** (21 to 2, p = 3e-5): HOLD-C keeps 92 boats (3 broached, 1 crushed), COND 73 (23 crushed).
+
+**Reported:** NEED-C (the trigger without the hold) loses to COND on value, goals AND survival (61 boats kept, 35 crushed). **Not recorded, said plainly:** how often the hold fired -- the HELD records carry no `held` field; the registration asked for it and the flyer did not write it.
+
+**What it says.** The held blow does what round 16 found -- it keeps the boat -- but a boat held up delivers half as much, and at the registered price (2.42 goals per 1,200 s of a lost boat's time) the goals cost more than the boats are worth. COND stays the Sub Aquarium's default courier captain; nothing changes there. A courier that wanted the hold would need it released once the boat is safe (round 20's question on the dives), or a price on a lost boat well above the mission's own rate.
+
+### ROUND 20: THE HELD BLOW WITH A 10 m RELEASE
+
+**THE VERDICTS (registered):**
+* **V1, the high rider: HOLD-R BEATS TRIAGE,** 47 to 17 (p = 1e-4). HOLD-R keeps 76 of 96 (20 still broach); TRIAGE 46 (50 crushed); HOLD (round 16's, no release) broached all 96.
+* **V2, the default vessel: HOLD BEATS HOLD-R,** 30 to 0 (p = 9e-10). The release costs the default vessel 30 boats, all crushed: above 10 m the helm floods the tank back, and the small tank cannot catch the boat once it sinks below the line again.
+* Reported: HOLD-R on the high rider against HOLD-R on the default vessel, NO DIFFERENCE SHOWN (30 to 20, p = 0.10).
+
+**What it says.**
+* The release works where it was meant to: on the high rider it turns round 16's 96 broaches into 76 boats kept, more than TRIAGE keeps. 20 still broach -- the boat's momentum carries it through the 10 m line.
+* On the default vessel the same release is a loss: round 16's plain hold is the best rule there (96 of 96), and freeing the tank above 10 m undoes it.
+* No single rule of these is best on both hulls. Per vessel, the best on record: the default vessel, HOLD (96/96); the high rider, HOLD-R (76/96).
+
+**Status: rounds 19 and 20 CLOSED.** Backlog stations-hold-breached-courier and stations-hold-surface-release are closed with these results.
+
+## 43. ROUND 21, REGISTRATION (2026-11-26, committed before any seed of its sets is flown and before its code)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-release-on-rise`. No stations file uses a seed from 222000 to 223999 (grep, 2026-11-26).
+
+### ROUND 21: THE HELD BLOW, RELEASED ON A FAST RISE
+
+**THE QUESTION.** HOLD-R (round 20) kept 76 of 96 high-rider boats, and the other 20 broached: the boat's upward speed carries it through the 10 m release line. If the held blow is also released whenever the boat is rising fast, are those broaches kept -- without losing what HOLD-R kept, and what does it cost the default vessel?
+
+**THE RULE (HOLD-RR), FIXED NOW.** HOLD-R (`HOLDR_KNOBS`: the held blow forced only deeper than 10 m) with ONE change: the held blow is also NOT forced while the boat is **rising faster than 0.5 m/s** (a quarter of the task's 2 m/s transit speed); then the helm's own ballast stands. The latch is never cleared: the blow returns as soon as the boat is deeper than 10 m and rising at 0.5 m/s or less. One constant, fixed here.
+
+**THE TASK.** Round 20's (round 2's task with `HARD_LEAK`, both vessels), unchanged.
+
+**THE SETS.** DEV: 222001 to 222048. HELD: 223001 to 223096.
+
+**THE DEV CHECKS (non-degeneracy, nothing chosen).** Each verdict goes to HELD iff its two crews differ in survival on at least 3 of the 48 DEV dives; a verdict whose check fails is STOPPED AT DEV.
+
+**THE VERDICTS (HELD, once; exact one-sided sign tests on the discordant dives, p at most 0.05).**
+* **V1:** HOLD-RR against HOLD-R on the high rider.
+* **V2:** HOLD-RR against HOLD on the default vessel.
+* Reported, not in a verdict: HOLD-RR against TRIAGE on the high rider; every lost dive's status; and how many dives each crew's hold fired on (the `held` reading, recorded this time).
+
+**EXPECTATION.** V1: HOLD-RR BEATS HOLD-R about 45 percent (a fast rise near the surface is the broach), NO DIFFERENCE about 35, HOLD-R BEATS HOLD-RR about 20 (releasing mid-water may let the boat sink back past the crush depth). V2: HOLD BEATS HOLD-RR about 70 percent (round 20's release already cost the default vessel 30 boats; this releases more often).
+
+## 44. ROUND 21, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `triageCaptain`'s `releaseRise` (null by default), `stationsTask.mjs`'s HOLD-RR crew (`HOLDRR_KNOBS`) and round 21's sets, gated in `brain/stationsTask-selfcheck.mjs` section 11 (8 mutants, every one red). The hold's firing is read through `fly`'s `make`, so round 2's registered record keeps its fields.
+
+**DEV (222001 to 222048), the non-degeneracy checks only (both pass):** V1, HOLD-RR against HOLD-R on the high rider, differ in survival on 20 of 48; V2, HOLD-RR against HOLD on the default vessel, on 22 (3 needed each).
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result):** on the high rider HOLD-RR ended 34 submerged and 14 crushed (HOLD-R: 42 submerged, 6 broached); on the default vessel HOLD-RR lost 22 crushed (HOLD-R 14, HOLD none). Every HOLD crew's hold fired on all 48 dives of both vessels.
+
+**Nothing was tuned.** HELD: HOLD-RR, HOLD-R, HOLD and TRIAGE on both vessels on 223001 to 223096 to `brain/releaseRiseHeld.<part>.jsonl` (with each dive's `held`), committed unread, then read once.
+
+## 45. ROUND 21 RESULT (2026-11-26; `brain/releaseRiseHeld.{0,1,2,3}.jsonl`, committed unread at `ab1b6ad34`, then read ONCE)
+
+**THE VERDICTS (registered):**
+* **V1, the high rider: HOLD-R BEATS HOLD-RR,** 45 to 8 (p = 1e-7). HOLD-RR kept 49 of 96 (47 crushed); HOLD-R kept 86 (10 broached).
+* **V2, the default vessel: HOLD BEATS HOLD-RR,** 55 to 0 (p = 3e-17). HOLD kept all 96; HOLD-RR 41 (55 crushed).
+* Reported: HOLD-RR against TRIAGE on the high rider, HOLD-RR BEATS TRIAGE 9 to 2 (p = 0.033; 49 against 42 kept). Every HOLD crew's hold fired on all 96 dives of both vessels (the `held` reading, recorded this time).
+
+**What it says.**
+* Releasing the blow whenever the boat rises fast trades broaches for crushes, and loses badly on the trade: freed mid-water, the high rider's tank floods back and the boat sinks again past the crush depth. Round 20's single depth line (HOLD-R) remains the best high-rider rule on record -- 86 of 96 on these seeds, against round 20's 76 on its own (the seeds differ; both are HELD sets).
+* On the default vessel any release is a loss, again: HOLD's 96 of 96 stands.
+* The broaches HOLD-R leaves (10 here) are not fixed by speed; a rule for them would need to know the boat will reach the surface, not only that it is rising.
+
+**Status: round 21 CLOSED.** Backlog `stations-release-on-rise` is closed with this result.
+
+## 46. ROUND 22, REGISTRATION (2026-11-26, committed before any seed of its sets is flown and before its code)
+
+Keith, 2026-11-26: "Yes, let's work through those items" -- backlog `stations-courier-hold-release`. No stations file uses a seed from 224000 to 225999 (grep, 2026-11-26).
+
+### ROUND 22: THE COURIER'S HOLD, LET GO ONCE THE CHARGE IS BACK
+
+**THE QUESTION.** Round 19's HOLD-C kept boats (92 against COND's 73) and lost half the goals, because the held blow keeps the boat at the surface for good. A courier's battery recharges at the surface. If the hold is let go once the charge is back, does the courier keep the hold's survival AND COND's deliveries?
+
+**THE CREWS, FIXED NOW.**
+* **COND**: round 10's, unchanged.
+* **HOLD-CR**: round 19's HOLD-C with ONE change: once held, **the hold is cleared when the battery reads at least half full (frac 0.5)** -- the blow is no longer forced and the latch is re-armed, so NEED's trigger can fire again on a later sinking. One constant, fixed here.
+* Reported, not in the verdict: **HOLD-C** (round 19's, no release) on the same runs.
+
+**THE TASK.** Round 7's breached courier, unchanged.
+
+**THE SETS.** DEV: 224001 to 224024. HELD: 225001 to 225096.
+
+**THE DEV CHECK (non-degeneracy, nothing chosen).** HOLD-CR and COND must differ in goals or survival on at least 4 of the 24 DEV runs; otherwise STOPPED AT DEV.
+
+**THE VERDICT (HELD, once).** Round 15's (`learnedCourier.verdict15`) with HOLD-CR in PRICED's place: HOLD-CR against COND on the mission value, goals and survival reported the same way. Reported beside it: HOLD-C on the same runs; for each run, how many times the hold fired and how many times it was let go (recorded in the HELD records this time).
+
+**EXPECTATION.** NO DIFFERENCE SHOWN about 45 percent (a released boat is again a boat in trouble); HOLD-CR BEATS COND about 30; COND BEATS HOLD-CR about 25.
+
+## 47. ROUND 22, BUILT AND PAST DEV (2026-11-26)
+
+**Built:** `triageCaptain`'s `holdUntilFrac` (null by default) and its `.holds` reading ({ on, off }: latches and releases), `breachCourierTask.mjs`'s HOLD-CR crew (`HOLDCR_KNOBS`) and round 22's sets, gated in `brain/breachCourierTask-selfcheck.mjs` section 10 (8 mutants, every one red).
+
+**DEV (224001 to 224024), the non-degeneracy check only:** HOLD-CR and COND differ in goals or survival on 16 of 24 (4 needed): to HELD.
+
+**Seen on DEV and recorded because it was seen (DEV only, not a result), BEFORE HELD:** COND kept 19 of 24 and delivered 51 goals; HOLD-CR kept 22 and delivered 44. **HOLD-CR's hold CHATTERS:** 46,500 latches and 46,482 releases over the 24 runs. With the charge at or above half, NEED's trigger can still fire (the battery would run out before the climb at the current rate), so the hold latches and is let go on the next tick, over and over. That is the rule as registered ("cleared ... and re-armed"); it is left as written and flown as registered. A release that is not re-armed at once would be a different rule and a different registration.
+
+**Nothing was tuned.** HELD: COND, HOLD-CR and HOLD-C on 225001 to 225096 to `brain/courierReleaseHeld.<part>.jsonl` (with each run's latches and releases), committed unread, then read once.
+
+## 48. ROUND 22 RESULT (2026-11-26; `brain/courierReleaseHeld.{0,1,2,3}.jsonl`, committed unread at `16be85891`, then read ONCE)
+
+**THE VERDICT (registered, `verdict15` with HOLD-CR in PRICED's place): COND BEATS HOLD-CR on the mission value,** 57 runs to 20 (p = 1.5e-5; mean value 2.15 against 1.48).
+* Goals: **COND BEATS HOLD-CR** (57 to 16; 2.41 a run against 1.59).
+* Survival: **HOLD-CR BEATS COND** (20 to 7, p = 0.010): HOLD-CR keeps 87 boats (5 broached, 4 crushed), COND 74 (21 crushed, 1 broached).
+
+**Reported:** HOLD-C (round 19's hold, no release) on the same runs: 90 boats kept, 1.29 goals a run, value 1.18 -- below COND on value and goals, as in round 19. The hold fired on 95 of 96 runs for both hold crews; HOLD-CR's chattered as DEV showed (171,745 latches and 171,664 releases over the 96 runs).
+
+**What it says.**
+* Letting go once the charge is back recovers part of what round 19's hold cost (1.59 goals against HOLD-C's 1.29) and keeps most of its survival (87 against 90) -- but at the registered price COND's deliveries are still worth more than the 13 boats the hold saves.
+* The rule chattered: re-armed at once, NEED's trigger relatched it tick after tick above half charge, so HOLD-CR spent much of its time alternating between a forced blow and the helm. A hold that waits before re-arming would be a different rule; whether it changes the verdict is not known.
+* Across rounds 19 and 22 the courier's choice is stable: COND's mission beats every hold tried on the price a lost boat costs (2.42 goals per 1,200 s). Only a higher price on a boat would change that.
+
+**Status: round 22 CLOSED.** Backlog `stations-courier-hold-release` is closed with this result.
+
+## 49. THE COURIER'S BREAK-EVEN PRICE: A READING OF THE COMMITTED RECORDS (2026-11-26; no new flight, not a verdict)
+
+Backlog `stations-courier-break-even`. The mission value of rounds 19 and 22's HELD runs recomputed at boat prices P from 2 to 200 goals per 1,200 s of a lost boat's time (the registered price is 2.42), with the same paired sign test.
+
+| | runs the hold has more value / COND more, at P = 2.5 | ... at P = 100 | the test turns? | the MEANS equal at |
+|---|---|---|---|---|
+| round 19, HOLD-C | 21 / 68 | 23 / 66 | never (to P = 200) | P = 14 |
+| round 22, HOLD-C | 17 / 68 | 22 / 63 | never | P = 18 |
+| round 22, HOLD-CR | 20 / 57 | 22 / 55 | never | P = 14 |
+
+**What it says.** No price makes a hold beat COND on the paired test: the price only touches the runs where one boat is lost and the other is not, and in most runs BOTH survive and COND simply delivers more. The hold wins on the MEAN only if a lost boat costs 14 to 18 goals -- six to seven times the registered price, and more than a whole mission's deliveries (about 2.4). COND-for-couriers holds broadly, not by the price.
+
+**Consequence.** Backlog `stations-courier-hold-no-chatter` was conditional on a price within reach; there is none, so it is closed unrun. (Its question -- whether the chatter cost goals -- would change HOLD-CR's goals, not the paired test's shape.)

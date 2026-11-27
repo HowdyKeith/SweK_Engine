@@ -68,6 +68,13 @@ export const LEVELS = Object.freeze([
             fish: nb("no learned navigator"),
             lm: nb(),
         } },
+        { id: "sub-stations", name: "Captain a damaged boat's stations: damage control, energy, the main tank, a breached courier (submarine stations)", shoots: false, cells: {
+            hand: { status: "SCRIPTED", text: "hand rules chosen through registered rounds: on hard-leak dives a blow held once NEED's trigger fires keeps every boat on the default hull (HOLD 96 of 96, TRIAGE 37), and with a 10 m release the high rider's (HOLD-R 76 and 86 of 96 on two sets, where a plain hold broached all); on the breached courier COND (fight on, surface only on a second sinking) beats every hold tried on the mission value, at any boat price on the paired test. The Sub Aquarium seats COND on couriers and HOLD at a breach by default", src: [f("brain/SUB_STATIONS_WIP.md", "HOLD keeps all 96 hard-leak boats"), f("brain/SUB_STATIONS_WIP.md", "HOLD-R BEATS TRIAGE"), f("brain/SUB_STATIONS_WIP.md", "COND BEATS HOLD-CR on the mission value"), f("brain/SUB_STATIONS_WIP.md", "No price makes a hold beat COND on the paired test")] },
+            fly: nb(),
+            gpu: nb("no MLP captain; the learned courier is a 20-weight ES captain over hand features (rounds 11, 15, 18), level with COND at best (round 18: NO DIFFERENCE SHOWN on the mission value)"),
+            fish: nb(),
+            lm: nb(),
+        } },
     ] },
     { id: "sky", name: "Sky", tasks: [
         { id: "sky-flight", name: "Real fixed-wing flight: hold altitude, heading and airspeed through gusts and recoveries", shoots: false, cells: {

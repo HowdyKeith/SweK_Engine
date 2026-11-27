@@ -649,3 +649,115 @@ Response r = (74 - alarm size) / 74; every cell alarms (alarm sizes 15 to 39 deg
 * **The low-contrast criterion (C2) does NOT replicate, and it is not noise:** it failed in Round 29 by 0.021 and fails here by 0.078, the same way both times -- the gain lowers MOVING stripes at contrast 0.2 (gray - moving 0.216 here) but barely touches STATIC ones (0.038), where the animal lowers both about equally. That is the model's real gap: the downward-drift gain acts on motion, and the animal's low-contrast drop of static stripes is something else.
 * Against the predictions written before the run: A's prediction 2 holding was put at 45 % (it held); C2 at 30 % (it failed); both SUPPORTED at 15 % (A only).
 **Series position after Round 30.** The crab network with the contrast-normalised downward-drift gain at g 300 reproduces the animal's contrast-1 qualitative pattern on held-out collision-course stimuli (SUPPORTED, Round 30 A); it does not reproduce the low-contrast drop of static stripes (Rounds 29 and 30 B), which the gain's mechanism cannot give. NOT YET DONE: a mechanism for the low-contrast static drop; the "on" and light-control version of the gate; the receding alarm.
+
+## The masking principle, looked for in the paper (2026-11-26; backlog `stealth-masking-principle`, no round registered)
+**Read:** Santon et al. 2025, Sci Adv 11:eadr3686, the full text at https://pmc.ncbi.nlm.nih.gov/articles/PMC11939058/ (Results, the Figure 2 legend, Methods "Treadmill experiment" and "Statistical analysis"). The supplement (Table S1) and the Dryad data (doi 10.5061/dryad.jh9w0vtkq, `Treadmill_data.csv` inside a 66 MB zip) could NOT be read: the PMC supplement link returns a download interstitial, and Dryad refuses automated downloads (HTTP 403 from Dryad itself).
+**What the text says.**
+* Contrast is Weber contrast "measured between the light stripe and the medium gray background", the dark stripes "of the same value but opposite sign"; the striped ellipses are "3 cycles of 1:5 ratio dark versus light gray stripes", static (0 Hz) or moving down (4 Hz). **brain/stealthLoomStimuli.mjs already draws exactly this** (dark 1/6 of a cycle, light +wc, dark -wc) -- no stimulus error.
+* The text compares the stimuli ONLY at high contrast: "Crabs were more likely to react to high-contrast stimuli (e.g., WC = 1) without stripes or with stationary stripes than with stripes moving in a downward direction". **It states no low-contrast static-versus-plain difference in words, and proposes NO mechanism for static stripes** (its one mechanism: downward motion "overwhelming the threatening motion cues").
+**What this means for the gap.** Rounds 13, 29 and 30's C2 -- the low-contrast drop of STATIC stripes -- rests on values read off Figure 2's image (Round 13), with no stated statistic behind it. Before any masking term is registered, the drop itself should be checked in the data: the response rate by stimulus at WC 0.2 and 0.4 from `Treadmill_data.csv`, or Table S1's posterior differences. If the static drop is not credible in the data, C2 asks the model for something the animal may not show, and the right change is to the criterion (registered as such), not to the model.
+**Status:** blocked on the data file, which a person can download from Dryad (https://datadryad.org/dataset/doi:10.5061/dryad.jh9w0vtkq) and place in the tree for a reading.
+
+## The low-contrast drop, read from the raw data (2026-11-26; `vendor/santon2025/Treadmill_data.csv`, Keith's download from Dryad; a reading, not a registered round)
+753 trials, 55 crabs. Responded / shown:
+
+| Weber contrast | Grey (plain) | Static stripes | Moving stripes |
+|---|---|---|---|
+| 0.2 | 15/54 = 0.28 | 4/46 = 0.09 | 2/49 = 0.04 |
+| 0.4 | 28/53 = 0.53 | 17/50 = 0.34 | 24/50 = 0.48 |
+| 0.6 | 33/51 = 0.65 | 31/51 = 0.61 | 23/50 = 0.46 |
+| 0.8 | 43/53 = 0.81 | 40/51 = 0.78 | 30/53 = 0.57 |
+| 1.0 | 35/46 = 0.76 | 33/45 = 0.73 | 30/52 = 0.58 |
+
+Paired within each crab at the same contrast (crabs that responded to one and not the other; exact two-sided sign test): **at 0.2, Grey above Static 6 to 0 (p = 0.031), Grey above Moving 15 to 2 (p = 0.002), Static against Moving 4 to 2 (p = 0.69)**; at 0.4 Grey above Static 14 to 6 (p = 0.12); from 0.6 Grey and Static are level (11 to 11, 8 to 7, 7 to 7); at 0.8 Moving is below both (Grey 16 to 5, p = 0.027; Static 17 to 5, p = 0.017).
+**What it says.** The low-contrast drop of STATIC stripes is in the animal's data, not a figure-reading artefact: at 0.2 both stripe kinds fall below the plain ellipse, about equally, and the static drop is gone by 0.6 -- exactly the shape C2 (Rounds 13, 29, 30) asks for. **So the model's gap is real**, and the mechanism the paper does not give is still needed.
+**A lead, not a result.** The animal's numbers are response PROBABILITIES, near threshold at 0.2 (the plain ellipse 0.28), where a small loss of drive is a large loss of probability; the model's r is an ALARM SIZE, which has no threshold region. A striped ellipse carries the light value on 5/6 of its area and a near-background dark band on 1/6 (thin-stripe RGB 164 at 0.2, against a background of about 186). Whether the gap is the network's or the readout's (alarm size compared with a probability) is the question to register first -- for example a probabilistic readout of the alarm with its one constant fixed from the plain ellipse's contrast curve alone, tested on the stripes.
+
+## The criteria audit (2026-11-26; backlog `stealth-criteria-audit`; a reading of `vendor/santon2025/Treadmill_data.csv`, no runs)
+Rounds 13, 29 and 30's C1 to C4, applied word for word to the ANIMAL's response rates (as probabilities, with the same 0.05 and 0.1 margins), and the within-crab paired tests behind each:
+* **C1 holds** (grey 0.28, 0.65, 0.76 at 0.2, 0.6, 1.0).
+* **C2 holds** (at 0.2 grey above static by 0.191 and above moving by 0.237; static and moving 0.046 apart) -- paired: grey above static 6 to 0 (p 0.031), above moving 15 to 2 (p 0.002), static against moving 4 to 2 (p 0.69).
+* **C3 holds** (grey against static 0.039, 0.027, 0.028 at 0.6, 0.8, 1.0) -- paired, pooled over 0.6 to 1.0: 26 to 25 (p 1.0).
+* **C4 holds** (grey above moving by 0.187, 0.245, 0.184) -- paired, pooled: 46 to 17 (p 0.0003); each contrast alone 16 to 7 (p 0.09), 16 to 5 (p 0.027), 14 to 5 (p 0.064), all the same way.
+**Verdict of the audit: every criterion describes the animal; none is amended.** One thing the audit makes plain: the margins are in PROBABILITY units for the animal and in ALARM-SIZE units (r) for the model -- the comparison the readout round (backlog `stealth-masking-principle`) asks about.
+
+## Round 31 REGISTRATION: a probabilistic readout of the crab model, fixed from the PLAIN ellipse alone (written 2026-11-26 BEFORE any of its runs; backlog `stealth-masking-principle`)
+**Why.** The criteria audit: the animal's numbers are response PROBABILITIES, near threshold at contrast 0.2; the model is scored on its alarm SIZE (r = (74 - alarm size) / 74), which has no threshold region. Before any new term goes into the network, ask whether the low-contrast gap (C2) is the network's or the comparison's.
+**Fresh runs, held out.** Round 30's stripe numbers have been read, so they are not used. `brain/crabOrder30.mjs`, unchanged, at **azimuth 315 degrees (segment 14) and r/v 0.55 s** -- neither used by Rounds 28 to 30 -- contrasts 0.2, 0.4, 0.6, 0.8, 1.0, **g 300 only** (segment scope, 14 degree start, 720 x 240, polarity "both", light plain ellipse: Round 30's model, nothing refitted). r as Round 29 (0 when there is no alarm).
+**The readout (fixed before the runs).** P(respond) = 1 / (1 + exp(-(a + b r))). Its two constants are fitted by maximum likelihood to the animal's **PLAIN (Grey) trials only** (`vendor/santon2025/Treadmill_data.csv`, 258 trials), each trial given the model's plain r at its contrast. The striped trials are not used in the fit.
+**The test.** The fitted readout turns the model's static and moving r into probabilities; **C1 to C4 are Round 29's, word for word, on these probabilities** (C1 and the plain curve are the fit's own and are reported, not a test). **Verdict: SUPPORTED iff C2, C3 and C4 all hold** on the predicted probabilities; otherwise NOT SUPPORTED, naming each failure.
+**Reported either way:** the fitted a and b; predicted against observed probabilities in all 15 cells; the striped trials' log-likelihood under the predictions against a null that gives each striped trial the plain ellipse's observed rate at its contrast.
+**Predictions (confidence).** C2 holds on the predicted probabilities (45 %: the readout's slope is set by the plain curve's rise between 0.2 and 0.6, and a striped r a few hundredths below the plain one at 0.2 becomes a large probability drop only if that slope is steep); C3 holds (60 %); C4 holds (55 %); SUPPORTED (30 %). The striped trials fit better than the null (55 %).
+
+## Round 31 RESULTS (`brain/crabReadout31Runs/` committed unread at `5ed8a642d`; `brain/crabReadout31Agg.mjs` written and committed before the runs were read, `3d7144a90`; read ONCE): NOT SUPPORTED (C3)
+**A correction to the registration first:** it said 258 plain trials; the file has **257** (54 + 53 + 51 + 53 + 46). The fit used all of them; nothing else differs.
+**The readout:** a = -11.742, b = 16.655 (P = 1 / (1 + exp(-(a + b r)))), fitted on the Grey trials only.
+
+| contrast | model r: grey / static / moving | predicted P: grey / static / moving | observed: grey / static / moving |
+|---|---|---|---|
+| 0.2 | 0.642 / 0.549 / 0.477 | 0.259 / **0.069** / **0.022** | 0.278 / **0.087** / **0.041** |
+| 0.4 | 0.725 / 0.722 / 0.585 | 0.583 / 0.571 / 0.119 | 0.528 / 0.340 / 0.480 |
+| 0.6 | 0.763 / 0.728 / 0.598 | 0.723 / 0.594 / 0.144 | 0.647 / 0.608 / 0.460 |
+| 0.8 | 0.765 / 0.767 / 0.632 | 0.730 / 0.737 / 0.228 | 0.811 / 0.784 / 0.566 |
+| 1.0 | 0.765 / 0.769 / 0.665 | 0.730 / 0.743 / 0.339 | 0.761 / 0.733 / 0.577 |
+
+**Criteria on the predicted probabilities:** C1 holds (the fit's own). **C2 HOLDS** (grey - static 0.190, grey - moving 0.237, static and moving 0.048 apart -- the animal's 0.191, 0.237 and 0.046). **C3 fails at 0.6** (grey - static 0.129 against the 0.1 line; 0.8 and 1.0 hold). C4 holds (by 0.58, 0.50, 0.39 -- far more than the animal's 0.19, 0.25, 0.18). **Verdict: NOT SUPPORTED (C3).**
+**The striped trials' likelihood:** -341.9 under the predictions against -316.8 under the null (the plain ellipse's rate at each contrast): **the null fits the stripes better**, by 25.1.
+**Predictions:** C2 holds (45 %) HELD; C3 (60 %) MISSED; C4 (55 %) HELD; SUPPORTED (30 %) MISSED; the stripes fit better than the null (55 %) MISSED.
+**What it says.**
+* **The low-contrast gap of Rounds 29 and 30 was the COMPARISON, not the network.** Read through a readout fixed on the plain ellipse alone, the model's few-hundredths dip in r for both stripe kinds at contrast 0.2 becomes the animal's drop almost exactly (0.190 and 0.237 against 0.191 and 0.237) -- the drop lives in the steep part of the response curve, where alarm size cannot show it.
+* **The same readout exposes what the network gets wrong instead: the moving stripes are suppressed far too much at every contrast above 0.2** (predicted 0.12 to 0.34 against the animal's 0.46 to 0.58), and the static stripes too much at 0.6 (C3's miss). The readout is steep (b 16.7), so the moving stripes' r deficit that looked modest on the alarm-size scale (0.10 to 0.14) is large in probability. On the scale the animal is measured on, the g 300 drift gain is too strong.
+* So the next question is the gain's STRENGTH, judged on probabilities: g 300 was chosen on alarm sizes (Round 24's fit), not on this scale.
+**Series position after Round 31.** With a probabilistic readout fixed from the plain ellipse alone, the crab network with the g 300 drift gain reproduces the animal's low-contrast drop of BOTH stripe kinds (C2, which alarm sizes had missed twice) and the ordering at high contrast (C4), but over-suppresses moving stripes at every contrast and static stripes at 0.6, so the striped trials as a whole are fitted worse than by the plain rate. NOT YET DONE: the gain's strength chosen on the probability scale (registered, held out); the "on" and light-control version; the receding alarm.
+
+## Round 32 REGISTRATION: the drift gain's strength chosen on the PROBABILITY scale, held out twice (written 2026-11-27 BEFORE any of its runs; backlog `stealth-gain-on-probability`)
+**Why.** Round 31: read through a logistic readout fixed on the plain ellipse, g 300 (chosen on alarm sizes in Round 24) over-suppresses the moving stripes at every contrast (predicted 0.12 to 0.34 against the animal's 0.46 to 0.58).
+**The readout,** as Round 31: P = 1 / (1 + exp(-(a + b r))), a and b fitted by maximum likelihood to the animal's 257 PLAIN trials, each given the model's plain r at its contrast; refitted for each model run set (each g, each geometry). r as Round 29.
+**Step A, choosing g (geometry A: azimuth 90 degrees, segment 4, r/v 0.65 s -- neither used before).** `brain/crabOrder30.mjs`, unchanged, at g in **{50, 100, 150, 200, 300}** and contrasts 0.2 to 1.0 (25 runs). For each g the readout is fitted on the plain trials; **g is chosen by the log-likelihood of the animal's MOVING-stripe trials at contrast 1.0 ONLY** (52 trials). Nothing else enters the choice; a tie goes to the smaller g.
+**Step B, the test (geometry B: azimuth 270 degrees, segment 12, r/v 0.45 s -- neither used before).** The chosen g only, contrasts 0.2 to 1.0 (5 runs), the readout refitted on the plain trials. **C1 to C4 are Round 29's, word for word, on the predicted probabilities.** **Verdict: SUPPORTED iff C2, C3 and C4 all hold AND the striped trials' log-likelihood beats the null** (each striped trial given the plain ellipse's observed rate at its contrast); otherwise NOT SUPPORTED, naming each failure.
+**Reported either way:** step A's log-likelihoods for every g; step B's predicted against observed probabilities in all 15 cells; a and b at both steps.
+**Predictions (confidence).** The chosen g is below 300 (75 %); C2 holds at step B (50 %: a weaker gain lowers the stripes less at 0.2 too); C3 holds (60 %); C4 holds (55 %); the stripes beat the null (50 %); SUPPORTED (25 %).
+
+## Round 32 RESULTS (`brain/crabGain32Runs/`, step A committed unread at `2ad418ca4`, step B at `8edced2c8`; `brain/crabGain32Agg.mjs` committed before either was read, `5796736a1`; each step read ONCE): NOT SUPPORTED (C2, C3)
+**Step A (azimuth 90, r/v 0.65): g = 100 chosen.** Log-likelihood of the moving trials at contrast 1.0: g 50 -37.15, **g 100 -35.43**, g 150 -35.74, g 200 -35.88, g 300 -40.47. The plain readout is identical for every g (a -11.215, b 16.007: the gain does not touch the plain ellipse), so the choice rested on the moving stripes alone, as registered.
+**Step B (azimuth 270, r/v 0.45, g 100):** readout a -13.396, b 19.213.
+
+| contrast | predicted: grey / static / moving | observed: grey / static / moving |
+|---|---|---|
+| 0.2 | 0.283 / 0.197 / 0.070 | 0.278 / 0.087 / 0.041 |
+| 0.4 | 0.526 / 0.526 / 0.486 | 0.528 / 0.340 / 0.480 |
+| 0.6 | 0.727 / 0.617 / 0.486 | 0.647 / 0.608 / 0.460 |
+| 0.8 | 0.716 / 0.716 / 0.583 | 0.811 / 0.784 / 0.566 |
+| 1.0 | 0.777 / 0.786 / 0.663 | 0.761 / 0.733 / 0.577 |
+
+**Criteria:** C1 holds; **C2 FAILS** (grey - static 0.086 against the 0.1 line; grey - moving 0.213 holds; static and moving 0.127 apart, over the 0.1 line); **C3 fails at 0.6** (0.110; 0.8 and 1.0 hold); C4 holds (0.242, 0.133, 0.114). **The striped trials: -289.6 under the predictions against -316.8 under the null -- the predictions fit better, by 27.2** (Round 31 at g 300: worse, by 25.1). **Verdict: NOT SUPPORTED (C2, C3).**
+**Predictions:** the chosen g below 300 (75 %) HELD; C2 (50 %) MISSED; C3 (60 %) MISSED; C4 (55 %) HELD; the stripes beat the null (50 %) HELD; SUPPORTED (25 %) MISSED.
+**What it says.**
+* **On the probability scale the gain's strength is now right for the MOVING stripes** (0.486, 0.583, 0.663 at 0.6 to 1.0 against the animal's 0.460, 0.566, 0.577), and the model fits the striped trials better than the plain rate does -- the first round in the series where it does.
+* **But the weaker gain loses the low-contrast STATIC drop** that g 300 had (0.086 here against the animal's 0.191; Round 31's g 300 gave 0.190). Rounds 31 and 32 bracket it: g 300 gets the static drop and over-suppresses the moving stripes; g 100 gets the moving stripes and loses the static drop. **No single drift gain fits both** -- the same conclusion Round 30 reached by another route: the static drop is not the drift gain's to give, since static stripes have no drift, and at g 300 it appeared only because the gain's normalisation touched the static stripes' low-contrast edges.
+* So the series needs a second mechanism for the static drop, now with the drift gain fixed at 100 on the probability scale: the static texture's own effect at low contrast (the masking the earlier entry named), registered with its constant chosen on one held-out geometry and tested on another, as here.
+**Series position after Round 32.** With the probability readout, the drift gain at g 100 reproduces the animal's MOVING-stripe suppression at every contrast and fits the striped trials better than the plain rate; the low-contrast static drop needs a mechanism of its own.
+
+## Round 33 REGISTRATION: a static-texture term beside the drift gain (written 2026-11-27 BEFORE its code and any run; backlog `stealth-static-texture-mask`)
+**Why.** Rounds 31-32: on the probability scale g 100 fits the moving stripes and loses the low-contrast STATIC drop (0.086 against the animal's 0.191); static stripes have no drift, so the drift gain cannot give it.
+**The term (FIXED NOW).** In `brain/crabMlg1.mjs`, a new parameter `textureGain` h (null by default: the network as before). Each segment's drive is divided by **1 + g D^ + h S^**, where **S^ = the patch's mean squared VERTICAL luminance step, (L(y+1) - L(y))^2 averaged over the patch, divided by the patch's luminance variance** (the same normalisation as D^'s: dimensionless, contrast-free). A striped patch has more horizontal edges than a plain one, so a larger S^. **Said plainly:** the term sees texture, not motion, so it acts on the moving stripes too (they carry the same stripes). The round asks whether masking by texture, applied to both as the physics would, gives the static drop without spoiling Round 32's moving fit.
+**g fixed at 100** (Round 32's choice). The readout as Round 31 (fitted on the 257 plain trials per run set).
+**Step A, choosing h (geometry A': azimuth 45 degrees, segment 2, r/v 0.75 s -- unused).** h in **{0.3, 1, 3, 10, 30}**, contrasts 0.2 to 1.0 (25 runs, a new worker `brain/crabOrder33.mjs`, crabOrder30's with h as an argument). **h is chosen by the log-likelihood of the animal's STATIC-stripe trials at contrast 0.2 ONLY** (46 trials); a tie goes to the smaller h.
+**Step B, the test (geometry B': azimuth 157.5 degrees, segment 7, r/v 0.4 s -- unused).** The chosen h only (5 runs). **C1-C4 word for word on the predicted probabilities; verdict SUPPORTED iff C2, C3 and C4 hold AND the striped trials' log-likelihood beats the null**; otherwise NOT SUPPORTED, naming each failure. Reported: step A's likelihoods, step B's 15 cells, the striped likelihood against Round 32's (-289.6 at its geometry).
+**Predictions (confidence).** The chosen h is not the smallest (60 %); C2 holds (40 %); C4 still holds (45 %: the term also lowers the moving stripes); the stripes beat the null (50 %); SUPPORTED (15 %).
+
+## Round 33 RESULTS (2026-11-27; `brain/crabTexture33Runs/`, step A committed unread at `8df7a2391`, step B at `ead433445`, each read ONCE by `brain/crabTexture33Agg.mjs`): **NOT SUPPORTED (C3, the null)**
+**Step A (geometry A', g 100).** The log-likelihood of the 46 static trials at contrast 0.2: h 0.3 -14.45, **h 1 -14.22**, h 3 -15.22, h 10 -20.81, h 30 -22.60. **Chosen h = 1.**
+**Step B (geometry B', g 100, h 1).** The readout a = -15.35, b = 21.78.
+
+| contrast | predicted grey | predicted static | predicted moving | observed grey | observed static | observed moving |
+|---|---|---|---|---|---|---|
+| 0.2 | 0.261 | 0.027 | 0.107 | 0.278 | 0.087 | 0.041 |
+| 0.4 | 0.616 | 0.235 | 0.261 | 0.528 | 0.340 | 0.480 |
+| 0.6 | 0.720 | 0.342 | 0.424 | 0.647 | 0.608 | 0.460 |
+| 0.8 | 0.705 | 0.476 | 0.550 | 0.811 | 0.784 | 0.566 |
+| 1.0 | 0.720 | 0.397 | 0.672 | 0.761 | 0.733 | 0.577 |
+
+**C1** true (reported). **C2 TRUE** (grey minus static 0.234, grey minus moving 0.154, static against moving 0.080). **C3 FALSE**: grey minus static is 0.379, 0.229 and 0.324 at contrasts 0.6 to 1.0, against at most 0.1. **C4 true** (0.297, 0.155, 0.048: two of three above 0.1). **The striped trials' log-likelihood is -321.29 under the predictions and -316.80 under the null: the null fits better, by 4.49** (Round 32's was -289.6 at its own geometry).
+**Predictions.** The chosen h not the smallest: **held**. C2 holds: **held**. C4 still holds: **held**. The stripes beat the null: **MISSED**. SUPPORTED: no.
+**What it says.** The texture term does the one thing Rounds 31-32 lacked: it gives the low-contrast static drop, and C2 holds for the first time. It also masks the static stripes at HIGH contrast, where the animal shows none (observed grey minus static is 0.03 to 0.04 at contrasts 0.6 to 1.0). That is C3's failure, and it costs the likelihood. The cause is in the term's own definition: S^ is contrast-free by construction, the same at every contrast (the DEV check printed identical S^ at contrasts 0.2 and 1.0). So it divides the drive by the same amount whether the target stands out or not. In the animal, static texture masks only while the target is faint. **The lever this names:** masking that falls as the target's contrast against the texture rises, e.g. h S^ scaled by the background's contrast relative to the target's. That must be registered first, as its own round; it is not tuned here.

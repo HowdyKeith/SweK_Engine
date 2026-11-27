@@ -32,6 +32,8 @@
 // So SWEK_GATE_REPORT=1 turns emitting on, and every report records WHAT WAS NOT MEASURED rather than leaving
 // the last box's numbers standing in place of this one's.
 
+// 2026-11-26 -- THE QUESTION IS THE NET CHANGE (backlog history-gates-content-not-commits). PROVED ON A SCRATCH WORKTREE that re-made main's accident -- a commit deleting all 11,562 files and its byte-for-byte revert:
+//   the old query went red there as it did on Keith's rig, the new one is green; a REAL edit committed after it (brain/blobPolicyStore.js / a gate with a report) still goes red and names only that file.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -211,7 +213,10 @@ export function arguesInNumbers(src, strip = (s) => s) {
  * same-day hole above for every edit made here, because the verdict that ships an edit runs before its commit.
  * `dirty` (paths relative to root) and `mtime` (path -> ms) are injectable for the same reason `log` is.
  */
-export function staleReports({ root = ENG, reports = null, log = null, boundary = null, dirty = null, mtime = null } = {}) {
+// 2026-11-26 -- `netChanged(gate, at)`: whether the gate's CURRENT CONTENT was written after the report's day (backlog history-gates-content-not-commits). The log dates a gate by
+//   the last commit that TOUCHED it, so a commit deleting the whole tree and its byte-for-byte revert dated every gate after its report and reportFresh went red on all of them. A gate the log dates late is
+//   stale only if its content moved; asked of git only for those candidates. Injectable; with an injected `log` and none given, every candidate counts (the fixtures' rule, unchanged).
+export function staleReports({ root = ENG, reports = null, log = null, boundary = null, dirty = null, mtime = null, netChanged = null } = {}) {
     const dir = path.join(root, REPORT_DIR);
     const reps = reports || fs.readdirSync(dir).filter((f) => f.endsWith(".json") && f !== "index.json").map((f) => {
         try { const j = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return { file: `${REPORT_DIR}/${f}`, gate: j.gate, at: j.at }; }
@@ -253,7 +258,23 @@ export function staleReports({ root = ENG, reports = null, log = null, boundary 
         if (g != null && p != null && p < g) uncommitted.push({ ...r, edited: `uncommitted, ${new Date(g).toISOString().slice(0, 16)}Z` });
     }
     const judged = reps.filter((r) => r.at && (last.has(r.gate) || shallow.length === 0 || inTree.has(r.gate)));
-    const byDate = judged.filter((r) => last.has(r.gate) && last.get(r.gate) > r.at).map((r) => ({ ...r, edited: last.get(r.gate) }));
+    // The date of the gate's CURRENT CONTENT: newest first through the gate's own history, revisions holding HEAD's content (or none at all: a deletion, the pair's first half) are passed over until the
+    //   first DIFFERENT content; the oldest revision after it that held HEAD's content is the edit. The gate moved since its report iff that edit's day is later than the report's day (the rule above,
+    //   which forgives a same-day edit). Any failure judges it moved, as before.
+    const moved = netChanged || (log != null ? () => true : (gate, at) => {
+        try {
+            const blob = (rev) =>   /* `rev:./path`: without ./ git reads the path from the repository root, not from root (WebGLEngine/) */ { try { return execFileSync("git", ["rev-parse", "--verify", "-q", `${rev}:./${gate}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null; } catch { return null; } };
+            const head = blob("HEAD"); if (!head) return true;
+            let edit = null;
+            for (const line of git("log", "--format=%H %cs", "--", gate).split("\n").filter(Boolean)) {
+                const [sha, day] = line.split(" "), b = blob(sha);
+                if (b === head) { edit = day; continue; }
+                if (b === null) continue;
+                break;
+            }
+            return edit === null || edit > String(at).slice(0, 10);
+        } catch { return true; } });
+    const byDate = judged.filter((r) => last.has(r.gate) && last.get(r.gate) > r.at && moved(r.gate, r.at)).map((r) => ({ ...r, edited: last.get(r.gate) }));
     const seen = new Set(uncommitted.map((r) => r.file));
     return { reports: reps.length, judged: judged.length, unjudged: reps.length - judged.length,
              dirty: reps.filter((r) => inTree.has(r.gate)).length,

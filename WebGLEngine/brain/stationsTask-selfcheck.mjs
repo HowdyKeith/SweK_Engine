@@ -24,6 +24,10 @@
 //   depth, 0.30 m against 0.56 m). H1 is EQUIVALENT: createState reads the vessel's mass and inertia, and the two vessels differ only in the main ballast.
 // 2026-11-25 -- HOLD (round 16, section 9): 8 mutants of subStations.mjs and stationsTask.mjs, every one red by name (final pass): H1 never held | H2 held for every NEED | H3 the hold not applied | H4 held from the start |
 //   H5 TRIAGE_OFF holding | H6 HOLD_KNOBS without the hold | H7 the HOLD crew as NEED | H8 HELD from 213002. H7 WENT 0 RED FIRST (the crew was checked by its label) and got a row: seed 990005 outside every set.
+// 2026-11-26 -- ROUND 20 (section 10): 6 mutants, every one red by name (final pass): R1 holdBelow 3 | R2 the release on the wrong side | R3 the null test inverted | R4 HOLD-R flown with HOLD's knobs | R5 HELD on round 16's |
+//   R6 TRIAGE_OFF holding above 10 m. R4 WENT 0 RED FIRST (the crew was only named); the crew is driven by name through the latch fixture now.
+// 2026-11-26 -- ROUND 21 (section 11): 8 mutants, every one red by name: Q1 releaseRise 1.5 | Q2 the release at 0.5 itself | Q3 the release on a SINK | Q4 no rise test | Q5 HOLD-RR flown with HOLD-R's knobs |
+//   Q6 HELD on round 20's | Q7 TRIAGE_OFF releasing at 0.5 | Q8 HOLD-RR built on HOLD, not HOLD-R.
 "use strict";
 import * as T from "./stationsTask.mjs";
 import * as SS from "./subStations.mjs";
@@ -221,6 +225,54 @@ guarded("section 9", () => {
     ok("HOLD_KNOBS is NEED_KNOBS with blowHold, frozen; TRIAGE_OFF holds nothing; the HOLD crew flies them; round 16's sets are 212001-212048 and 213001-213096",
         J((({ blowHold, ...rest }) => rest)(T.HOLD_KNOBS)) === J(T.NEED_KNOBS) && T.HOLD_KNOBS.blowHold === true && Object.isFrozen(T.HOLD_KNOBS) && SS.TRIAGE_OFF.blowHold === false
         && T.R16_DEV_SET.length === 48 && T.R16_DEV_SET[0] === 212001 && T.R16_HELD_SET.length === 96 && T.R16_HELD_SET[0] === 213001 && T.fly(T.scenario(990005, T.HARD_LEAK), "HOLD", { seconds: 60 }).crew === "HOLD");
+});
+
+sec("10. HOLD-R (round 20, section 40): the held blow forced only deeper than 10 m");
+guarded("section 10", () => {
+    const model = NT.model(), mission = { depth: 20, heading: 0, speed: 2 }, sink = S.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5;
+    // section 9's latch fixture (the trigger fires at 30 m), then the boat shown at `depth` m, rising slowly, with a steady charge: what ballast does the captain command there?
+    const at = (knobs, depth, byName = null) => { let i = 0; const fr = Array.from({ length: 302 }, (_, k) => 0.15 - (0.10 * k) / 300);
+        const read = () => ({ cls: "battery", frac: fr[Math.min(i, fr.length - 1)], depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 });
+        const c = byName ? T.crew(byName, { read, model }) : SS.triageCaptain({ pilot: A.pilot(), model, read, knobs }); c(sink, mission);
+        const st = S.createState({ depth: 30, speed: 2, model }); st.vel[2] = 0.05; st.tank = { ...(st.tank || {}), released: true };
+        for (i = 1; i < fr.length; i++) c(st, mission);
+        const there = S.createState({ depth, speed: 2, model }); there.vel[2] = 0.05; there.tank = { ...(there.tank || {}), released: true };
+        const steady = fr.length - 1; let cmd = null; for (let k = 0; k < 400; k++) { i = steady; cmd = c(there, mission); }   // 400 ticks (> the 10 s window): NEED's own trigger has cleared, so what is left is the hold alone
+        const bare = SS.triageCaptain({ pilot: A.pilot(), model, read: () => ({ cls: "battery", frac: 0.5, depth, flood: 0, damage: 0, refills: true, refillDepth: 0.7 }), knobs: SS.TRIAGE_OFF })(there, mission);
+        return { ballast: cmd.ballast, held: c.held, helm: bare.ballast }; };
+    const deepR = at(T.HOLDR_KNOBS, 25), shallowR = at(T.HOLDR_KNOBS, 5), shallowH = at(T.HOLD_KNOBS, 5);
+    ok("both HOLD and HOLD-R latch the hold when the trigger fires; deeper than 10 m HOLD-R still blows (ballast -1)", deepR.held === true && deepR.ballast === -1 && shallowH.held === true, J({ deepR, shallowH }));
+    ok("!! THE RELEASE: at 5 m, after the latch, HOLD keeps ballast at -1 while HOLD-R flies the helm's own ballast (which floods, > -1 here) -- and still reads held, the latch never cleared",
+        shallowH.ballast === -1 && shallowR.held === true && shallowR.ballast > -1 && shallowR.helm > -1, J({ shallowH, shallowR }));
+    const crewR = at(null, 5, "HOLD-R"), crewH = at(null, 5, "HOLD");
+    ok("...and the CREWS BY NAME do the same (stationsTask.crew): at 5 m after the latch the HOLD-R crew flies the helm's ballast and the HOLD crew keeps -1", crewR.held === true && crewR.ballast > -1 && crewH.ballast === -1, J({ crewR, crewH }));
+    ok("HOLDR_KNOBS is HOLD_KNOBS with holdBelow 10, frozen; TRIAGE_OFF's holdBelow is null (round 16's hold at every depth); round 20's sets are 220001-220048 and 221001-221096; the HOLD-R crew flies",
+        J((({ holdBelow, ...rest }) => rest)(T.HOLDR_KNOBS)) === J(T.HOLD_KNOBS) && T.HOLDR_KNOBS.holdBelow === 10 && Object.isFrozen(T.HOLDR_KNOBS) && SS.TRIAGE_OFF.holdBelow === null && T.HOLD_KNOBS.holdBelow === undefined
+        && T.R20_DEV_SET.length === 48 && T.R20_DEV_SET[0] === 220001 && T.R20_DEV_SET[47] === 220048 && T.R20_HELD_SET.length === 96 && T.R20_HELD_SET[0] === 221001 && T.R20_HELD_SET[95] === 221096
+        && T.fly(T.scenario(990005, T.HARD_LEAK), "HOLD-R", { seconds: 60 }).crew === "HOLD-R");
+});
+
+sec("11. HOLD-RR (round 21, section 43): the held blow also released while rising faster than 0.5 m/s");
+guarded("section 11", () => {
+    const model = NT.model(), mission = { depth: 20, heading: 0, speed: 2 }, sink = S.createState({ depth: 30, speed: 2, model }); sink.vel[2] = -0.5;
+    // section 10's latch fixture, then 400 ticks at 25 m (deeper than the 10 m line) rising at `vz` with a steady charge (NEED's own trigger quiet): what ballast is commanded there?
+    const at = (byName, vz) => { let i = 0; const fr = Array.from({ length: 302 }, (_, k) => 0.15 - (0.10 * k) / 300);
+        const read = () => ({ cls: "battery", frac: fr[Math.min(i, fr.length - 1)], depth: 30, flood: 0, damage: 0, refills: true, refillDepth: 0.7 });
+        const c = T.crew(byName, { read, model }); c(sink, mission);
+        const st = S.createState({ depth: 30, speed: 2, model }); st.vel[2] = 0.05; st.tank = { ...(st.tank || {}), released: true };
+        for (i = 1; i < fr.length; i++) c(st, mission);
+        const there = S.createState({ depth: 25, speed: 2, model }); there.vel[2] = vz; there.tank = { ...(there.tank || {}), released: true };
+        let cmd = null; for (let k = 0; k < 400; k++) { i = fr.length - 1; cmd = c(there, mission); }
+        return { ballast: cmd.ballast, held: c.held }; };
+    const rrFast = at("HOLD-RR", 1.0), rFast = at("HOLD-R", 1.0), rrSlow = at("HOLD-RR", 0.05), rrEdge = at("HOLD-RR", 0.5);
+    ok("!! THE RISE RELEASE: at 25 m rising at 1 m/s, after the latch, HOLD-RR flies the helm's ballast (> -1) where HOLD-R keeps -1; both still read held", rrFast.held && rFast.held && rrFast.ballast > -1 && rFast.ballast === -1, J({ rrFast, rFast }));
+    ok("...rising slowly (0.05 m/s) HOLD-RR still blows, and at exactly 0.5 m/s it still blows (the release is FASTER than 0.5)", rrSlow.ballast === -1 && rrEdge.ballast === -1, J({ rrSlow, rrEdge }));
+    ok("HOLDRR_KNOBS is HOLDR_KNOBS with releaseRise 0.5, frozen; TRIAGE_OFF's releaseRise is null; round 21's sets are 222001-222048 and 223001-223096",
+        J((({ releaseRise, ...rest }) => rest)(T.HOLDRR_KNOBS)) === J(T.HOLDR_KNOBS) && T.HOLDRR_KNOBS.releaseRise === 0.5 && Object.isFrozen(T.HOLDRR_KNOBS) && SS.TRIAGE_OFF.releaseRise === null && T.HOLDR_KNOBS.releaseRise === undefined
+        && T.R21_DEV_SET.length === 48 && T.R21_DEV_SET[0] === 222001 && T.R21_DEV_SET[47] === 222048 && T.R21_HELD_SET.length === 96 && T.R21_HELD_SET[0] === 223001 && T.R21_HELD_SET[95] === 223096);
+    // the hold's firing is read through fly's `make` (the HELD flyer does the same), so round 2's registered record keeps its fields
+    let cap = null; const f = T.fly(T.scenario(990005, T.HARD_LEAK), "HOLD-RR", { seconds: 60, make: (ctx) => (cap = T.crew("HOLD-RR", ctx)) });
+    ok("the HOLD-RR crew flies by name, and through `make` its captain says whether the hold fired (a boolean), the record keeping round 2's fields", f.crew === "HOLD-RR" && typeof cap.held === "boolean" && !("held" in f), J({ held: cap.held }));
 });
 
 finished = true;
