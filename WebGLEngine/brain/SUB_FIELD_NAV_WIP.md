@@ -1168,3 +1168,17 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **The verdict (registered):** the edge arm arrives where the reference does not on 4 seeds and the reverse on 2 -- p = 0.34: **NO DIFFERENCE SHOWN.** FOLLOW-UP 10's EDGE BEATS ARC does not replicate at the registered bar.
 **Predictions.** **R1 MISSED** (not EDGE BEATS ARC). **R2 held** (49 against 47). **R3 held** (2 exits, at most half of 8). **R4 held** (9 collisions against 4).
 **What it says, across the two sets (120 scenarios).** The edge rule's effect is the same in direction both times -- exits fall sharply (15 to 7, 8 to 2) and collisions rise (3 to 6, 4 to 9; with ships 0 to 4, 1 to 6) -- and the net on arrivals is +5 and +2. The exits it saves are partly spent as collisions: stuck more often, the rule flies the plan's heading into the ship. So the next change is the stuck fallback (backlog `nav-avoid-stuck-fallback`), not the aquarium; `aquarium-courier-arc-edge` waits, by its own condition.
+
+## FOLLOW-UP 12 [SERIES B]: WHEN THE EDGE RULE IS STUCK, THE LEAST BAD HEADING (backlog `nav-avoid-stuck-fallback`; Keith, 2026-11-27; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** Over FOLLOW-UPS 10 and 11 the edge rule saved exits and spent part of them as collisions (3 to 6 and 4 to 9; with ships 0 to 4 and 1 to 6): stuck in 35 percent of its fires, it flies the plan's heading, into the ship.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge-least`: FOLLOW-UP 10's edge rule exactly, except WHEN STUCK. Then, instead of the plan's heading, it flies the heading -- the plan's own or one of the offsets, in the usual order -- whose arc keeps the LARGEST minimum clearance over the 25 s look: the clearance at a sample is the distance to an obstacle less its required clearance (r + half-hull + SHIP_CLEAR for ships, + STATIC_CLEAR for statics; obstacles passed beneath skipped, as before), minimised over obstacles and samples; the edge band is not in this measure; the first in order wins a tie. Nothing else changes.
+
+**Arms flown:** `any+predict+edge+avoid-arc-edge` (FOLLOW-UP 10's designated, the REFERENCE) and `any+predict+edge+avoid-arc-edge-least` (**designated**), HELD5's world.
+
+**The set.** NEW: **HELD12, seeds 9301 to 9360 of hard-traffic, flown ONCE** after the change and its gate rows are sabotaged. DEV (seeds 1 to 30) once as a sanity run; the one amendment allowed: if DEV shows the rule degenerate (the least-bad heading is never different from the plan's), it is amended and written here.
+
+**Verdict.** On REACHED, paired, the exact one-sided sign test at p at most 0.05 either way (LEAST BEATS EDGE / EDGE BEATS LEAST / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck.
+
+**Predictions.** **F1**: the designated arm's ship collisions are fewer than the reference's. 65 percent. **F2**: its exits are at most the reference's plus 3 (the least-bad heading ignores the edge). 60 percent. **F3**: NO DIFFERENCE SHOWN. 55 percent; LEAST BEATS EDGE 35.
