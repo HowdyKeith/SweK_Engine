@@ -87,8 +87,8 @@ console.log("4. THE GRID");
 await section(async () => {
     await p.evaluate(() => { Object.assign(window.__gizmoDemo.boxes[0], { position: [-1.6, 0.5, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }); window.__gizmoDemo.select(-1);   // back on the ground: the scale above sank half of it below
     window.__gizmoDemo.controls.goal.yaw = 0.7; window.__gizmoDemo.controls.goal.pitch = 0.12; }); await frame();   // low enough that the horizon is on the screen
-    const on = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = true; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye }; });
-    const off = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = false; const c = await s.capture(); s.gridOn = true; return c; });
+    const on = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = true; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye }; }).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));
+    const off = await p.evaluate(async () => { const s = window.__gizmoDemo; s.gridOn = false; const c = await s.capture(); s.gridOn = true; return c; }).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));
     const picks = await p.evaluate(() => { const s = window.__gizmoDemo, out = []; for (let y = 3; y < 600; y += 7) for (let x = 3; x < 900; x += 7) { const k = s.pick(x + 0.5, y + 0.5), inner = k >= 0 && [[4, 0], [-4, 0], [0, 4], [0, -4]].every(([dx, dy]) => s.pick(x + 0.5 + dx, y + 0.5 + dy) === k); out.push(k < 0 ? -1 : inner ? k : -2); } return out; });   // -2: a box's edge (where it meets the ground the two depths are one: not judged)
     const inv = invert4(on.vp), P = { invViewProj: inv, eye: on.eye, up: "y", cell: 0.5, major: 10, fade: 25, zRange: "gl" }, at = (img, x, y) => { const o = ((on.h - 1 - y) * on.w + x) * 4; return [img[o], img[o + 1], img[o + 2]]; };
     const dbg = []; let strong = 0, strongShown = 0, empty = 0, emptyExact = true, onBox = 0, boxExact = true, k = 0, sky = 0, skyExact = true;

@@ -9,7 +9,11 @@
      WHAT THIS PAGE IS NOT, SAID PLAINLY:
        - NOT THE OPT-IN SEA. The vendored web-ocean FFT sea (ocean-spike.html) is slice 4 and costs far more; this is the water every GPU can draw.
        - NOT A FITTED SEA STATE. Six seeded Gerstner waves; they look like swell, not like any measured spectrum.
-       - NOT LIT LIKE THE ENGINE. A one-pass WebGL2 shader (sky tint by Fresnel, a sun glint, foam where the particles bunch); the engine's own lighting is not applied.
+       - NOT LIT LIKE THE ENGINE, BY DEFAULT. A one-pass WebGL2 shader (sky tint by Fresnel, a sun glint, foam where the particles bunch). 2026-11-27 (Keith: "lets do 1 through 6",
+         1 being the sea pages' many lights and fog at sea level): ?lights=1 lights it with the engine's render/clusteredLights.mjs instead -- dusk, a low sun with three cascades
+         of buoy shadow, a navigation lamp over each buoy, three searchlights on masts sweeping the water -- and &fog=1 lays render/volumetricFog.mjs's sea-level haze over it,
+         with the sun's shafts and the searchlights' beams in it (&shafts=0 neither, &beams=0 no beams). ?t=12 holds the sea and the lights at that time. Held by
+         tools/ship/oceanLit-selfcheck.mjs; without ?lights the page draws exactly as before.
        - NOT YET READ BY ANYTHING ELSE. The submarine and the boats take their water height from the physics surface when a later slice wires them.
      Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
 <html lang="en">
@@ -81,10 +85,13 @@
   import { createCameraControls, bindCameraControls } from "/render/cameraControls.mjs";   // 2026-11-22: the shared camera
   import { createGpuTimerGL } from "/render/gpuTimerGL.mjs";
   import { timerLines } from "/render/gpuTimer.mjs";
+  import { createClusteredLighting, CLUSTERED_GLSL } from "/render/clusteredLights.mjs";   // ?lights=1
+  import { createFogGL } from "/render/volumetricFog.mjs";                               // &fog=1
 
   const $ = (id) => document.getElementById(id);
   const cv = $("cv"), hud = $("hud");
   const gl = cv.getContext("webgl2", { antialias: true });
+  const Q = new URLSearchParams(location.search), LIT = Q.get("lights") === "1", FOG = LIT && Q.get("fog") === "1", T0 = Q.has("t") ? Number(Q.get("t")) : null;
   const state = { frames: 0, agreement: null, originHeight: null, n: 96, seed: 1, vertices: 0, triangles: 0, buoys: 0, error: "" };
   window.__ocean = state;
   // slice 3: the tier switch. The sea itself is slice 4, so "sea" here is what WOULD be chosen; the water drawn below is always this one.
@@ -143,6 +150,35 @@
     catch (e) { state.error = String(e.message || e); hud.textContent = "shader error: " + state.error; return; }
     const U = (n) => gl.getUniformLocation(prog, n);
     const uVP = U("uVP"), uBasis = U("uBasis"), uOffset = U("uOffset"), uMode = U("uMode"), uEye = U("uEye");
+    // ---- ?lights=1: the same geometry through the engine's clustered lighting (render/clusteredLights.mjs), at dusk ----
+    let lit = null;
+    if (LIT) {
+      const LFS = `#version 300 es
+      precision highp float; precision highp int;
+      ${CLUSTERED_GLSL}
+      in vec3 vN; in vec3 vW; in float vFoam;
+      uniform vec3 uEye; uniform int uMode;
+      out vec4 o;
+      vec3 duskSky(vec3 d) { float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0); return mix(vec3(0.16, 0.12, 0.13), vec3(0.03, 0.05, 0.11), pow(h, 0.6)); }
+      void main() {
+        vec3 n = normalize(vN), v = normalize(uEye - vW);
+        if (uMode == 1) { vec3 alb = vec3(0.85, 0.3, 0.16); vec3 c = alb * 0.03 + clusteredLight(vW, n, v, alb); o = vec4(c / (1.0 + c), 1.0); return; }
+        float f = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+        vec3 alb = mix(vec3(0.04, 0.1, 0.14), vec3(0.8, 0.84, 0.88), clamp(vFoam * 0.85, 0.0, 1.0));
+        vec3 c = mix(alb * 0.04, duskSky(reflect(-v, n)), 0.1 + 0.9 * f) + clusteredLight(vW, n, v, alb);
+        o = vec4(c / (1.0 + c), 1.0);
+      }`;
+      const DFS = `#version 300 es
+      precision highp float; void main() {}`;
+      const link = (fs) => { const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(pr, 0, "aPos"); gl.bindAttribLocation(pr, 1, "aNormal"); gl.bindAttribLocation(pr, 2, "aFoam"); gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr)); return pr; };
+      try { lit = { prog: link(LFS), depth: link(DFS) }; } catch (e) { state.error = String(e.message || e); hud.textContent = "shader error: " + state.error; return; }
+      lit.lighting = createClusteredLighting(gl, { maxLights: 16, space: "view", viewCells: [16, 9, 24], maxPerCell: 16, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 260, casterReach: 60 });
+      // the sea-level haze: thick at the water, thinning over 6 m; lit by the low sun (its lightDir toward the sun) and a dusk ambient
+      lit.fogParams = { density: 0.018, falloff: 6, baseHeight: 0, albedo: 0.9, ambient: [0.025, 0.03, 0.05], lightDir: [0.8, 0.25, 0.55], lightColor: [0.5, 0.36, 0.26], g: 0.55, maxDistance: 420, steps: 48, jitter: true };
+      if (FOG) { const shafts = Q.get("shafts") !== "0"; lit.fogFlat = createFogGL(gl); lit.fogLit = shafts ? createFogGL(gl, { lighting: lit.lighting }) : null; lit.fogNoBeams = shafts ? createFogGL(gl, { lighting: lit.lighting, fogLights: [] }) : null; lit.beamsDefault = shafts && Q.get("beams") !== "0"; }
+      // what a gate switches, live: the sun, the lamps, the searchlights, the buoys' shadows, the fog, its shafts and its beams
+      state.lit = { sun: true, lamps: true, searchlights: true, casters: true, fogOn: FOG, shaftsOn: FOG && Q.get("shafts") !== "0", beamsOn: !!lit.beamsDefault, extra: [], fog: FOG, fogParams: lit.fogParams, lights: null, stats: null, vp: null, eye: null };
+    }
 
     // ---- the water: buffers sized for the largest grid, filled every frame ----
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -186,13 +222,38 @@
     // 2026-11-22: the water and the buoys timed on the card (render/gpuTimerGL.mjs); ?gputimer=0 turns it off
     const gpuTimer = createGpuTimerGL(new URLSearchParams(location.search).get("gputimer") === "0" ? null : gl);
     const BUOYS = [[0, 0], [22, -14], [-30, 18], [45, 40], [-55, -38]];
+    // ?lights=1's lights: the dusk sun; a lamp 3.2 m over each buoy (red to port of the channel, green to starboard, white at the middle); three searchlights 9 m up masts on
+    // three buoys, each sweeping round at its own rate, 27 degrees down
+    const MASTS = [1, 2, 3], LAMP = [[1, 0.95, 0.85], [0.9, 0.12, 0.08], [0.1, 0.9, 0.3], [0.9, 0.12, 0.08], [0.1, 0.9, 0.3]];
+    function litLights(t) {
+      const L = [], S = state.lit;
+      if (S.sun) L.push({ type: "directional", direction: [-0.8, -0.25, -0.55], color: [1, 0.72, 0.52], intensity: 0.55, shadow: true });
+      BUOYS.forEach(([bx, bz], k) => { const b = buoy(sea, bx, bz, t);
+        if (S.lamps) L.push({ type: "point", position: [b.x + b.nx * 3.2, b.y + b.ny * 3.2, b.z + b.nz * 3.2], range: 16, color: LAMP[k], intensity: 6, shadow: false });
+        if (S.searchlights && MASTS.includes(k)) { const a = 0.35 * t * (k % 2 ? 1 : -1) + k * 2.1, dn = Math.tan(0.5);
+          L.push({ type: "spot", position: [b.x, b.y + 9, b.z], direction: [Math.cos(a), -dn, Math.sin(a)], range: 95, innerAngle: 0.15, outerAngle: 0.22, color: [0.95, 0.97, 1], intensity: 900, shadow: true, priority: 2 }); } });
+      L.push(...S.extra);   // lights a gate adds
+      return L;
+    }
+    let fb = null, fbColor = null, fbDepth = null, fbW = 0, fbH = 0;
+    const sizeFb = (w, h) => { if (fb && fbW === w && fbH === h) return; if (fb) { gl.deleteFramebuffer(fb); gl.deleteTexture(fbColor); gl.deleteTexture(fbDepth); } fbW = w; fbH = h;
+      const tx = (ifmt, fmt, type) => { const x = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, x); gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, null); for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v); return x; };
+      fbColor = tx(gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE); fbDepth = tx(gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT);
+      fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fbColor, 0); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, fbDepth, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); };
+    const inv4 = (m) => { const a = m, o = new Array(16), b = [a[0] * a[5] - a[1] * a[4], a[0] * a[6] - a[2] * a[4], a[0] * a[7] - a[3] * a[4], a[1] * a[6] - a[2] * a[5], a[1] * a[7] - a[3] * a[5], a[2] * a[7] - a[3] * a[6], a[8] * a[13] - a[9] * a[12], a[8] * a[14] - a[10] * a[12], a[8] * a[15] - a[11] * a[12], a[9] * a[14] - a[10] * a[13], a[9] * a[15] - a[11] * a[13], a[10] * a[15] - a[11] * a[14]];
+      const det = b[0] * b[11] - b[1] * b[10] + b[2] * b[9] + b[3] * b[8] - b[4] * b[7] + b[5] * b[6], d = 1 / det;
+      o[0] = (a[5] * b[11] - a[6] * b[10] + a[7] * b[9]) * d; o[1] = (-a[1] * b[11] + a[2] * b[10] - a[3] * b[9]) * d; o[2] = (a[13] * b[5] - a[14] * b[4] + a[15] * b[3]) * d; o[3] = (-a[9] * b[5] + a[10] * b[4] - a[11] * b[3]) * d;
+      o[4] = (-a[4] * b[11] + a[6] * b[8] - a[7] * b[7]) * d; o[5] = (a[0] * b[11] - a[2] * b[8] + a[3] * b[7]) * d; o[6] = (-a[12] * b[5] + a[14] * b[2] - a[15] * b[1]) * d; o[7] = (a[8] * b[5] - a[10] * b[2] + a[11] * b[1]) * d;
+      o[8] = (a[4] * b[10] - a[5] * b[8] + a[7] * b[6]) * d; o[9] = (-a[0] * b[10] + a[1] * b[8] - a[3] * b[6]) * d; o[10] = (a[12] * b[4] - a[13] * b[2] + a[15] * b[0]) * d; o[11] = (-a[8] * b[4] + a[9] * b[2] - a[11] * b[0]) * d;
+      o[12] = (-a[4] * b[9] + a[5] * b[7] - a[6] * b[6]) * d; o[13] = (a[0] * b[9] - a[1] * b[7] + a[2] * b[6]) * d; o[14] = (-a[12] * b[3] + a[13] * b[1] - a[14] * b[0]) * d; o[15] = (a[8] * b[3] - a[9] * b[1] + a[10] * b[0]) * d; return o; };
+    if (LIT) state.capture = () => new Promise((res) => { state._want = res; });
+    if (T0 != null) { simT = T0; paused = true; }
     let fpsAcc = 0, fpsN = 0, fps = 0;
     function frame(now) {
       const dt = Math.min(0.1, (now - last) / 1000); last = now; camInput.tick(dt);
       if (!paused) simT += dt;
       const w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight), dpr = Math.min(2, window.devicePixelRatio || 1);
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-      gl.viewport(0, 0, cv.width, cv.height);
       const m = buildWater(sea, { half: 150, n, t: simT });
       gl.bindVertexArray(vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.positions);
@@ -200,22 +261,41 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, bFoam); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.foam);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx); gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, m.indices);
       const pose = controls.pose(), eye = pose.eye;
-      const vp = mul(persp(0.9, w / h, 0.5, 2000), look(eye, pose.target, [0, 1, 0]));
-      gl.useProgram(prog); gl.uniformMatrix4fv(uVP, false, new Float32Array(vp)); gl.uniform3fv(uEye, eye);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gpuTimer.begin("water"); gl.uniform1i(uMode, 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0); gpuTimer.end();
-      // buoys: on the physics surface, leaning with its normal
-      gl.bindVertexArray(vaoB); gl.uniform1i(uMode, 1); gpuTimer.begin("buoys");
-      for (const [bx, bz] of BUOYS) {
+      const viewM = look(eye, pose.target, [0, 1, 0]), projM = persp(0.9, w / h, 0.5, 2000), vp = mul(projM, viewM);
+      // the buoys, one matrix each: on the physics surface, leaning with its normal (drawn by the colour pass, and by the shadow atlas with ?lights=1)
+      const drawBuoys = (pr) => { gl.bindVertexArray(vaoB); gl.uniform1i(gl.getUniformLocation(pr, "uMode"), 1); for (const [bx, bz] of BUOYS) {
         const b = buoy(sea, bx, bz, simT);
         let ax = [1, 0, 0]; const ny = [b.nx, b.ny, b.nz];
         let t1 = [ny[1] * ax[2] - ny[2] * ax[1], ny[2] * ax[0] - ny[0] * ax[2], ny[0] * ax[1] - ny[1] * ax[0]]; const l1 = Math.hypot(...t1); t1 = t1.map((x) => x / l1);
         const t2 = [ny[1] * t1[2] - ny[2] * t1[1], ny[2] * t1[0] - ny[0] * t1[2], ny[0] * t1[1] - ny[1] * t1[0]];
         const S = 3;   // a buoy a few metres across, so it reads at the orbit distance
-        gl.uniformMatrix3fv(uBasis, false, new Float32Array([t2[0] * S, t2[1] * S, t2[2] * S, ny[0] * S, ny[1] * S, ny[2] * S, t1[0] * S, t1[1] * S, t1[2] * S]));
-        gl.uniform3f(uOffset, b.x, b.y, b.z); gl.drawArrays(gl.TRIANGLES, 0, oct.count);
+        gl.uniformMatrix3fv(gl.getUniformLocation(pr, "uBasis"), false, new Float32Array([t2[0] * S, t2[1] * S, t2[2] * S, ny[0] * S, ny[1] * S, ny[2] * S, t1[0] * S, t1[1] * S, t1[2] * S]));
+        gl.uniform3f(gl.getUniformLocation(pr, "uOffset"), b.x, b.y, b.z); gl.drawArrays(gl.TRIANGLES, 0, oct.count);
+      } };
+      let P = prog;
+      if (LIT) {
+        const S = state.lit, L = S.lights = litLights(simT);
+        S.stats = lit.lighting.update(L, { view: viewM, proj: projM, near: 0.5, far: 2000 }); S.vp = vp; S.eye = eye.slice();
+        gpuTimer.begin("shadows");
+        lit.lighting.renderShadows((fvp) => { if (!S.casters) return; gl.useProgram(lit.depth); gl.uniformMatrix4fv(gl.getUniformLocation(lit.depth, "uVP"), false, fvp); drawBuoys(lit.depth); });
+        gpuTimer.end();
+        P = lit.prog; gl.useProgram(P); lit.lighting.bind(P, 4);
       }
-      gpuTimer.end(); gpuTimer.finish(); const gst = gpuTimer.collect(); if (gst.frames) state.gpuTimes = Object.fromEntries(Object.entries(gst.labels).map(([k, v]) => [k, v.ms]));
+      const fogged = LIT && FOG && state.lit.fogOn;
+      if (fogged) { sizeFb(cv.width, cv.height); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); }
+      gl.viewport(0, 0, cv.width, cv.height); gl.enable(gl.DEPTH_TEST);
+      if (LIT) gl.clearColor(0.05, 0.06, 0.1, 1);
+      gl.useProgram(P); gl.uniformMatrix4fv(gl.getUniformLocation(P, "uVP"), false, new Float32Array(vp)); gl.uniform3fv(gl.getUniformLocation(P, "uEye"), eye);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.bindVertexArray(vao); gpuTimer.begin("water"); gl.uniform1i(gl.getUniformLocation(P, "uMode"), 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0); gpuTimer.end();
+      gpuTimer.begin("buoys"); drawBuoys(P); gpuTimer.end();
+      if (fogged) {
+        const S = state.lit, f = S.shaftsOn && lit.fogLit ? (S.beamsOn ? lit.fogLit : lit.fogNoBeams) : lit.fogFlat;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.disable(gl.DEPTH_TEST);
+        gpuTimer.begin("fog"); f.draw({ colorTex: fbColor, depthTex: fbDepth, invViewProj: inv4(vp), eye, params: lit.fogParams, zRange: "gl" }); gpuTimer.end(); gl.enable(gl.DEPTH_TEST);
+      }
+      if (state._want) { const px = new Uint8Array(cv.width * cv.height * 4); gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = state._want; state._want = null; let b64 = ""; for (let i = 0; i < px.length; i += 0x8000) b64 += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000)); r({ w: cv.width, h: cv.height, b64: btoa(b64), topDown: false }); }
+      gpuTimer.finish(); const gst = gpuTimer.collect(); if (gst.frames) state.gpuTimes = Object.fromEntries(Object.entries(gst.labels).map(([k, v]) => [k, v.ms]));
       // the measurement: re-ask the physics about 32 drawn vertices
       let worst = 0;
       for (let k = 0; k < 32; k++) {

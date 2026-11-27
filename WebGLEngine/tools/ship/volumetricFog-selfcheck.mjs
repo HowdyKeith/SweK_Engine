@@ -128,8 +128,8 @@ await section(async () => {
     await p.goto(`http://127.0.0.1:${srv.address().port}/gizmo-demo.html?ease=0&fog=1&gputimer=0`); await p.waitForFunction(() => window.__gizmoDemo && window.__gizmoDemo.ready, null, { timeout: 60000 });
     await p.evaluate(() => { const s = window.__gizmoDemo; s.gridOn = false; s.controls.goal.pitch = 0.12; });
     await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const on = await p.evaluate(async () => { const s = window.__gizmoDemo; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, params: s.fogParams }; });
-    const off = await p.evaluate(async () => { const s = window.__gizmoDemo; s.fogOn = false; await new Promise((r) => requestAnimationFrame(r)); const c = await s.capture(); s.fogOn = true; return c; });
+    const on = await p.evaluate(async () => { const s = window.__gizmoDemo; const c = await s.capture(); return { ...c, vp: s.viewProj, eye: s.eye, params: s.fogParams }; }).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));
+    const off = await p.evaluate(async () => { const s = window.__gizmoDemo; s.fogOn = false; await new Promise((r) => requestAnimationFrame(r)); const c = await s.capture(); s.fogOn = true; return c; }).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));
     const boxAt = await p.evaluate(([w, h]) => { const s = window.__gizmoDemo, out = {}; for (let yb = 2; yb < h; yb += 5) for (let x = 2; x < w; x += 5) out[`${x},${yb}`] = s.pick(x + 0.5, h - 1 - yb + 0.5) >= 0; return out; }, [on.w, on.h]);
     const inv = invert4(on.vp), BG = [11, 15, 23].map((v) => v / 255); let sky = 0, skyWorst = 0; const ground = [];
     for (let yb = 2; yb < on.h; yb += 5) for (let x = 2; x < on.w; x += 5) {

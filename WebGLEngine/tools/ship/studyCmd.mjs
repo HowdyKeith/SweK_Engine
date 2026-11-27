@@ -73,6 +73,7 @@ const TOOLS = {
     bakeDendritePlaces: () => import("../bakeDendritePlaces.mjs"),
     denoiseKernelRound: () => import("../denoiseKernelRound.mjs"),
     denoiseLayers: () => import("../denoiseLayers.mjs"),
+    lightingCost: () => import("../lightingCost.mjs"),   // 2026-11-27: what the new lighting costs on the rig's card
     splatPack: () => import("../splatPack.mjs"),
 };
 const FILE = (name) => { const t = String(TOOLS[name]).match(/import\("([^"]+)"\)/)[1]; return path.resolve(HERE, t); };

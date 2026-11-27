@@ -14,6 +14,8 @@
 //   3  A POINT LIGHT  a red light 40 units over a ship reddens that ship and nothing but ships within its range -- a ship framed at the left edge too; the same light 2000 units higher, outside its range, changes nothing at all
 //   4  THE FOG        where nothing wrote depth (all but the ships) the fogged pixel is render/volumetricFog.mjs fogCPU's closed form over the 12000-unit ray, to 2 levels; the
 //                     ships each by their own distance: (fogged - fog light) / (clear - fog light) is e^-(density x distance); without ?lights and ?fog the page has no __flightLights
+//   5  THE SHAFTS     (2026-11-27) on by default with lights and fog; in a thickened haze, looking past a ship toward the sun, switched live on one frozen frame, the ships' shadows only darken the fog, and with the
+//                     ships out of the atlas the switch changes nothing
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -51,8 +53,8 @@ const open = async (q, until = "L.frames > 40") => {
 const shot = (p, set = {}) => p.evaluate(async (set) => {
     const L = window.__flightLights; Object.assign(L, set);
     const f0 = L.frames; await new Promise((res) => { const t = () => (L.frames >= f0 + 3 ? res() : requestAnimationFrame(t)); t(); });
-    return L.capture();
-}, set);
+    const c = await L.capture(); return c;
+}, set).then((c) => ({ ...c, px: Buffer.from(c.b64, "base64") }));   // the page sends its pixels as base64 (a JS array of millions of numbers cost most of this gate)
 const lum = (px, i) => 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
 
 console.log("1. IT RUNS");
@@ -140,7 +142,7 @@ await section(async () => {
 
 console.log("4. THE FOG");
 await section(async () => {
-    const { p, errors } = await open("?lights=1&fog=1");
+    const { p, errors } = await open("?lights=1&fog=1&shafts=0");   // the closed form has nothing hidden from the sun: the shafts are section 5's
     const clear = await shot(p, { freeze: true, fogOn: false }), hazy = await shot(p, { freeze: true, fogOn: true });
     const cam = await p.evaluate(() => { const L = window.__flightLights, live = window.__tacticsFight.A.concat(window.__tacticsFight.B).filter((e) => !e.dead), d = live.map((e) => Math.hypot(e.x - L.eye[0], -L.eye[1], e.y - L.eye[2]));
         return { vp: L.vp, eye: L.eye, P: L.fogParams, error: L.error, dmin: Math.min(...d), dmax: Math.max(...d) }; }); await p.close();
@@ -163,6 +165,26 @@ await section(async () => {
     ok("!! without ?lights and ?fog the page has no __flightLights (and draws as it always did)", none === null && q.errors.length === 0);
 });
 
+console.log("5. THE SUN'S SHAFTS IN THE HAZE (2026-11-27)");
+await section(async () => {
+    // the page's own haze lets a ship's shadow take under a level from the fog; thickened (the same fogParams object the page draws with), the shafts show. One frozen frame,
+    // the shafts switched live (flightLights.shaftsOn), and again with the ships' depth left out of the atlas (casters: false) -- then nothing may hide the sun
+    const { p, errors } = await open("?lights=1&fog=1");
+    // framed as shafts are seen: from 400 units behind a live ship, looking past it toward the sun, so the rays round its silhouette run inside its shadow (seen side-on from
+    // the orbit, a ship's 50-unit shadow crosses a ray for 50 units of 12000 and takes under a level). The haze thick enough to show it, not so bright it saturates
+    const info = await p.evaluate(() => { const L = window.__flightLights; L.freeze = true; Object.assign(L.fogParams, { density: 0.002, lightColor: [0.2, 0.19, 0.17], ambient: [0.01, 0.012, 0.02], steps: 48 });
+        const s = window.__tacticsFight.A.concat(window.__tacticsFight.B).filter((e) => !e.dead)[0], u = (() => { const t = L.fogParams.lightDir, n = Math.hypot(...t); return t.map((v) => v / n); })(), c = [s.x, 0, s.y];
+        L.view = { eye: c.map((v, i) => v - u[i] * 400), center: c }; return { shafts: L.shafts, timer: L.gpuTimer }; });
+    const off = await shot(p, { freeze: true, shaftsOn: false }), on = await shot(p, { freeze: true, shaftsOn: true });
+    const offNC = await shot(p, { freeze: true, shaftsOn: false, casters: false }), onNC = await shot(p, { freeze: true, shaftsOn: true, casters: false });
+    const R = await p.evaluate(() => ({ error: window.__flightLights.error })); await p.close();
+    const N = on.w * on.h; let darker = 0, brighter = 0, ncDiff = 0;
+    for (let k = 0; k < N; k++) { const d = lum(on.px, k * 4) - lum(off.px, k * 4); if (d < -3) darker++; if (d > 1) brighter++; if (Math.abs(lum(onNC.px, k * 4) - lum(offNC.px, k * 4)) > 1) ncDiff++; }
+    ok("!! THE SHAFTS ARE ON BY DEFAULT WITH ?lights=1&fog=1, and &shafts=0 is the plain haze", info.shafts === true && errors.length === 0 && !R.error, `${JSON.stringify(info)}${errors[0] ? "; " + errors[0] : ""}`);
+    ok("!! LOOKING PAST A SHIP TOWARD THE SUN, IN A THICKER HAZE, ITS SHADOW TAKES LIGHT FROM IT: a fiftieth of the picture darker by over 3 levels, none brighter by over 1", darker > N * 0.02 && brighter === 0, `${darker} darker, ${brighter} brighter, of ${N}`);
+    ok("!! AND IT IS THE SHIPS THAT DO IT: with their depth left out of the atlas, the shafts change nothing (to a level)", ncDiff <= N * 0.0005, `${ncDiff} pixels differ`);
+});
+
 await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
@@ -174,3 +196,6 @@ process.exit(fails === 0 ? 0 : 1);
 // past it, so a ship at the frame's edge is still lit (the edge check added for it passes either way); the eye not written -- it feeds only the specular term, too faint here
 // to cross a threshold. THE FIRST SWEEP FOUND THE GATE FLAKY: under load the battle had run on before the freeze and other ships, wholly in shadow, sat in the frame -- the
 // ships are now told by what the unshadowed sun lights, not by what the shadowed sun lights.
+// 2026-11-27, THE SHAFTS (section 5): 4 mutants of flight-gpu.html. ALL 4 RED -- the shafts' fog made without the lighting, the live switch ignored, the switch inverted,
+// the shafts off by default. BEFORE THE SABOTAGE the section found the first framing wrong: from the orbit a ship's 50-unit shadow crosses a ray for 50 units of 12000 and
+// changes nothing; looking past a ship toward the sun its shadow runs along the rays, and the shafts show.

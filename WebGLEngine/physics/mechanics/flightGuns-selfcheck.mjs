@@ -196,5 +196,33 @@ console.log("\n7. THE FRONT DOOR");
     ok("GUN is frozen with the numbers the header gives: 300 m/s, 15 a second, 300 rounds, boresight -0.05, a 2 s life, a 4 m sphere, 20 hit points of 1 damage", Object.isFrozen(G.GUN) && G.GUN.muzzleSpeed === 300 && G.GUN.rate === 15 && G.GUN.magazine === 300 && G.GUN.boresight === -0.05 && G.GUN.life === 2 && G.GUN.hitRadius === 4 && G.GUN.damage === 1 && G.GUN.hp === 20 && G.GRAVITY === F.GRAVITY);
 }
 
+// THE EARLY REJECT IN stepRounds IS SPEED AND NOTHING ELSE (2026-11-26): stepRounds skips sweepHit for a target the round provably cannot reach this tick. Held here by
+// the result it must equal -- every round stepped once by hand and sweepHit asked about EVERY target -- over rounds and targets drawn to graze each other: half the
+// targets put a hair inside or outside the round's reach, so a reject with no margin, or one too wide, changes a hit. SABOTAGED: the reject with half the radius and
+// no margin -> RED here (it was red only in brain/battleshipDuel-selfcheck.mjs's pinned fights before this row).
+{
+    let seed = 20261126; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    let cases = 0, same = 0, hitsSeen = 0;
+    for (let n = 0; n < 4000; n++) {
+        const r = { pos: [rnd() * 40 - 20, rnd() * 40 - 20, rnd() * 40 + 5], vel: [rnd() * 600 - 300, rnd() * 600 - 300, rnd() * 600 - 300], age: 0, owner: 0 }, dt = 1 / 30;
+        const nxt = G.stepRound(r, dt), targets = [];
+        for (let k = 0; k < 6; k++) {
+            const radius = 1 + rnd() * 6, f = rnd(), on = [0, 1, 2].map((i) => r.pos[i] + (nxt.pos[i] - r.pos[i]) * f);
+            // half the targets sit at the round's segment pushed out by radius x (1 +/- a hair), the rest anywhere near
+            const dir = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], dl = Math.hypot(...dir), edge = radius * (k % 2 ? 1 + 1e-7 * (rnd() - 0.5) : 0.5 + rnd());
+            const from = k < 3 ? on.map((v, i) => v + dir[i] / dl * edge) : [rnd() * 60 - 30, rnd() * 60 - 30, rnd() * 60];
+            const vel = [rnd() * 40 - 20, rnd() * 40 - 20, rnd() * 40 - 20];
+            targets.push({ id: k + 1, from, to: from.map((v, i) => v + vel[i] * dt), radius });
+        }
+        let best = null;
+        for (const tg of targets) { const t = G.sweepHit(r.pos, nxt.pos, tg.from, tg.to, tg.radius); if (t !== null && (best === null || t < best.t)) best = { t, target: tg.id }; }
+        const got = G.stepRounds([r], dt, targets, { ground: null }), h = got.hits[0] || null;
+        cases++; if (best) hitsSeen++;
+        if ((best === null && h === null) || (best && h && h.target === best.target && h.t === best.t)) same++;
+    }
+    ok("!! stepRounds' hits are sweepHit's over every target, exactly (the same target, the same t to the bit) -- 4,000 rounds against six targets each, half of them a hair from the round's reach: the early reject is speed and changes nothing",
+        same === cases && hitsSeen > 200, `${same} of ${cases} the same, ${hitsSeen} with a hit`);
+}
+
 console.log(fails ? `\nflightGuns-selfcheck: ${fails} FAILED` : "\nflightGuns-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

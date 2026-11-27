@@ -50,6 +50,12 @@ import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 // kept as the falsification's home and the launch sites still pass what it returns (nothing). The remedy that
 // IS measured to work is named by dxcAdvice, below, at the site where the symptom is actually seen.
 import { launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
+// 2026-11-27 -- ARRAYS CROSS THE PAGE BOUNDARY AS BASE64. page.evaluate serialises its argument and its result as JSON, and a JSON array of numbers
+// costs about 1.2 s a megabyte each way (measured: 2.3 million bytes as numbers, 10.5 s in and 11.4 s out). Storage words, source images, textures and
+// read-backs go as one base64 string and are turned back here into exactly what a caller got before (an Array of numbers), so no caller changes.
+const b64Of = (t) => Buffer.from(t.buffer, t.byteOffset, t.byteLength).toString("base64");
+const bytesOfB64 = (t) => new Uint8Array(Buffer.from(t, "base64"));   // a copy, on an aligned buffer of its own
+const f32sOfB64 = (t) => Array.from(new Float32Array(bytesOfB64(t).buffer));
 const LAUNCH_ENV = launchEnv();
 
 // *** WINDOWS NEEDS A SECOND FLAG, MEASURED ON KEITH'S RIG, NOT GUESSED. *** --enable-unsafe-webgpu alone is
@@ -212,6 +218,7 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
 // and its argument. Re-indented from runWgslCompute's inline body; the statements are that body's, plus the session
 // cache (see `S`) -- one implementation of what a run does, so the two entry points cannot drift apart.
 async function pageRun(a) {
+    const FROMB64 = (t) => { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }, TOB64 = (u) => { let t = ""; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };   // arrays cross the page boundary as base64 (2026-11-27: JSON arrays cost ~1.2 s a megabyte)
             // v4814: a SESSION (a.session) keeps one adapter and device in the page and compiles each distinct shader
             // once; a one-shot call keeps none, exactly as before. Nothing else in this body knows which it is.
             const S = a.session ? (globalThis.__swekWgsl ||= { dev: null, adapter: null, lost: false, mods: new Map(), pipes: new Map() }) : null;
@@ -258,7 +265,7 @@ async function pageRun(a) {
             // v4465 -- outInit: starting contents for a kernel that works in place on binding 0 (headlessGpu takes the same).
             // v4572 -- the same sentinel fill the native harness uses, so "nothing ran" is a reading here too
             // and a liveness failure on one side does not read as a DIVERGENCE between the two.
-            if (a.outInit) dev.queue.writeBuffer(outBuf, 0, new Uint32Array(a.outInit).subarray(0, a.outCount));
+            if (a.outInit || a.outInitB64) dev.queue.writeBuffer(outBuf, 0, (a.outInitB64 ? new Uint32Array(FROMB64(a.outInitB64).buffer) : new Uint32Array(a.outInit)).subarray(0, a.outCount));
             else dev.queue.writeBuffer(outBuf, 0, new Float32Array(a.outCount).fill(a.sentinel));
             const readBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -273,7 +280,7 @@ async function pageRun(a) {
             // v4457 -- read-only storage inputs, the same option headlessGpu.runWgslComputeNative takes, so the
             // two harnesses keep one signature (crossBackend-selfcheck's corpus depends on that).
             for (const inp of a.inputs || []) {
-                const words = new Uint32Array(inp.words);
+                const words = inp.wordsB64 ? new Uint32Array(FROMB64(inp.wordsB64).buffer) : new Uint32Array(inp.words);
                 const b = dev.createBuffer({ size: words.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
                 dev.queue.writeBuffer(b, 0, words);
                 entries.push({ binding: inp.binding, resource: { buffer: b } });
@@ -296,13 +303,13 @@ async function pageRun(a) {
                 reason: "the device REJECTED this run -- an empty read-back is not a measurement",
                 errors: [String(validation.message || validation).slice(0, 300)] };
             await readBuf.mapAsync(GPUMapMode.READ);
-            const values = Array.from(new Float32Array(readBuf.getMappedRange()));
+            const vals = new Float32Array(readBuf.getMappedRange().slice(0));
             readBuf.unmap();
             // a session runs hundreds of calls on one device, so each call's buffers go when it is done with them
             if (S) for (const b of [outBuf, readBuf, uniBuf, ...entries.slice(uniBuf ? 2 : 1).map((e) => e.resource.buffer)]) try { b && b.destroy(); } catch {}
             const ai = adapter.info || {};
-            return { ok: true, values, errors: [],
-                     wroteNothing: !a.outInit && a.outCount > 0 && values.every((v) => v === a.sentinel),
+            return { ok: true, valuesB64: TOB64(new Uint8Array(vals.buffer)), errors: [],
+                     wroteNothing: !a.outInit && !a.outInitB64 && a.outCount > 0 && vals.every((v) => v === a.sentinel),
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
         }
@@ -353,10 +360,10 @@ export async function openWgslSession({ launchArgs = null, timeoutMs = 60000, ru
                 const ev = page.evaluate((a) => globalThis.__swekRun(a), {
                     code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
                     outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: true, probe,
-                    inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
-                    outInit: outInit ? Array.from(storageWords(outInit)) : null });
+                    inputs: inputs ? inputs.map((i) => ({ binding: i.binding, wordsB64: b64Of(storageWords(i.data)) })) : null,
+                    outInitB64: outInit ? b64Of(storageWords(outInit)) : null });
                 const out = await Promise.race([ev, new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error("timeout"), { timeout: true })), runTimeoutMs); })]);
-                return { skipped: false, errors: [], values: [], ...out };
+                return { skipped: false, errors: [], values: [], ...out, ...(out.valuesB64 !== undefined ? { values: f32sOfB64(out.valuesB64), valuesB64: undefined } : {}) };
             } catch (e) {
                 if (e && e.timeout) {
                     process.stderr.write(`[wgsl-session] run ${n} did not return in ${runTimeoutMs} ms -- session dropped` +
@@ -419,10 +426,10 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
         if (trace) trace.launched = Date.now();
         const out = await page.evaluate(pageRun, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
              outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: false,
-             inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
-             outInit: outInit ? Array.from(storageWords(outInit)) : null });
+             inputs: inputs ? inputs.map((i) => ({ binding: i.binding, wordsB64: b64Of(storageWords(i.data)) })) : null,
+             outInitB64: outInit ? b64Of(storageWords(outInit)) : null });
         if (trace) trace.ran = Date.now();
-        return { skipped: false, errors: [], values: [], ...out };
+        return { skipped: false, errors: [], values: [], ...out, ...(out.valuesB64 !== undefined ? { values: f32sOfB64(out.valuesB64), valuesB64: undefined } : {}) };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
     } finally {
@@ -479,6 +486,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
         const page = await browser.newPage();
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         const out = await page.evaluate(async (a) => {
+            const FROMB64 = (t) => { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }, TOB64 = (u) => { let t = ""; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };   // arrays cross the page boundary as base64 (2026-11-27: JSON arrays cost ~1.2 s a megabyte)
             if (!navigator.gpu) return { ok: false, reason: "navigator.gpu absent on a secure origin" };
             const adapter = await navigator.gpu.requestAdapter();
             if (!adapter) return { ok: false, reason: "requestAdapter() returned null" };
@@ -492,7 +500,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
             const n2 = a.srcSize;
             const tex = d.createTexture({ size: [n2, n2], format: "rgba8unorm",
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
-            d.queue.writeTexture({ texture: tex }, new Uint8Array(a.src), { bytesPerRow: n2 * 4 },
+            d.queue.writeTexture({ texture: tex }, FROMB64(a.srcB64), { bytesPerRow: n2 * 4 },
                                  { width: n2, height: n2 });
             const samp = d.createSampler({ magFilter: "nearest", minFilter: "nearest",
                                            addressModeU: "repeat", addressModeV: "repeat" });
@@ -522,13 +530,14 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
                                     { width: a.width, height: a.height });
             d.queue.submit([enc.finish()]);
             await rb.mapAsync(GPUMapMode.READ);
-            const px = Array.from(new Uint8Array(rb.getMappedRange()));
+            const px = TOB64(new Uint8Array(rb.getMappedRange()));
             rb.unmap();
             const ai = adapter.info || {};
-            return { ok: true, pixels: px, bytesPerRow: bpr,
+            return { ok: true, pixelsB64: px, bytesPerRow: bpr,
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null } };
-        }, { code, width, height, srcSize: n, src: Array.from(src),
+        }, { code, width, height, srcSize: n, srcB64: b64Of(src),
              uniforms: uniforms ? Array.from(uniforms) : null });
+        if (out.pixelsB64 !== undefined) { out.pixels = Array.from(bytesOfB64(out.pixelsB64)); delete out.pixelsB64; }
         return { skipped: false, errors: [], ...out, source: src };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
@@ -597,7 +606,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             const px2 = gen2(x, y, n), i = (y * n + x) * 4;
             buf[i] = px2[0]; buf[i + 1] = px2[1]; buf[i + 2] = px2[2]; buf[i + 3] = px2[3];
         }
-        texData[nm] = Array.from(buf);
+        texData[nm] = b64Of(buf);
     }
 
     // v4612 -- task #35's own gate found this the hard way: a WHILE-LOOP shader (tools/ship/precisionProbe-
@@ -614,6 +623,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         const page = await browser.newPage();
         let timer = null;
         const out = await Promise.race([page.evaluate(async (a) => {
+            const FROMB64 = (t) => { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }, TOB64 = (u) => { let t = ""; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };   // arrays cross the page boundary as base64 (2026-11-27: JSON arrays cost ~1.2 s a megabyte)
             const c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
             const gl = c.getContext("webgl2", { preserveDrawingBuffer: true });
             if (!gl) return { ok: false, reason: "no webgl2 context" };
@@ -638,7 +648,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             // this comparison exists to pin down; leaving it on here would silently re-flip the source.
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, a.srcSize, a.srcSize, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-                          new Uint8Array(a.src));
+                          FROMB64(a.srcB64));
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -665,7 +675,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
                 gl.bindTexture(gl.TEXTURE_2D, t);
                 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, a.srcSize, a.srcSize, 0, gl.RGBA,
-                              gl.UNSIGNED_BYTE, new Uint8Array(data));
+                              gl.UNSIGNED_BYTE, FROMB64(data));
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -713,9 +723,9 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             // because a uniformly black frame is a legitimate answer for some shaders.
             const seen = new Set();
             for (let i = 0; i < px.length; i += 4) seen.add((px[i] << 16) | (px[i + 1] << 8) | px[i + 2]);
-            return { ok: true, pixels: Array.from(px), renderer: gl.getParameter(gl.RENDERER), unresolved,
+            return { ok: true, pixelsB64: TOB64(px), renderer: gl.getParameter(gl.RENDERER), unresolved,
                      distinctColours: seen.size, uniformErrors };
-        }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
+        }, { vertex, fragment, width, height, srcSize: n, srcB64: b64Of(src),
              uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
              uniformVecs: uniformVecs || {}, textures: texData, uniformArrays: uniformArrays || {},
              uniformInts: uniformInts || {} }),
@@ -724,6 +734,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         ]);
         clearTimeout(timer);
         if (!out.ok) return { skipped: false, ...out };
+        out.pixels = bytesOfB64(out.pixelsB64); delete out.pixelsB64;
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);
         for (let y = 0; y < height; y++) {
@@ -789,6 +800,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         const out = await page.evaluate(async (a) => {
+            const FROMB64 = (t) => { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }, TOB64 = (u) => { let t = ""; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };   // arrays cross the page boundary as base64 (2026-11-27: JSON arrays cost ~1.2 s a megabyte)
             const THREE = await import("/vendor/three/three.module.js");
             const mod = await import(a.passModule);
             const make = mod[a.passFactory];
@@ -796,7 +808,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
             const canvas = document.createElement("canvas"); canvas.width = a.width; canvas.height = a.width;
             const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
             renderer.setSize(a.width, a.width, false);
-            const tex = new THREE.DataTexture(new Uint8Array(a.src), a.srcSize, a.srcSize, THREE.RGBAFormat);
+            const tex = new THREE.DataTexture(FROMB64(a.srcB64), a.srcSize, a.srcSize, THREE.RGBAFormat);
             tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
             tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
             tex.flipY = a.flipY;
@@ -811,9 +823,10 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
             renderer.render(pass.scene, pass.camera);
             const px = new Uint8Array(a.width * a.width * 4);
             renderer.readRenderTargetPixels(rt, 0, 0, a.width, a.width, px);
-            return { ok: true, pixels: Array.from(px), revision: THREE.REVISION, flipY: tex.flipY };
-        }, { passModule, passFactory, width, srcSize: n, src: Array.from(src), time, uniforms, flipY });
+            return { ok: true, pixelsB64: TOB64(px), revision: THREE.REVISION, flipY: tex.flipY };
+        }, { passModule, passFactory, width, srcSize: n, srcB64: b64Of(src), time, uniforms, flipY });
         if (!out.ok) return { skipped: false, ...out, pageErrors };
+        out.pixels = bytesOfB64(out.pixelsB64); delete out.pixelsB64;
         const flipped = new Uint8Array(width * width * 4);
         for (let y = 0; y < width; y++) {
             const srcRow = (width - 1 - y) * width * 4;
@@ -863,7 +876,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
             const p = inputTexel(x, y, n);
             for (let c = 0; c < 4; c++) u[(y * n + x) * 4 + c] = enc16(p[c]);
         }
-        inputBits = Array.from(u);
+        inputBits = b64Of(u);
     }
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
@@ -884,6 +897,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
         page.setDefaultTimeout(timeoutMs);
         await page.goto(url);
         const out = await page.evaluate(async (a) => {
+            const FROMB64 = (t) => { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }, TOB64 = (u) => { let t = ""; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };   // arrays cross the page boundary as base64 (2026-11-27: JSON arrays cost ~1.2 s a megabyte)
             if (!navigator.gpu) return { ok: false, reason: "navigator.gpu undefined" };
             const adapter = await navigator.gpu.requestAdapter();
             if (!adapter) return { ok: false, reason: "requestAdapter() returned null" };
@@ -908,7 +922,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
             if (a.inputBits) {
                 const src = dev.createTexture({ size: [a.n, a.n], format: "rgba16float",
                     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
-                dev.queue.writeTexture({ texture: src }, new Uint16Array(a.inputBits),
+                dev.queue.writeTexture({ texture: src }, new Uint16Array(FROMB64(a.inputBits).buffer),
                     { bytesPerRow: a.n * 8 }, [a.n, a.n]);
                 entries.push({ binding: 2, resource: src.createView() });
             }
@@ -939,11 +953,12 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
             const raw = new Uint8Array(readBuf.getMappedRange()).slice();
             readBuf.unmap();
             const ai = adapter.info || {};
-            return { ok: true, raw: Array.from(raw), bytesPerRow, errors: errs,
+            return { ok: true, rawB64: TOB64(raw), bytesPerRow, errors: errs,
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null } };
         }, { code, entryPoint, n, format, uniforms: uniforms ? Array.from(uniforms) : null, workgroups,
              inputBits });
         if (!out.ok) return { skipped: false, pixels: null, ...out };
+        if (out.rawB64 !== undefined) { out.raw = Array.from(bytesOfB64(out.rawB64)); delete out.rawB64; }
 
         // Decode ROW BY ROW, because copyTextureToBuffer pads every row up to a 256-byte multiple and the
         // padding is not pixels. Reading it as a flat array would shear the image by a few texels per row --

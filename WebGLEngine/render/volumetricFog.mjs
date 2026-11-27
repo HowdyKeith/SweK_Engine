@@ -22,9 +22,21 @@
 //   samples the sun's cascaded shadow at every step, so the sun's share of the light scattered there is cut where the sun is hidden: the fog behind a pillar, seen from the
 //   side, is darker -- shafts. The light added over a step is then T * albedo * (phase * lightColor * visible + ambient) * (1 - e^-tau), summed step by step (it no longer
 //   telescopes; with nothing hidden it is the same sum). The fog's lightDir should be the sun's (towards it). fogCPU(params, { ..., shadowOf(p) }) is the same march on the CPU.
-// Held by tools/ship/volumetricFog-selfcheck.mjs; the shafts by tools/ship/softShadows-selfcheck.mjs.
+// THE SHADOW GAPS CLOSED (2026-11-27, Keith's "close the shadow gaps"): (1) the shafts on WebGL2 too: createFogGL(gl, { lighting }) with a createClusteredLighting object;
+//   (2) SPOT LIGHTS IN THE FOG -- searchlight beams: with `lighting`, every spot light (up to MAX_FOG_LIGHTS, in the lights' order; `fogLights` names others, [] none) adds its
+//   in-scattering at every step -- its radiance there (range window, cone, cookie) times its own shadow times the phase toward it (clusteredLights' clInScatter) -- so its
+//   cone shows in the haze and a pillar in the cone leaves a dark wedge. The light added over a step is T * albedo * (phase * lightColor * sunVisible + ambient + spots) *
+//   (1 - e^-tau). fogCPU(params, { ..., shadowOf(p), localOf(p) }) is the march on the CPU (localOf(p) the spots' sum at p, per unit of scattering).
+// Held by tools/ship/volumetricFog-selfcheck.mjs; the shafts and spots by tools/ship/softShadows-selfcheck.mjs.
 "use strict";
-import { clusteredWGSL } from "./clusteredLights.mjs";
+import { clusteredWGSL, CLUSTERED_GLSL } from "./clusteredLights.mjs";
+
+export const MAX_FOG_LIGHTS = 8;
+/** The lights the fog marches: `fogLights` as given, else every spot light, at most MAX_FOG_LIGHTS. */
+export function fogLightsOf(lights, fogLights = null) {
+    const idx = fogLights ?? lights.map((l, i) => (l.type === "spot" ? i : -1)).filter((i) => i >= 0);
+    return idx.slice(0, MAX_FOG_LIGHTS);
+}
 
 export const FOG_DEFAULTS = Object.freeze({ density: 0.08, falloff: 2.5, baseHeight: 0, up: "y", albedo: 0.9, ambient: [0.55, 0.62, 0.72], lightDir: [0.35, 0.8, 0.45], lightColor: [1.0, 0.92, 0.78], g: 0.6, maxDistance: 80, steps: 32, jitter: true });
 const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -38,11 +50,14 @@ export function sourceOf(P, dir) { const c = dir[0] * P.L[0] + dir[1] * P.L[1] +
 const sigmaAt = (P, h) => (P.falloff > 0 ? P.density * Math.exp(-Math.max(0, h - P.baseHeight) / P.falloff) : P.density);
 
 /** The CPU twin of the shaders. `origin` the eye; `dir` unit; `distance` to the surface (clamped to maxDistance); `color` the scene's [r, g, b] in 0..1. */
-export function fogCPU(params, { origin, dir, distance, color, px = 0, py = 0, shadowOf = null }) {
+export function fogCPU(params, { origin, dir, distance, color, px = 0, py = 0, shadowOf = null, localOf = null }) {
     const P = with_(params), d = Math.min(distance, P.maxDistance), n = P.steps, dt = d / n, j = P.jitter ? ign(px, py) : 0.5, k = P.up === "z" ? 2 : 1;
-    if (shadowOf) {   // the shafts' march: the sun's share at each step times how much of the sun that step sees
+    if (shadowOf || localOf) {   // the shafts' march: the sun's share at each step times how much of the sun that step sees, plus the spots' light there
         const c = dir[0] * P.L[0] + dir[1] * P.L[1] + dir[2] * P.L[2], ph = phaseHG(c, P.g) * 4 * Math.PI; let T = 1; const acc = [0, 0, 0];
-        for (let i = 0; i < n; i++) { const s = (i + j) * dt, a = Math.exp(-sigmaAt(P, origin[k] + dir[k] * s) * dt), vis = shadowOf([0, 1, 2].map((q) => origin[q] + dir[q] * s)); for (let q = 0; q < 3; q++) acc[q] += T * (ph * P.lightColor[q] * vis + P.ambient[q]) * (1 - a); T *= a; }
+        for (let i = 0; i < n; i++) {
+            const s = (i + j) * dt, a = Math.exp(-sigmaAt(P, origin[k] + dir[k] * s) * dt), p = [0, 1, 2].map((q) => origin[q] + dir[q] * s), vis = shadowOf ? shadowOf(p) : 1, loc = localOf ? localOf(p) : [0, 0, 0];
+            for (let q = 0; q < 3; q++) acc[q] += T * (ph * P.lightColor[q] * vis + P.ambient[q] + loc[q]) * (1 - a); T *= a;
+        }
         return [0, 1, 2].map((q) => color[q] * T + P.albedo * acc[q]);
     }
     let tau = 0;
@@ -89,11 +104,20 @@ void main() {
     outColor = vec4(scene * T + uFog.w * S * (1.0 - T), 1.0);
 }`;
 
-export function createFogGL(gl) {
+/** The WebGL2 fog with the sun's shadow and the spots at every step (render/clusteredLights.mjs's CLUSTERED_GLSL, bound by the lighting object from texture unit 2). */
+export const FOG_SHAFTS_FS_GLSL = FOG_FS_GLSL.replace("precision highp float;", `precision highp float; precision highp int;
+${CLUSTERED_GLSL}
+uniform int uFogLights[${MAX_FOG_LIGHTS}]; uniform int uFogLightCount;`).replace(/    float T = exp\(-tau\)[\s\S]*?outColor = vec4\(scene \* T \+ uFog\.w \* S \* \(1\.0 - T\), 1\.0\);/, `    float c = dot(dir, normalize(uLightDir)), g = uFog2.x, ph = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5); vec3 sunC = ph * uLightColor;
+    float T = 1.0; vec3 acc = vec3(0.0);
+    for (int i = 0; i < 256; i++) { if (i >= n) break; float s = (float(i) + j) * dt; float a = exp(-sigmaAt(h0 + v * s) * dt); vec3 q = uEye + dir * s; vec3 loc = vec3(0.0);
+        for (int k = 0; k < ${MAX_FOG_LIGHTS}; k++) { if (k >= uFogLightCount) break; loc += clInScatter(uFogLights[k], q, dir, g); }
+        acc += T * (sunC * clSunShadowAt(q) + uAmbient + loc) * (1.0 - a); T *= a; }
+    outColor = vec4(scene * T + uFog.w * acc, 1.0);`).replace("    for (int i = 0; i < 256; i++) { if (i >= n) break; tau += sigmaAt(h0 + v * (float(i) + j) * dt) * dt; }\n", "");   // the march below takes the transmittance
+export function createFogGL(gl, { lighting = null, fogLights = null } = {}) {
     const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error("volumetricFog: " + gl.getShaderInfoLog(o)); return o; };
-    const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, FOG_VS_GLSL)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FOG_FS_GLSL)); gl.linkProgram(prog);
+    const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, FOG_VS_GLSL)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, lighting ? FOG_SHAFTS_FS_GLSL : FOG_FS_GLSL)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("volumetricFog: " + gl.getProgramInfoLog(prog));
-    const U = Object.fromEntries(UNIFORMS.map((n) => [n, gl.getUniformLocation(prog, n)])), vao = gl.createVertexArray();
+    const U = Object.fromEntries(UNIFORMS.map((n) => [n, gl.getUniformLocation(prog, n)])), vao = gl.createVertexArray(), uFL = gl.getUniformLocation(prog, "uFogLights"), uFLN = gl.getUniformLocation(prog, "uFogLightCount");
     return {
         draw({ colorTex, depthTex, invViewProj, eye, params = {}, zRange = "gl" }) {
             const P = with_(params);
@@ -105,6 +129,7 @@ export function createFogGL(gl) {
             gl.uniform4f(U.uFog, P.density, P.falloff, P.baseHeight, P.albedo); gl.uniform4f(U.uFog2, P.g, P.maxDistance, P.up === "z" ? 1 : 0, P.jitter ? 1 : 0);
             gl.uniform3fv(U.uAmbient, Float32Array.from(P.ambient)); gl.uniform3fv(U.uLightDir, Float32Array.from(P.L)); gl.uniform3fv(U.uLightColor, Float32Array.from(P.lightColor));   // the phase in the shader is 4 pi times Henyey-Greenstein's (isotropic is 1), as sourceOf's
             gl.uniform2f(U.uSteps, P.steps, zRange === "zo" ? 1 : 0);
+            if (lighting) { lighting.bind(prog, 2); const fl = fogLightsOf(lighting.lights, fogLights), a = new Int32Array(MAX_FOG_LIGHTS); a.set(fl); gl.uniform1iv(uFL, a); gl.uniform1i(uFLN, fl.length); }
             gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null); gl.activeTexture(gl.TEXTURE0);
         },
         destroy() { gl.deleteProgram(prog); gl.deleteVertexArray(vao); },
@@ -116,11 +141,14 @@ export const FOG_WGSL = fogWGSL();
 export function fogWGSL({ shafts = false } = {}) { return `${shafts ? `${clusteredWGSL({ group: 1 })}
 fn fogSun(p: vec3f) -> f32 {
     _ = arrayLength(&clCells); _ = clCookieSampler; _ = textureDimensions(clCookies);   // unread here but bound: the auto layout keeps every binding of the group
-    if (clP.sun.x < 0.0) { return 1.0; }
-    let l = clLights[u32(clP.sun.x)];
-    return clShadow(p, vec3f(0.0), -l.dirCosOuter.xyz, vec3f(0.0), true, u32(l.cosInnerFaces.y), u32(l.cosInnerFaces.z));
+    return clSunShadowAt(p);
+}
+fn fogSpots(p: vec3f, dir: vec3f, g: f32) -> vec3f {
+    var loc = vec3f(0.0);
+    for (var k = 0; k < i32(U.steps.z); k++) { let v4 = select(U.fogLightsB, U.fogLightsA, k < 4); loc += clInScatter(u32(v4[k & 3]), p, dir, g); }
+    return loc;
 }` : ""}
-struct FU { invViewProj: mat4x4f, eye: vec4f, fog: vec4f, fog2: vec4f, ambient: vec4f, lightDir: vec4f, lightColor: vec4f, steps: vec4f };
+struct FU { invViewProj: mat4x4f, eye: vec4f, fog: vec4f, fog2: vec4f, ambient: vec4f, lightDir: vec4f, lightColor: vec4f, steps: vec4f, fogLightsA: vec4f, fogLightsB: vec4f };   // steps = (steps, zo, fog light count, 0); then the fog lights' indices
 @group(0) @binding(0) var<uniform> U: FU;
 @group(0) @binding(1) var colorTex: texture_2d<f32>;
 @group(0) @binding(2) var depthTex: texture_depth_2d;
@@ -139,7 +167,7 @@ fn sigmaAt(h: f32) -> f32 { if (U.fog.y > 0.0) { return U.fog.x * exp(-max(0.0, 
     let zUp = U.fog2.z > 0.5; let h0 = select(U.eye.y, U.eye.z, zUp); let vv = select(dir.y, dir.z, zUp);
 ${shafts ? `    let c = dot(dir, U.lightDir.xyz); let g = U.fog2.x; let ph = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5); let sunC = ph * U.lightColor.rgb;
     var T = 1.0; var acc = vec3f(0.0);
-    for (var i = 0; i < n; i++) { let s = (f32(i) + j) * dt; let a = exp(-sigmaAt(h0 + vv * s) * dt); acc += T * (sunC * fogSun(U.eye.xyz + dir * s) + U.ambient.rgb) * (1.0 - a); T *= a; }
+    for (var i = 0; i < n; i++) { let s = (f32(i) + j) * dt; let a = exp(-sigmaAt(h0 + vv * s) * dt); let q = U.eye.xyz + dir * s; acc += T * (sunC * fogSun(q) + U.ambient.rgb + fogSpots(q, dir, g)) * (1.0 - a); T *= a; }
     return vec4f(scene * T + U.fog.w * acc, 1.0);` : `    var tau = 0.0;
     for (var i = 0; i < n; i++) { tau += sigmaAt(h0 + vv * (f32(i) + j) * dt) * dt; }
     let T = exp(-tau); let c = dot(dir, U.lightDir.xyz); let g = U.fog2.x; let ph = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5);
@@ -147,17 +175,17 @@ ${shafts ? `    let c = dot(dir, U.lightDir.xyz); let g = U.fog2.x; let ph = (1.
     return vec4f(scene * T + U.fog.w * S * (1.0 - T), 1.0);`}
 }`; }
 
-export function createFogGPU(device, format, { lighting = null } = {}) {
-    const BU = globalThis.GPUBufferUsage, mod = device.createShaderModule({ code: lighting ? fogWGSL({ shafts: true }) : FOG_WGSL }), ubuf = device.createBuffer({ size: 176, usage: BU.UNIFORM | BU.COPY_DST });
+export function createFogGPU(device, format, { lighting = null, fogLights = null } = {}) {
+    const BU = globalThis.GPUBufferUsage, mod = device.createShaderModule({ code: lighting ? fogWGSL({ shafts: true }) : FOG_WGSL }), ubuf = device.createBuffer({ size: 208, usage: BU.UNIFORM | BU.COPY_DST });
     const pipe = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return {
-        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo" }) {
-            const P = with_(params), u = new Float32Array(44);
+        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo", timer = null }) {   // timer: render/gpuTimer.mjs's, the pass under "fog"
+            const P = with_(params), u = new Float32Array(52), fl = lighting ? fogLightsOf(lighting.lights, fogLights) : [];
             u.set(invViewProj, 0); u.set([...eye, 0], 16); u.set([P.density, P.falloff, P.baseHeight, P.albedo], 20); u.set([P.g, P.maxDistance, P.up === "z" ? 1 : 0, P.jitter ? 1 : 0], 24);
-            u.set([...P.ambient, 0], 28); u.set([...P.L, 0], 32); u.set([...P.lightColor, 0], 36); u.set([P.steps, zRange === "zo" ? 1 : 0, 0, 0], 40);
+            u.set([...P.ambient, 0], 28); u.set([...P.L, 0], 32); u.set([...P.lightColor, 0], 36); u.set([P.steps, zRange === "zo" ? 1 : 0, fl.length, 0], 40); u.set(fl, 44);
             device.queue.writeBuffer(ubuf, 0, u);
             const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }, { binding: 1, resource: colorView }, { binding: 2, resource: depthView }] });
-            const pass = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: "clear", clearValue: [0, 0, 0, 1], storeOp: "store" }] });
+            const pass = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: "clear", clearValue: [0, 0, 0, 1], storeOp: "store" }], ...(timer ? { timestampWrites: timer.writes("fog") } : {}) });
             pass.setPipeline(pipe); pass.setBindGroup(0, bg); if (lighting) pass.setBindGroup(1, lighting.bindGroupFor(pipe, 1)); pass.draw(3); pass.end();
         },
         destroy() { ubuf.destroy(); },

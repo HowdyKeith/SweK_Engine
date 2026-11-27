@@ -20,15 +20,19 @@ import { createCameraControls, bindCameraControls } from "./render/cameraControl
 import { perspective, lookAt } from "./render/gpuDriven.mjs";
 import { createClusteredLightingGPU, clusteredWGSL, ZO, makeCookieAtlas } from "./render/clusteredLights.mjs";
 import { sceneOf } from "./render/lightsDemoScene.mjs";
-import { createFogGPU } from "./render/volumetricFog.mjs";   // ?fog=1: the moonlit haze, with shafts (&shafts=0 without)
+import { createFogGPU } from "./render/volumetricFog.mjs";   // ?fog=1: the moonlit haze, with the moon's shafts and the spot lights' beams (&shafts=0 neither; &spots=0 no beams)
 import { mat4Invert } from "./render/motionVectors.mjs";
+import { createGpuTimer } from "./render/gpuTimer.mjs";   // 2026-11-27: each pass on the card's own clock (shadows, lit, fog) where the adapter offers timestamps; ?gputimer=0 none
 
 const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsGpu = { ready: false, frames: 0, error: null };
 const fail = (m) => { state.error = m; document.getElementById("stats").textContent = "· " + m; throw new Error(m); };
 if (!navigator.gpu) { const W = await import("./ui/webgpuProbe.mjs"), P = W.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location }); if (P.reason === "insecure-origin") W.showOriginBanner(P); fail(P.message); }   // the origin may be what withheld it (ui/webgpuProbe.mjs)
 const adapter = await navigator.gpu.requestAdapter(); if (!adapter) fail("no WebGPU adapter");
-const device = await adapter.requestDevice(), ctx = cv.getContext("webgpu"), FORMAT = "rgba8unorm";
+const wantTimer = Q.get("gputimer") !== "0" && adapter.features.has("timestamp-query");
+const device = await adapter.requestDevice(wantTimer ? { requiredFeatures: ["timestamp-query"] } : undefined), ctx = cv.getContext("webgpu"), FORMAT = "rgba8unorm";
 ctx.configure({ device, format: FORMAT, alphaMode: "opaque", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+const timer = createGpuTimer(device); state.gpuTimer = timer.supported ? "on" : Q.get("gputimer") === "0" ? "off" : "this adapter has no timestamp-query";
+state.adapter = (() => { const i = adapter.info || {}; return [i.vendor, i.architecture, i.description || i.device].filter(Boolean).join(" ") || "unknown"; })(); state.software = !!(adapter.info && /swiftshader|llvmpipe|basic render|warp/i.test(`${adapter.info.vendor} ${adapter.info.description} ${adapter.info.device} ${adapter.info.architecture}`)) || !!adapter.isFallbackAdapter;
 device.addEventListener?.("uncapturederror", (e) => { state.error = "WebGPU: " + e.error.message; });
 const mul4 = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
 
@@ -71,7 +75,7 @@ const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0
 state.capture = () => new Promise((res) => { state._want = res; });
 const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now();
 let last = performance.now(), depthTex = null, sceneTex = null;
-const fog = FOG ? createFogGPU(device, FORMAT, SHAFTS ? { lighting } : {}) : null;
+const fog = FOG ? createFogGPU(device, FORMAT, SHAFTS ? { lighting, ...(Q.get("spots") === "0" ? { fogLights: [] } : {}) } : {}) : null;
 async function frame() {
     const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
     const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
@@ -82,14 +86,15 @@ async function frame() {
     state.viewProj = Array.from(vpGL); state.eye = pose.eye;   // the GL-style matrix, as lights-demo.html reports it: the gate reads both pages one way
     device.queue.writeBuffer(camBuf, 0, new Float32Array([...vp, ...pose.eye, 0]));
     const enc = device.createCommandEncoder();
-    lighting.renderShadows(enc, (pass, face) => { pass.setPipeline(depthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, vbuf); pass.draw(36, objects.length); });
-    const tex = ctx.getCurrentTexture(), pass = enc.beginRenderPass({ colorAttachments: [{ view: FOG ? sceneTex.createView() : tex.createView(), loadOp: "clear", clearValue: [0.027, 0.035, 0.055, 1], storeOp: "store" }], depthStencilAttachment: { view: depthTex.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" } });
+    lighting.renderShadows(enc, (pass, face) => { pass.setPipeline(depthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, vbuf); pass.draw(36, objects.length); }, { timer });
+    const tex = ctx.getCurrentTexture(), pass = enc.beginRenderPass({ colorAttachments: [{ view: FOG ? sceneTex.createView() : tex.createView(), loadOp: "clear", clearValue: [0.027, 0.035, 0.055, 1], storeOp: "store" }], depthStencilAttachment: { view: depthTex.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" }, ...(timer.supported ? { timestampWrites: timer.writes("lit") } : {}) });
     pass.setPipeline(lit); pass.setBindGroup(0, litBG0); pass.setBindGroup(1, litBG1); pass.setVertexBuffer(0, vbuf); pass.draw(36, objects.length); pass.end();
-    if (FOG) fog.encode(enc, tex.createView(), { colorView: sceneTex.createView(), depthView: depthTex.createView(), invViewProj: mat4Invert(vp), eye: pose.eye, params: FOG_PARAMS, zRange: "zo" });
+    if (FOG) fog.encode(enc, tex.createView(), { colorView: sceneTex.createView(), depthView: depthTex.createView(), invViewProj: mat4Invert(vp), eye: pose.eye, params: FOG_PARAMS, zRange: "zo", timer: timer.supported ? timer : null });
     let rb = null;
     if (state._want) { const row = 256 * Math.ceil(cv.width * 4 / 256); rb = { buf: device.createBuffer({ size: row * cv.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), row, w: cv.width, h: cv.height, res: state._want }; state._want = null; enc.copyTextureToBuffer({ texture: tex }, { buffer: rb.buf, bytesPerRow: row }, [cv.width, cv.height]); }
-    device.queue.submit([enc.finish()]);
-    if (rb) { await rb.buf.mapAsync(GPUMapMode.READ); const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), px = new Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w * 4; x++) px[y * rb.w * 4 + x] = raw[y * rb.row + x]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, px, topDown: true }); }
+    timer.finish(enc); device.queue.submit([enc.finish()]);
+    timer.collect().then((t) => { if (t.frames) { state.gpuTimes = Object.fromEntries(Object.entries(t.labels).map(([k, v]) => [k, +v.ms.toFixed(4)])); state.gpuTotal = +t.totalMs.toFixed(4); state.gpuFrames = t.frames; } });
+    if (rb) { await rb.buf.mapAsync(GPUMapMode.READ); const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), px = new Uint8Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w * 4; x++) px[y * rb.w * 4 + x] = raw[y * rb.row + x]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, b64: ((u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); })(px), topDown: true }); }   // base64: the pixels cross to the gate as one string
     if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights (${N} moving, ${lights.filter((l) => l.shadow).length} casting shadows) · ${stats.cells} cells · ${stats.faces} atlas tiles of 16 (the moon's ${stats.cascades} cascades among them) · ${stats.space === "view" ? "clusters fitted to the view" : "clusters over the lights"}${stats.unshadowed ? ` · ${stats.unshadowed} without a shadow` : ""}${stats.overflow ? ` · ${stats.overflow} over the cap` : ""}${Q.get("brute") === "1" ? " · every light, every pixel (brute)" : ""}`;
     state.frames++; if (state.frames >= 2) state.ready = true;
     requestAnimationFrame(frame);
