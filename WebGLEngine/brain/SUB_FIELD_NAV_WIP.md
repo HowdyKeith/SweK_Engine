@@ -1184,3 +1184,11 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **Predictions.** **F1**: the designated arm's ship collisions are fewer than the reference's. 65 percent. **F2**: its exits are at most the reference's plus 3 (the least-bad heading ignores the edge). 60 percent. **F3**: NO DIFFERENCE SHOWN. 55 percent; LEAST BEATS EDGE 35.
 
 **CORRECTION TO FOLLOW-UP 12'S REGISTRATION (2026-11-27, written before any of its code and before any seed is flown).** Its set, 9301 to 9360, lies inside `brain/subNavRoute.mjs`'s range(9301, 9500); the seed check printed after the registration was written. **HELD12 is seeds 9701 to 9760** (no file uses them). Nothing else in the registration changes.
+
+### DEV NOTE TO FOLLOW-UP 12 [SERIES B] (2026-11-27; made BEFORE HELD12 was flown; DEV is not a result and nothing registered above is changed)
+
+**Built:** `minClearArc`, `avoidHeadingArc`'s `least` option and the `any+predict+edge+avoid-arc-edge-least` arm; FOLLOW-UPS 8 to 10's arms untouched (their goldens unchanged). Gated in `brain/subAvoidNav-selfcheck.mjs` section 7 (8 mutants, every one red; L7, the plan's own heading left out of the comparison, went 0 red first and got a row).
+
+**DEV sanity run (seeds 1 to 30, both arms):** NOT degenerate -- the least-bad heading changes the flights (stuck ticks 4,924 against the reference's 8,653; the rule fires 21,042 times against 24,903) -- so no amendment. The reference reproduces FOLLOW-UP 10's DEV counts exactly (24,903 fires, 16,250 turns, 8,653 stuck). Read for sanity, not tuned on: the reference reached 26 of 30 (2 exits, 2 collisions, 1 with a ship); the least arm 23 of 30 (7 exits, no collision).
+
+**Nothing was tuned.** HELD12 (9701 to 9760) is flown once, both arms, to `brain/subAvoidHeld12.<part>.jsonl`, committed unread, then read once.
