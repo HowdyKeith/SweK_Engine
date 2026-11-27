@@ -12,7 +12,7 @@ import * as H from "./subHardNav.mjs";
 import * as A from "./subAvoidNav.mjs";
 import * as AP from "./autopilotSub.mjs";
 const pilot = (s, t, c) => AP.decide(s, t, c), model = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 }));
-const HOW = { "any+predict+edge+avoid-arc": "arc", "any+predict+edge+avoid-arc-edge": "arc-edge", "any+predict+edge+avoid-arc-edge-least": "arc-edge-least" };
+const HOW = { "any+predict+edge+avoid-arc": "arc", "any+predict+edge+avoid-arc-edge": "arc-edge", "any+predict+edge+avoid-arc-edge-least": "arc-edge-least", "any+predict+edge+avoid-arc-edge-least-edge": "arc-edge-least-edge" };
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a)), deg = (a) => Math.round(a * 180 / Math.PI);
 function trace(sc, armName) {   // flyAvoid's loop, with every tick kept
     const how = HOW[armName], arm = "any+predict+edge", spec = H.ARM_SPEC[arm], dt = S.DT, total = Math.round(H.SECONDS_HARD / dt), st = sc.start, every = Math.max(1, Math.round(H.REPLAN_S / dt)), mode = "predict";
@@ -24,7 +24,7 @@ function trace(sc, armName) {   // flyAvoid's loop, with every tick kept
         if (i > 0 && i % every === 0) field = H.buildLadderField(H.planShapes(sc, i * dt, { mode, blind: false, horizon: H.HORIZON_S }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder: H.MARGIN_LADDER, own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge });
         let target = H.hardTarget(arm, s, field, sc.goal, { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: sc.minDepth, yieldSpeed: H.YIELD_SPEED });
         const hc = S.attitude(s).heading, h0 = target.heading;
-        const a = A.avoidHeadingArc(s.pos[0], s.pos[1], i * dt, hc, h0, sc.obstacles, sc.minDepth, { edge: how !== "arc", least: how === "arc-edge-least" });
+        const a = A.avoidHeadingArc(s.pos[0], s.pos[1], i * dt, hc, h0, sc.obstacles, sc.minDepth, { edge: how !== "arc", least: how.startsWith("arc-edge-least"), leastEdge: how === "arc-edge-least-edge" });
         target = { ...target, heading: a.heading };
         T.push({ t: i * dt, x: s.pos[0], y: s.pos[1], hc, h0, h: a.heading, fired: a.fired, turned: a.turned, stuck: a.stuck,
             planShip: A.conflictArc(s.pos[0], s.pos[1], i * dt, hc, h0, sc.obstacles, sc.minDepth), planStatic: A.conflictArc(s.pos[0], s.pos[1], i * dt, hc, h0, sc.obstacles, sc.minDepth, { ships: false, statics: true }),
@@ -39,7 +39,8 @@ function trace(sc, armName) {   // flyAvoid's loop, with every tick kept
     }
     return { status, hit, ticks, path, T, end: { x: s.pos[0], y: s.pos[1] } };
 }
-const files = fs.readdirSync("brain").filter((f) => /^subAvoidHeld1[012]\.\d+\.jsonl$/.test(f)).sort();
+const SETS = process.argv[2] ? process.argv[2].split(",") : ["10", "11", "12"];   // node brain/subAvoidLossAudit.mjs 13 -> HELD13 (FOLLOW-UP 13)
+const files = fs.readdirSync("brain").filter((f) => SETS.some((n) => new RegExp(`^subAvoidHeld${n}\\.\\d+\\.jsonl$`).test(f))).sort();
 const recs = files.flatMap((f) => fs.readFileSync(`brain/${f}`, "utf8").trim().split("\n").map((l) => ({ set: f.split(".")[0].replace("subAvoid", ""), ...JSON.parse(l) })));
 const bySeed = {}; for (const r of recs) (bySeed[`${r.set}:${r.seed}`] ||= []).push(r);
 const losses = recs.filter((r) => !r.reached), rows = [], W = Math.round(10 / S.DT);
