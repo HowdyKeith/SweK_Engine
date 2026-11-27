@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/gpuTimerAuto-selfcheck.mjs",
- "at": "2026-11-24",
+ "at": "2026-11-27",
  "tables": [
   {
    "title": "the pages that carry the timer line, by class (read from the source, so it is written on a box with no browser too)",
@@ -140,6 +140,167 @@
     [
      "zoom-blur.html",
      "draws at load or every frame"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "the pages that carry the timer line (not the on-ask ones), as this run timed them",
+   "columns": [
+    "page",
+    "canvas",
+    "overlay"
+   ],
+   "rows": [
+    [
+     "avatarstage.html",
+     "600 x 357",
+     "GPU: idle; the last frame that drew took 79.45 ms"
+    ],
+    [
+     "benchmark.html",
+     "286 x 96",
+     "GPU 38.57 ms a frame on the card"
+    ],
+    [
+     "brain-room.html",
+     "600 x 380",
+     "GPU 41.97 ms a frame on the card"
+    ],
+    [
+     "bzflag.html",
+     "600 x 380",
+     "world         3.22 ms\nthe rest    202.28 ms\nGPU total   203.64 ms a frame"
+    ],
+    [
+     "camera-effects.html",
+     "600 x 380",
+     "GPU 30.40 ms a frame on the card"
+    ],
+    [
+     "comic-voxel-fire.html",
+     "600 x 380",
+     "GPU 33.10 ms a frame on the card"
+    ],
+    [
+     "cube.html",
+     "600 x 380",
+     "GPU 31.19 ms a frame on the card"
+    ],
+    [
+     "gallery.html",
+     "300 x 150",
+     "GPU: nothing drawn since the timer started (this page draws on a change)"
+    ],
+    [
+     "gizmo-demo.html",
+     "600 x 380",
+     "GPU 61.66 ms a frame on the card"
+    ],
+    [
+     "index.html",
+     "600 x 380",
+     "GPU: idle; the last frame that drew took 94.74 ms"
+    ],
+    [
+     "indexPlus.html",
+     "600 x 380",
+     "GPU: idle; the last frame that drew took 116.54 ms"
+    ],
+    [
+     "krbn-compare.html",
+     "920 x 560",
+     "GPU: idle; the last frame that drew took 1534.86 ms"
+    ],
+    [
+     "lights-demo.html",
+     "600 x 380",
+     "lit         318.44 ms\nshadows      15.99 ms\nthe rest   1335.40 ms\nGPU total  1434.89 ms a frame"
+    ],
+    [
+     "mesh-line.html",
+     "900 x 420",
+     "GPU 280.70 ms a frame on the card"
+    ],
+    [
+     "nebula.html",
+     "600 x 380",
+     "GPU 184.72 ms a frame on the card"
+    ],
+    [
+     "panels.html",
+     "300 x 150",
+     "GPU: idle; the last frame that drew took 2394.13 ms"
+    ],
+    [
+     "phone.html",
+     "572 x 480",
+     "GPU 36.07 ms a frame on the card"
+    ],
+    [
+     "pom-demo.html",
+     "560 x 560",
+     "GPU: idle; the last frame that drew took 1553.76 ms"
+    ],
+    [
+     "raymarch-gl-demo.html",
+     "640 x 440",
+     "GPU: idle; the last frame that drew took 1277.72 ms"
+    ],
+    [
+     "raymarch-live.html",
+     "720 x 420",
+     "march       386.10 ms\nboxes         8.57 ms\nthe rest    662.02 ms\nGPU total  1056.69 ms a frame"
+    ],
+    [
+     "rps.html",
+     "256 x 256",
+     "GPU 34.88 ms a frame on the card"
+    ],
+    [
+     "sinogram-gpu.html",
+     "256 x 180",
+     "GPU: idle; the last frame that drew took 1533.71 ms"
+    ],
+    [
+     "sky.html",
+     "720 x 420",
+     "GPU: idle; the last frame that drew took 1533.31 ms"
+    ],
+    [
+     "slug-text.html",
+     "600 x 462",
+     "GPU: idle; the last frame that drew took 1533.17 ms"
+    ],
+    [
+     "sphere-impostor.html",
+     "260 x 260",
+     "GPU: idle; the last frame that drew took 1537.21 ms"
+    ],
+    [
+     "volume-cache.html",
+     "460 x 320",
+     "GPU: idle; the last frame that drew took 0.02 ms"
+    ],
+    [
+     "voxel-viewer.html",
+     "480 x 135",
+     "GPU: idle; the last frame that drew took 632.03 ms"
+    ],
+    [
+     "water.html",
+     "600 x 262",
+     "scene       158.18 ms\ncaustics     27.15 ms\nsim           2.82 ms\nthe rest    150.74 ms\nGPU total   338.88 ms a frame"
+    ],
+    [
+     "wormhole-jump.html",
+     "600 x 380",
+     "GPU 507.98 ms a frame on the card"
+    ],
+    [
+     "zoom-blur.html",
+     "288 x 144",
+     "GPU 22.85 ms a frame on the card"
     ]
    ],
    "note": null

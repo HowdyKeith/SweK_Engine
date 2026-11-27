@@ -123,6 +123,15 @@ sec("5. THE SEARCH, THE RECORD AND THE LEDGER (a stub fitness)");
     ok("!! the ledger checks pass a complete ledger and name Round 42's 2,695-weight net and Round 42's seeds as wrong",
         X.ledgerChecks(recs).length === 0 && X.ledgerChecks([...recs.slice(0, 3), mk(3, { weightCount: 2695, weights: Array(2695).fill(0) })]).length > 0 && X.ledgerChecks([...recs.slice(0, 3), mk(3, { seed: 97703 })]).length > 0);
     ok("championWeights falls back to the start (the look-ahead net's hand weights) when nothing is eligible", JSON.stringify(Array.from(X.championWeights([]))) === JSON.stringify(Array.from(PC.createLookaheadPolicy().handWeights())));
+    // 2026-11-27 (the publish merge; definitionGates named recordOf, trainingLines, SEARCHES and the rest below as unmentioned by any gate).
+    const again = X.recordOf(2, lines, { Pol, sets, recipe, every });
+    ok("!! recordOf, given the search's own scored lines, is the record searchJob returned, field for field (the seed is search 2's, 97802)",
+        JSON.stringify(again) === JSON.stringify(rec) && again.seed === 97802 && again.weightCount === real.WEIGHT_COUNT, `chose child ${again.chosenAt}`);
+    const TL = X.trainingLines(recs);
+    ok("trainingLines heads with the round and its 35-input net, gives one line per search in search order, and ends on the champion",
+        X.SEARCHES === 4 && X.SEARCHES === X.SEARCH_SEEDS.length && X.SEARCH_SEEDS.join() === "97800,97801,97802,97803" && TL.length === X.SEARCHES + 2 &&
+        /^ROUND 43 TRAINING: 4 searches of the look-ahead circuit \(35 inputs\)/.test(TL[0]) && [0, 1, 2, 3].every((k) => TL[k + 1].startsWith(`  search ${k} (seed ${X.SEARCH_SEEDS[k]}): `)) && /^CHAMPION: /.test(TL.at(-1)),
+        TL.at(-1));
 }
 
 sec("6. THE TWO-ARM CHECKS AND THE BOTTOM LINE (V4 OR NOTHING)");
@@ -134,6 +143,10 @@ try {
     const same = res(shift(0), shift(0)), beat = res(shift(0.02), shift(0.02)), beatOne = res(shift(0.02), shift(0)), hurt = res(shift(-0.02), shift(0));
     ok("!! a net that only EQUALS the seat replaces NOTHING (unlike Round 42): the line names V4", /DOES NOT BEAT THE SEAT \(V4 /.test(X.bottomLine(same)) && /NOTHING IS REPLACED/.test(X.bottomLine(same)));
     ok("!! beating the seat at BOTH gauges replaces the profile; at one gauge it does not", X.bottomLine(beat) === "THE LOOK-AHEAD CIRCUIT BEATS THE SEAT: IT REPLACES THE AQUARIUM'S CIRCUIT PROFILE" && /NOTHING IS REPLACED/.test(X.bottomLine(beatOne)));
+    const vs = X.verdictsOf(same), vb = X.verdictsOf(beat), vo = X.verdictsOf(beatOne), vh = X.verdictsOf(hurt), vc = X.verdictsOf(res(shift(0.02), shift(0.02), { cb: 12 }));
+    ok("!! verdictsOf: equal to the seat clears V1-V3 and not V4; beating it at both gauges clears V4, at one gauge it does not; a hurt score fails V3 at REF; a worse hull under BIAS fails V1",
+        vs.v1 && vs.v2 && vs.v3 && !vs.v4 && vb.v1 && vb.v2 && vb.v3 && vb.v4 && !vo.v4 && !vh.v3ref && vh.v3bias && !vh.v3 && !vc.v1 && vc.v2 && vc.bad.NEW.BIAS === 12 && vc.bad["SEAT-04"].BIAS === 1 &&
+        X.COND_NAMES.join() === "REF,BIAS" && Object.keys(vs.bad.NEW).join() === "REF,BIAS");
     ok("!! a hurt score or a worse hull is named; a start champion is said so", /V3 the score at REF/.test(X.bottomLine(hurt)) && /V1 the hull under BIAS/.test(X.bottomLine(res(shift(0.02), shift(0.02), { cb: 12 }))) && /THE TRAINING BOUGHT NOTHING$/.test(X.bottomLine(same, { isStart: true })));
     const recsStart = [0, 1, 2, 3].map((k) => ({ k, seed: X.SEARCH_SEEDS[k], recipe: X.RECIPE, weightCount: 3619, weights: Array(3619).fill(0), checkpoints: X.CHECKPOINTS.map((at, i) => ({ at, heldOut: 0.9, draws: i + 1 })), chosen: 0, chosenAt: 0, heldOut: 0.9, poolCrashed: 0, start: { train: 0.8, heldOut: 0.9, poolCrashed: 0 } }));
     const eq = { NEW: same["SEAT-04"], "SEAT-04": same["SEAT-04"] }, row = (r) => X.checksOf(r, recsStart, { dives: n }).find((c) => c.name === "THE ARMS DIFFER");
@@ -146,6 +159,13 @@ sec("7. THE AUDIT AND THE COMMAND");
 {
     const r = X.auditJob("SEAT-04", "REF", 0, { range: [X.GATE_SEEDS[0], X.GATE_SEEDS[0]], seconds: 30 });
     ok("an audit job flies its arm on the chunk it names, and an unknown arm or condition is refused", r.runs.length === 1 && (() => { try { X.auditJob("CUR", "REF", 0); return false; } catch { } try { X.auditJob("NEW", "DROP", 0); return false; } catch { return true; } })());
+    const ch = [0, 1, 2, 3].map((j) => X.chunkRange(j)), throws = (f) => { try { f(); return false; } catch { return true; } };
+    ok("!! the audit is the registration's: 300 dives, seeds 57001-57300, in 4 chunks that tile them with no gap or overlap; a chunk outside 0-3 is refused; the job list is every arm, condition and chunk",
+        X.DIVES === 300 && X.SEEDS[1] - X.SEEDS[0] + 1 === X.DIVES && X.CHUNKS === 4 && ch[0][0] === 57001 && ch[3][1] === 57300 && ch.every((c, j) => j === 0 || c[0] === ch[j - 1][1] + 1) &&
+        ch.reduce((a, c) => a + c[1] - c[0] + 1, 0) === 300 && throws(() => X.chunkRange(4)) && throws(() => X.chunkRange(-1)) && X.chunkRange(0, [10, 12]).join() === "10,10" &&
+        X.AUDIT_JOBS.length === X.ARMS.length * X.COND_NAMES.length * X.CHUNKS, ch.map((c) => c.join("-")).join(", "));
+    ok("pilotOf: NEW needs the champion's weights and is built from them; SEAT-04 is the shipped seat's pilot; any other arm is refused",
+        throws(() => X.pilotOf("NEW")) && !!X.pilotOf("NEW", { weights: PC.createLookaheadPolicy().handWeights() }) && !!X.pilotOf("SEAT-04") && throws(() => X.pilotOf("CUR")));
     const CMD = path.join(HERE, "lookaheadCircuitCmd.mjs"), src = fs.readFileSync(CMD, "utf8"), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lookahead-circuit-"));
     try {
         fs.mkdirSync(path.join(tmp, "lookahead-circuit"));

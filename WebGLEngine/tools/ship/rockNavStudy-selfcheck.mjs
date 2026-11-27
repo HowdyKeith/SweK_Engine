@@ -276,6 +276,29 @@ row("29 THE COMMAND REFUSES ROUND F'S HELD BEFORE ITS DEV PASSES; ROUND F'S SETS
     return { ok: st === 2 && mine.length === 120 && new Set(mine).size === 120 && mine.every((x) => !earlier.includes(x) && !inRange(x, S.SPENT.gates) && !inRange(x, [1901, 1930]) && !inRange(x, [2101, 2130]) && !inRange(x, [2401, 2460])), detail: `heldF exit ${st}` };
 });
 
+// 2026-11-27 (the publish merge; definitionGates named these thirteen exports as unmentioned by any gate) -- each held to the registration or to what it computes.
+row("THE CONSTANTS ARE THE REGISTRATION'S (brain/ROCK_NAV_WIP.md): the four kinds; 120 s fights; the sign test at alpha 0.05 with a floor of 20 non-tied pairs; the arms of Rounds B (N, L), C (L, F) and D (L, LC); the following field rebuilt every 60 ticks", () => {
+    const note = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "brain", "ROCK_NAV_WIP.md"), "utf8").replace(/\s+/g, " ");
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    return { ok: S.KINDS === BF.KINDS && same(S.KINDS, ["bow", "beam", "stern", "swarm"]) && S.SECONDS === 120 && /8 fighters, 120 s/.test(note) &&
+        S.ALPHA === 0.05 && /p <= 0\.05/.test(note) && S.FLOOR_MIN === 20 && /fewer than 20 non-tied pairs/.test(note) &&
+        same(S.ARMS_B, ["N", "L"]) && same(S.ARMS_C, ["L", "F"]) && same(S.ARMS_D, ["L", "LC"]) && [S.ARMS_B, S.ARMS_C, S.ARMS_D].every(Object.isFrozen) &&
+        /\*\*F:\*\* followingField with lane true and every = 60/.test(note) && S.FOLLOW_EVERY === 60,
+        detail: `kinds ${S.KINDS.join(",")}; ${S.SECONDS} s; alpha ${S.ALPHA}, floor ${S.FLOOR_MIN}; B ${S.ARMS_B} C ${S.ARMS_C} D ${S.ARMS_D}; every ${S.FOLLOW_EVERY}` };
+});
+row("scenariosOf crosses every seed with the four kinds, seed by seed; median is the middle value (the mean of the two middle ones for an even count, null for none) and leaves its input unsorted", () => {
+    const sc = S.scenariosOf([3, 5]), xs = [9, 1, 5, 3];
+    return { ok: sc.length === 8 && sc.every((x, i) => x.seed === [3, 5][Math.floor(i / 4)] && x.kind === S.KINDS[i % 4]) && S.scenariosOf([]).length === 0 &&
+        S.median([3, 1, 2]) === 2 && S.median(xs) === 4 && xs.join() === "9,1,5,3" && S.median([7]) === 7 && S.median([]) === null && S.median([-2, -6]) === -4,
+        detail: `median([9,1,5,3]) ${S.median(xs)}` };
+});
+row("reportLines names the round and prints its sets as the module holds them", () => {
+    const L = S.reportLines();
+    return { ok: L.length === 2 && /^\[rockNavStudy\] the rock nav rounds: arm D/.test(L[0]) &&
+        L[1] === `  DEV ${S.DEV_SEEDS[0]}-${S.DEV_SEEDS.at(-1)} x 4 kinds (checks only); HELD ${S.HELD_SEEDS[0]}-${S.HELD_SEEDS.at(-1)} x 4 kinds; regular gunners, 24 rocks` &&
+        S.DEV_SEEDS[0] === 3101 && S.HELD_SEEDS.at(-1) === 3290, detail: L[1] };
+});
+
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[rockNavStudy-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);

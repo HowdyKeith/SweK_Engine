@@ -123,6 +123,12 @@ await section(async () => {
         if (!q) {
             await p.waitForFunction(() => window.__gpuTimerAuto && window.__gpuTimerAuto.frames >= 3, null, { timeout: 15000 }).catch(() => {});
             await p.setViewportSize({ width: 600, height: 380 }); await p.waitForTimeout(2500);   // a resize: many pages draw again on one
+            // 2026-11-27 (the publish merge) -- and then until the overlay LISTS the passes the page has already timed, for at most 10 s more. On a slow
+            // software GPU the fixed 2.5 s above read the overlay before its next redraw: raymarch-live's "march" and bzflag's "world" were timed (labels > 0)
+            // and not yet in the box, a different page red on each run. The row below is unchanged: an overlay that never lists them still fails.
+            // SABOTAGED, restored byte for byte: P1 raymarch-live asked for a pass it does not have -> 1 red; P2 the wait demanding a pass name no page has -> 1 red (the wait times out, the row reads).
+            await p.waitForFunction(() => { const t = window.__gpuTimerAuto, b = (document.getElementById("gpuTimerAuto") || {}).textContent || "";
+                return Object.entries((t && t.labels) || {}).filter(([, v]) => v > 0).every(([l]) => new RegExp("^" + l + " ", "m").test(b)); }, null, { timeout: 10000 }).catch(() => {});
         } else await p.waitForTimeout(3000);
         const r = await p.evaluate(() => ({ ...window.__gpuTimerAuto, time: undefined, box: (document.getElementById("gpuTimerAuto") || {}).textContent || null })).catch((e) => ({ state: "page gone: " + e.message.slice(0, 40) }));
         await p.close(); return { ...r, errs };

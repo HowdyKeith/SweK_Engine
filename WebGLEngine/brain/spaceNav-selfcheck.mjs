@@ -180,6 +180,22 @@ row("20 AN EMPTY LANE FALLS BACK TO THE PLAIN GOAL (the origin's own cell blocke
         detail: `origin blocked ${originBlocked}, laneEmpty ${E.laneEmpty}, goal cells ${goals(E)} (plain ${goals(P)}); the fixture of rows 14-16 laneEmpty ${LL.laneEmpty}` };
 });
 
+// 2026-11-27 (the publish merge; definitionGates named these three exports as unmentioned by any gate) -- each held to what it is for.
+row("NAV_DEFAULTS are the registration's settings: cells of 16 in a cube of half-width 560 (70 a side), margin 20, re-aimed every 15 ticks, no lane (brain/ROCK_NAV_WIP.md)", () => {
+    const d = NV.NAV_DEFAULTS;
+    return { ok: Object.isFrozen(d) && d.cell === 16 && d.half === 560 && Math.round(2 * d.half / d.cell) === 70 && d.margin === 20 && d.every === 15 && d.lane === false, detail: JSON.stringify(d) };
+});
+row("shipOf finds the arena's capital ship, not the first craft, and nothing in an arena without one", () => {
+    const cap = { id: 1, kind: "capital", body: { pos: [0, 0, 0] } }, A = { crafts: [{ id: 7, kind: "fighter", body: { pos: [5, 0, 0] } }, cap, { id: 8, kind: "fighter", body: { pos: [9, 0, 0] } }] };
+    const real = BF.build(41, "bow", { rocks: 0 }).arena, got = NV.shipOf(real);
+    return { ok: NV.shipOf(A) === cap && NV.shipOf({ crafts: [A.crafts[0]] }) === undefined && got && got.kind === "capital" && real.crafts.includes(got), detail: `the real arena's ship is craft ${got && got.id}` };
+});
+row("reportLines says what the layer is and prints the defaults it flies with", () => {
+    const L = NV.reportLines(), d = NV.NAV_DEFAULTS;
+    return { ok: Array.isArray(L) && L.length === 2 && /^\[spaceNav\] the navigation layer for the rock field/.test(L[0]) &&
+        L[1] === `  cell ${d.cell}, half-width ${d.half}, margin ${d.margin}, re-aim every ${d.every} ticks`, detail: L[1] };
+});
+
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[spaceNav-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);

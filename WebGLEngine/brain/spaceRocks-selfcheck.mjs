@@ -102,5 +102,14 @@ try {
 } catch (e) { ok("!! section 4 ran to its end (no fight threw)", false, e.message); }
 
 console.log();
+// 2026-11-27 (the publish merge; definitionGates named this export as unmentioned by any gate) -- touchedRock, the contact test, graded on a fixture.
+{
+    const rocks = [{ pos: [0, 0, 0], radius: 10 }, { pos: [100, 0, 0], radius: 5 }];
+    ok("touchedRock: the index of the first rock a sphere reaches (centre distance under the two radii), -1 when it reaches none, and the boundary itself not a touch",
+        SR.touchedRock(rocks, [0, 12, 0], 3) === 0 && SR.touchedRock(rocks, [100, 0, 7], 3) === 1 && SR.touchedRock(rocks, [50, 0, 0], 3) === -1 &&
+        SR.touchedRock(rocks, [0, 13, 0], 3) === -1 && SR.touchedRock(rocks, [0, 12.999, 0], 3) === 0 && SR.touchedRock([], [0, 0, 0], 3) === -1 &&
+        SR.touchedRock([rocks[1], rocks[0]], [0, 0, 0], 1) === 1);
+}
+
 if (fails) { console.log("spaceRocks-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("spaceRocks-selfcheck: all checks pass");

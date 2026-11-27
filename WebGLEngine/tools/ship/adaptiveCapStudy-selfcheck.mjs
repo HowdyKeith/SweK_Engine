@@ -79,6 +79,16 @@ row("8 THE COMMAND: export-free; HELD refused before DEV passes; an unknown opti
 });
 row("9 reportLines NAMES K AND THE SETS", () => { const l = A.reportLines().join(" "); return l.includes(`K ${A.K}`) && l.includes(String(A.HELD_SEEDS[0])); });
 
+// 2026-11-27 (the publish merge; definitionGates named these exports as unmentioned by any gate) -- each held to what it is for.
+row("adaptiveCapStudy: SPENT is the design survey's throwaway seeds 9990049-9990060 the registration names (brain/SPACE_DOCTRINE_WIP.md), in neither DEV nor HELD; scenariosOf crosses every seed with the four kinds, seed by seed", () => {
+    const [a, b] = A.SPENT.survey, note = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "brain", "SPACE_DOCTRINE_WIP.md"), "utf8");
+    const sc = A.scenariosOf([7, 9]), K = ["bow", "beam", "stern", "swarm"];
+    return { ok: Object.isFrozen(A.SPENT) && a === 9990049 && b === 9990060 && note.includes("throwaway space seeds 9990049-9990060") &&
+        ![...A.DEV_SEEDS, ...A.HELD_SEEDS].some((s) => s >= a && s <= b) &&
+        sc.length === 8 && sc.every((x, i) => x.seed === [7, 9][Math.floor(i / 4)] && x.kind === K[i % 4]) && A.scenariosOf([]).length === 0,
+        detail: `survey ${a}-${b}; scenariosOf([7, 9]) ${sc.map((x) => x.seed + x.kind[0]).join(" ")}` };
+});
+
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[adaptiveCapStudy-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);

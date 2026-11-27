@@ -77,6 +77,17 @@ row("8 THE COMMAND: export-free; HELD refused before DEV passes, and refused whi
 });
 row("9 reportLines NAMES THE GRID, THE SETS AND THE CAP'S STATE", () => { const l = G.reportLines().join(" "); return l.includes(G.GRID.join(", ")) && l.includes(String(G.HELD_SEEDS[0])) && l.includes(G.CAP_STRONG === null ? "not yet chosen" : String(G.CAP_STRONG)); });
 
+// 2026-11-27 (the publish merge; definitionGates named these exports as unmentioned by any gate) -- each held to what it is for.
+row("strongGunnersStudy: SPENT is the design survey's throwaway seeds 9990037-9990048 the registration names (brain/SPACE_DOCTRINE_WIP.md), in neither DEV nor HELD; scenariosOf crosses every seed with the four kinds, seed by seed", () => {
+    const [a, b] = G.SPENT.survey, note = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "brain", "SPACE_DOCTRINE_WIP.md"), "utf8");
+    const sc = G.scenariosOf([7, 9]), K = ["bow", "beam", "stern", "swarm"];
+    return { ok: Object.isFrozen(G.SPENT) && a === 9990037 && b === 9990048 && note.includes("throwaway space seeds 9990037-9990048") &&
+        ![...G.DEV_SEEDS, ...G.HELD_SEEDS].some((s) => s >= a && s <= b) &&
+        sc.length === 8 && sc.every((x, i) => x.seed === [7, 9][Math.floor(i / 4)] && x.kind === K[i % 4]) && G.scenariosOf([]).length === 0 &&
+        G.FLOOR_MIN === S.FLOOR_MIN && G.FLOOR_MIN === 20 && G.ALPHA === S.ALPHA && G.ALPHA === 0.05 && G.TIE_EPS === S.TIE_EPS && G.TIE_EPS === 1e-9,
+        detail: `survey ${a}-${b}; scenariosOf([7, 9]) ${sc.map((x) => x.seed + x.kind[0]).join(" ")}` };
+});
+
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[strongGunnersStudy-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);
