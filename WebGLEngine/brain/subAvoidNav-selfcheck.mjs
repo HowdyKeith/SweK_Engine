@@ -19,6 +19,9 @@
 // 2026-11-26 -- FOLLOW-UP 10 (section 6): 7 mutants, every one red by name (final pass): E1 a 0 m band | E2 the south edge not tested | E3 the trigger edge-tested | E4 candidates not edge-tested | E5 the edge on the
 //   wrong arm | E6 HELD10 on HELD9's seeds | E7 a 3 s edge look. E1 and E5 WENT 0 RED FIRST: the band row started where the path crossed the edge anyway (now 85 m out, ending 10 m inside the band), and swapping the arms
 //   kept them different (a golden of both arms on six DEV seeds now pins each). The south-edge row's first fixture sat by the east edge, where nothing was refused.
+// 2026-11-27 -- FOLLOW-UP 12 (section 7): 8 mutants, every one red by name (final pass): L1 the last on a tie | L2 the MOST bad | L3 statics at SHIP_CLEAR | L4 obstacles passed beneath counted | L5 least never on |
+//   L6 HELD12 on subNavRoute's seeds | L7 the plan's own heading left out of the comparison | L8 the least arm without the edge. L7 WENT 0 RED FIRST (the stuck fixture's best was an offset); a fan where holding is
+//   least bad now pins it.
 import * as A from "./subAvoidNav.mjs";
 import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
@@ -172,6 +175,11 @@ console.log("\n7. FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING");
     const all = [0, ...A.OFFSETS].map((d) => ({ d, m: A.minClearArc(0, 0, 0, 0, d, w2, -Infinity) })), top = Math.max(...all.map((x) => x.m)), firstTop = all.find((x) => x.m === top).d;
     ok("!! STUCK (a ring of big ships and one close ahead): without least the plan's heading comes back; with least, the heading with the largest minimum clearance, the first in order on a tie (here +90: -69.1 against the plan's -79.0)",
         plain.stuck && plain.heading === 0 && least.stuck && !least.turned && least.heading === firstTop && least.heading !== 0 && Math.abs(top - (-69.1)) < 0.05, JSON.stringify({ least: least.heading, top }));
+    // the plan's heading can be the least bad: ships 60 m off on every candidate's side and a mild conflict dead ahead (115 m) -- holding is better than any turn (-28.4 against the best offset's -38.7)
+    const fan = [ship(115, 0, 0, 0)]; for (let j = 1; j <= 6; j++) for (const sg of [1, -1]) { const ang = sg * j * Math.PI / 12; fan.push(ship(60 * Math.cos(ang), -60 * Math.sin(ang), 0, 0)); }
+    const hold = A.avoidHeadingArc(0, 0, 0, 0, 0, fan, -Infinity, { least: true });
+    ok("!! the PLAN'S OWN heading is in the comparison: stuck in a fan of ships with a mild conflict ahead, least keeps the plan's heading because it has the largest minimum clearance", hold.stuck && hold.heading === 0
+        && A.minClearArc(0, 0, 0, 0, 0, fan, -Infinity) > Math.max(...A.OFFSETS.map((d) => A.minClearArc(0, 0, 0, 0, d, fan, -Infinity))), JSON.stringify(hold));
     ok("...and when a candidate clears, least changes nothing (the turn is taken as before)", same(A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { least: true }), A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity)));
     let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEAST_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
     ok("!! GOLDEN: the least arm on DEV seeds 1-6 fires 3781, turns 3107, stuck 674, statuses lrrrrr (the edge arm's golden, section 6, is unchanged)", same({ f, t, k, st }, { f: 3781, t: 3107, k: 674, st: "lrrrrr" }), JSON.stringify({ f, t, k, st }));
