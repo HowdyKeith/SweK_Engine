@@ -14,3 +14,13 @@ What was taken: the two lookup tables only (the area table, 160 x 80 RG8, and th
 PlayCanvas's deflate-raw base64 into `smaaLookup.mjs` so a page needs no DecompressionStream. The shaders that read them
 (`render/smaaPass.js`, `render/smaaPassGPU.mjs`) were written here from the paper and the reference code's structure; no
 PlayCanvas shader code is vendored. `tools/ship/smaaPass-selfcheck.mjs` checks the tables' sizes and their sha256s.
+
+## The SMAA notice
+
+`LICENSE` beside this file is PlayCanvas's `LICENSE` from `playcanvas@2.24.2`, byte for byte (sha256
+`42fa51ddd556be151a29f381fb97ee975825dcc454e805ea3ea9c079cca04d34`, 1,064 bytes). The lookup tables are SMAA's, whose reference
+implementation is MIT too, and its notice is carried here (it was appended to `LICENSE` at v4933 and moved here on 2026-11-27,
+so that `LICENSE` is the upstream file):
+
+SMAA (the algorithm and its lookup tables): Copyright (C) 2013 Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro,
+Diego Gutierrez -- MIT licence (the reference implementation, https://github.com/iryoku/smaa).

@@ -34,7 +34,11 @@ console.log("1. THE TABLES");
 await section(() => {
     const L = V.smaaLookup(), sha = (b) => crypto.createHash("sha256").update(b).digest("hex"), lic = fs.readFileSync(path.join(ENG, "vendor", "smaa", "LICENSE"), "utf8");
     ok("!! the area table is 160 x 80 x 2 bytes and the search table 64 x 16, each with the sha256 recorded when vendored", L.area.length === 25600 && L.search.length === 1024 && sha(L.area) === V.AREA_SHA256 && sha(L.search) === V.SEARCH_SHA256 && V.AREA_SHA256 === "a365373fbcece6d1589add8d993f3541217fdacbe2cc6ca4beb578cc1dfa9b3b");
-    ok("!! the licence file carries PlayCanvas's MIT licence and SMAA's", /PlayCanvas Ltd/.test(lic) && /Permission is hereby granted/.test(lic) && /Jorge Jimenez/.test(lic) && /MIT/.test(lic));
+    // 2026-11-27 -- LICENSE is PlayCanvas's file from playcanvas@2.24.2 byte for byte, and SMAA's own notice, appended to it at v4933, is carried in PROVENANCE.md.
+    const prov = fs.readFileSync(path.join(ENG, "vendor", "smaa", "PROVENANCE.md"), "utf8");
+    ok("!! the licence file is PlayCanvas's MIT licence as playcanvas@2.24.2 ships it, and PROVENANCE.md beside it carries SMAA's notice",
+        sha(Buffer.from(lic, "utf8")) === "42fa51ddd556be151a29f381fb97ee975825dcc454e805ea3ea9c079cca04d34" && /PlayCanvas Ltd/.test(lic) && /Permission is hereby granted/.test(lic) &&
+        /## The SMAA notice/.test(prov) && /Copyright \(C\) 2013 Jorge Jimenez, Jose I\. Echevarria, Belen Masia, Fernando Navarro,\s+Diego Gutierrez -- MIT licence/.test(prov));
 });
 
 // the page's own test: draws scenes into the pass's input, runs it to a readable target, reads back; and the same scene at 8 x 8 for the truth

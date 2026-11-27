@@ -159,4 +159,8 @@ export const NOT_A_LICENCE_BODY = Object.freeze([
     { path: "vendor/mikktspace", why: "the grant is the zlib text in the header comment of mikktspace.h and " +
         "mikktspace.c, verbatim; the upstream repository carries no LICENSE file. identify() knows the MIT, " +
         "0BSD, OFL and Apache bodies and has no zlib clause set, so it correctly returns null here." },
+    // 2026-11-27 -- at the publish merge, read off vendor/santon2025/PROVENANCE.md here rather than typed from memory.
+    { path: "vendor/santon2025", why: "the grant is Dryad's stated policy, recorded in PROVENANCE.md, that every deposit is published under the CC0 1.0 " +
+        "public-domain waiver, and the same file says the waiver text was not re-read from the record's own page. A policy NAMED is not CC0's legal " +
+        "code, so identify() has nothing to read." },
 ]);
