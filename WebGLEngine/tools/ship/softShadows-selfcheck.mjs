@@ -121,12 +121,12 @@ await softChecks("WEBGPU", "lights-gpu.html", "__lightsGpu", [...PRESENT_ARGS]);
 // no moon shadow there); with `spots`, each spot light's in-scattering (lightAt: window, cone, cookie), hidden where the segment to the light meets one
 const COOKIES = CL.makeCookieAtlas(256);
 const segHit = (p, q, b) => { const d = [0, 1, 2].map((i) => q[i] - p[i]), L = Math.hypot(...d); return boxHit(p, d.map((v) => v / L), b) < L; };
-const fogTwin = (r, { spots, spotShadows = true }) => {
+const fogTwin = (r, { spots, spotShadows = true, cookies = COOKIES }) => {
     const P = r.fogParams, inv = invert4(r.vp), toSun = norm(P.lightDir), boxes = r.pillars;
     const V = [T4(inv, [0, 0, 1, 1]), T4(inv, [0, 0, -1, 1])].map((q) => q.map((v) => v / q[3])), look = norm([0, 1, 2].map((i) => V[0][i] - V[1][i]));
     const shadowOf = (p) => { const along = [0, 1, 2].reduce((s, i) => s + (p[i] - r.eye[i]) * look[i], 0); if (along > 28) return 1; return boxes.some((b) => boxHit(p, toSun, b) < Infinity) ? 0 : 1; };
     const spotL = spots ? r.lights.filter((l) => l.type === "spot") : [];
-    return (dir) => ({ dir, shadowOf, localOf: spotL.length ? (p) => spotL.reduce((acc, l) => { const sh = spotShadows && boxes.some((b) => segHit(p, l.position, b)) ? 0 : 1, v = CL.inScatterCPU(l, p, dir, P.g, { shadow: sh, cookies: COOKIES }); return acc.map((a, i) => a + v[i]); }, [0, 0, 0]) : null });
+    return (dir) => ({ dir, shadowOf, localOf: spotL.length ? (p) => spotL.reduce((acc, l) => { const sh = spotShadows && boxes.some((b) => segHit(p, l.position, b)) ? 0 : 1, v = CL.inScatterCPU(l, p, dir, P.g, { shadow: sh, cookies }); return acc.map((a, i) => a + v[i]); }, [0, 0, 0]) : null });
 };
 // the CPU's picture at a 5-pixel lattice, against the page's: rows top first; WebGL2's jitter counts rows from the bottom
 const latticeErr = (r, clear, twin, glRows, want) => {
@@ -152,10 +152,12 @@ const shaftChecks = (title, file, stateVar, args, glRows) => section(async () =>
     ok(`!! ${title}: THE SHAFTS ARE THE CPU'S MARCH WITH THE MOON HIDDEN BEHIND THE PILLARS AND THE CANOPY: nine pixels in ten to 4 levels (a 5-pixel lattice), and on average far closer than the march that never hides it`, within >= n * 0.9 && eS < 0.4 * eF, `${within} of ${n} to 4 levels; mean error ${(eS / n).toFixed(2)} levels against ${(eF / n).toFixed(2)} unhidden`);
     // THE SPOTS' BEAMS (2026-11-27)
     ok(`!! ${title}: THE SPOT LIGHTS' BEAMS ONLY ADD LIGHT TO THE FOG, AND SHOW`, sDown === 0 && sUp > N * 0.01, `${sUp} pixels brighter by more than 3 levels, ${sDown} darker`);
-    const sp = latticeErr(spots, clear, fogTwin(spots, { spots: true }), glRows, (err, t) => { const tu = fogTwin(spots, { spots: true, spotShadows: false })(t.dir); return [err(t), err({ shadowOf: t.shadowOf }), err(tu)]; });
+    const sp = latticeErr(spots, clear, fogTwin(spots, { spots: true }), glRows, (err, t) => { const tu = fogTwin(spots, { spots: true, spotShadows: false })(t.dir); const tc = fogTwin(spots, { spots: true, cookies: null })(t.dir); return [err(t), err({ shadowOf: t.shadowOf }), err(tu), err(tc)]; });
     const m = sp.length, w4 = sp.filter(([e]) => e <= 4).length, beam = sp.filter(([e, f]) => Math.abs(f - e) > 3), eNo = beam.reduce((s, [, f]) => s + f, 0), eYes = beam.reduce((s, [e]) => s + e, 0);
-    ok(`!! ${title}: THE BEAMS ARE THE CPU'S MARCH WITH EACH SPOT'S IN-SCATTERING (cone, falloff, cookie): nine pixels in ten to 4 levels, and in the beams (where the spots change the answer by over 3 levels) a quarter the error of the march without them`, w4 >= m * 0.9 && beam.length > 50 && eYes < 0.25 * eNo, `${w4} of ${m} to 4 levels; in ${beam.length} beam pixels, mean error ${(eYes / beam.length).toFixed(2)} against ${(eNo / beam.length).toFixed(2)} without the spots`);
+    ok(`!! ${title}: THE BEAMS ARE THE CPU'S MARCH WITH EACH SPOT'S IN-SCATTERING (cone, falloff, cookie): nine pixels in ten to 4 levels, and in the beams (where the spots change the answer by over 3 levels) a quarter the error of the march without them, and under a level on average`, w4 >= m * 0.9 && beam.length > 50 && eYes < 0.25 * eNo && eYes < beam.length, `${w4} of ${m} to 4 levels; in ${beam.length} beam pixels, mean error ${(eYes / beam.length).toFixed(2)} against ${(eNo / beam.length).toFixed(2)} without the spots`);
     const lit = sp.filter(([e, , u]) => Math.abs(u - e) > 3), closer = lit.filter(([e, , u]) => e < u).length;
+    const tinted = sp.filter(([e, , , c]) => Math.abs(c - e) > 3), byCookie = tinted.filter(([e, , , c]) => e < c).length;
+    ok(`!! ${title}: THE COOKIE TINTS ITS SPOT'S BEAM -- where the stained glass changes the answer (over 3 levels), the page is the march through it, not the bare light`, tinted.length > 20 && byCookie >= tinted.length * 0.85, `${byCookie} of ${tinted.length} closer to the march with the cookie`);
     ok(`!! ${title}: AND EACH SPOT'S OWN SHADOW CUTS ITS BEAM -- where hiding the spot behind the pillars and boards matters (over 3 levels), the page is the hidden march`, lit.length > 20 && closer >= lit.length * 0.85, `${closer} of ${lit.length} closer to the hidden march`);
 });
 
@@ -188,3 +190,9 @@ process.exit(fails === 0 ? 0 : 1);
 // falling, the bind group not set, the CPU's shadow taken from the ambient, the shadow looked up toward the wrong side. GREEN AND SAID SO: the shadow taking the ambient too --
 // this fog's ambient (0.01 to 0.018) is under a level. BEFORE THE SABOTAGE the gate found the first measures wrong: a per-pixel change misses a wide, faint penumbra (the edge's
 // GRADIENT is what softens), the pillars alone are too thin to cut visible shafts (the canopy, ?fog=1), and penumbrae of 12 texels were too narrow to see (24 now).
+// 2026-11-27, THE SHADOW GAPS (WebGL2's shafts; the spots' beams): 12 mutants of render/clusteredLights.mjs and 11 of render/volumetricFog.mjs. ALL 23 RED -- in both chunks the
+// phase taken away from the light, the spot's own shadow ignored, the cone ignored, the cookie ignored, the sun's fog shadow dropped or looked up on the wrong side; on the CPU
+// the in-scattering's shadow or phase wrong, the march ignoring the spots; no spot a fog light, the count or the indices wrong (one slot off, halves swapped), the lighting
+// bound over the depth's texture unit, the moon never hidden in the WebGL2 fog, the spots' light not dimmed by the fog in front, the spots sampled at the eye. THE COOKIE was
+// green at first: the beam bound (a quarter of the march without the spots) let a 1.7-level mean error through; the bound is now under a level, and a check holds the
+// stained-glass spot's beam to the march through its cookie, not the bare light.
