@@ -189,7 +189,7 @@ sec("6. THE AUDIT AND THE COMMAND");
     const was = X.profileSame((p) => AQ.circuitSeat(p, AQ.CIRCUIT_CHAMPION)), now = X.profileSame(AQ.circuitSeat), ship = X.shippedSame();
     const rep42 = fs.readFileSync(path.join(ENG, "brain", "rig-results", "planner-circuit-report.json"), "utf8");
     ok("!! CUR WAS THE AQUARIUM'S CIRCUIT PROFILE (Round 40's net, still reachable; PASS in the committed report) and is not since Round 42's replacement; SEAT-04 IS THE SHIPPED SEAT",
-        was && !now && ship && /PASS CUR IS THE AQUARIUM'S CIRCUIT PROFILE/.test(rep42), `${((Date.now() - t1) / 1000).toFixed(1)} s`);
+        was && !now && ship && JSON.parse(rep42).report.some((l) => l.trim().startsWith("PASS CUR IS THE AQUARIUM'S CIRCUIT PROFILE:") && l.trim().endsWith(": true")), `${((Date.now() - t1) / 1000).toFixed(1)} s`);
     const nw0 = { REF: { score: 0, runs: [], crashed: 0, stranded: 0 }, BIAS: { score: 0, runs: [], crashed: 0, stranded: 0 } };
     const rep = X.report({ NEW: nw0, "SEAT-04": nw0, CUR: nw0 }, [], { dives: 300 });
     ok("!! the report with a failed check says NOT WEIGHED and prints no verdict", rep.at(-1) === "BOTTOM LINE: NOT WEIGHED (a check failed)" && !rep.some((l) => /V1|V3/.test(l)) && rep.some((l) => /FAIL SIZES/.test(l)));

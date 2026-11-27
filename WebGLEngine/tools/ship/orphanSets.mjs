@@ -708,6 +708,14 @@ export const RECORDED = Object.freeze({
         "tools/ship/subTerrainStudy.mjs",
         "tools/ship/takeTankDropout.mjs",
         "tools/ship/tankNavRun.mjs",
+        // 2026-11-27 -- ARRIVED through the publish merge of the open branches: series B's FOLLOW-UP 13 and 14 commands (tools/ship/subReconcileStudy.mjs and
+        // subNoiseStudy.mjs; brain/SUB_FIELD_NAV_WIP.md), each run as the command its registration names and called by nothing but its own gate, and the fly
+        // line's two topology bakers (tools/bakeCompassRingTopology.mjs and tools/bakeGfVisualTopology.mjs), run once to write the topology the brain modules
+        // read and named by those modules' headers as where it came from -- a mention, not a wire, in all four.
+        "tools/ship/subReconcileStudy.mjs",
+        "tools/ship/subNoiseStudy.mjs",
+        "tools/bakeCompassRingTopology.mjs",
+        "tools/bakeGfVisualTopology.mjs",
         // (2026-11-22: brain/lc4Topology.mjs and brain/lplc2Topology.mjs were admitted here ahead of their consumer; brain/evadeReflex.mjs now imports them, so they left.)
         // 2026-11-22 -- COMMANDS, ADMITTED WITH THEIR REASON: the fly-wired line's registered studies and trainers (tools/ship/take*.mjs, train*.mjs) and three tools
         // (splatPack, denoiseLayers, bakeDendritePlaces). Each is a COMMAND a person runs by path (its header gives the line), imported only by its own gate, and

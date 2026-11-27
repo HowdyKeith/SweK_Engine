@@ -321,6 +321,11 @@ export const HAND_VERIFIED = Object.freeze([
     // renderer's generated WGSL only inside regular expressions it tests that WGSL with -- a quoter.
     Object.freeze({ file: "render/splatSH.mjs", kind: "emitter", why: REASONS.EMITTED }),
     Object.freeze({ file: "tools/ship/splatRendererGPU-selfcheck.mjs", kind: "quoter", why: null }),
+    // 2026-11-27 (the publish merge of claude/code-review-nr3a0i) -- TWO FILES THAT LINE'S SECOND DEFERRAL TRANCHE MADE HITS, read by hand: tools/ship/deferralCensus.mjs
+    // names the gl_FragDepth wiring and FRAG_SRC_DEPTH only as the regular expressions a settled marker is held to, and its gate names them only in its sabotage log
+    // and in the comment on the overlap -- neither builds a shader, so both are quoters.
+    Object.freeze({ file: "tools/ship/deferralCensus.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "tools/ship/deferralCensus-selfcheck.mjs", kind: "quoter", why: null }),
 ]);
 
 /** The rows the shipped thresholds get wrong, named rather than excluded. See the header. One at v4486; two since v4880. */
@@ -362,17 +367,18 @@ export const RESIDUALS = Object.freeze([Object.freeze({
 export const TUNING = Object.freeze({
     floors: Object.freeze([2, 3, 4, 5, 6, 7, 8]),
     byRadius: Object.freeze({
+        // 2026-11-27 (the publish merge of claude/code-review-nr3a0i): every cell +2 -- tools/ship/deferralCensus.mjs and its gate, added to the key by hand as quoters, both read as the key says at every radius and floor; the SHAPE is unchanged.
         // v4933: every cell +2 -- the two files added by hand (render/splatSH.mjs, tools/ship/splatRendererGPU-selfcheck.mjs), both read as the key says at every radius and floor; the SHAPE is unchanged
         // v4895: every cell +4 -- the six files added by hand, four of which the thresholds classify as read (the two they do not are the new residuals); the SHAPE is unchanged: the same spike, the same four-wide run
-        80: Object.freeze([50, 50, 46, 43, 42, 40, 36]),
-        100: Object.freeze([50, 50, 47, 45, 44, 42, 40]),
-        140: Object.freeze([50, 50, 51, 48, 46, 44, 42]),
-        200: Object.freeze([49, 50, 50, 50, 50, 46, 43]),
-        300: Object.freeze([48, 48, 49, 49, 50, 48, 48]),
+        80: Object.freeze([52, 52, 48, 45, 44, 42, 38]),
+        100: Object.freeze([52, 52, 49, 47, 46, 44, 42]),
+        140: Object.freeze([52, 52, 53, 50, 48, 46, 44]),
+        200: Object.freeze([51, 52, 52, 52, 52, 48, 45]),
+        300: Object.freeze([50, 50, 51, 51, 52, 50, 50]),
     }),
-    peak: Object.freeze({ radius: 140, floor: 4, agreement: 51, shipped: false,
+    peak: Object.freeze({ radius: 140, floor: 4, agreement: 53, shipped: false,
         note: "a spike -- every neighbour reads lower -- which is what a threshold fitted to its own key looks like" }),
-    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 50,
+    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 52,
         note: "inside the widest run at the best non-spike score: FOUR floors wide (3 through 6), where every other radius manages at most two" }),
     // Derived by the gate from byRadius, not typed: the length of each radius' longest run at its own best score.
     runAtBest: Object.freeze({ 80: 2, 100: 2, 140: 1, 200: 4, 300: 1 }),
@@ -424,7 +430,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
     // v4895 -- six files read by hand (two emitters, four quoters); the thresholds now miss four of the 52 rows (two more quoters read as emitters).
     v4895: Object.freeze({ rows: 52, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 29, reportedEmitters: 25, reportedQuoters: 27 }),
-    v4896: Object.freeze({ rows: 55, agreement: 50, handVerifiedEmitters: 24, handVerifiedQuoters: 31, reportedEmitters: 27, reportedQuoters: 28 }),   // v4933: +2 rows (render/splatSH.mjs an emitter, tools/ship/splatRendererGPU-selfcheck.mjs a quoter), both read the way the key says
+    v4896: Object.freeze({ rows: 57, agreement: 52, handVerifiedEmitters: 24, handVerifiedQuoters: 33, reportedEmitters: 27, reportedQuoters: 30 }),   // 2026-11-27 (the publish merge): +2 rows (tools/ship/deferralCensus.mjs and its gate, both quoters), both read the way the key says.   // v4933: +2 rows (render/splatSH.mjs an emitter, tools/ship/splatRendererGPU-selfcheck.mjs a quoter), both read the way the key says
     // Against backendParity's own figures, unchanged and deliberately not widened.
     preambleCensus: Object.freeze({ glslBearing: 178, wgslBearing: 148, both: 29 }),   // v4933: 170/138/27 -> 178/148/29, the PlayCanvas line's files (render/backendParity.mjs's PARITY_BASELINE names them);   // v4926: wgslBearing 137 -> 138, brain/reservoirPilotGpu.mjs (READOUT_WGSL, a compute shader only).   // v4922: wgslBearing 136 -> 137, brain/reservoirGpu.mjs (a compute shader only).   // the FSR4 branch's rounds 70-76 merged over v4908: wgslBearing 135 -> 136 with backendParity (render/learnedUpscaleTemporalGPU.mjs). v4901: wgslBearing 134 -> 135 with backendParity (render/denoiseFrameGenGPU.mjs, merged from the FSR4 branch). v4897: wgslBearing 132 -> 134 with backendParity (render/deformTexture.mjs and its gate). v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
