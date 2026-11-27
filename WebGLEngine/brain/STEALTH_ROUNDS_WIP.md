@@ -717,3 +717,23 @@ Rounds 13, 29 and 30's C1 to C4, applied word for word to the ANIMAL's response 
 **Step B, the test (geometry B: azimuth 270 degrees, segment 12, r/v 0.45 s -- neither used before).** The chosen g only, contrasts 0.2 to 1.0 (5 runs), the readout refitted on the plain trials. **C1 to C4 are Round 29's, word for word, on the predicted probabilities.** **Verdict: SUPPORTED iff C2, C3 and C4 all hold AND the striped trials' log-likelihood beats the null** (each striped trial given the plain ellipse's observed rate at its contrast); otherwise NOT SUPPORTED, naming each failure.
 **Reported either way:** step A's log-likelihoods for every g; step B's predicted against observed probabilities in all 15 cells; a and b at both steps.
 **Predictions (confidence).** The chosen g is below 300 (75 %); C2 holds at step B (50 %: a weaker gain lowers the stripes less at 0.2 too); C3 holds (60 %); C4 holds (55 %); the stripes beat the null (50 %); SUPPORTED (25 %).
+
+## Round 32 RESULTS (`brain/crabGain32Runs/`, step A committed unread at `2ad418ca4`, step B at `8edced2c8`; `brain/crabGain32Agg.mjs` committed before either was read, `5796736a1`; each step read ONCE): NOT SUPPORTED (C2, C3)
+**Step A (azimuth 90, r/v 0.65): g = 100 chosen.** Log-likelihood of the moving trials at contrast 1.0: g 50 -37.15, **g 100 -35.43**, g 150 -35.74, g 200 -35.88, g 300 -40.47. The plain readout is identical for every g (a -11.215, b 16.007: the gain does not touch the plain ellipse), so the choice rested on the moving stripes alone, as registered.
+**Step B (azimuth 270, r/v 0.45, g 100):** readout a -13.396, b 19.213.
+
+| contrast | predicted: grey / static / moving | observed: grey / static / moving |
+|---|---|---|
+| 0.2 | 0.283 / 0.197 / 0.070 | 0.278 / 0.087 / 0.041 |
+| 0.4 | 0.526 / 0.526 / 0.486 | 0.528 / 0.340 / 0.480 |
+| 0.6 | 0.727 / 0.617 / 0.486 | 0.647 / 0.608 / 0.460 |
+| 0.8 | 0.716 / 0.716 / 0.583 | 0.811 / 0.784 / 0.566 |
+| 1.0 | 0.777 / 0.786 / 0.663 | 0.761 / 0.733 / 0.577 |
+
+**Criteria:** C1 holds; **C2 FAILS** (grey - static 0.086 against the 0.1 line; grey - moving 0.213 holds; static and moving 0.127 apart, over the 0.1 line); **C3 fails at 0.6** (0.110; 0.8 and 1.0 hold); C4 holds (0.242, 0.133, 0.114). **The striped trials: -289.6 under the predictions against -316.8 under the null -- the predictions fit better, by 27.2** (Round 31 at g 300: worse, by 25.1). **Verdict: NOT SUPPORTED (C2, C3).**
+**Predictions:** the chosen g below 300 (75 %) HELD; C2 (50 %) MISSED; C3 (60 %) MISSED; C4 (55 %) HELD; the stripes beat the null (50 %) HELD; SUPPORTED (25 %) MISSED.
+**What it says.**
+* **On the probability scale the gain's strength is now right for the MOVING stripes** (0.486, 0.583, 0.663 at 0.6 to 1.0 against the animal's 0.460, 0.566, 0.577), and the model fits the striped trials better than the plain rate does -- the first round in the series where it does.
+* **But the weaker gain loses the low-contrast STATIC drop** that g 300 had (0.086 here against the animal's 0.191; Round 31's g 300 gave 0.190). Rounds 31 and 32 bracket it: g 300 gets the static drop and over-suppresses the moving stripes; g 100 gets the moving stripes and loses the static drop. **No single drift gain fits both** -- the same conclusion Round 30 reached by another route: the static drop is not the drift gain's to give, since static stripes have no drift, and at g 300 it appeared only because the gain's normalisation touched the static stripes' low-contrast edges.
+* So the series needs a second mechanism for the static drop, now with the drift gain fixed at 100 on the probability scale: the static texture's own effect at low contrast (the masking the earlier entry named), registered with its constant chosen on one held-out geometry and tested on another, as here.
+**Series position after Round 32.** With the probability readout, the drift gain at g 100 reproduces the animal's MOVING-stripe suppression at every contrast and fits the striped trials better than the plain rate; the low-contrast static drop needs a mechanism of its own.

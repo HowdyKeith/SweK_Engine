@@ -3098,10 +3098,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "stealth-gain-on-probability",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27 as stealth Round 32 (brain/STEALTH_ROUNDS_WIP.md): g 100 chosen on one held-out geometry, tested on another -- NOT SUPPORTED (C2, C3), but the moving stripes now track the animal at every contrast and the model fits the striped trials better than the null (by 27.2; Round 31 lost by 25.1). The weaker gain loses the low-contrast static drop g 300 had: no single drift gain fits both. Followed by stealth-static-texture-mask.",
+        how: "None.",
+        why: "Closed.",
+    },
+    {
+        id: "stealth-static-texture-mask",
         blocker: "OPEN",
-        what: "Round 31: read through a probability readout fixed on the plain ellipse, the drift gain g 300 (chosen on alarm sizes, Round 24) over-suppresses moving stripes at every contrast and static stripes at 0.6.",
-        how: "Register first: the gain's strength chosen on the PROBABILITY scale -- the readout fixed on the plain ellipse as Round 31, g chosen on one held-out geometry by the moving stripes' likelihood ONLY at high contrast (1.0), then tested once on another held-out geometry with C1-C4 and the full striped likelihood against the null. Choosing g on the very trials it is tested on would be a fit, not a test.",
-        why: "Round 31 shows the gap moved from the network's low-contrast behaviour to its gain's strength.",
+        what: "Rounds 31-32: on the probability scale the drift gain at g 100 fits the moving stripes but leaves the low-contrast static drop (0.086 against the animal's 0.191); no single drift gain fits both, and static stripes have no drift.",
+        how: "Register first ONE static-texture term (for example a divisive normalisation of the patch's looming drive by the stripes' own static edge energy, which matters only where the object's contrast is low), g fixed at 100, the readout as Round 31, the term's one constant chosen on a held-out geometry by the STATIC trials at contrast 0.2 ONLY, then tested once on another held-out geometry with C1-C4 and the striped likelihood against the null.",
+        why: "It is the one part of the animal's pattern the drift gain cannot give.",
     },
     {
         id: "ship-census-rederive",
