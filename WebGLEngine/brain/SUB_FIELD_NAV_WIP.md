@@ -358,3 +358,706 @@ The code was gated and sabotaged first (the module's options 77 mutants, 76 live
 **What this would not say.** That a yield rule cannot work: this one is a slowing to 2.0 m/s on a conflict test over the next 30 s on the plan's own ship model; a stop, a turn-away or a plan that reads the ship's velocity (a velocity obstacle) were not tried. That an edge band cannot remove the exits: the band was 20 m wider and the exits fell from 12 to 6. That 40 of 60 is the arm's rate: it is one set of 60, and the incumbent's own rate moved nine flights between two sets.
 
 **What it leaves open (entered in `tools/ship/nextRounds.mjs` as `nav-traffic-avoid-not-slow`).** A vessel that turns away from a ship instead of slowing for it; the exits through the wall that did not stop.
+
+## FOLLOW-UP 6 [SERIES B -- see note at FOLLOW-UP 6 of series B]: REACTING TRAFFIC (nextRounds entry `nav-reacting-traffic`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+> **NUMBERING NOTE (added at the v4934 merge).** From here to the end of this block the FOLLOW-UP numbers 6-12 belong to SERIES B, written on the working branch before it met main. Main, in parallel, wrote its own FOLLOW-UP 6-10 (give way, turn sweep, dive under the keel, deep transit, under every keel: further down this file). The numbers collide; the titles do not. Series B was not renumbered because its modules, studies and gates cite the numbers in comments. The two series closed overlapping backlog items (nav-3d-terrain, nav-traffic-avoid-not-slow, nav-missions-and-cost, nav-fleet-avoidance); their results were NOT reconciled at the merge and where they disagree both stand as written (notably missions: main HELD83 reference 5/60 against series B HELD10 1/60 energy-out).
+
+
+**What is open.** Every ship in HELD4 and HELD5 holds course and speed, cannot see the vessel, and has a velocity the planner is TOLD exactly. FOLLOW-UP 5's designated arm (`any+predict+edge+yield`) reached 40 of 60 on those terms and 14 of its 20 failures were ships. Two things that real traffic does and this generator never did: **a ship reacts to the vessel**, and **a planner that was not given the ship's velocity has to ESTIMATE it** from where the ship has been seen.
+
+**Two new things, in a new module `brain/subReactNav.mjs` (`brain/subHardNav.mjs` is not edited; it supplies the scenario, the plan, the field, the yield test and the vessel).**
+1. **Reacting ships.** The scenario is `hardScenario(seed, "hard-traffic")`, unchanged (the same ships, icebergs, start and waypoint, so a flight differs only through the ships' behaviour). Three SHIP BEHAVIOURS, each a function of the ship's own state and the vessel's, evaluated every tick, the ship knowing the vessel's exact position and velocity:
+   * **`react-none`** (the control): constant velocity, the HELD4/HELD5 ship. Its flights must be the SAME flights as `flyHard`'s (the gate shows the identity).
+   * **`react-turn`** (a give-way rule): the ship asks whether it and the vessel, each at its CURRENT velocity, come within r + half-hull + **SHIP_CLEAR = 30 m** at any second in the next **SHIP_LOOK_S = 25 s**. If so it turns its velocity vector to STARBOARD (clockwise in the plan) at **TURN_RATE = 0.07 rad/s (4 degrees a second)**, up to **MAX_TURN = 1.05 rad (60 degrees)** from its nominal course; when there is no conflict it HOLDS the course it has (it does not turn back). A ship that has turned away is not a ship on the old track.
+   * **`react-stop`**: the ship asks the same question for the vessel and ITSELF AT ITS NOMINAL velocity; if the answer is yes its desired velocity is zero, else its nominal one, and its actual velocity moves toward the desired at **STOP_ACCEL = 0.5 m/s squared**. A stopped ship waits for the vessel to pass and then moves on.
+   The numbers (30 m, 25 s, 4 degrees a second, 60 degrees, 0.5 m/s squared) are written here BEFORE DEV, are derived from nothing but ordinary-ship values, and are NOT tuned.
+2. **A planner that estimates.** Two planner beliefs about every ship, used by the same arm in the same way (the plan, every REPLAN_S, as the capsule the ship will sweep in the next HORIZON_S; the yield test every tick; the vessel's flight is unchanged otherwise):
+   * **nominal**: the ship is where its ORIGINAL schedule puts it (`posAt`, which is what `flyHard` does): the planner was told the route once. After a reaction that schedule is wrong.
+   * **estimated**: the ship is at its OBSERVED position now and moves at the velocity estimated from the position seen **EST_S = 3 s** ago (v = (p(t) - p(t - 3)) / 3; the first 3 s use the nominal velocity, as a contact report at t = 0). A constant-velocity finite-difference filter, the simplest one; no noise is added to the observations.
+
+**Arms flown, in each of the three behaviours (3 x 3 = 9 cells):** `any+replan` (the plan rebuilt every 3 s with each ship where it is, no prediction: the reference), `any+predict+edge+yield` (**nominal belief; HELD5's designated arm, byte for byte**) and `est+predict+edge+yield` (**estimated belief; designated**). Edge band +20 m, yield speed 2.0 m/s, margin ladder 12, 8, 6, 3 m, REPLAN_S 3, HORIZON_S 30, SECONDS_HARD 260, the autopilot: all as in FOLLOW-UP 5.
+
+**The set.** NEW: **HELD6, seeds 601 to 660 of each behaviour (180 scenarios, 540 flights), flown ONCE**, after the module, the study command and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. If DEV shows the reaction rules to be degenerate (a behaviour in which no ship ever reacts, or every flight collides at t = 0) I amend the rule BEFORE HELD6 is read and write it here; nothing is changed after. The command is `tools/ship/subReactStudy.mjs`.
+
+**Designated comparison and verdict.** The designated arm is `est+predict+edge+yield`, read against `any+predict+edge+yield` on the same seeds. **GAIN** in a reacting behaviour = the designated arm reaches **at least 5 more** than the nominal-belief arm. **SUPPORTED** if the gain holds in BOTH `react-turn` and `react-stop`; **PARTLY SUPPORTED** if in one; **NOT SUPPORTED** otherwise. (Estimating velocity is not asked to reach 80%: FOLLOW-UP 5's arm was at 67% and this round does not re-open that bar.)
+
+**Predictions, written before DEV and before HELD6 (scored held or missed, moving nothing).**
+* **R1** (estimating costs nothing when ships do not react): in `react-none` the designated arm and the nominal arm reach within 3 of each other. 80 percent.
+* **R2** (a give-way ship helps): the nominal arm reaches at least as many in `react-turn` as in `react-none`. 60 percent.
+* **R3** (a ship that stops is no harder than one that does not): the nominal arm reaches at least 3 fewer in `react-stop` than in `react-none` is MISSED if it is false; i.e. R3 holds if it reaches at most 2 fewer. 55 percent.
+* **R4** (the designated gain, `react-turn`): the gain holds. 45 percent.
+* **R5** (the designated gain, `react-stop`): the gain holds. 25 percent (a stopped ship stays on the schedule's own line, so the stale belief is nearly right).
+* **R6** (the plan with no prediction is the worst reacting-world arm): `any+replan` reaches fewer than the nominal arm in each of the three behaviours. 55 percent.
+* **R7**: no designated flight times out in any behaviour (at most 3 in all). 85 percent.
+* **R8** (reacting ships do not make exits worse): the designated arm's exits in `react-turn` and `react-stop` are each at most its exits in `react-none`. 55 percent.
+* The designated arm's collisions with ships in `react-turn` are fewer than the nominal arm's: 50 percent. Its median arrival time is within 1.25 times the nominal arm's in every behaviour: 80 percent.
+
+**What a result would not say.** FOLLOW-UP 3's and 5's lists stand (a perfect position fix, an exact map, one hull, one autopilot, the current not in the field). The ships here react by a fixed rule written by me; real ships turn by other rules, hide, and answer the vessel's own manoeuvres, and no ship here communicates or negotiates. The estimate is a two-point finite difference with no noise; a real tracker has noise and a filter, and a noisy one could be worse than the nominal belief. The vessel's own options the entry listed (stopping, reversing, an edge COST in the field) are NOT in this round, and neither is a vessel that turns AWAY from a ship (that is `nav-traffic-avoid-not-slow`). A result on 60 scenarios per cell moves by about nine flights between two sets of the same arm (FOLLOW-UP 5 measured that), so a gain of 5 is a bar on a noisy count.
+
+### DEV NOTE TO FOLLOW-UP 6 [SERIES B] (2026-11-23; made BEFORE HELD6 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (`node tools/ship/subReactStudy.mjs --set dev`, seeds 1 to 30 of hard-traffic in each behaviour, 270 flights, 72 s) found NEITHER rule degenerate, which was the only thing the registration allowed an amendment for: ships do react (`react-stop` takes `any+replan` from 16 of 30 with none to 30 of 30; `react-turn` from 16 to 25), no behaviour collides at t = 0, and the arms separate. Read for sanity, not tuned on: with no reaction the estimated arm and the nominal arm fly the same 30 flights (20 each, the identity the gate shows); in `react-turn` the estimated arm reached 25 against the nominal arm's 21 (gain 4 of the 5 asked); in `react-stop` 26 against 20 (gain 6); the estimated arm had one exit in `react-turn` and two in `react-stop` against none in `react-none`; `any+replan` beat the nominal arm in `react-turn` (25 to 21) and in `react-stop` (30 to 20), which is the opposite of prediction R6. **I expect PARTLY SUPPORTED on HELD6** (the stop gain held, the turn gain a coin toss), R6 and R8 to be MISSED. The constants (30 m, 25 s, 0.07 rad/s, 1.05 rad, 0.5 m/s squared, 3 s), the arms, the bars and the verdict rule stand as registered.
+
+## RESULT OF REACTING TRAFFIC (2026-11-23; `node tools/ship/subReactStudy.mjs --set held6 --write`, HELD6 = seeds 601 to 660 of hard-traffic in each of three ship behaviours, read once; every flight is in `brain/subReactHeld6.jsonl`, 540 records): **PARTLY SUPPORTED** -- the estimating arm `est+predict+edge+yield` reached **18 more** than the nominal-belief arm in `react-stop` (56 against 38 of 60) and **3 more** in `react-turn` (47 against 44), so the gain bar of 5 was held in one behaviour and missed in the other.
+
+The module, the study command and their gates were sabotaged first (the module 120 mutants, 99 red on the first pass and 16 equivalent ones declared after the gate grew; the study command 88 mutants, none left; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| behaviour | arm | reached | collided (with ships) | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|---|
+| react-none | any+replan | 32 / 60 (53%) | 26 (26) | 2 | 0 | 136.5 | 1.06 | 1.13 |
+| react-none | any+predict+edge+yield (nominal) | 44 / 60 (73%) | 15 (11) | 1 | 0 | 161.4 | 1.18 | 15.15 |
+| react-none | **est+predict+edge+yield** | 44 / 60 (73%) | 15 (11) | 1 | 0 | 161.4 | 1.18 | 15.15 |
+| react-turn | any+replan | 47 / 60 (78%) | 10 (10) | 3 | 0 | 133.0 | 1.04 | 11.34 |
+| react-turn | any+predict+edge+yield (nominal) | 44 / 60 (73%) | 15 (11) | 1 | 0 | 162.0 | 1.17 | 13.21 |
+| react-turn | **est+predict+edge+yield** | 47 / 60 (78%) | 13 (11) | 0 | 0 | 152.4 | 1.11 | 15.09 |
+| react-stop | any+replan | **59 / 60 (98%)** | 1 (1) | 0 | 0 | 125.4 | 0.99 | 17.43 |
+| react-stop | any+predict+edge+yield (nominal) | 38 / 60 (63%) | 21 (17) | 1 | 0 | 161.4 | 1.17 | 12.35 |
+| react-stop | **est+predict+edge+yield** | 56 / 60 (93%) | 3 (3) | 1 | 0 | 147.9 | 1.06 | 20.56 |
+
+**Verdict.** Gain in `react-turn` (at least 5): MISSED (+3). Gain in `react-stop`: HELD (+18). By the registered rule the verdict is PARTLY SUPPORTED, which is what the DEV note said to expect.
+
+**Predictions scored (held or missed, moving nothing).** **R1 held** (the two arms are the same 44 flights in react-none, the identity the gate shows: 0 gained, 0 lost). **R2 held** (the nominal arm 44 in react-turn, 44 in react-none). **R3 MISSED** (the nominal arm reached 38 in react-stop against 44 in react-none: 6 fewer, the bar was at most 2). **R4 MISSED** (+3). **R5 held** (+18). **R6 MISSED**: `any+replan` reached fewer than the nominal arm only in react-none (32 against 44); it reached MORE in react-turn (47 against 44) and far more in react-stop (59 against 38). **R7 held** (no flight of the designated arm timed out in any behaviour). **R8 held** (its exits: 1 in react-none, 0 in react-turn, 1 in react-stop; the DEV note had expected a miss). **R9 MISSED** (its collisions with ships in react-turn equal the nominal arm's: 11 and 11). **R10 held** (its median arrival time is 1.00, 0.94 and 0.92 times the nominal arm's).
+
+**Post hoc, from the 540 recorded flights (labelled: none of it was registered and none of it moves the verdict).** Paired on the same 60 seeds (flights gained / lost, exact two-sided sign test):
+* **Estimating against the nominal belief:** react-turn 8 gained, 5 lost (p 0.58); **react-stop 19 gained, 1 lost (p < 0.0001)**; react-none 0 and 0.
+* **`any+replan` against the nominal arm:** react-none 10 gained, 22 lost (p 0.050); react-turn 10 and 7 (p 0.63); **react-stop 22 and 1 (p < 0.0001)**. **`any+replan` against the estimating arm:** react-turn 7 and 7; react-stop 4 gained, 1 lost (p 0.38): the estimate brings the predicting arm up to what the plain replan does in a world that reacts, and not past it.
+* **What the reaction does to each arm, behaviour against react-none:** the nominal arm in react-stop 6 gained, 12 lost (p 0.24) and in react-turn 8 and 8; the estimating arm in react-stop 15 gained, 3 lost (p 0.0075); **`any+replan` in react-stop 27 gained, 0 lost**.
+* **What is left of the estimating arm's failures.** In react-turn its 13 failures are 11 collisions with ships (all 11 with a ship of 2 m/s or more in 11 of the 13), 2 with icebergs; the nominal arm in react-stop has 22 failures, 17 of them ships and 21 with a ship at 2 m/s or more.
+* **No flight was a no-route scenario** and 6 of the 540 first plans were built at a margin under 12 m.
+
+**What this says.** A planner that keeps a ship to its original schedule is the WORST arm of the three the moment ships wait for the vessel (63 against 98 and 93): it blocks the corridor the ship has left and the ship that stopped, and the vessel steers round a place nothing is. The plan with no prediction at all, rebuilt every 3 s from where the ships are, reaches 59 of 60 there. Estimating the velocity from the last 3 s repairs most of that (56 of 60) and not all. When ships hold their courses (react-none) the order reverses: prediction is worth 12 flights over the plain replan (44 against 32, p 0.05). When ships turn away the three arms are within three flights of one another (44, 47, 47) and nothing separates them. **So the choice between planning from where a ship is and planning from where it will be depends on whether the ship keeps its schedule, which is the thing this planner does not know.**
+
+**What this would not say.** FOLLOW-UP 3's, 5's and the registration's lists stand: the rules are mine (a 4 degrees a second give-way turn to starboard and a wait at 0.5 m/s squared), a ship knows the vessel's exact position and velocity, the planner sees every ship's position exactly and the estimate is a two-point finite difference with no noise, the vessel cannot turn away or stop, and the current is not in the field. A real tracker has noise, and a noisy velocity estimate could be worse than the nominal belief. The reaction rules were not tuned on DEV or HELD6. HELD6's 60 scenarios per cell move by about nine flights between two sets for one arm (FOLLOW-UP 5), so the +3 of react-turn is inside that noise and the +18 of react-stop is not.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-traffic-avoid-not-slow` (a vessel that turns away from a ship) is untouched. New: **`nav-belief-by-behaviour`**, an arm that decides between planning from where a ship is and from where it will be by watching whether ships keep the schedule it was told; and **`nav-estimate-with-noise`**, the same estimating arm with noisy position observations and a filter instead of a two-point difference.
+
+## FOLLOW-UP 7 [SERIES B -- see note at FOLLOW-UP 6 of series B]: THE CURRENT IN THE FIELD (nextRounds entry `nav-current-in-field`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** The field does not know the current. HELD4's `hard-current` kind (mean up to 1.2 m/s on each horizontal axis, unsteady 0.2 to 0.5 m/s, weight error up to 0.6 percent, 260 s) was flown by `any` (the plan built once, the heading taken from the field) and reached 56 of 60 with 4 collisions. The autopilot reads its speed, alpha and beta relative to the WATER and the heading target is the NOSE's heading, so a current across the track pushes the ground track off the heading the field asked for: the vessel is carried sideways at about the current's cross-track speed while it turns, and the margin ladder (12, 8, 6, 3 m) was built for a still sea.
+
+**Two things, in a new module `brain/subCurrentNav.mjs` (`brain/subHardNav.mjs` is not edited; it supplies the scenario, the plan, the field and the vessel).**
+1. **A crab angle in the aim point.** The planner is TOLD the mean current c (the three means of the scenario, horizontal part; NOT the unsteady part, NOT the weight error). The field heading g is the ground course the field asks for. The nose heading flown is the one for which the water velocity V u plus c lies along g: with n the unit vector 90 degrees to g, `u.n = -(c.n) / V` (V = CRUISE, 3 m/s), clamped to +-0.9, and u = sqrt(1 - k^2) g + k n. A derived formula, no gain, nothing tuned.
+2. **A margin that grows with the current.** The ladder's rungs are each raised by **DRIFT_M = |c_horizontal| x T_TURN**, where T_TURN = (pi / 2) x R_TURN / V = 1.5708 x 35 / 3 = **18.3 s**, the time of a quarter turn at the vessel's turn radius (about 35 m) and cruise speed: the distance the current carries the vessel while it turns a right angle. The raised rungs are tried first and the ordinary ladder (12, 8, 6, 3) after them, so a corridor too narrow for the raised margin is still planned.
+   NOT in this round, and said now: **the current in the COST** (a cell costs more against the set) needs the field solver's cost model changed, and `brain/subFieldNav.mjs` is not edited here. The entry's `nav-current-in-field` stays OPEN for that part.
+
+**Arms flown:** `any` (the reference: HELD4's, byte for byte, the current ignored), `any+crab`, `any+margin`, `any+crab+margin` (**designated**). Plan once at t = 0 (hard-current has no ships); everything else as in `flyHard`.
+
+**Two strengths (2 kinds x 4 arms).** `x1.0`: `hardScenario(seed, "hard-current")` unchanged (the HELD4 kind). `x1.5`: the same scenario with the current's MEAN and its unsteady amplitude both multiplied by 1.5 (mean up to 1.8 m/s on an axis, up to 2.5 m/s in magnitude against a cruise of 3 m/s), the map, start, goal and weight error unchanged. `x1.5` exists because `any` is already at 93 percent at x1.0 and a gain of five flights has no room there.
+
+**The set.** NEW: **HELD7, seeds 701 to 760 in each strength (120 scenarios, 480 flights), flown ONCE**, after the module, the study command (`tools/ship/subCurrentStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. The registration allows ONE amendment before HELD7 is read: if DEV shows a crab clamp or a raised ladder to be degenerate (every flight at no route; the crab arm turning away from the goal) I amend that rule and write it here; nothing is changed after.
+
+**Designated comparison and verdict.** `any+crab+margin` against `any`, paired on the same seeds. **x1.5 GAIN** = reaches **at least 5 more** than `any`. **x1.0 GAIN** = its collisions are **at most half** of `any`'s (a gain of five flights cannot be asked of a 93 percent arm) AND it reaches no fewer. **SUPPORTED** if both hold; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise.
+
+**Predictions, written before DEV and HELD7 (scored held or missed, moving nothing).**
+* **C1**: at x1.5 `any` reaches under 80 percent (at most 47 of 60). 65 percent.
+* **C2** (x1.5 gain): holds. 60 percent.
+* **C3** (x1.0 gain): holds. 45 percent.
+* **C4** (the crab alone does the work): at x1.5 `any+crab` reaches at least 3 more than `any+margin`. 55 percent.
+* **C5** (the margin alone is the cheaper half): `any+margin` reaches no more than `any` at x1.0. 55 percent.
+* **C6** (costs time): the designated arm's median arrival time is within 1.15 times `any`'s at both strengths. 70 percent.
+* **C7**: the designated arm times out in at most 3 flights in all 120. 80 percent.
+* **C8**: no scenario is a no-route scenario for the designated arm's first plan at the raised ladder AND the ordinary one (at most 1 in 120). 85 percent.
+
+**What a result would not say.** The mean current is known EXACTLY by the planner and the unsteady part and the weight error not at all; a vessel that must estimate the current (from its own drift) is another round. The current is horizontal-mean plus a fixed-frequency unsteady part from one generator; real currents have shear, eddies and reversals. The crab is a ground-course correction, not a trajectory plan: the field is still a still-sea field. FOLLOW-UP 3's and 5's lists stand (a perfect position fix, an exact map, one hull, one autopilot). The x1.5 strength is a second condition of my own making, not a measured one.
+
+### DEV NOTE TO FOLLOW-UP 7 [SERIES B] (2026-11-23; made BEFORE HELD7 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (`node tools/ship/subCurrentStudy.mjs --set dev`, seeds 1 to 30, 2 strengths x 4 arms, 240 flights, 7 s) found NEITHER rule degenerate, the only thing the registration allowed an amendment for: no first plan was a no-route scenario at the raised or the ordinary ladder, and the crab arm never turned away from its goal. Read for sanity, not tuned on: `any` reached 26 of 30 at x1.0 and 16 at x1.5; `any+crab` 28 and 20; `any+margin` 23 and 14; the designated `any+crab+margin` 28 and 17. At x1.5 the crab arms time out more (6 and 7 of 30 against `any`'s 3): a current of up to 2.5 m/s against a cruise of 3 m/s leaves a ground speed near 0.5 m/s on a head-on leg, and the 260 s limit is the cost of staying on the course. That is the vessel's physics and not a defect of the rule, and C7 (at most 3 designated timeouts in all) is expected to be MISSED; it is not amended. The raised margin alone did NOT help on DEV (`any+margin` below `any` at both strengths), a finding I will read against C5 and not tune. HELD7 is flown next, once.
+
+## RESULT OF THE CURRENT IN THE FIELD (2026-11-23; `node tools/ship/subCurrentStudy.mjs --set held7 --write`, HELD7 = seeds 701 to 760 of hard-current at two strengths, read once; every flight is in `brain/subCurrentHeld7.jsonl`, 480 records): **PARTLY SUPPORTED by the registered rule, and the designated arm was the wrong one** -- `any+crab+margin` (designated) held the x1.0 gain (2 collisions against `any`'s 4, 58 reached against 56) and missed the x1.5 gain (41 against 38, +3, the bar 5). The arm that did the work was the CRAB ALONE.
+
+The module, the study command and their gates were sabotaged first (the module 64 mutants, 50 red and 14 declared equivalent or not reached; the study command 84 mutants, 82 red and 2 equivalent; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| strength | arm | reached | collided | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|---|
+| x1.0 | any (reference) | 56 / 60 (93%) | 4 | 0 | 0 | 155.6 | 1.09 | 10.0 |
+| x1.0 | any+crab | **60 / 60 (100%)** | 0 | 0 | 0 | 145.6 | 1.03 | 14.1 |
+| x1.0 | any+margin | 56 / 60 (93%) | 3 | 0 | 1 | 172.2 | 1.20 | 22.3 |
+| x1.0 | **any+crab+margin** | 58 / 60 (97%) | 2 | 0 | 0 | 159.1 | 1.12 | 24.9 |
+| x1.5 | any (reference) | 38 / 60 (63%) | 12 | 0 | 10 | 159.0 | 1.12 | 7.1 |
+| x1.5 | any+crab | **48 / 60 (80%)** | 1 | 0 | 11 | 135.5 | 1.03 | 12.8 |
+| x1.5 | any+margin | 34 / 60 (57%) | 15 | 3 | 8 | 182.4 | 1.20 | 8.9 |
+| x1.5 | **any+crab+margin** | 41 / 60 (68%) | 9 | 0 | 10 | 154.2 | 1.10 | 13.6 |
+
+**Predictions scored (held or missed, moving nothing).** **C1 held** (`any` reached 38 at x1.5, the bar 47). **C2 MISSED** (+3). **C3 held**. **C4 held** (`any+crab` 48 against `any+margin` 34). **C5 held** (`any+margin` 56 against `any`'s 56). **C6 held** (time ratios 1.02 and 0.97). **C7 MISSED** (the designated arm timed out in 10 flights at x1.5, the bar 3; the DEV note said to expect it). **C8 held** (no scenario had no route).
+
+**Post hoc, from the 480 recorded flights (labelled: none of it was registered and none of it moves the verdict).** Paired on the same 60 seeds, flights gained / lost, exact two-sided sign test:
+* **`any+crab` against `any`:** x1.0 4 gained, 0 lost (p 0.125); **x1.5 10 gained, 0 lost (p 0.002)**. It reached every one of the 60 at x1.0, with no collision, and cut collisions at x1.5 from 12 to 1.
+* **`any+margin` against `any`:** x1.0 3 and 3; x1.5 1 gained, 5 lost (p 0.22). The raised margin alone does not help and costs time (path over chord 1.20 against 1.09).
+* **`any+crab+margin` against `any+crab`:** x1.5 **0 gained, 7 lost (p 0.016)**; x1.0 0 and 2. Adding the margin to the crab makes it WORSE.
+* **What is left of the crab arm at x1.5:** 11 timeouts and 1 collision. The 11 are flights that stay on the course against a current averaging 2.04 m/s (the whole x1.5 set averages 1.48) with a cruise of 3 m/s; `any` timed out in 10 of its own, and the crab turns 12 of its collisions into 9 more reached and 2 more timeouts. A real vessel would burn more thrust or take the lee, and neither is in this round.
+
+**What this says.** The field does not know the current, and the cheapest correction is the aim point: pointing the nose so the ground track lies on the course the field asked for turned 93 percent into 100 at the HELD4 strength and 63 into 80 at 1.5 times it, with one collision where `any` had twelve. The margin raised by the quarter-turn drift did not do what it was written for: it rounds corridors off the plan's shortest line (path over chord 1.20) and the vessel spends longer exposed to the unsteady part of the current. Within this model the registered designated arm was the worse of the two combinations, which the registration could not know and which is entered above, not hidden.
+
+**What this would not say.** The registration's list stands: the planner is told the MEAN current exactly (a vessel that has to estimate it from its own drift is not here), nothing of the unsteady part or the weight error, the current is one generator's, and x1.5 is a condition of my own making. The crab is a ground-course correction, not a trajectory plan, and the clamp 0.9 was not tuned. The 11 remaining timeouts are a speed limit of the model (a head-on leg in a current close to the cruise speed), not a navigation fault. HELD7's 60 scenarios per cell move by about nine flights between two sets for one arm (FOLLOW-UP 5), so the x1.0 differences (4 flights) are inside that and the x1.5 crab gain (10, p 0.002, 0 lost) is not.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-current-in-field` PARTLY done: the crab angle is in and works, the raised margin is out as written; the current IN THE COST (a cell costs more against the set) and the turn radius in the margin are untouched. New: **`nav-current-estimated`**, the crab arm with the mean current ESTIMATED from the vessel's own drift (ground velocity against water velocity) instead of told.
+
+## FOLLOW-UP 8 [SERIES B -- see note at FOLLOW-UP 6 of series B]: A VESSEL THAT TURNS AWAY FROM A SHIP (nextRounds entry `nav-traffic-avoid-not-slow`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 5's designated arm (`any+predict+edge+yield`) reached 40 of 60 on HELD5; 14 of its 16 collisions were with ships, and slowing to 2.0 m/s for a ship did not change that count. The plan routes round a ship's predicted capsule; when the capsule is wrong or the vessel is already inside the encounter, the only thing the vessel does is slow down. A vessel can also TURN away.
+
+**One new thing, in a new module `brain/subAvoidNav.mjs` (`brain/subHardNav.mjs` is not edited; it supplies the scenario, the plan, the field and the vessel).** The world is HELD5's and FOLLOW-UP 6's `react-none`: `hardScenario(seed, "hard-traffic")` unchanged, every ship holds course and speed, the planner is told each ship's velocity exactly (`posAt`). Every tick the arm takes the heading `h0` the plan gives and asks: holding `h0` at the cruise speed (3 m/s), does the vessel come within r + half-hull + **SHIP_CLEAR = 30 m** of any ship (one the vessel does not pass beneath) at any whole second of the next **SHIP_LOOK_S = 25 s**? If not, `h0` is flown unchanged. If so, the heading is the first of `h0 + d` for d = +15, -15, +30, -30, ... +90, -90 degrees (**AVOID_STEP = 15 degrees, AVOID_MAX = 90 degrees**; starboard first on a tie) that (a) clears every ship by SHIP_CLEAR over the same 25 s and (b) clears every STATIC obstacle (island, iceberg, wall disc the vessel does not pass beneath) by r + half-hull + **STATIC_CLEAR = 12 m** (the ladder's top rung) over the same 25 s. If no candidate qualifies, `h0` is flown. The vessel's heading is assumed to change at once for the test (OPTIMISTIC: it turns at about 35 m radius; SHIP_CLEAR is what absorbs that). The numbers are the ordinary-ship values of FOLLOW-UP 6 and are NOT tuned.
+
+**Arms flown (HELD5's world, 3 arms):** `any+predict+edge+yield` (the reference, HELD5's designated arm byte for byte), `any+predict+edge+avoid` (**designated**: the plan of the reference WITHOUT the slow-down, plus the turn) and `any+predict+edge+yield+avoid` (the reference's slow-down AND the turn). Edge +20 m, yield speed 2.0 m/s, ladder 12, 8, 6, 3 m, REPLAN_S 3, HORIZON_S 30, 260 s: as in FOLLOW-UP 5.
+
+**The set.** NEW: **HELD8, seeds 801 to 860 of hard-traffic (60 scenarios, 180 flights), flown ONCE**, after the module, the study command (`tools/ship/subAvoidStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. The one amendment allowed before HELD8 is read: if DEV shows the avoid rule degenerate (it never fires, or every candidate fails so it never turns) I amend the rule and write it here.
+
+**Designated comparison and verdict.** `avoid` against the reference, paired on the same seeds. **GAIN** = reaches at least **5 more** AND its collisions with ships are **at most half** of the reference's. **SUPPORTED** if both hold; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise.
+
+**Predictions, written before DEV and HELD8 (scored held or missed, moving nothing).**
+* **A1**: the reach gain (at least 5 more) holds. 50 percent.
+* **A2**: ship collisions at most half the reference's. 50 percent.
+* **A3**: the designated arm's exits (left the region) are at most the reference's. 55 percent.
+* **A4**: `avoid+yield` reaches at least as many as `avoid`. 50 percent.
+* **A5**: the designated median arrival time is at most 1.25 times the reference's. 75 percent.
+* **A6**: the designated arm times out in at most 3 flights. 80 percent.
+* **A7**: the designated arm reaches 80 percent (48 of 60), FOLLOW-UP 5's bar. 20 percent.
+
+**What a result would not say.** FOLLOW-UP 3's, 5's and 6's lists stand (a perfect position fix, an exact map, ships that hold course and cannot see the vessel, the velocity told exactly, one hull and autopilot, the current not in the field). The turn is tested as if instant. The look-ahead test uses the SHIP'S true velocity as the planner was told it. A stop, a reverse, an edge COST in the field, a capsule that is the ship's reach and the 36 m-wall exits are NOT in this round, and the entry stays OPEN for them.
+
+### DEV NOTE TO FOLLOW-UP 8 [SERIES B] (2026-11-23; made BEFORE HELD8 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (seeds 1 to 30 of hard-traffic, 3 arms, 90 flights, 36 s) found the avoid rule NEITHER dead nor degenerate, the only thing the registration allowed an amendment for: it fires in 26,472 ticks and turns in 18,794 of them, and in 7,678 no candidate qualified (stuck, the plan's heading flown). The reference arm is `flyHard`'s flight byte for byte (the identity the gate shows). Read for sanity, not tuned on: the reference reached 20 of 30 with 7 ship collisions; the designated `avoid` 20 of 30 with 4 ship collisions, 2 exits (the reference had none) and 4 berg collisions in all; `yield+avoid` 21 of 30 with 6 ship collisions. So the turn trades ship collisions for berg collisions and exits on DEV; the reach gain of 5 looks unlikely, and A1 and A7 are expected to be MISSED. Nothing is amended. HELD8 is flown next, once.
+
+## RESULT OF A VESSEL THAT TURNS AWAY (2026-11-23; `node tools/ship/subAvoidStudy.mjs --set held8 --write`, HELD8 = seeds 801 to 860 of hard-traffic, read once; every flight is in `brain/subAvoidHeld8.jsonl`, 180 records): **NOT SUPPORTED** -- `any+predict+edge+avoid` reached **40 of 60** against the reference's 36 (+4, the bar 5), and its ship collisions fell from 18 to 11 (not half).
+
+The module, the study command and their gates were sabotaged first (the module 96 mutants, 62 red on the first pass, rows added, 18 left declared equivalent or not reached; the study command 70 mutants, 68 red and 2 equivalent; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| arm | reached | collided (with ships) | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|
+| any+predict+edge+yield (reference) | 36 / 60 (60%) | 22 (18) | 2 | 0 | 164.3 | 1.18 | 8.5 |
+| **any+predict+edge+avoid** (designated) | 40 / 60 (67%) | 15 (11) | 5 | 0 | 170.1 | 1.32 | 14.6 |
+| any+predict+edge+yield+avoid | 34 / 60 (57%) | 22 (21) | 4 | 0 | 159.5 | 1.20 | 7.7 |
+
+**Predictions scored (held or missed, moving nothing).** **A1 MISSED** (+4). **A2 MISSED** (11 ship collisions against 18, the bar 9). **A3 MISSED** (5 exits against 2). **A4 MISSED** (`yield+avoid` 34 against `avoid`'s 40). **A5 held** (time ratio 1.03). **A6 held** (no timeouts). **A7 MISSED** (40, the bar 48).
+
+**Post hoc, from the 180 recorded flights (labelled: none of it was registered and none of it moves the verdict).** Paired on the same 60 seeds, flights gained / lost, exact two-sided sign test: `avoid` against the reference 11 and 7 (p 0.48); `yield+avoid` against the reference 5 and 7 (p 0.77); `avoid` against `yield+avoid` 14 and 8 (p 0.29). Collisions by kind: the reference 18 ships and 4 bergs; `avoid` 11 ships and 4 bergs; `yield+avoid` 21 ships and 1 berg. The rule fired in 59,167 ticks of the designated arm's flights and turned in 72 percent of them; in 28 percent no candidate qualified and the plan's heading was flown. 16 of the designated arm's 20 failures had at least one stuck tick.
+
+**What this says.** Turning away from a ship does what it is for (ship collisions fall by seven, 18 to 11) and costs what a turn costs: the vessel leaves the plan's line, travels a third further (path over chord 1.32 against 1.18), and 5 flights left the region where 2 did. The net is four more arrivals, which is inside the nine-flight set-to-set movement FOLLOW-UP 5 measured and nowhere near a signature (p 0.48). Slowing as well made it worse (34), not better: the slower vessel is inside the ships' reach for longer. Nothing registered held except the cost of time and the timeouts. FOLLOW-UP 5's account stands: a quarter of the fires have no safe heading inside 90 degrees given the clearance 30 m and an instant turn, and those are the flights that fail, so a vessel that can only turn is not enough; the entry's other options (a stop, a reverse, a capsule that is the ship's reach, the exits through the edge band) are the ones left.
+
+**What this would not say.** The registration's list stands: the turn was tested as if instant (the real vessel takes about 35 m to turn, which makes the flown result WORSE than the rule's own test, not better), the ships hold course and the planner knows their velocity, the clearances were the ordinary-ship values of FOLLOW-UP 6 and not tuned, and one set of 60 moves by about nine flights. A 90-degree limit and a 15-degree step were not swept.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-traffic-avoid-not-slow` stays OPEN for a stop, a reverse, a capsule that is the ship's reach and the edge exits. New: **`nav-avoid-turn-radius`**, the same rule with the candidate tested against the vessel's own turning arc (a circle of about 35 m radius) instead of a straight line after an instant turn, on fresh seeds.
+
+## FOLLOW-UP 9 [SERIES B -- see note at FOLLOW-UP 6 of series B]: THE ANY-ANGLE ARM'S MARGINS SWEPT (nextRounds entry `nav-margin-sweep-any`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** The any-angle arm's margins were never swept. 12 m was chosen on DEV for the cell arms and carried over; the harder test added a ladder 12, 8, 6, 3 m without sweeping its top rung, and the vertical margin (**VMARGIN = 5 m**: the planner blocks an iceberg when its keel plus 5 m exceeds the shallower of the start and waypoint depths) was never moved. Both write-ups say so as an open caveat.
+
+**Two parameters, in a new module `brain/subMarginSweep.mjs` (`brain/subHardNav.mjs` is not edited; its `flyHard` already takes a ladder, and the vertical margin is moved through the scenario's `minDepth`).**
+1. **The ladder's top rung `T`** in {8, 12, 16, 20, 24} m. The ladder tried is `T` followed by the rungs of the incumbent ladder (12, 8, 6, 3) that are SMALLER than `T` (T = 12: 12, 8, 6, 3 = the incumbent; T = 8: 8, 6, 3; T = 20: 20, 12, 8, 6, 3).
+2. **The vertical margin `V`** in {2, 5, 8, 12} m. `keel + V > minDepth` equals `keel + 5 > minDepth - (V - 5)`, so a flight at `V` is flown on a copy of the scenario whose `minDepth` is `minDepth - (V - 5)`, which moves the plan's block test and the ship conflict test together and nothing else (the collision test reads the real keel and depth and is untouched).
+The incumbent is **(T, V) = (12, 5)**. 5 x 4 = 20 cells.
+
+**What is flown.** The arm is `any` (HELD4's designated arm in hard-islands and hard-gaps: the plan built once at t = 0), in the two static kinds **hard-islands** and **hard-gaps**. SECONDS_HARD 260 and everything else as in `flyHard`. No ships, no current in these kinds.
+
+**The selection rule (written before DEV).** DEV (seeds 1 to 30 of each kind: 20 cells x 2 kinds x 30 = 1,200 flights) is flown once and is NOT a result. The cell chosen is the **best NON-INCUMBENT cell on DEV**: the most reached (pooled over the two kinds), then the fewest collisions, then the smallest distance from the incumbent (|T - 12| + |V - 5|), then the smaller T. It is chosen from 19 cells on 60 scenarios, so its DEV margin over the incumbent is an overstatement by construction (the winner's curse); the held read is the safeguard and is the only result.
+
+**The set.** NEW: **HELD9, seeds 901 to 960 of each of hard-islands and hard-gaps (120 scenarios), flown ONCE**, the incumbent and the DEV-chosen cell on every scenario (240 flights), after the module, the study command (`tools/ship/subMarginStudy.mjs`) and their gates are sabotaged. No amendment is allowed after DEV is read; the grid and the rule above are the whole of it.
+
+**Designated comparison and verdict.** The DEV-chosen cell against the incumbent, paired on the same HELD9 seeds. **GAIN** = the chosen cell reaches at least **5 more** than the incumbent pooled over the 120 scenarios AND loses no more than **2** in either kind (reaches no fewer than the incumbent minus 2 in each kind). **SUPPORTED** (the incumbent margins were not the best and the sweep found better) if the gain holds; **NOT SUPPORTED** (the incumbent's margins stand) if the chosen cell reaches no more than 2 more pooled; **PARTLY SUPPORTED** otherwise (a gain of 3 to 4 pooled, or 5 or more with a kind losing more than 2).
+
+**Predictions, written before DEV and HELD9 (scored held or missed, moving nothing).**
+* **M1**: on DEV some non-incumbent cell reaches at least 3 more than the incumbent, pooled (of 60). 60 percent.
+* **M2**: the verdict is NOT SUPPORTED (the incumbent stands on a fresh set). 55 percent.
+* **M3**: the DEV-chosen cell has a top rung `T` above 12. 40 percent.
+* **M4**: the DEV-chosen cell's vertical margin is above 5. 40 percent.
+* **M5**: on DEV the cell (8, 2) (the thinnest margins) reaches fewer than the incumbent. 70 percent.
+* **M6**: on HELD9 the chosen cell reaches at least as many as the incumbent pooled. 60 percent.
+
+**What a result would not say.** One map generator, one hull, one autopilot, an exact map and fix, and no ships or current in the two kinds swept (the margin for traffic and for a current is a different question: FOLLOW-UP 7 found the raised margin did NOT help in a current). The sweep is a grid of 20 on one fixed `any` plan; the margin is not swept for the cell arms, nor against the edge band. HELD9's 60 scenarios per kind move by about nine flights between two sets for one arm (FOLLOW-UP 5), so a gain under five pooled over 120 is inside the noise this set has.
+
+### DEV NOTE TO FOLLOW-UP 9 [SERIES B] (2026-11-23; made BEFORE HELD9 was read or flown; DEV is not a result and nothing registered above is changed except ONE TIE-BREAK, said here)
+
+**What DEV showed.** The sweep (20 cells x 2 kinds x seeds 1 to 30, 1,200 flights, 30 s) found the plan's margins nearly FLAT on the DEV set: pooled reached out of 60 was **58** at top rung 8 and 20, **59** at 12, 16 and 24, in EVERY vertical margin (2, 5, 8 and 12 gave the same count at each top rung). The incumbent (12, 5) reached 59 of 60 with 1 collision; the `any` arm is at its ceiling on these two kinds, so a gain of 5 pooled over 120 is not within reach and **M1 (a non-incumbent cell 3 above the incumbent) is MISSED**; **M5 (T8V2 below the incumbent) is held** (58 against 59). The vertical margin has NO effect on any DEV flight outcome although it does change the plan's block test (checked by hand: 10, 14 and 27 of the 89 finite-keel obstacles in these 60 scenarios flip their block decision at V = 2, 8 and 12): the icebergs it flips are out of the way of the flown route.
+
+**The tie-break the registration lacked.** The selection rule ended at "the smaller T", and DEV has a TIE that rule does not break: T12V2 and T12V8 are both 59 of 60 with 1 collision, both at distance 3 from the incumbent, both at T = 12. Before HELD9 was read I added **"then the smaller vertical margin"** (the chosen cell is therefore **T12V2**, which is the incumbent's ladder with the thinnest vertical margin); it is in the study command's code and its gate and in the registration's rule above only through this note. It was added knowing DEV's counts, not blind to them, and it is the plain reading of "the more cautious change is the smaller one"; the alternative (T12V8) would have been the same result on HELD9 by the DEV evidence that V does not move a flight, but that is a prediction, not a fact.
+
+**M3 and M4** (the chosen cell's top above 12; its vertical above 5) are therefore decided: M3 MISSED (T = 12), M4 MISSED (V = 2). HELD9 is flown next, once; it will read T12V2 against the incumbent T12V5, which differ ONLY in the vertical margin.
+
+## RESULT OF THE ANY-ANGLE ARM'S MARGINS SWEPT (2026-11-23; `node tools/ship/subMarginStudy.mjs --set held9 --write`, HELD9 = seeds 901 to 960 of hard-islands and of hard-gaps, read once; every flight is in `brain/subMarginHeld9.jsonl`, 240 records): **NOT SUPPORTED -- the incumbent's margins stand.** The DEV-chosen cell T12V2 and the incumbent T12V5 each reached **118 of 120** (59 and 59 by kind), the same two collisions (islands seed 901, gaps seed 927), a pooled gain of 0.
+
+The module, the study command and their gates were sabotaged first (the module 17 mutants, all killed after one row was added; the study command 107 mutants, 96 red on the first pass, 9 of the 11 survivors killed by rows and 2 declared equivalent; logged in the gate headers), the DEV note was written (with the one tie-break it added, disclosed there), and the set was flown once, after that, as registered:
+
+| cell | ladder | reached | collided | left | timeout | median time (s) | islands | gaps |
+|---|---|---|---|---|---|---|---|---|
+| T12V5 (incumbent) | 12, 8, 6, 3 | 118 / 120 (98%) | 2 | 0 | 0 | 128.6 | 59 / 60 | 59 / 60 |
+| **T12V2** (DEV-chosen) | 12, 8, 6, 3 | 118 / 120 (98%) | 2 | 0 | 0 | 128.6 | 59 / 60 | 59 / 60 |
+
+**Predictions scored (held or missed, moving nothing).** **M1 MISSED** (on DEV no cell reached more than 59 of 60, the incumbent's own count). **M2 held** (the verdict is NOT SUPPORTED). **M3 MISSED** (the chosen top rung is 12). **M4 MISSED** (the chosen vertical margin is 2). **M5 held** (T8V2 reached 58 on DEV against the incumbent's 59). **M6 held** (118 against 118).
+
+**Post hoc (labelled).** The two cells differ in only 10 of the 120 flights, and in none of them in the outcome: the arrival times differ by 24 s earlier to 19 s later (the path by 66 m shorter to 52 m longer), so the vertical margin changes the PLAN in those scenarios and not what happens to the vessel in them. The two failures are the same flights in both cells.
+
+**What this says.** On the two static kinds (islands, gaps), the any-angle arm at 12, 8, 6, 3 m and a 5 m vertical margin is at its ceiling (59 of 60 on DEV, 118 of 120 on HELD9) and neither moving the top rung (8 to 24 m, DEV only) nor the vertical margin (2 to 12 m) changed a flight's outcome in the 1,200 DEV flights beyond the top-rung differences of one flight (58 at tops 8 and 20, 59 at 12, 16 and 24). The caveat both write-ups carried (that the margins were never swept) is answered for these two kinds: they do not matter there, because there is nothing left to gain.
+
+**What this would not say.** HELD9 read only T12V2 against the incumbent; the other 18 cells were read on DEV (30 seeds per kind), where the best of them equalled the incumbent, and were not flown on HELD9. A ceiling effect hides a margin that would matter on a harder map (a denser one, or a narrower gap than 24 m); the generator's widths (24, 32, 40 m) were not varied here. The kinds with ships and with a current were NOT swept (FOLLOW-UP 7 found a raised margin made things worse in a current, and the edge band of FOLLOW-UP 5 is another margin). One hull, one autopilot, an exact map and fix.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-margin-sweep-any` is CLOSED for the two static kinds; the traffic arm's margin and the cell arms' margins are not swept (new entry **`nav-margin-sweep-traffic`**: the ladder's top rung and the edge band's extra width on the `any+predict+edge+yield` arm in hard-traffic, where the arm is NOT at its ceiling (60 percent)).
+
+## FOLLOW-UP 10 [SERIES B -- see note at FOLLOW-UP 6 of series B]: MISSIONS AND WHAT A METRE COSTS (nextRounds entry `nav-missions-and-cost`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** Every flight so far is ONE waypoint, and a detour costs nothing. FOLLOW-UP 5 and 6 found `any+predict` flew paths 18 to 25 percent longer than `any+replan`; whether that matters depends on what a metre costs. The submarine's energy model already exists (`physics/mechanics/subNeeds.mjs`, `brain/NEEDS_AND_LIMITS.md`): a BATTERY of 3.0 MJ, electrical power = 200 W hotel + |thrust x forward speed| / 0.5, and a dead screw (thrust forced to 0) at 0 J. Measured by that model's own trim (no flight): holding **3.0 m/s costs 8,025 W = 2,675 J per metre; 2.5 m/s 1,891 J/m; 2.0 m/s 1,259 J/m** (the drag is quadratic, so a metre at cruise costs twice a metre at 2 m/s). A 3 MJ battery therefore carries about **1,120 m at cruise** and a detour is not free.
+
+**One new thing, in a new module `brain/subMissionNav.mjs` (`brain/subHardNav.mjs` and `physics/mechanics/subNeeds.mjs` are not edited; they supply the scenario, the plan, the field, the vessel and the energy).** A MISSION is `hardScenario(seed, "hard-traffic")` (ships hold course and the planner is told their velocity, as in HELD5) with TWO intermediate waypoints between the start and the scenario's own goal: **start -> W1 -> W2 -> goal**. The waypoints are drawn by a seeded generator (not the scenario's): uniform x in [40, 360] m, y in [-100, 100] m, depth uniform in [20, 35] m, accepted when (a) at least r + half-hull + **40 m** from every STATIC obstacle, (b) each leg is at least **120 m**, and (c) the sum of the three chords is between **600 and 850 m** (the cruise energy of that chord is 0.53 to 0.76 of the battery: feasible, with a detour budget of 31 to 88 percent); up to 500 draws, and a seed with no acceptable draw is dropped and counted. A waypoint is reached within 10 m horizontally and 4 m in depth (`missionTask.reached`); on reaching one the plan is rebuilt toward the next. The mission's `minDepth` is the shallowest of the start and the waypoint depths. A mission ends: **complete** (the goal reached with charge left), **energy-out** (the charge hit 0 before the goal; the screw is dead and the vessel drifts: stated in the record as the first tick it was 0), **collided**, **left**, **timeout** at **450 s** (1.5 x the longest chord at cruise, rounded). The energy is the needs layer's: class `battery`, started full, the energy integrated by `stepNeeds` every tick; nothing is refilled (the vessel is never within 0.7 m of the surface).
+
+**Arms flown (4):** `any+replan` (the plan rebuilt every 3 s with each ship where it is, no prediction: the SHORT arm), `any+predict+edge` (the prediction without the slow-down), `any+predict+edge+yield` (**the reference**, HELD5's designated arm: the one that flew the longest paths and slows to 2.0 m/s for a ship), and `any+predict+edge+yield@2.5` (**designated**: the reference with the cruise speed capped at **2.5 m/s**, the middle of the screw's table: 1,891 against 2,675 J/m, 29 percent less a metre, 20 percent longer on the clock). Edge +20 m, yield speed 2.0 m/s, ladder 12, 8, 6, 3 m, REPLAN_S 3, HORIZON_S 30: as in FOLLOW-UP 5.
+
+**The set.** NEW: **HELD10, seeds 1001 to 1060 of hard-traffic (60 missions, 240 flights), flown ONCE**, after the module, the study command (`tools/ship/subMissionStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. The one amendment allowed before HELD10 is read: if DEV shows the missions degenerate (almost every mission dropped for want of waypoints, or every arm dead by energy-out before the first waypoint) I amend the waypoint rule and write it here.
+
+**Designated comparison and verdict.** The designated arm against the reference, paired on the same seeds. **GAIN** = the designated arm completes at least **5 more** missions than the reference. **COST MATTERS** = the reference runs out of energy in at least **5** of the 60. **SUPPORTED** if both hold; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise (a metre's cost does not change which arm to fly).
+
+**Predictions, written before DEV and HELD10 (scored held or missed, moving nothing).**
+* **E1**: the reference runs out of energy in at least 5 of 60 (COST MATTERS). 45 percent.
+* **E2**: the designated arm completes at least 5 more than the reference (GAIN). 40 percent.
+* **E3**: `any+replan` completes at least as many as the reference (the short arm wins once energy counts). 40 percent.
+* **E4**: the designated arm times out in more missions than the reference (the 450 s limit costs the slower vessel). 60 percent.
+* **E5**: the designated arm's energy-outs are at most half the reference's. 45 percent.
+* **E6**: the designated arm completes at least 36 of 60 (the one-waypoint reference's HELD8 rate, 60 percent, held over three legs). 20 percent.
+
+**What a result would not say.** FOLLOW-UP 3's, 5's and 6's lists stand (a perfect position fix, an exact map, ships that hold course and cannot see the vessel, the velocity told exactly, one hull and autopilot, the current not in the field). The energy model is TANK-SCALE and the battery's 3 MJ is its default, not a measured submarine; no waypoint has a task to do and none is optional; the order is fixed (no travelling-salesman choice); no recharging by surfacing is planned (the vessel never surfaces) and a detour is not priced INSIDE the plan (an edge COST in the field is another round). The speed cap is one value, not swept.
+
+### DEV NOTE TO FOLLOW-UP 10 [SERIES B] (2026-11-23; made BEFORE HELD10 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (seeds 1 to 30 of hard-traffic as three-leg missions, 4 arms, 120 flights, 57 s) found the missions NEITHER degenerate nor dropped, the only thing the registration allowed an amendment for: no seed was dropped for want of waypoints (18.4 draws on average, chord sums 605 to 846 m) and the arms are not all dead by energy-out before the first waypoint. Read for sanity, not tuned on: completed of 30 were `any+replan` 16, `any+predict+edge` 17, the reference `any+predict+edge+yield` 19 and the designated `@2.5` 17; energy-outs 0, 2, 1 and 0; collisions 14, 10, 10 and 10 (collisions with ships and icebergs, not energy, are what ends most missions); timeouts 0, 0, 0 and 3. Mean joules a metre flown were 2,889, 2,905, 2,522 and 1,864. So on DEV energy-out is rare (1 mission for the reference) and the designated arm saved 26 percent a metre at the cost of time-outs: **E1 (5 energy-outs in 60) and E2 (5 more completed) are both looking unlikely and are expected to be MISSED**; nothing is amended. HELD10 is flown next, once.
+
+## RESULT OF MISSIONS AND WHAT A METRE COSTS (2026-11-23; `node tools/ship/subMissionStudy.mjs --set held10 --write`, HELD10 = seeds 1001 to 1060 of hard-traffic as three-leg missions on the 3 MJ battery, read once; every flight is in `brain/subMissionHeld10.jsonl`, 240 records): **NOT SUPPORTED -- on this battery a metre's cost did not decide which arm to fly.** The reference ran out of energy in **1** of 60 missions (the bar 5) and the 2.5 m/s arm completed **43**, the same as the reference's 43 (the bar +5).
+
+The module, the study command and their gates were sabotaged first (the module 104 mutants, 76 red on the first pass, a row added, 26 left declared equivalent or not reached; the study command 64 mutants, 62 red and 2 equivalent; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| arm | completed | energy-out | collided | left | timeout | median time (s) | median MJ used | median J/m | path / chord |
+|---|---|---|---|---|---|---|---|---|---|
+| any+replan | 43 / 60 (72%) | 0 | 17 | 0 | 0 | 294.2 | 2.31 | 2,840 | 1.19 |
+| any+predict+edge | 40 / 60 (67%) | 3 | 16 | 1 | 0 | 301.3 | 2.32 | 2,851 | 1.20 |
+| any+predict+edge+yield (reference) | 43 / 60 (72%) | 1 | 14 | 2 | 0 | 319.2 | 2.29 | 2,765 | 1.21 |
+| **any+predict+edge+yield@2.5** (designated) | 43 / 60 (72%) | 0 | 14 | 3 | 0 | 375.9 | 1.64 | 1,980 | 1.23 |
+
+**Predictions scored (held or missed, moving nothing).** **E1 MISSED** (1 energy-out, the bar 5). **E2 MISSED** (43 against 43). **E3 held** (`any+replan` 43, the reference 43). **E4 MISSED** (no arm timed out: the 450 s limit did not bind even for the slow arm, whose median mission took 376 s). **E5 held** (0 energy-outs against 1, at most half). **E6 held** (43, the bar 36: the one-waypoint reference rate of 60 percent survives three legs, at 72 percent, because HELD10's missions are a different draw from HELD8's single legs and are not comparable beyond that).
+
+**Post hoc (labelled; none of it registered, none of it moves the verdict).** Paired on the same 60 missions, completed gained / lost against the reference: `any+replan` 9 and 9 (p 1.0); `any+predict+edge` 3 and 6 (p 0.51); the 2.5 m/s arm 5 and 5 (p 1.0). Collisions by kind: `any+replan` 16 ships and 1 iceberg; `any+predict+edge` 14 and 2; the reference 12 and 2; the 2.5 m/s arm 10 and 4. The reference's completed missions finished with a median of 0.54 MJ left and a minimum of **0.09 MJ**; the 2.5 m/s arm's with a median of 1.19 MJ. The reference's only energy-out was a 758 m mission that died after two legs.
+
+**What this says.** The energy model prices a metre at 2,675 J at cruise and 1,259 J at 2 m/s, and a three-leg mission of 600 to 850 m uses about 1.6 to 2.3 MJ of a 3 MJ battery at cruise: that is close enough to the limit that the cheapest arm saves 0.65 MJ a mission (2.29 against 1.64) and the thinnest margin of the reference was 3 percent of the battery. But the missions that fail here fail to collisions (14 to 17 of the 60 in every arm, 10 to 16 of them with ships) and to 1 to 3 exits: energy ended 1 mission in 60 for the reference and none for two of the arms, so "what a metre costs" is **not what separates the arms on this battery**; collisions with ships are. Arrival time is what the saving costs (376 against 319 s median), and no timeout bound it. A smaller battery, a longer chord window or a hotel load higher than 200 W would make energy bind; none of those was tried.
+
+**What this would not say.** FOLLOW-UP 3's, 5's, 6's lists stand. The 3 MJ battery is the needs layer's tank-scale default; a mission that used 1.6 to 2.3 MJ was chosen by the chord window I wrote (600 to 850 m) and not by any real task; the order is fixed, no waypoint is optional, no waypoint has a task; the detour is not priced INSIDE the plan (an edge cost in the field, the entry's second idea, is not done). The single speed cap of 2.5 m/s was not swept. HELD10's 60 missions per arm move by about nine between two sets for one arm.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-missions-and-cost` is CLOSED for what it asked (multi-waypoint missions, and the energy of a detour through the existing model); new **`nav-mission-energy-binds`**: the same missions on a battery sized so the cruise reference ends at a registered fraction of its charge (for instance 1.0 MJ, where 600 to 850 m at cruise needs 1.6 to 2.3 MJ), so energy decides between the arms, and the 2.5 m/s cap becomes a swept speed.
+
+## FOLLOW-UP 11 [SERIES B -- see note at FOLLOW-UP 6 of series B]: A DEPTH DIMENSION (nextRounds entry `nav-3d-terrain`, picked up 2026-11-23; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** The field is a plan view. An iceberg blocks it when its keel plus 5 m exceeds the SHALLOWER of the start and the waypoint depths (`minDepth`, about 20 m), so a berg with a keel under 15 m is passed beneath "by luck of the vessel's depth" and every deeper one is a column to go round, even where the water under it is deep enough to dive. And there is no seabed at all: the vessel could ground. The harder test's keel was the first step (31 of 57 paired flights changed path, 5 percent shorter at the median). Here: a seabed that rises, and a vertical plan.
+
+**One new thing, in a new module `brain/subTerrain3dNav.mjs` (`brain/subHardNav.mjs` and `brain/missionTask.mjs` are not edited; they supply the scenario, the plan, the field, the vessel and the seabed function).**
+1. **A seabed.** For every scenario a terrain `{ base, a1, l1, a2, l2, b, ly, ... }` in `missionTask.seabedAt`'s form from a seeded generator: base uniform in [65, 85] m, the along-track terms' amplitudes in [3, 8] and [1, 4] m (wavelengths [100, 160] and [50, 80] m), the cross-track term's in [2, 6] m (wavelength [120, 200] m): the floor lies between about 47 and 105 m. **GROUNDED** is `missionTask.fly`'s own test: the hull's lowest point (radius x cos pitch + half the length x |sin pitch|) at or under the floor.
+2. **Three arms**, each the HELD4 `any` plan (hard-islands, built once at t = 0) with:
+   * **`any`**: nothing else. The depth target is the waypoint's depth. Blind to the floor.
+   * **`any+floor`**: the depth target is the smaller of the waypoint's depth and the floor under the hull and 20 m ahead (the sonar range) minus **ALTITUDE = 10 m** (the terrain mission's own altitude). Plan unchanged (2D). Isolates the floor.
+   * **`any+3d`** (**designated**): `any+floor`'s floor clamp AND the vertical plan. A berg whose keel + VMARGIN (5 m) + VRADIUS (0.6 m) can be cleared with the floor 10 m below the hull at EVERY one of nine points of its footprint (the centre and eight on its circle) is PASSABLE UNDER and is removed from the plan's shapes (islands, full-depth walls and bergs that cannot be passed stay). Then the depth target is raised to that clearance (keel + 5.6 m) while the vessel is inside the berg's footprint grown by **DIVE_PAD = 20 m**, or its heading ray meets that footprint within **DIVE_LOOK_M = 90 m** (30 s at cruise); the clamp to the floor still applies and wins.
+3. **The record** adds the arm, the kind, `grounded` (a status), the least floor clearance and the number of ticks the vessel was held down by a keel (`dives`).
+
+**The set.** NEW: **HELD11, seeds 1101 to 1160 of hard-islands (60 scenarios x 3 arms, 180 flights), flown ONCE**, after the module, the study command (`tools/ship/subTerrainStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is NOT a result. The one amendment allowed before HELD11 is read: if DEV shows the seabed degenerate (the start or goal under the floor in most scenarios, or no berg ever passable under) I amend the terrain's ranges and write it here.
+
+**Designated comparison and verdict.** `any+3d` against `any+floor`, paired on the same seeds (the floor is the same, so the difference is the dive-under). **SHORTER** = the median over pairs both reached of path(any+3d) / path(any+floor) is **at most 0.97**. **SAFE** = `any+3d` reaches no fewer than `any+floor` minus 2 AND its groundings plus collisions are at most `any+floor`'s plus 2. **SUPPORTED** if both; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise.
+
+**Predictions, written before DEV and HELD11 (scored held or missed, moving nothing).**
+* **T1** (the floor is a real hazard): `any` grounds in at least 5 of 60. 55 percent.
+* **T2**: `any+floor` reaches at least as many as `any`. 85 percent.
+* **T3** (SHORTER): the median path ratio is at most 0.97. 55 percent.
+* **T4** (SAFE): holds. 55 percent.
+* **T5**: `any+3d` is held down by a keel in at least 30 of 60 flights. 60 percent.
+* **T6**: `any+3d`'s groundings are at most half `any+floor`'s. 30 percent.
+* **T7**: `any+3d`'s median arrival time is at most `any+floor`'s. 55 percent.
+
+**What a result would not say.** FOLLOW-UP 3's and 5's lists stand (a perfect position fix, an exact map, ships none here, the current none, one hull and one autopilot). The floor is READ EXACTLY (no sonar noise: the terrain mission's sensors are noisy and are not used here), so the grounding rate is a floor and not a ceiling; the seabed is smooth sinusoids, no cliffs, no overhangs, no caves; the vertical plan is a depth floor under a berg and not a 3D path search (the plan itself is still a plan view); the autopilot's dive rate limits how late the dive can start and DIVE_LOOK_M was not swept.
+
+### DEV NOTE TO FOLLOW-UP 11 [SERIES B] (2026-11-23; made BEFORE HELD11 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (seeds 1 to 30 of hard-islands over a seabed, 3 arms, 90 flights, 3 s) found the seabed and the vertical plan NEITHER degenerate in the two ways the registration allowed an amendment for (the start or goal under the floor in most scenarios; no berg ever passable under): every flight started above the floor, and **89 of the 89 bergs were passable under** on the floor drawn (every berg of the 30 scenarios had a keel under about 31 m against a floor of at least 47 m less the altitude). Read for sanity, not tuned on: all three arms reached 30 of 30; `any` and `any+floor` flew IDENTICAL flights (the floor never came within 10 m of the vessel: **the floor is not a hazard on these ranges, and T1 is expected to be MISSED**); `any+3d` was held down by a keel in 18 of 30 flights (25,731 dive ticks) and its median path over chord was 1.016 against 1.042, its summed path 11,748 m against 11,738 m (a median gain of a few percent with a longer sum), and the paired median ratio 1.000. Nothing is amended: a rougher floor (a ridge the vessel must go over or round) is a different test and is entered in the register after this one. HELD11 is flown next, once.
+
+## RESULT OF A DEPTH DIMENSION (2026-11-23; `node tools/ship/subTerrainStudy.mjs --set held11 --write`, HELD11 = seeds 1101 to 1160 of hard-islands over a seabed, read once; every flight is in `brain/subTerrainHeld11.jsonl`, 180 records): **PARTLY SUPPORTED by the registered rule** -- the vertical plan was as SAFE as the floor arm but the paired MEDIAN path ratio was **1.00** (the bar 0.97), because the dive-under changed only half the flights; in the flights it changed it shortened every one.
+
+The module, the study command and their gates were sabotaged first (the module 105 mutants, 61 red on the first pass and, after rows were added for the survivors, 25 left declared equivalent or not reached; the study command 72 mutants, 67 red, 3 more killed by rows, 2 equivalent; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| arm | reached | grounded | collided | left | timeout | held down by a keel | median time (s) | path / chord | median min floor gap (m) |
+|---|---|---|---|---|---|---|---|---|---|
+| any | 59 / 60 (98%) | 0 | 1 | 0 | 0 | 0 | 130.1 | 1.02 | 34.9 |
+| any+floor (reference) | 59 / 60 (98%) | 0 | 1 | 0 | 0 | 0 | 130.1 | 1.02 | 34.9 |
+| **any+3d** (designated) | 59 / 60 (98%) | 0 | 1 | 0 | 0 | 25 | 126.9 | 1.00 | 35.2 |
+
+**Verdict.** SHORTER (the paired median of path(any+3d) / path(any+floor) at most 0.97): MISSED, 1.00. SAFE (reaches no fewer than the floor arm minus 2; groundings plus collisions at most plus 2): HELD (59 and 59; 1 and 1). By the registered rule: PARTLY SUPPORTED.
+
+**Predictions scored (held or missed, moving nothing).** **T1 MISSED** (`any` never grounded: the floor was not a hazard). **T2 held** (`any+floor` 59, `any` 59: identical flights). **T3 MISSED** (1.00). **T4 held**. **T5 MISSED** (held down by a keel in 25 of 60 flights, the bar 30). **T6 held, trivially** (0 groundings against 0). **T7 held** (the median arrival time 126.9 against 130.1 s).
+
+**Post hoc, from the 180 recorded flights (labelled; none of it was registered and none of it moves the verdict).** Of the 58 pairs both arms reached, `any+3d` flew a SHORTER path in **29**, a longer one in **0** and the same path in 29 (exact sign test p < 0.0001); the quartiles of the ratio are 0.86 (10th percentile), 0.95 (25th), 1.00 (median and 90th); the shortest is 0.74; the summed path ratio is **0.960** (4 percent shorter over all pairs). The median is 1.00 because the 29 flights with no passable berg on or near the route are the same flight; the 3d arm's 25 held-down flights are the ones that moved, and 20 of them are shorter by more than 0.1 percent. Every scenario had berg(s) passable under (161 in all); `any` and `any+floor` flew IDENTICAL paths in every one of the 60. The two failures were different flights: `any+floor` hit an island on 1133, which `any+3d` reached; `any+3d` struck a berg on 1131 after being held down for 551 ticks (it was held under the keel, and a berg it did not plan for met it), which `any+floor` reached.
+
+**What this says.** On a floor with 47 to 105 m of water, nearly every berg can be dived under, the vessel does so (in 25 of 60 flights), and where it does it saves a quarter of the detour it would have flown (up to 26 percent of the path, 4 percent over all the flights), with no extra arrival time (3 s earlier at the median) and no more risk (one collision each). The registered bar was a median, and a median cannot see an effect that is half the flights and none of the rest: HELD11 read PARTLY SUPPORTED by that rule, and it is a real gain by the paired test. The floor never mattered: the seabed here is not a hazard (no arm grounded in 90 DEV flights or 180 HELD11 ones), so `any+floor` is `any` on this generator, and the first half of the entry (a seabed that rises) is untested.
+
+**What this would not say.** FOLLOW-UP 3's, 5's lists stand. The floor is read exactly, and is smooth sinusoids 47 to 105 m deep, nowhere near the vessel's depth: a ridge to go over or round, a floor shallower than the keels, or a sonar with noise are the tests this does not do. The vertical plan is a depth floor under a berg (a held depth target), not a 3D path search; DIVE_LOOK_M (90 m) and DIVE_PAD (20 m) were not swept. 29 of 58 pairs were identical, so the 60 scenarios carry 29 informative pairs; they move by about nine between two sets for one arm.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-3d-terrain` stays PARTLY DONE: the vertical plan is in and works on a deep floor; the seabed that rises is not tested. New: **`nav-3d-rough-floor`**, the same three arms over a floor drawn so that it comes within the keels (a base of 25 to 45 m with a ridge that crosses the route), so the floor clamp, the passable test and the choice between going over, under and round are all in play.
+
+## FOLLOW-UP 12 [SERIES B -- see note at FOLLOW-UP 6 of series B]: A FLEET OF COURIERS (nextRounds entry `nav-fleet-avoidance`, picked up 2026-11-23 as "the next suggested round" after nav-3d-terrain; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** Every courier in the Sub Aquarium's navigation scene (`brain/subTankNav.mjs`) sails alone: the other subs are not obstacles, so a crowd of couriers pass through one another. The tank scene is where a crowd can be seen. This round measures it headlessly on the same sea and the same navigator.
+
+**One new thing, in a new module `brain/subFleetNav.mjs` (`brain/subTankNav.mjs` and `brain/subHardNav.mjs` are not edited; they supply the sea, the goals, the plan, the field and the vessel).**
+1. **A headless fleet.** `tankScene(seed)` (the standard 500 x 300 m tank: two islands, three icebergs, two patrolling ships) with **N couriers** flown together by the studies' own autopilot, one navigator each (each draws its own goal as the tank's navigator does), for **240 s**. Starts: uniform in x [60, 440] m, y [60, 240] m, depth [14, 40] m, a random heading and 2.5 m/s, at least 20 m + r from every static disc and 50 m from every other sub.
+2. **Two arms.** `any+predict` (**the reference**: the tank's default navigator, `subTankNav.createNavigator`; the other subs are not in its plan) and **`fleet`** (**designated**): the same plan and goal logic, written out in the new module, with every OTHER sub added to the plan's obstacle list at each replan (every 3 s) as a moving disc: its position and velocity as observed exactly then, radius **4 m (the half-hull)**, a FULL-DEPTH column (the plan has no vertical separation, so a sub at another depth is treated as in the way: conservative, said plainly), predicted along a straight line over the plan's 30 s horizon. With no other sub in the list the `fleet` navigator's target is the reference's, tick for tick (the gate shows the identity).
+3. **What is counted.** A **SUB CONTACT**: two subs whose plan-view centres are under **8 m** (2 x half-hull) apart and whose depths differ by under **5 m** (the vertical margin); a new one for the same pair only after **1 s** clear (the tank navigator's HIT_CLEAR_S). Also counted: contacts with the sea's obstacles (the navigator's own `hits`), goals reached (`arrivals`), metres travelled, and the plans for which no route was found (`noRoute`).
+
+**Two fleet sizes:** **N = 4** and **N = 8** (the tank holds up to a few dozen; 8 in 150,000 square metres is a crowd the plan has to share).
+
+**The set.** NEW: **HELD12, seeds 1201 to 1230 (30 seas x 2 fleet sizes x 2 arms = 120 fleet runs), flown ONCE**, after the module, the study command (`tools/ship/subFleetStudy.mjs`) and their gates are sabotaged. DEV (seeds 1 to 10) is flown once as a sanity run and is NOT a result. The one amendment allowed before HELD12 is read: if DEV shows the fleet degenerate (the reference has NO sub contact in any DEV run at N = 8, so nothing can be avoided; or every start is dropped for want of a free position) I amend the start rule and write it here.
+
+**Designated comparison and verdict.** `fleet` against the reference, paired on the same seas and sizes, summed over the 60 pairs. **GAIN** = `fleet`'s sub contacts are **at most half** the reference's. **KEEPS MOVING** = `fleet`'s arrivals are **at least 0.9** of the reference's. **SUPPORTED** if both hold; **PARTLY SUPPORTED** if one; **NOT SUPPORTED** otherwise.
+
+**Predictions, written before DEV and HELD12 (scored held or missed, moving nothing).**
+* **F1**: the reference has at least one sub contact in the median N = 8 run. 80 percent.
+* **F2** (GAIN): holds. 60 percent.
+* **F3** (KEEPS MOVING): holds. 70 percent.
+* **F4**: `fleet`'s contacts with the sea's obstacles are at most the reference's plus 10 percent. 60 percent.
+* **F5**: at least 5 percent of `fleet`'s plans find no route (a crowd blocks the water). 25 percent.
+* **F6**: the ratio of fleet to reference sub contacts is lower (better) at N = 4 than at N = 8. 55 percent.
+
+**What a result would not say.** FOLLOW-UP 3's, 5's, 6's lists stand (a perfect position fix, an exact map, ships that hold a lane, one hull and one autopilot, no current). Every sub sees every other sub's exact position and velocity (no sensing, no communication, no negotiation: all couriers run the same rule, so there is no right-of-way and two subs can dodge the same way); a sub is a full-depth column in the plan, so the plan cannot use a vertical separation; the headless fleet is a model of the tank page, not the page (frame timing, the render and the wanderers' other behaviours are not in it); N = 4 and 8 are two sizes, not a sweep.
+
+### DEV NOTE TO FOLLOW-UP 12 [SERIES B] (2026-11-24; made BEFORE HELD12 was read or flown; DEV is not a result and nothing registered above is changed)
+
+The DEV sanity run (seeds 1 to 10, fleets of 4 and 8, both arms, 40 runs of 240 s, 151 s) found the fleet NEITHER degenerate in the two ways the registration allowed an amendment for: the reference HAS sub contacts at N = 8 (28 in 10 runs, 2.8 a run) and every start was drawn (4 and 8 subs on all ten seas). Read for sanity, not tuned on, pooled over the two sizes: sub contacts 31 for the reference against **6** for `fleet` (N = 4: 3 and 0; N = 8: 28 and 6); arrivals 219 against **161** (0.74 of the reference's: N = 4 72 and 58, N = 8 147 and 103); contacts with the sea's obstacles 56 against **87** (24 and 25; 32 and 62: the fleet arm hits the sea about half as much again at N = 8); the fleet arm found no route in 277 of 3,249 plans at N = 4 (8.5 percent) and 1,167 of 6,476 at N = 8 (18 percent). So GAIN is looking strong (F2 held), KEEPS MOVING looks MISSED (0.74 against 0.9, F3), F4 (sea contacts within 10 percent) looks MISSED, F5 (5 percent no-route) looks held. Nothing is amended. HELD12 is flown next, once.
+
+## RESULT OF A FLEET OF COURIERS (2026-11-24; `node tools/ship/subFleetStudy.mjs --set held12 --write`, HELD12 = seeds 1201 to 1230, fleets of 4 and 8, two arms, 240 s, read once; every run is in `brain/subFleetHeld12.jsonl`, 120 records): **PARTLY SUPPORTED** -- making the other subs obstacles cut sub contacts to **29 against 102** (28 percent of the reference's, the bar half) but lost **28 percent of the arrivals** (522 against 693: 0.75, the bar 0.9), and doubled the contacts with the sea's own obstacles.
+
+The module, the study command and their gates were sabotaged first (the module 178 and then 181 mutants after one function was factored out, 151 red and 30 declared equivalent or not reached; the study command 93 mutants, 76 red on the first pass, **one real flaw found** (GAIN needed an N = 4 designated cell, so an N = 8-only study could not read it: fixed, with rows), 3 equivalent left; both logged in the gate headers), the DEV note was written, and the set was flown once, after that, as registered above:
+
+| fleet | arm | sub contacts | median / run | sea hits | arrivals | travel (km) | plans with no route | lost |
+|---|---|---|---|---|---|---|---|---|
+| 4 | any+predict (reference) | 20 | 1.0 | 46 | 232 | 83.3 | 0 of 9,769 | 0 |
+| 4 | **fleet** | **4** | 0.0 | 76 | 191 | 82.4 | 869 of 9,749 (8.9%) | 0 |
+| 8 | any+predict (reference) | 82 | 2.0 | 91 | 461 | 166.7 | 0 of 19,548 | 0 |
+| 8 | **fleet** | **25** | 1.0 | 204 | 331 | 163.7 | 3,324 of 19,470 (17.1%) | 0 |
+
+**Verdict.** GAIN (sub contacts at most half the reference's, pooled): HELD (29 against 102). KEEPS MOVING (arrivals at least 0.9 of the reference's): MISSED (522 against 693, 0.75). By the registered rule: PARTLY SUPPORTED, which is what the DEV note said to expect.
+
+**Predictions scored (held or missed, moving nothing).** **F1 held** (the reference's median N = 8 run has 2 sub contacts). **F2 held** (the gain). **F3 MISSED** (0.75). **F4 MISSED** (the fleet arm's contacts with the sea 280 against 137, 2.0 times; the bar 1.1). **F5 held** (14.4 percent of the fleet arm's plans found no route; the bar 5). **F6 held** (the fleet/reference ratio 0.20 at N = 4 and 0.30 at N = 8).
+
+**Post hoc, from the 120 recorded runs (labelled; none of it was registered and none of it moves the verdict).** Paired on the same 30 seas: sub contacts, `fleet` lower / higher / same: N = 4 14 / 1 / 15 (exact sign test p 0.001), N = 8 23 / 4 / 3 (p 0.0003). Contacts with the sea: `fleet` HIGHER in 19 of 30 seas at N = 4 (lower in 4; p 0.003) and in **27 of 30 at N = 8 (lower in 3; p < 0.0001)**. Arrivals: `fleet` lower in 21 of 30 at N = 4 (higher in 1) and in **30 of 30 at N = 8** (none higher). Per sub-hour, sub contacts fall from 4.25 to 1.21 and arrivals per kilometre travelled from 2.77 to 2.12 (the same distance, fewer goals reached).
+
+**What this says.** Treating the other subs as traffic does what it is for: sub contacts fall by 72 percent and the median N = 8 run goes from 2 contacts to 1. It costs in two places that grow with the crowd: arrivals (every one of the 30 N = 8 seas lost some) and the sea (the subs, steered round each other, are put into the islands and icebergs they would have avoided: contacts with the sea double). The plan finds no route for 14 percent of its replans because a full-depth column per sub fills the water (17 percent at N = 8); a sub that finds none flies the plan's last heading or the straight default. So the conservative model (a sub is a full-depth disc, which ignores that subs pass at different depths) is the obvious thing to relax first: most of the lost water is vertical separation the plan does not use.
+
+**What this would not say.** The registration's list stands: every sub sees every other's exact position and velocity, there is no negotiation (all subs run one rule, so two can dodge the same way), a sub is a full-depth column, the model is the tank page's navigation and not the page, and N = 4 and 8 are two sizes. The sea's contacts are counted as the tank navigator counts them (not punished); the doubled count says the fleet arm is worse at the thing the tank navigator was built for, which a page showing a crowd would show.
+
+**What it leaves open (entered in `tools/ship/nextRounds.mjs`).** `nav-fleet-avoidance` is CLOSED for the first measurement; new **`nav-fleet-vertical`**: the other subs as discs with a keel (their depth plus a margin) so the plan can pass above or below a sub at another depth, as it already does for icebergs and ships, and a sub that finds no route slows or holds instead of flying on; the same HELD12 design on fresh seas.
+
+## WHY THE FOUR HELD5 EXITS CROSSED THE EDGE BAND (2026-11-16; post hoc, a diagnosis of four recorded flights, NOT a registered result; part 1 of `nav-traffic-avoid-not-slow`)
+
+The designated arm `any+predict+edge+yield` left the region on HELD5 seeds 504, 508, 527 and 535. Re-flown under the first-order orientation step they were recorded with (`setOrientationDefault("euler")`), all four reproduce to the tick (1968, 3878, 3256, 4005 ticks, status `left`). A trace of the last minute of each (position, distance to the edge, the vessel's heading, the target heading, the plan's margin and whether the plan has a route from the vessel's cell) shows ONE mechanism, the same in all four:
+
+1. **The ship's predicted capsule pushes the plan toward the edge.** 25-35 m from the edge, the vessel is heading almost square at it (headings -80 to -120 deg toward y = +140, +90 toward y = -140) at the cruise 3 m/s, and the target heading jumps between successive plans (seed 504: 133, -13, -6, 1, 135 deg on five replans).
+2. **The margin ladder falls to its last rung, 3 m.** That narrows the blocked edge band from 4 + 12 + 20 = 36 m to 4 + 3 + 20 = 27 m, and within a replan or two the vessel's own cell lies INSIDE the band.
+3. **From a blocked cell there is no route.** `buildHardField`'s `own` option frees the cells around the vessel of SHAPES (ships, islands) but not of the EDGE, so the flow field has no distance at the vessel's cell (`NOROUTE`, `inBlocked` on every replan to the exit), and the arm falls back to the straight bearing to the goal.
+4. **The fallback asks for a turn the vessel cannot make in the room left.** The straight bearing is 70-145 deg off the vessel's heading; at 3 m/s the turn needs about 35 m (the turning radius the notes give) and 20-24 m remain. The vessel leaves 9-13 s later (at x = 119, 270, 217, 316, as recorded). `+yield` does not slow it: it slows only for a ship conflict, and by then none is in front.
+
+**What this says, and does not.** The band is a wall for the PLAN only; nothing in the arm slows or turns the vessel when the plan has no route, so a vessel that enters the band at speed and square to it leaves. Two changes follow from the trace and are NOT tested here: free the edge cells around the vessel as `own` frees the shapes (so a route always exists from where it is, pointing inward), and slow to the yield speed while the vessel's cell is blocked. Neither touches the 14 ship collisions, which are the other half of the entry; a give-way move is the registered round's question.
+
+## FOLLOW-UP 6: GIVE WAY, AND A WAY OUT OF THE EDGE BAND (Keith, 2026-11-16: "lets do all 3 next steps", the third being `nav-traffic-avoid-not-slow`; REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+**Why.** HELD5 left two failures in the traffic kind: 14 collisions with ships that a 2 m/s slow-down did not prevent, and 4 exits, which the diagnosis above traced to a vessel standing inside the blocked edge band with no route from its own cell. This round adds one fix for each and flies them alone and together.
+
+**The two options (new, in a new module; `brain/subHardNav.mjs` is not edited).**
+- **`+free`:** when a plan is rebuilt, the cells within OWN_CLEAR (15 m) of the vessel are freed of the EDGE as well as of shapes, so a route always starts where the vessel is; and while the vessel's own cell is in the blocked edge band of the plan in force, its speed target is YIELD_SPEED (2.0 m/s).
+- **`+giveway`:** when `shipConflict` fires (the same test `+yield` uses: a ship within r + half-hull + 20 m in the next 30 s, the vessel holding heading and speed), the vessel steers instead of only slowing: of the headings within +-90 deg of the plan's target heading, in 5 deg steps, nearest the target first (a tie to the turn to starboard, that is to the smaller heading), it takes the first whose straight run at its present speed for the next 30 s keeps every ship farther than r + half-hull + 20 m and every point at least half-hull + 3 m inside the region. If none does, it keeps the plan's heading and slows to 2.0 m/s, as `+yield` does. No constant is chosen on data.
+
+**Arms (hard-traffic, ships holding course and speed):** `ref` = `any+predict+edge+yield` (HELD5's designated arm, flown by a copy of `flyHard` that the gate holds equal to it bit for bit with both options off); `ref+free`; `ref+giveway`; **`ref+free+giveway` (designated)**.
+
+**The set:** **HELD78 = hard-traffic seeds 7501 to 7560**, no navigation set uses them, flown ONCE after the options, the command and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is not a result. Every flight is flown under the engine's default orientation step (RK4); nothing here is read against a first-order record.
+
+**Checks (a failure: the verdict is NOT WEIGHED):** with both options off the copy equals `flyHard` on every DEV flight (status, ticks, path, minimum clearance); every arm flies the same 60 scenarios; each option changes at least one HELD78 flight.
+
+**The rule (FOLLOW-UP 5's, unchanged in form).** SUPPORTED iff the designated arm reaches **at least 48 of 60**, **no flight leaves the region**, its **ship collisions are at most half the reference's**, and it **gains at least 5 flights net over `ref` with an exact two-sided sign test p <= 0.10** on the discordant flights. PARTLY SUPPORTED iff only the gain bar holds; NOT SUPPORTED otherwise. Reported, not weighed: each single option against `ref` the same way, median arrival time, path over chord, minimum clearance.
+
+**Expectations, written before any flight.** `+free` alone leaves no exit: about 70 percent. `+giveway` alone halves the ship collisions: about 40. The designated arm reaches 48 of 60: about 25; gains 5 net at p <= 0.10: about 45; the verdict SUPPORTED about 20, PARTLY about 30, NOT about 50.
+
+**What will be built:** `brain/subGiveWay.mjs` (the flight copy and the two options), `tools/ship/subGiveWayStudy.mjs` (DEV, HELD78, the report), gates for both with mutation passes; then HELD78 once.
+
+## RESULT OF FOLLOW-UP 6 (2026-11-16; `node tools/ship/subGiveWayStudy.mjs --set held78 --write`, HELD78 = hard-traffic seeds 7501 to 7560, read once; 240 flights in `brain/subGiveWayHeld78.jsonl`): **NOT SUPPORTED.**
+
+The options and the command were gated and sabotaged first (22 mutants, all red by name, seven only after a row each; logged in the gate's header); six DEV flights were flown while building, as a smoke run, and DEV was flown once more as the registered sanity run (designated 21 of 30 against the reference's 20, not a result). All three checks passed.
+
+| arm | reached | collided (with a ship) | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|
+| ref (`any+predict+edge+yield`) | 44 / 60 | 14 (13) | 1 | 1 | 163.4 | 1.13 | 14.02 |
+| ref+free | 45 / 60 | 14 (13) | **0** | 1 | 164.0 | 1.13 | 14.02 |
+| ref+giveway | 45 / 60 | 11 (**9**) | **4** | 0 | 162.9 | 1.18 | 19.38 |
+| **ref+free+giveway** | **45 / 60** | 10 (8) | 4 | 1 | 162.9 | 1.18 | 19.38 |
+
+**Verdict.** 48 of 60: MISSED (45). No exit: MISSED (4). Ship collisions at most half the reference's: MISSED (8 against 13). Net gain of 5 at p <= 0.10: MISSED (7 gained, 6 lost, net 1, exact sign p 1.0). By the registered rule, NOT SUPPORTED.
+
+**Against the expectations (written first).** `+free` alone leaves no exit, about 70: **held** (0 against the reference's 1). `+giveway` alone halves the ship collisions, about 40: **no** (13 to 9). The designated arm reaches 48, about 25: no. Net 5 at p <= 0.10, about 45: no. NOT SUPPORTED, about 50: it came.
+
+**What this says.** `+free` does what the diagnosis said it would and nothing else: the one exit it could see is gone, and no flight changed otherwise. `+giveway` moves the failures rather than removing them: it steers clear of four ships (13 to 9 ship collisions, minimum clearance 14 m to 19 m) and in doing so takes four flights out of the region, although every heading it chooses keeps a straight 30 s run 7 m inside. Why a run that is checked to stay inside still ends outside is NOT traced; the turn back after giving way (about 35 m at cruise) is the first suspect, and it is a guess. `+free` does not save them: it slows the vessel in the band but cannot shorten the turn. **Traffic is still not fixed**: on fresh ships the reference itself reached 44 of 60, the best arm 45.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** A give-way that checks the turn back into the plan as well as the straight run, or that gives way only while the run back is clear; the one timeout per arm; a stop, which this vessel cannot do (its authority falls with speed).
+
+## WHY THE HELD78 GIVE-WAY EXITS LEFT THE REGION (2026-11-17; post hoc, a diagnosis of recorded flights, NOT a registered result; part 1 of FOLLOW-UP 7)
+
+FOLLOW-UP 6 named "the turn back after giving way" as the first suspect and said it was a guess. **It is mostly wrong.** Re-flying the four `ref+giveway` exits (seeds 7503, 7539, 7552, 7553) with a pilot that logs every tick, and the reference's own exit (7553):
+
+* In three of the four, the last ship conflict ended **90 to 236 s before the exit**, with the vessel 60 to 75 m from the edge. Giving way changed WHERE the vessel was; it did not take it out. Only 7539 exits within 16 s of an episode, 12.8 m from the edge.
+* What takes them out is a **reversal of the plan near the edge**. About 50 m from the edge and heading toward it, a replan flips the target heading by about 180 degrees (7503 at 235 s: heading 51, target -129; the reference on 7553 at 199 s: heading -69, target 135). The autopilot takes the half-turn the short way. At about 180 degrees that is an accident of sign, and in all the traced cases it was the way that **sweeps through the heading pointing straight at the edge**. The plan then changes its mind mid-turn (7503: -135 to -23; 7553: 135 to 40) and the vessel turns back, too late.
+* **The turn, measured** (the PD autopilot on the explorer model at cruise, a target held 90 degrees ahead of the heading): 180 degrees in about 28 s; advance 32 m at 90 degrees; transfer 47 m at 180. A vessel 50 m from the edge and heading toward it has room only if it turns AWAY. In the traces the turns ran slower than this clean one (about 2 to 3 degrees a second against 6.4) while the plan kept moving.
+
+`+giveway` makes this more likely because it moves the vessel off the plan's line. The reference does it too (its one HELD78 exit is this). `+free` slows the vessel in the band but does not choose the direction of the turn.
+
+## FOLLOW-UP 7: A TURN THAT CHECKS ITS OWN SWEEP (Keith, 2026-11-17: "Let's do all the next sandbox rounds, smallest first"; the backlog's FOLLOW-UP 7 of `nav-traffic-avoid-not-slow`; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**The option, `+sweep`.** It sits between the plan and the autopilot and acts on the final target, after give-way and `+free`. When the target heading is more than 90 degrees from the vessel's heading, it predicts the path of the turn in each direction. The prediction uses a table of the vessel's own measured turn: the displacement every 5 degrees of a turn led 90 degrees ahead at cruise, measured from the model at load, not assumed. It rotates the table to the vessel's heading, mirrors it for the direction, and runs it up to the angle that direction needs (capped at 180). A direction is **inside** if every predicted point is at least HULL_HALF + 3 + SWEEP_PAD (10 m) from every edge of the region. If the autopilot's own (shortest) direction is inside, nothing changes. If it is not and the other direction is, the option **commands the heading 90 degrees ahead of the vessel in the other direction**, and keeps that direction (a latch) until the vessel is within 90 degrees of the target. If neither is inside, nothing changes. SWEEP_PAD = 10 m is fixed here, not tuned: the traced turns were slower than the clean one.
+
+**The arms** (hard-traffic, `any+predict+edge+yield` underneath, `brain/subGiveWay.mjs`'s flight unchanged): `ref`; `ref+sweep` (reported); `ref+free+giveway` (FOLLOW-UP 6's designated arm, reported); **`ref+free+giveway+sweep` (designated)**.
+
+**The set.** HELD79 = hard-traffic seeds 7601 to 7660, flown ONCE; spent by no navigation module. DEV (seeds 1 to 30) is flown first as a sanity run and is not a result. HELD78 will also be flown with the new arms as a labelled POST HOC check of the diagnosis. It is not a result: its exits chose the fix.
+
+**The registered test.** The designated arm against `ref`, paired by seed:
+* **SUPPORTED** iff (1) no flight leaves the region, (2) net gain >= 5 at an exact two-sided sign p <= 0.10, and (3) ship collisions no more than `ref`'s.
+* **PARTLY SUPPORTED** iff no flight leaves the region and the gain bar is missed.
+* **NOT SUPPORTED** otherwise.
+Reported beside it: the designated arm against `ref+free+giveway` (what the sweep adds to FOLLOW-UP 6's arm), `ref+sweep` against `ref`, and how many flights the sweep changed (ticks overridden per arm).
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: with the sweep off, the arms reproduce FOLLOW-UP 6's stored HELD78 flights on its first five seeds (status, ticks, path). (2) THE TABLE IS THE MODEL'S: the table's 90-degree advance is 25 to 40 m, its 180-degree transfer is 40 to 55 m (the measurement above), and the two directions mirror each other. (3) SAME SCENARIOS. (4) THE SWEEP BITES: it overrides at least one tick on the set.
+
+**Expectations, written before any seed is flown.** E1 the designated arm has no exit: about 55 percent. Exits are about 1 in 15 flights on this kind, and the sweep cannot help a vessel whose both directions are out. E2 SUPPORTED: about 20 percent, because the gain bar needs 5 net and exits were at most 4 of 60. E3 PARTLY SUPPORTED: about 35 percent. E4 the sweep overrides fewer than 2 percent of ticks: about 80 percent. E5 `ref+sweep` reaches at least as many as `ref`: about 70 percent.
+
+**What a result would not say.** The table is the clean turn of one hull at cruise. The region's edge is a hard wall here and the islands are not in the check (only the edge is), so a sweep could steer into an island. The verdict is about exits on hard-traffic.
+
+### CORRECTION TO THE DIAGNOSIS AND TO FOLLOW-UP 7's REGISTRATION (2026-11-17, while building its gate, BEFORE ANY HELD79 SEED IS FLOWN; the option, the arms, the set, the test, the bars and SWEEP_PAD are UNCHANGED)
+
+**My trace scripts counted time as ticks x 0.1 s. The model's tick is 1/30 s**, so every time in the diagnosis above is three times too large. The gate found it: a flight of 3310 ticks cannot be 331 s long when a flight is capped at 260 s. Corrected:
+* The last ship conflict ended **10 to 79 s** before the exit in the three late cases (not 90 to 236), and 7539 exits **5 s** after its episode (not 16).
+* 7503's reversal is at **78 s** (not 235); the reference's on 7553 at **66 s** (not 199).
+* **"In the traces the turns ran slower than the clean one" is WRONG.** 7503 turned 67 degrees in 11.7 s, about 5.7 degrees a second, near the clean turn's 6.4. That sentence was SWEEP_PAD's stated reason. SWEEP_PAD stays 10 m as registered, as a fixed allowance for the plan moving during the turn and for the vessel not starting the turn at cruise. It has no measured basis, which is what "not tuned" already said.
+* The mechanism is unchanged and was read from positions and headings, not times: a reversal of the plan about 50 m from the edge, the short way sweeping through the heading at the edge, the plan changing its mind mid-turn.
+
+The turn table and the 28 s, 32 m and 47 m of the turn measurement were computed with the model's own tick and are right. The module's gate now checks a real 180-degree turn of the model against the table at every 5 degrees (worst 0.000 m).
+
+## RESULT OF FOLLOW-UP 7 (2026-11-17; `node tools/ship/subTurnSweepStudy.mjs --set held79 --write`, HELD79 = hard-traffic seeds 7601 to 7660, read once; 240 flights in `brain/subTurnSweepHeld79.jsonl`): **PARTLY SUPPORTED.**
+
+The module, the study and both gates were committed and sabotaged first (dfe83ca0; 23 mutants logged; one of them exposed the time-scale error corrected above). DEV was flown once as the sanity run (no exit in any arm; PARTLY SUPPORTED on 30, not a result). HELD78 was flown as the labelled post hoc check (the designated arm's exits 4 to 1, the reference's 1 to 0; not a result). All four checks passed on HELD79.
+
+| arm | reached | collided (with a ship) | left | timeout | sweep turns | ticks overridden |
+|---|---|---|---|---|---|---|
+| ref (`any+predict+edge+yield`) | 45 / 60 | 10 (9) | **5** | 0 | 0 | 0 |
+| ref+sweep | 47 / 60 | 12 (11) | 1 | 0 | 6 | 0.82% |
+| ref+free+giveway (FOLLOW-UP 6) | 45 / 60 | 11 (8) | 4 | 0 | 0 | 0 |
+| **ref+free+giveway+sweep** | **48 / 60** | 12 (10) | **0** | 0 | 8 | 1.23% |
+
+**Verdict.** No exit: MET (0, against the reference's 5). Net gain of 5 at p <= 0.10 against `ref`: MISSED (10 gained, 7 lost, net 3, exact sign p 0.6291). Ship collisions no more than `ref`'s: MISSED (10 against 9). By the registered rule, PARTLY SUPPORTED.
+
+**Reported beside it.** What the sweep adds to FOLLOW-UP 6's arm: 3 gained, 0 lost (p 0.25); exits 4 to 0. `ref+sweep` against `ref`: 3 gained, 1 lost; exits 5 to 1.
+
+**Against the expectations (written first).** E1 no exit, about 55: held. E2 SUPPORTED, about 20: no. E3 PARTLY SUPPORTED, about 35: held. E4 fewer than 2 percent of ticks overridden: held (1.23). E5 `ref+sweep` reaches at least as many as `ref`: held (47 against 45).
+
+**What this says.** The diagnosis was right about the exits. Taking the long way round when the short way leaves the region removed every exit on a fresh set, and it never cost the give-way arm a flight it had reached. It did not fix traffic. The flights it kept inside mostly ended against a ship instead (`ref+sweep`: 4 fewer exits, 2 more collisions), and the designated arm reached 48, three more than either reference, not significant. **Traffic is still not fixed. The failures left are collisions with ships, about 1 flight in 6, with no exit on any arm that has the sweep.**
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The collisions: whether the sweep's long way, which checks only the edge, turns into ships (the registration said it might, and it was not checked). A sweep that checks ships as well as the edge is the obvious next registration. The one remaining exit of `ref+sweep` (both ways out).
+
+## WHY THE HELD79 SHIP COLLISIONS HAPPENED (2026-11-17; post hoc, a diagnosis of recorded flights, NOT a registered result; part 1 of FOLLOW-UP 8)
+
+FOLLOW-UP 7's designated arm hit a ship in 10 of 60 HELD79 flights. **The sweep's forced turns were not the main cause**: 9 of its 12 collisions (ships and bergs) had no forced turn. The sweep did turn 3 exits into ship collisions (7627, 7633, and 7657 under `ref+sweep`). Re-flying seven of the designated arm's ship collisions with a pilot that logs every tick (the tick is 1/30 s):
+
+* **Head-on, mostly.** In 5 of 7 the ship's course is within 35 degrees of opposite the vessel's (relative course -155 to 175). The others: -134 and -54. Ship speeds 1.25 to 2.8 m/s against the vessel's 1.9 to 2.1.
+* **Deep keels.** The ships' keels are 27 to 51 m. The vessel was at 15 to 40 m, always ABOVE the keel, so a ship cannot be passed beneath at the depth the vessel holds.
+* **Give-way runs out of headings.** The conflict lasted 15 to 31 s. Ten seconds before the hit, give-way had a heading in 6 of 7. **One and five seconds before, it had none in all 7 but one**: no candidate within 90 degrees keeps a straight 30 s run clear. Give-way then FALLS BACK TO THE PLAN, the worst choice, and the vessel holds on into the ship.
+
+## FOLLOW-UP 8: WHEN NO HEADING IS CLEAR, THE LEAST BAD ONE; AND A DIVE UNDER THE KEEL (Keith, 2026-11-17: "then the sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+Two options on top of FOLLOW-UP 7's designated arm (`ref+free+giveway+sweep`, the reference here, flown unchanged).
+
+* **`+leastbad`.** When give-way acts (a ship conflict) and finds no clear heading, it takes the candidate whose straight run stays clear the LONGEST: the most whole seconds before the run first breaks the region margin or a ship's clearance, by `runClear`'s own geometry. Ties go to the nearer offset, in give-way's order. A best run of 0 s changes nothing. It holds the plan's depth and speed, as give-way does.
+* **`+dive`.** When there is a ship conflict, the vessel is commanded down to the deepest keel among the ships in conflict, plus VMARGIN, plus 2 m, if that is deeper than the target's depth and no deeper than **DIVE_MAX = 60 m** (crush depth 100 m). It is held while the conflict lasts. Only the depth changes. "In conflict" is `shipConflict`'s test, applied ship by ship.
+
+**The arms** (hard-traffic): `sweep` (the reference, FOLLOW-UP 7's designated arm); `sweep+leastbad` and `sweep+dive` (reported); **`sweep+leastbad+dive` (designated)**.
+
+**The set.** HELD81 = hard-traffic seeds 7821 to 7880, flown ONCE; spent by no navigation set (HELD80 ends at 7820). DEV (1 to 30) is the sanity run. HELD79 will also be flown with the new arms as a labelled POST HOC check: its collisions chose the fix.
+
+**The registered test.** The designated arm against the reference, paired by seed:
+* **SUPPORTED** iff (1) ship collisions at most half the reference's, (2) net gain >= 5 at an exact two-sided sign p <= 0.10, and (3) no flight leaves the region.
+* **PARTLY SUPPORTED** iff (3) holds and exactly one of (1) and (2) does.
+* **NOT SUPPORTED** otherwise.
+Reported beside it: each option alone against the reference; how often each option acted (ticks); the deepest depth any flight reached.
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: with both options off, the reference reproduces FOLLOW-UP 7's stored HELD79 flights of its designated arm on the first five seeds (status, ticks, path). (2) SAME SCENARIOS. (3) EACH OPTION BITES: each changes at least one flight on the set. (4) NO CRUSH: no flight is lost to depth.
+
+**Expectations, written before any seed is flown.** E1 `sweep+dive` alone at most halves the ship collisions: about 45 percent (a 20 m dive takes about 20 s at 1 m/s, against conflicts of 15 to 30 s). E2 `sweep+leastbad` alone reduces them: about 50 percent. E3 SUPPORTED: about 25 percent. E4 PARTLY SUPPORTED: about 35 percent. E5 no flight is lost to depth: about 95 percent.
+
+**What a result would not say.** The ships do not react here (hard-traffic: the reacting kind is NAV_PLUS item 3's). Their keels are known exactly. The dive ignores icebergs' keels and the region's floor (the navigation model's seabed is 1,000 m).
+
+### CLARIFICATION OF FOLLOW-UP 8's REGISTRATION (2026-11-17, before any of its code is run and before any seed is flown)
+
+"It holds the plan's depth and speed, as give-way does" was ambiguous. When give-way finds no heading, the target the vessel is given is the plan's WITH the yield's slowing (2 m/s at a predicted conflict). Give-way's own target, when it finds one, has no yield. **`+leastbad` changes only the heading of the target it is given, so the yield's slowing stays.** Both options act on the final target, after give-way and `+free` and before FOLLOW-UP 7's sweep. Nothing else changes.
+
+### AMENDMENT 1 TO FOLLOW-UP 8 (2026-11-17; made while building, on five seeds of HELD79, the POST HOC set; BEFORE DEV OR ANY HELD81 SEED IS FLOWN)
+
+**The registered `+leastbad` score cannot act when it is needed.** "The most whole seconds the run stays clear" is 0 for EVERY candidate once the vessel is already inside a ship's clearance ring (r + HULL_HALF + 20 m), which is exactly the last seconds the diagnosis found give-way empty in. The rule then changes nothing. Smoke-flown on HELD79's 7601, 7605, 7620, 7635 and 7641, it acted on 0 to 62 ticks and saved none.
+
+**Amended `+leastbad`.** In a ship conflict with no clear give-way heading, each candidate is scored by its straight run's **closest predicted approach** to the ships in conflict over the horizon: the minimum of the distance to each one, less its r and HULL_HALF. Runs that leave the region margin within the horizon are not candidates. The candidate with the largest closest approach is taken (ties to the earlier offset) if it is larger than the target heading's own; otherwise nothing changes. Only the heading changes. `+dive`, the arms, the set, the test, the bars and the checks are unchanged.
+
+## RESULT OF FOLLOW-UP 8 (2026-11-17; `node tools/ship/subTrafficDiveStudy.mjs --set held81 --write`, HELD81 = hard-traffic seeds 7821 to 7880, read once; 240 flights in `brain/subTrafficDiveHeld81.jsonl`): **PARTLY SUPPORTED.**
+
+The module, the study and both gates were committed and sabotaged first (ef15e8c7; 18 mutants logged). DEV was the sanity run (NOT SUPPORTED on 30, not a result). HELD79 was the labelled post hoc check (NOT SUPPORTED: the designated arm gained 5 and lost 1, ship collisions 7 against 10; not a result). All four checks passed on HELD81.
+
+| arm | reached | collided (with a ship) | left | least-bad ticks | dive ticks | deepest (m) |
+|---|---|---|---|---|---|---|
+| sweep (FOLLOW-UP 7's designated arm, the reference) | 44 / 60 | 15 (9) | 1 | 0 | 0 | 40.9 |
+| sweep+leastbad | 45 / 60 | 14 (9) | 1 | 4,230 | 0 | 40.9 |
+| sweep+dive | 49 / 60 | 11 (6) | 0 | 0 | 29,260 | 55.1 |
+| **sweep+leastbad+dive** | **49 / 60** | 11 (6) | **0** | 4,645 | 28,867 | 55.1 |
+
+**Verdict.** Ship collisions at most half the reference's: MISSED (6 against 9). Net gain of 5 at p <= 0.10: MET (5 gained, 0 lost, exact sign p 0.0625). No exit: MET. Exactly one of the first two bars holds with no exit, so the registered rule gives PARTLY SUPPORTED.
+
+**Reported beside it.** `sweep+dive` alone against the reference: the same 5 gained, 0 lost. `sweep+leastbad` alone: 1 gained, 0 lost; it leaves the ship collisions at 9.
+
+**Against the expectations (written first).** E1 `sweep+dive` at most halves the ship collisions, about 45: no (9 to 6). E2 `sweep+leastbad` reduces them, about 50: no (9 to 9). E3 SUPPORTED, about 25: no. E4 PARTLY SUPPORTED, about 35: held. E5 no flight lost to depth, about 95: held (deepest 55.1 m against a crush depth of 100).
+
+**What this says.** **Going under the keel is the fix that works; turning the least bad way is not.** Diving below a ship in conflict turned 5 flights that the reference lost into arrivals and lost none, on fresh seeds and on the post hoc set alike (5 to 0 there too). Steering at the last moment does nothing measurable: once give-way has no clear heading, there is no heading that helps. The designated arm reached 49 of 60, the best of any traffic arm so far (FOLLOW-UP 7's 48 on HELD79, 45 on its own set), with no exit. **Traffic is still not fixed**: 6 flights in 60 still meet a ship, and 5 more an iceberg or an island.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The dive starts only when a conflict is predicted, 30 s out, and a 15 m dive at 1 m/s nearly fills that. A plan that chooses a depth beneath the traffic from the start is the obvious next registration, building on the vertical plan of `brain/NAV_3D_WIP.md`. Least-bad can be dropped.
+
+## FOLLOW-UP 9: A DEEP TRANSIT, BENEATH THE TRAFFIC FROM THE START (Keith, 2026-11-17: "let's do the next sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** FOLLOW-UP 8 found that going under a ship's keel is the fix that works, but its dive starts only when a conflict is predicted 30 s out, and a 15 m dive at 1 m/s nearly fills that. Measured before registering (a property of the scenario generator, no flight): in DEV's 30 hard-traffic scenarios, **82 of 99 ships have keels a vessel can pass under within 60 m** (keel + VMARGIN + 2 <= 60; keels 18 to 60 m, median 39), and in 15 of the 30 scenarios every ship can be.
+
+**The option, `+deep`.** From the start, the target depth is the **transit depth**: the deepest keel among the scenario's ships that can be passed under (keel + VMARGIN + DIVE_PAD <= DIVE_MAX = 60 m), plus VMARGIN, plus DIVE_PAD (2 m). It holds while the vessel is more than **ASCEND_M = 140 m** from the goal on the plane, then gives way to the goal's depth.
+
+ASCEND_M is fixed here from the arrival rule: within 4 m of the goal's depth, a climb of up to 45 m at the autopilot's 1 m/s takes about 45 s, which is 110 to 135 m of track at cruise. Only the depth changes, and only deeper. A scenario with no passable ship, or whose transit depth is not deeper than the target, is unchanged. `+deep` acts on the final target before FOLLOW-UP 8's dive and FOLLOW-UP 7's sweep, both kept. The plan and give-way are unchanged and still avoid ships the vessel may already be under: conservative, and said.
+
+**The arms** (hard-traffic): `sweep+dive` (the reference: FOLLOW-UP 8's arm that carried its gain; least-bad is dropped, as its result advised); **`sweep+dive+deep` (designated)**.
+
+**The set.** HELD82 = hard-traffic seeds 7881 to 7940, flown ONCE (HELD81 ended at 7880). DEV (1 to 30) is the sanity run.
+
+**The registered test** (FOLLOW-UP 8's): the designated arm against the reference, paired by seed.
+* **SUPPORTED** iff ship collisions at most half the reference's, AND a net gain >= 5 at an exact two-sided sign p <= 0.10, AND no exit.
+* **PARTLY SUPPORTED** iff no exit and exactly one of the first two holds.
+* **NOT SUPPORTED** otherwise.
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: the reference reproduces FOLLOW-UP 8's stored `sweep+dive` HELD81 flights on the first five seeds (status, ticks, path). (2) SAME SCENARIOS. (3) DEEP BITES: it changes at least one flight. (4) NO CRUSH.
+
+**Expectations, written before any seed is flown.** E1 the ship collisions at most halve: about 55 percent. E2 SUPPORTED: about 30 percent. E3 some flight is lost to arriving deep or timing out on the climb (more timeouts than the reference): about 35 percent. E4 no crush: about 95 percent.
+
+**What a result would not say.** The ships' keels are known exactly from the start. A deeper transit costs energy, which is not counted here (`brain/NAV_MISSIONS_WIP.md` prices a metre, not a depth).
+
+## RESULT OF FOLLOW-UP 9 (2026-11-17; `node tools/ship/subDeepTransitStudy.mjs --set held82 --write`, HELD82 = hard-traffic seeds 7881 to 7940, read once; 120 flights in `brain/subDeepTransitHeld82.jsonl`): **NOT SUPPORTED** by the registered rule (one exit), with the largest gain any traffic arm has shown.
+
+The module, the study and the gate were committed and sabotaged first (a3387e92; 14 mutants, all red on the first run). DEV was the sanity run (27 of 30 against 23, one exit, not a result). All four checks passed.
+
+| arm | reached | collided (with a ship) | left | timeout | deepest (m) |
+|---|---|---|---|---|---|
+| sweep+dive (the reference, FOLLOW-UP 8's) | 43 / 60 | 16 (13) | 1 | 0 | 59.0 |
+| **sweep+dive+deep** | **52 / 60** | **7 (7)** | 1 | 0 | 60.5 |
+
+**Verdict.** Ship collisions at most half the reference's: MISSED by half a flight (7 against 13; half is 6.5). Net gain of 5 at p <= 0.10: MET (**9 gained, 0 lost, exact sign p 0.0039**). No exit: MISSED (1). The rule asks for no exit before anything else, so it is **NOT SUPPORTED**.
+
+**Said plainly.** The one exit is seed 7920, and **the reference leaves on the same seed**. The deep transit did not cause it; it did not fix it either. Every one of the deep arm's 7 collisions is a seed on which the reference also collided. The deep arm lost no flight the reference reached, and its 3 iceberg collisions are gone (bergs have keels of 6 to 36 m). By the rule as written the round is NOT SUPPORTED, and that verdict stands. A result that clears the bars it can affect is still not a result on the bar it cannot.
+
+**Against the expectations (written first).** E1 the ship collisions at most halve, about 55: no, narrowly (13 to 7). E2 SUPPORTED, about 30: no. E3 more timeouts than the reference, about 35: no (0 and 0). E4 no crush, about 95: held (deepest 60.5 m against 100).
+
+**What this says.** Flying beneath the traffic from the start is the strongest traffic result yet. 52 of 60 against FOLLOW-UP 8's 49 of 60 on its own set, and it never cost a flight. What is left is: ships whose keels are too deep to pass under (17 percent of ships, measured), the one exit the planner makes on 7920, and an energy cost a deeper transit was not charged.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).**
+* Why 7920 leaves in both arms: an exit the sweep did not catch.
+* The ships too deep to pass under.
+* The transit's price in energy (`brain/NAV_MISSIONS_WIP.md`'s meter can be pointed at it).
+
+## WHY FOLLOW-UP 9'S DEEP ARM STILL FAILS (2026-11-18; post hoc, a diagnosis of spent sets, NOT a registered result; Keith: "Let's do all 6 items", item 4 nav-traffic-avoid-not-slow)
+
+A diagnosis re-flew the deep arm and its reference on the spent HELD82, HELD81 and DEV sets. The re-flights match all 120 stored HELD82 flights and the 60 stored HELD81 sweep+dive flights exactly. The deep arm had never been flown on HELD81. There it reached 54 of 60 against 49 (+7 -2), but HELD81 is spent, so that is not a result.
+
+**The deep arm's 14 failures on HELD82 and HELD81 fall into four classes:**
+* **(A) A ship too deep to pass under** (keel over 53 m, since keel + VMARGIN 5 + DIVE_PAD 2 > DIVE_MAX 60): **9 of its 12 ship collisions.** Two missed passing under by 0.8 m and 0.3 m.
+* **(B) The climb near the goal** (inside ASCEND_M 140 m), which ignores ships overhead: 2 (7912, 7832).
+* **(C) A descent too slow** for a ship arriving within 20 s (the autopilot's 1 m/s climb-rate limit): 1 (7888).
+* **(D) An exit, because the plan lost its route:** 2, **7920** and 7863. **The ships that close the route are ones the deep vessel is ALREADY BENEATH**, because the plan filters ships against the scenario's minDepth (the shallower of start and goal), not the vessel's own depth.
+
+**Energy.** The transit has no depth cost under the needs model (the hull takes no damage below a strain of 0.8; the deepest point was 60.5 m). On flights both arms reached, the paired energy difference had a median of -3.9 kJ on HELD82 and -4.3 kJ on HELD81, about 0.1 percent of a battery.
+
+## FOLLOW-UP 10: UNDER EVERY KEEL -- the last flown round of nav-traffic-avoid-not-slow (REGISTERED 2026-11-18, BEFORE ANY CODE FOR IT AND BEFORE ANY HELD88 SEED IS FLOWN)
+
+**What was flown before this registration, said first.** Prototypes of 8 configurations were flown on the spent sets above and on **hard-traffic seeds 1401 to 1600 (in no set): about 2,400 flights there.** The designs below were chosen after seeing them, so the true effect is likely smaller than the prototype's, and the set is sized for half of it. The prototype numbers on 1401 to 1600, against the deep arm (R: 182 reached, 15 ship collisions, 1 berg, 1 exit, 1 timeout):
+
+| configuration | reached | paired | sign p | ship collisions |
+|---|---|---|---|---|
+| the limit raised to 70 m alone | 192 | +10 -0 | 0.002 | 5 |
+| the beneath filter alone | 181 | +8 -9 | | 17 |
+| **both (the designated arm U)** | **196** | **+15 -1** | **0.0005** | **3** |
+
+U had 0 exits, and its deepest point was 68.1 m. A limit of 80 was identical to 70 tick for tick, alone and combined: any limit of 67 m or more gives the same arm, because the generator's keels are at most 60 m. **U costs vertical clearance**: on 1401 to 1600 the median minimum ship clearance fell from 20.0 m to 7.0 m, because it passes beneath ships it used to avoid.
+
+**The question.** On fresh hard-traffic scenarios, does a deep transit that may go as deep as needed to pass under every keel the sea holds, AND whose plan no longer routes around ships the vessel is already beneath, reach more goals than FOLLOW-UP 9's deep arm, with fewer ship collisions and no more exits?
+
+**The arms (FOLLOW-UP 9's sweep+dive+deep, with nothing else changed):**
+* **R `sweep+dive+deep`**, the REFERENCE: FOLLOW-UP 9's designated arm, DIVE_MAX 60.
+* **U `sweep+dive+deep+under+beneath`**, DESIGNATED. Two changes:
+  * **+under:** the transit and the conflict dive may go to 70 m. The transit becomes the deepest keel of ALL the ships + VMARGIN + DIVE_PAD, at most 67 m, a hull strain of 0.67, below the needs model's damage-free 0.8.
+  * **+beneath:** at each tick the plan, the give-way, the yield and the dive see the scenario's obstacles WITHOUT the ships whose keel + VMARGIN is at or above the vessel's present depth; bergs are untouched. Such a ship cannot be hit: the collision test needs depth - 0.6 < keel, and the vessel is at least 5 m below the keel. A gate row holds that the collision verdicts equal a full-list check.
+* **L `sweep+dive+deep+under`**: the limit alone. A SECONDARY reading for attribution, not judged by the verdict.
+
+**The set.** **HELD88 = hard-traffic seeds 10201 to 10400: 200 scenarios, flown ONCE.** A grep for 10201 and 10400 over the navigation modules, their studies and notes finds nothing; the only hits are other families' seed ranges (planner, zero-range), with their own generators. DEV = seeds 1 to 30 (spent), a sanity run only. Why 200 and not the series' 60: at the prototype's rates, the gain bar below has about 38 percent power at 60 scenarios and about 98 percent at 200; at half the effect, 6 and 63 percent.
+
+**The registered test: U against R, paired by seed.**
+* **SUPPORTED** iff all three hold:
+  * **(a)** U's ship collisions are at most half of R's;
+  * **(b)** the net gain (only U reached, minus only R) is at least 5, at an exact two-sided sign p <= 0.10;
+  * **(c)** U has no more exits than R, and at most 1. The series' "no exit" bar was set per 60 scenarios; it is restated here for 200, said openly.
+* **PARTLY SUPPORTED** iff (c) holds and exactly one of (a) and (b) holds.
+* **NOT SUPPORTED** otherwise.
+* **HARMFUL** is printed beside it if the net gain is -5 or worse.
+
+**Reported (moving nothing):**
+* L against R, the same three readings (the limit's share);
+* each arm's status counts, timeouts, deepest point, and energy (navEnergy);
+* the MINIMUM SHIP CLEARANCE per flight: the larger of the horizontal gap less radius and half-hull, and the vertical gap below the keel, with a paired sign test;
+* the failure classes A to D of U's failures.
+
+**Checks (a failure: NOT WEIGHED; all run before any HELD88 flight):**
+1. **THE COPY:** R reproduces the stored FOLLOW-UP 9 flights of HELD82 (brain/subDeepTransitHeld82.jsonl) on its first five seeds (status, ticks, path).
+2. **SAME SCENARIOS:** every arm flies the 200 HELD88 seeds in order (checked after).
+3. **THE LIMIT BITES:** on DEV, some U flight goes deeper than 60.8 m.
+4. **NO HULL DAMAGE:** no arm's deepest point reaches 80 m (checked after).
+
+**This is the last flown round for this item, said before it is flown.** What the prototype leaves (contact while still descending, under the 1 m/s climb-rate limit) is a property of the autopilot, not the navigation. Whatever HELD88 reads, the item closes on it with that residue named.
+
+**Expectations, written before any HELD88 seed.**
+* K1: SUPPORTED, about 60 percent (the prototype's effect, discounted for selection).
+* K2: (a) holds, about 75.
+* K3: (b) holds, about 70.
+* K4: U has at most 1 exit, about 85.
+* K5: L gains at least 5 over R, about 60.
+* K6: U's median minimum ship clearance is below R's, about 95 percent (it passes beneath).
+
+**What a result would not say.** Anything about drafts deeper than the vessel can go, or keels the vessel must sense: keels are known exactly. Nor anything about a hull with a shallower damage depth: 67 m is safe only for this hull.
+
+## RESULT OF FOLLOW-UP 10 (2026-11-18; `node tools/ship/subTrafficUnderStudy.mjs --set dev`, then `--set held88 --write`; HELD88 = hard-traffic seeds 10201 to 10400, flown ONCE; 600 flights in brain/subTrafficUnderHeld88.jsonl): **SUPPORTED**
+
+Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference reproduces FOLLOW-UP 9's stored HELD82 flights; the limit bites on DEV; the same 200 seeds in order; the deepest point of any arm is 68.0 m, under 80. Before the registered flights, the three arms were checked against the prototype on all 270 HELD82 and DEV flights, and matched every one. DEV was a sanity run with no verdict (U 30 of 30 against R 27).
+
+| arm | reached | ship collisions | exits | timeouts | deepest (m) | median min ship clearance (m) | median energy (kJ) |
+|---|---|---|---|---|---|---|---|
+| R sweep+dive+deep (reference) | 181/200 | 17 | 2 | 0 | 61.0 | 19.22 | 1292 |
+| **U +under+beneath (designated)** | **197/200** | **3** | **0** | 0 | 67.9 | 6.96 | 1112 |
+| L +under (attribution) | 194/200 | 4 | 2 | 0 | 68.0 | 20.41 | 1279 |
+
+* **U against R: gained 16, lost 0, net 16, exact sign p < 0.0001.**
+* (a) ship collisions 3, at most half of 17: HOLDS. (b) net 16 >= 5 at p <= 0.10: HOLDS. (c) no exit, against R's 2: HOLDS.
+* **VERDICT: SUPPORTED.**
+* **Reported:**
+  * L against R: +13 -0, p 0.0002; ships 4 against 17; exits 2. **The limit carries 13 of the 16 gains; the beneath filter removes the exits** (L keeps R's 2, U has none).
+  * R's ship collisions were 15 in scenarios with a keel over 53 m and 2 in the others; U's were 2 and 1.
+  * **The minimum ship clearance is SMALLER under U in 138 scenarios and larger in 57 (p < 0.0001), median 6.96 m against 19.22 m.** U passes beneath ships it used to keep away from.
+  * U used less energy (median 1112 kJ against 1292).
+
+**Against the expectations (written first).** K1 SUPPORTED (about 60): HELD. K2 (a) (about 75): HELD. K3 (b) (about 70): HELD. K4 at most 1 exit (about 85): HELD (0). K5 L gains at least 5 (about 60): HELD (13). K6 U's clearance below R's (about 95): HELD.
+
+**What it says.** With the dive allowed to the depth the deepest keel needs, and the plan no longer routing around ships the vessel is already beneath, this vessel reaches 197 of 200 fresh traffic scenarios. The remaining 3 are ship collisions. The prototype's leftovers were contact while still descending, which is the autopilot's 1 m/s climb-rate limit, not the navigation. The gain was bought partly with vertical margin: the vessel now passes closer beneath ships, by design, and with keels known exactly.
+
+**nav-traffic-avoid-not-slow CLOSES on this result, as registered.** The residue is named, not opened:
+* contact while descending (an autopilot property);
+* keels the vessel must sense rather than know;
+* drafts deeper than the hull may go (here every keel was at most 60 m, against a damage depth of 80);
+* the smaller vertical clearance, if a real vessel wanted a larger one.

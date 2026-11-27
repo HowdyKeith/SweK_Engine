@@ -1,0 +1,7 @@
+// WebGLEngine/brain/crabSlow.mjs -- Round 27 worker (registered BEFORE the run): slower collision-course stimuli, crab network with the drift gain at 720 x 240. node brain/crabSlow.mjs <g> <rv> -> a JSON line.
+import * as C from "./crabMlg1.mjs";
+import { loomingEllipse } from "./stealthLoomStimuli.mjs";
+const S = 4, W = 180 * S, H = 60 * S, fps = 30, [g, rv] = [Number(process.argv[2]), Number(process.argv[3])], P = { driftGain: g, driftScope: "segment" }, seg = 4;
+const mk = (o) => loomingEllipse({ rv, w: W, h: H, fovDeg: 144, step: 1 / fps, startPx: 3 * S, endPx: 37 * S, cx: 45 * S, cy: H / 2, ...o });
+const run = (o) => { const s = mk(o), net = C.createNetwork({ W, H, params: P }); let a = null, sp = 0; s.frames.forEach((f, k) => { const r = net.step({ w: W, h: H, data: f.data.map((v) => v * 255) }); if (r.spike[seg]) sp++; if (r.alarm[seg] && a === null) a = k; }); return { alarm: a, size: a === null ? null : s.width[a] * 2 / S, t: a === null ? null : a / fps, sp, frames: s.frames.length }; };
+console.log(JSON.stringify({ g, rv, plain: run({ plain: "light" }), static: run({ stripes: "static" }), moving: run({ stripes: "moving" }), up: run({ stripes: "moving", stripeHz: -4 }), recede: run({ plain: "light", receding: true }) }));

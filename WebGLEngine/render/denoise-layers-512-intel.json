@@ -1,0 +1,445 @@
+{
+ "about": "tools/denoiseLayers.mjs: where the denoiser's time goes on this adapter, layer by layer, and a kernel set aimed at the slowest",
+ "adapter": {
+  "name": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+  "software": false,
+  "timestamps": true
+ },
+ "software": false,
+ "compiler": "DXC",
+ "size": [
+  512,
+  512
+ ],
+ "network": {
+  "name": "shipped",
+  "file": "render/denoise-net-r11.json",
+  "layers": [
+   {
+    "Cin": 10,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 32,
+    "k": 3
+   },
+   {
+    "Cin": 32,
+    "Cout": 81,
+    "k": 1
+   }
+  ]
+ },
+ "sets": [
+  "r12",
+  "r15",
+  "r18t",
+  "r18u",
+  "r27w",
+  "r41h",
+  "r57p"
+ ],
+ "whole": {
+  "r12": {
+   "gpuMs": 2573.609287,
+   "perPass": [
+    {
+     "name": "layer 0 (tiled, 10 -> 32)",
+     "ms": 185.590183
+    },
+    {
+     "name": "layer 1 (tiled, 32 -> 32)",
+     "ms": 630.090905
+    },
+    {
+     "name": "layer 2 (tiled, 32 -> 32)",
+     "ms": 628.518846
+    },
+    {
+     "name": "layer 3 (tiled, 32 -> 32)",
+     "ms": 620.7903
+    },
+    {
+     "name": "layer 4 (direct, 32 -> 81)",
+     "ms": 384.347994
+    },
+    {
+     "name": "kernel (apply)",
+     "ms": 108.878132
+    }
+   ],
+   "passes": [
+    "layer 0 (tiled, 10 -> 32)",
+    "layer 1 (tiled, 32 -> 32)",
+    "layer 2 (tiled, 32 -> 32)",
+    "layer 3 (tiled, 32 -> 32)",
+    "layer 4 (direct, 32 -> 81)",
+    "kernel (apply)"
+   ]
+  },
+  "r15": {
+   "gpuMs": 273.233481,
+   "perPass": [
+    {
+     "name": "layer 0 (fast, 10 -> 32)",
+     "ms": 23.572799
+    },
+    {
+     "name": "layer 1 (fast, 32 -> 32)",
+     "ms": 72.322286
+    },
+    {
+     "name": "layer 2 (fast, 32 -> 32)",
+     "ms": 72.466451
+    },
+    {
+     "name": "layer 3 (fast, 32 -> 32)",
+     "ms": 72.634532
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 33.678974
+    }
+   ],
+   "passes": [
+    "layer 0 (fast, 10 -> 32)",
+    "layer 1 (fast, 32 -> 32)",
+    "layer 2 (fast, 32 -> 32)",
+    "layer 3 (fast, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r18t": {
+   "gpuMs": 263.213721,
+   "perPass": [
+    {
+     "name": "layer 0 (tile_inline, 10 -> 32)",
+     "ms": 25.445936
+    },
+    {
+     "name": "layer 1 (tile_inline, 32 -> 32)",
+     "ms": 68.43768
+    },
+    {
+     "name": "layer 2 (tile_inline, 32 -> 32)",
+     "ms": 70.720062
+    },
+    {
+     "name": "layer 3 (tile_inline, 32 -> 32)",
+     "ms": 71.747045
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 26.284422
+    }
+   ],
+   "passes": [
+    "layer 0 (tile_inline, 10 -> 32)",
+    "layer 1 (tile_inline, 32 -> 32)",
+    "layer 2 (tile_inline, 32 -> 32)",
+    "layer 3 (tile_inline, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r18u": {
+   "gpuMs": 174.31736,
+   "perPass": [
+    {
+     "name": "layer 0 (fast_unroll, 10 -> 32)",
+     "ms": 15.997084
+    },
+    {
+     "name": "layer 1 (fast_unroll, 32 -> 32)",
+     "ms": 41.203523
+    },
+    {
+     "name": "layer 2 (fast_unroll, 32 -> 32)",
+     "ms": 41.156857
+    },
+    {
+     "name": "layer 3 (fast_unroll, 32 -> 32)",
+     "ms": 41.390603
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 33.850971
+    }
+   ],
+   "passes": [
+    "layer 0 (fast_unroll, 10 -> 32)",
+    "layer 1 (fast_unroll, 32 -> 32)",
+    "layer 2 (fast_unroll, 32 -> 32)",
+    "layer 3 (fast_unroll, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r27w": {
+   "gpuMs": 546.518877,
+   "perPass": [
+    {
+     "name": "layer 0 (wino, 10 -> 32)",
+     "ms": 55.125555
+    },
+    {
+     "name": "layer 1 (wino, 32 -> 32)",
+     "ms": 148.823758
+    },
+    {
+     "name": "layer 2 (wino, 32 -> 32)",
+     "ms": 153.857429
+    },
+    {
+     "name": "layer 3 (wino, 32 -> 32)",
+     "ms": 152.569116
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 31.807086
+    }
+   ],
+   "passes": [
+    "layer 0 (wino, 10 -> 32)",
+    "layer 1 (wino, 32 -> 32)",
+    "layer 2 (wino, 32 -> 32)",
+    "layer 3 (wino, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r41h": {
+   "gpuMs": 340.032937,
+   "perPass": [
+    {
+     "name": "layer 0 (fast_unroll_h, 10 -> 32)",
+     "ms": 39.534549
+    },
+    {
+     "name": "layer 1 (fast_unroll_h, 32 -> 32)",
+     "ms": 91.866565
+    },
+    {
+     "name": "layer 2 (fast_unroll_h, 32 -> 32)",
+     "ms": 90.993411
+    },
+    {
+     "name": "layer 3 (fast_unroll_h, 32 -> 32)",
+     "ms": 90.397171
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 29.759285
+    }
+   ],
+   "passes": [
+    "layer 0 (fast_unroll_h, 10 -> 32)",
+    "layer 1 (fast_unroll_h, 32 -> 32)",
+    "layer 2 (fast_unroll_h, 32 -> 32)",
+    "layer 3 (fast_unroll_h, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  },
+  "r57p": {
+   "gpuMs": 167.774712,
+   "perPass": [
+    {
+     "name": "layer 0 (fast_unroll_p, 10 -> 32)",
+     "ms": 13.406707
+    },
+    {
+     "name": "layer 1 (fast_unroll_p, 32 -> 32)",
+     "ms": 39.826628
+    },
+    {
+     "name": "layer 2 (fast_unroll_p, 32 -> 32)",
+     "ms": 39.695713
+    },
+    {
+     "name": "layer 3 (fast_unroll_p, 32 -> 32)",
+     "ms": 41.230773
+    },
+    {
+     "name": "layer 4 and kernel (head_apply, 32 -> 81 -> 3)",
+     "ms": 33.593642
+    }
+   ],
+   "passes": [
+    "layer 0 (fast_unroll_p, 10 -> 32)",
+    "layer 1 (fast_unroll_p, 32 -> 32)",
+    "layer 2 (fast_unroll_p, 32 -> 32)",
+    "layer 3 (fast_unroll_p, 32 -> 32)",
+    "layer 4 and kernel (head_apply, 32 -> 81 -> 3)"
+   ]
+  }
+ },
+ "aim": {
+  "best": "r57p",
+  "bestMs": 167.753463,
+  "perLayer": [
+   {
+    "layer": 0,
+    "set": "r57p",
+    "kernel": "fast_unroll_p",
+    "ms": 13.406707,
+    "fastest": "r57p",
+    "bySet": {
+     "r12": 185.590183,
+     "r15": 23.572799,
+     "r18t": 25.445936,
+     "r18u": 15.997084,
+     "r27w": 55.125555,
+     "r41h": 39.534549,
+     "r57p": 13.406707
+    }
+   },
+   {
+    "layer": 1,
+    "set": "r57p",
+    "kernel": "fast_unroll_p",
+    "ms": 39.826628,
+    "fastest": "r57p",
+    "bySet": {
+     "r12": 630.090905,
+     "r15": 72.322286,
+     "r18t": 68.43768,
+     "r18u": 41.203523,
+     "r27w": 148.823758,
+     "r41h": 91.866565,
+     "r57p": 39.826628
+    }
+   },
+   {
+    "layer": 2,
+    "set": "r57p",
+    "kernel": "fast_unroll_p",
+    "ms": 39.695713,
+    "fastest": "r57p",
+    "bySet": {
+     "r12": 628.518846,
+     "r15": 72.466451,
+     "r18t": 70.720062,
+     "r18u": 41.156857,
+     "r27w": 153.857429,
+     "r41h": 90.993411,
+     "r57p": 39.695713
+    }
+   },
+   {
+    "layer": 3,
+    "set": "r57p",
+    "kernel": "fast_unroll_p",
+    "ms": 41.230773,
+    "fastest": "r57p",
+    "bySet": {
+     "r12": 620.7903,
+     "r15": 72.634532,
+     "r18t": 71.747045,
+     "r18u": 41.390603,
+     "r27w": 152.569116,
+     "r41h": 90.397171,
+     "r57p": 41.230773
+    }
+   },
+   {
+    "layer": 4,
+    "set": "r57p",
+    "kernel": "head_apply",
+    "ms": 33.593642,
+    "fastest": "r18t",
+    "bySet": {
+     "r12": 493.226126,
+     "r15": 33.678974,
+     "r18t": 26.284422,
+     "r18u": 33.850971,
+     "r27w": 31.807086,
+     "r41h": 29.759285,
+     "r57p": 33.593642
+    }
+   }
+  ],
+  "mixed": [
+   "r57p",
+   "r57p",
+   "r57p",
+   "r57p",
+   "r57p"
+  ],
+  "predictedMs": 167.753463,
+  "predictedGain": 1,
+  "slowest": [
+   {
+    "layer": 3,
+    "ms": 41.230773,
+    "share": 0.24578194847757032
+   },
+   {
+    "layer": 1,
+    "ms": 39.826628,
+    "share": 0.2374116592752544
+   },
+   {
+    "layer": 2,
+    "ms": 39.695713,
+    "share": 0.2366312580980817
+   },
+   {
+    "layer": 4,
+    "ms": 33.593642,
+    "share": 0.20025602690538793
+   },
+   {
+    "layer": 0,
+    "ms": 13.406707,
+    "share": 0.0799191072437056
+   }
+  ],
+  "uniform": true
+ },
+ "headToHead": {
+  "rounds": 5,
+  "mixed": {
+   "median": 172.38689,
+   "p10": 166.992974,
+   "p90": 188.850383,
+   "n": 50
+  },
+  "best": {
+   "median": 171.357323,
+   "p10": 150.710812,
+   "p90": 185.163524,
+   "n": 50
+  },
+  "gain": 0.9940275794754463
+ },
+ "image": {
+  "worstVsF64": 0.004287344096436571,
+  "worstVsBest": 0,
+  "finite": true,
+  "built": [
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "head_apply"
+  ],
+  "wanted": [
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "fast_unroll_p",
+   "head_apply"
+  ]
+ },
+ "at": "2026-11-22T00:55:53.103Z",
+ "package": "0.6.2"
+}

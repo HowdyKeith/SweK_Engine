@@ -183,6 +183,23 @@ console.log("\n2b. THE CONNING TOWER AND THE TAIL: built here with the real thre
     mat.dispose(); for (const k of Object.keys(geo)) geo[k].dispose();
 }
 
+console.log("\n2c. THE DARK-COMPASS MARK: the pure arithmetic, and its store built with the real three.js (no GL needed). The obstacles, goals and survey stations are render/subAquarium3dMarks.mjs's (its own gate).");
+{
+    ok("  the dark-compass mark is amber (DARK_COLOUR 0xf6a623), its ring is 0.9 of a hull (DARK_RING " + V3.DARK_RING + "), its ghost line GHOST 2.2 rings long",
+        V3.DARK_COLOUR === 0xf6a623 && Math.abs(V3.DARK_RING - V3.HULL_LENGTH * 0.9) < 1e-12 && V3.GHOST === 2.2);
+    const dm = V3.darkMark({ id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } });
+    ok("!! darkMark: a dark compass gives a ring centred on the sub (100, -20, 50) of radius DARK_RING and a ghost tip GHOST rings along its believed heading 0 (+X); a valid compass or none gives null; a non-finite belief draws the ring only",
+        dm && dm.centre.join() === "100,-20,50" && dm.r === V3.DARK_RING && Math.abs(dm.tip[0] - (100 + V3.DARK_RING * V3.GHOST)) < 1e-9 && dm.tip[1] === -20 && Math.abs(dm.tip[2] - 50) < 1e-9
+        && V3.darkMark({ x: 0, y: 0, depth: 0, compass: { valid: true, seen: 0 } }) === null && V3.darkMark({ x: 0, y: 0, depth: 0 }) === null
+        && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).tip === null && V3.darkMark({ x: 0, y: 0, depth: 5, compass: { valid: false, seen: NaN } }, 2).r === 2 * V3.DARK_RING, JSON.stringify(dm));
+    const ds = V3.darkStore(THREE), darkRow = { id: "d", x: 100, y: 50, depth: 20, heading: 0, pitch: 0, compass: { valid: false, seen: 0 } };
+    const d1 = V3.syncDark(THREE, ds, [darkRow, { id: "s", survey: { finished: false, stations: [{ x: 1, y: 2, depth: 3, visited: false }] } }]), ring = ds.dark.get("d").ring, kids = ds.group.children.length, d2 = V3.syncDark(THREE, ds, []);
+    ok("!! syncDark: one ring and ghost line per dark sub (a survey draws nothing here now), the ring at the sub scaled to DARK_RING, and an empty snapshot clears them",
+        d1.dark === 1 && kids === 2 && ring.position.x === 100 && ring.position.y === -20 && ring.scale.x === V3.DARK_RING && ds.darkMat.color.getHex() === V3.DARK_COLOUR && d2.dark === 0 && ds.group.children.length === 0, JSON.stringify({ d1, kids, d2 }));
+    ok("!! main's survey buoys and navigation columns are GONE from this module (2026-11-20: the branch's render/subAquarium3dMarks.mjs draws them), so nothing is drawn twice",
+        !("stationMarks" in V3) && !("navColumns" in V3) && !("navStore" in V3) && !("syncNav" in V3) && !("marksStore" in V3) && !("syncMarks" in V3));
+}
+
 console.log("\n3. THE PAGE");
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");

@@ -72,11 +72,35 @@ function litEnd(src, i) {
  * WHOLE `+`-chain forward from the assignment and joins it, which is what the page itself does at runtime.
  * @returns {Array<{name:string, code:string}>}
  */
-export function extractShaders(src) {
-    // pass 1 -- plain `const NAME = `...`` literals, so a chain term naming one can be resolved
+/** The file's own top-level template constants: { NAME: text }. */
+export function templateConsts(src) {
     const consts = new Map();
-    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(`(?:[^`\\]|\\[\s\S])*`)\s*;/g)) {
-        consts.set(m[1], m[2].slice(1, -1));
+    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(`(?:[^`\\]|\\[\s\S])*`)\s*;/g)) consts.set(m[1], m[2].slice(1, -1));
+    return consts;
+}
+/**
+ * 2026-11-22 -- A SPLICE INSIDE A SHADER (`${NAME}` in a template) is read, not skipped: when NAME is a template constant of this file, or one this file imports by a
+ * relative path (`imported(name)` gives that file's text, when the caller can), the splice is that constant's own text, splices and all; any other splice (a number
+ * formatted into the code, a call) becomes a neutral token and marks the shader OPAQUE -- part of it was not seen, so a binding it never names is UNVERIFIABLE there,
+ * not dropped. Before this, render/splatRendererGPU.mjs's SPLAT_WGSL, which takes its spherical-harmonics function from render/splatSH.mjs by a splice, read as
+ * dropping the binding that function uses.
+ */
+function resolveSplices(text, consts, seen = new Set()) {
+    let opaque = false;
+    const out = text.replace(/\$\{\s*([^}]*?)\s*\}/g, (all, expr) => {
+        if (/^[A-Za-z_]\w*$/.test(expr) && consts.has(expr) && !seen.has(expr)) { const r = resolveSplices(consts.get(expr), consts, new Set([...seen, expr])); opaque = opaque || r.opaque; return r.text; }
+        opaque = true; return "0.0";
+    });
+    return { text: out, opaque };
+}
+export function extractShaders(src, { imported = null } = {}) {
+    // pass 1 -- plain `const NAME = `...`` literals, so a chain term naming one can be resolved; and the constants of relatively imported files, by the names imported
+    const consts = templateConsts(src);
+    if (imported) for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'](\.{1,2}\/[^"']+)["']/g)) {
+        let other; try { other = imported(m[2]); } catch { other = null; } if (!other) continue;
+        const theirs = templateConsts(other);
+        for (const part of m[1].split(",")) { const [a, b] = part.trim().split(/\s+as\s+/); if (a && theirs.has(a) && !consts.has(b || a)) consts.set(b || a, theirs.get(a)); }
+        for (const [k, v] of theirs) if (!consts.has(k)) consts.set(k, v);   // that file's own helpers its constants splice in
     }
     const out = [];
     const start = /(?:(?:const|let|var)\s+)?([A-Za-z_][\w.]*)\s*=[ \t]*/g;
@@ -103,10 +127,10 @@ export function extractShaders(src) {
             i++;
         }
         if (!sawLiteral) continue;
-        const code = parts.join("\n");
+        const r = resolveSplices(parts.join("\n"), consts), code = r.text;
         if (!code.includes("@binding(")) continue;
         if (!ENTRY().test(code)) continue;   // a declarations-only fragment such as COMMON is not a shader
-        out.push({ name: m[1], code });
+        out.push({ name: m[1], code, opaque: r.opaque });
     }
     return out;
 }
@@ -208,22 +232,24 @@ export function scanTree(root) {
         }
     })(root);
 
-    const hits = [];
+    const hits = [], unverifiable = [];
     for (const f of files) {
         let src;
         try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
         if (!src.includes("@binding(")) continue;
         const kinds = autoLayoutKinds(src);
         if (!kinds.compute && !kinds.render) continue;
-        for (const sh of extractShaders(src)) {
+        const imported = (rel) => fs.readFileSync(path.resolve(path.dirname(f), rel), "utf8");
+        for (const sh of extractShaders(src, { imported })) {
             const ifaces = resourceInterfaces(sh.code);
             if (!ifaces.length) continue;
             // a module whose entry points are all compute backs a compute pipeline, and vice versa
             const kind = ifaces.every((r) => r.stage === "compute") ? "compute" : "render";
             if (!kinds[kind]) continue;
             const dropped = droppedBindings(sh.code);
-            if (dropped.length) hits.push({ file: path.relative(root, f), shader: sh.name, kind, dropped });
+            if (dropped.length) (sh.opaque ? unverifiable : hits).push({ file: path.relative(root, f), shader: sh.name, kind, dropped });
         }
     }
+    hits.unverifiable = unverifiable;   // a drop in a shader part of which was not seen: said, not failed, not passed
     return hits;
 }

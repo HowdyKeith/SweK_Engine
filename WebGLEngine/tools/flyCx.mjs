@@ -1,4 +1,4 @@
-// WebGLEngine/tools/flyCx.mjs -- UNNUMBERED. Run: node tools/flyCx.mjs --dir <exported-traced-adjacencies-v1.2> [--min-weight 3] [--out vendor/hemibrain/hemibrain-cx-heading-loop.json] [--write]
+// WebGLEngine/tools/flyCx.mjs -- UNNUMBERED. Run: node tools/flyCx.mjs --dir <exported-traced-adjacencies-v1.2> [--circuit headingLoop|steering] [--min-weight 3] [--out <the circuit's file in vendor/hemibrain/>] [--write]
 //        or:  node tools/flyCx.mjs --neurons <traced-neurons.csv> --connections <traced-total-connections.csv> ...
 //
 // THE FRUIT FLY'S HEADING LOOP FROM DATA THAT IS OPEN: the hemibrain v1.2 release (Scheffer et al. 2020, Janelia FlyEM / Google) keeps its adjacency export in a public bucket (https://storage.googleapis.com/hemibrain/v1.2/exported-traced-adjacencies-v1.2.tar.gz,
@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { circuitOf, CELL_TYPES, DEFAULTS, REQUIRED_NEURON_COLUMNS, SIGN_SOURCE } from "./flyCxLib.mjs";
+import { circuitOf, CIRCUITS, DEFAULTS, REQUIRED_NEURON_COLUMNS, SIGN_SOURCE } from "./flyCxLib.mjs";
 import { parseTable } from "./fishInputSideLib.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,14 +33,15 @@ function* connectionRows(text) {
 }
 
 function main(argv) {
-    const known = new Set(["--dir", "--neurons", "--connections", "--min-weight", "--out", "--write"]);
+    const known = new Set(["--dir", "--neurons", "--connections", "--min-weight", "--out", "--write", "--circuit"]);
     for (let i = 0; i < argv.length; i++) if (argv[i].startsWith("--") && !known.has(argv[i])) { console.error(`flyCx: unknown option ${argv[i]}`); return 2; }
     const arg = (f, d = null) => { const i = argv.indexOf(f); if (i === -1) return d; if (argv[i + 1] === undefined || argv[i + 1].startsWith("--")) throw new Error(`${f} needs a value`); return argv[i + 1]; };
-    let neuronsFile, connFile, minWeight, out;
+    let neuronsFile, connFile, minWeight, out, circuit, spec;
     try {
         const dir = arg("--dir");
         neuronsFile = arg("--neurons", dir && path.join(dir, "traced-neurons.csv")); connFile = arg("--connections", dir && path.join(dir, "traced-total-connections.csv"));
-        minWeight = Number(arg("--min-weight", DEFAULTS.minWeight)); out = path.resolve(ROOT, arg("--out", "vendor/hemibrain/hemibrain-cx-heading-loop.json"));
+        circuit = arg("--circuit", "headingLoop"); if (!Object.hasOwn(CIRCUITS, circuit)) throw new Error(`--circuit must be one of ${Object.keys(CIRCUITS).join(", ")}, got ${circuit}`); spec = CIRCUITS[circuit];   // 2026-11-19: the steering readout
+        minWeight = Number(arg("--min-weight", DEFAULTS.minWeight)); out = path.resolve(ROOT, arg("--out", spec.out));
         if (!neuronsFile || !connFile) throw new Error("--dir <export folder> (or --neurons and --connections) is required");
         if (!Number.isInteger(minWeight) || minWeight < 1) throw new Error(`--min-weight must be a whole number of 1 or more, got ${arg("--min-weight")}`);
     } catch (e) { console.error("flyCx: " + e.message); return 2; }
@@ -48,16 +49,16 @@ function main(argv) {
         const nBytes = fs.readFileSync(neuronsFile), cBytes = fs.readFileSync(connFile), table = parseTable(nBytes.toString("utf8"));
         const missing = REQUIRED_NEURON_COLUMNS.filter((c) => !table.length || !(c in table[0]));
         if (missing.length) throw new Error(`the neurons file has no column ${missing.join(", ")}`);
-        const c = circuitOf(table, connectionRows(cBytes.toString("utf8")), { minWeight }), s = c.selection;
+        const c = circuitOf(table, connectionRows(cBytes.toString("utf8")), { minWeight, circuit }), s = c.selection;
         console.log(`[flyCx] ${table.length} traced neurons in the table; ${s.connectionRows} connection rows read`);
-        console.log(`[flyCx] heading loop: ${s.neurons} neurons ${JSON.stringify(s.byClass)}, sides ${JSON.stringify(s.bySide)}; ${s.edges} edges of at least ${minWeight} synapses (${s.excitatoryEdges} excitatory, ${s.inhibitoryEdges} inhibitory), ${s.synapses} synapses; ${s.belowFloorPairs} pairs (${s.belowFloorSynapses} synapses) between these cells below the floor left out`);
-        console.log(`[flyCx] input cells ${c.io.inputs.length} (E-PG and P-EN), output cells ${c.io.outputs.length} (E-PG and P-EG); edges by class pair ${JSON.stringify(s.byClassPair)}`);
+        console.log(`[flyCx] ${spec.label}: ${s.neurons} neurons ${JSON.stringify(s.byClass)}, sides ${JSON.stringify(s.bySide)}; ${s.edges} edges of at least ${minWeight} synapses (${s.excitatoryEdges} excitatory, ${s.inhibitoryEdges} inhibitory), ${s.synapses} synapses; ${s.belowFloorPairs} pairs (${s.belowFloorSynapses} synapses) between these cells below the floor left out`);
+        console.log(`[flyCx] input cells ${c.io.inputs.length} (${spec.inputNote}), output cells ${c.io.outputs.length} (${spec.outputNote}); edges by class pair ${JSON.stringify(s.byClassPair)}`);
         const meta = {
             dataset: "hemibrain:v1.2 (exported-traced-adjacencies-v1.2: traced-neurons.csv, traced-total-connections.csv)", server: "https://storage.googleapis.com/hemibrain/v1.2/exported-traced-adjacencies-v1.2.tar.gz",
             files: { "traced-neurons.csv": { bytes: nBytes.length, sha256: sha(nBytes) }, "traced-total-connections.csv": { bytes: cBytes.length, sha256: sha(cBytes) } },
-            license: "CC-BY 4.0 as the hemibrain release states it (to be re-read from the release's own text; none is claimed here beyond that)",
+            license: circuit === "headingLoop" ? "CC-BY 4.0 as the hemibrain release states it (to be re-read from the release's own text; none is claimed here beyond that)" : "CC-BY, as the hemibrain project page states it (https://www.janelia.org/project-team/flyem/hemibrain: \"Hemibrain is licensed under CC-BY.\", read 2026-11-19); cite the paper below",
             citation: "Scheffer, L. K., Xu, C. S., Januszewski, M., et al. (2020). A connectome and analysis of the adult Drosophila central brain. eLife 9:e57443. (Janelia FlyEM, Google, hemibrain v1.2.)",
-            ids: "hemibrain body ids (the export's bodyId)", signs: SIGN_SOURCE, cellTypes: CELL_TYPES.map((t) => `${t.type} (${t.nt})`), build: { minWeight }, selection: s,
+            ids: "hemibrain body ids (the export's bodyId)", signs: SIGN_SOURCE, cellTypes: spec.types.map((t) => `${t.type} (${t.nt})`), build: { minWeight }, selection: s,
         };
         const json = { meta, neurons: c.neurons, edges: c.edges, io: c.io };
         if (argv.includes("--write")) { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(json) + "\n"); console.log("[flyCx] wrote " + path.relative(ROOT, out)); }

@@ -198,16 +198,21 @@ function viewProj(){ resize(); const asp=canvas.width/Math.max(1,canvas.height);
   return mMul(P, mLook(camEye(), cam.tgt, [0,1,0])); }
 
 let curVP=null;
+// 2026-11-22: the gas and the stars timed on the card (render/gpuTimerGL.mjs, loaded as a module from this classic script); ?gputimer=0 turns it off
+let gpuTimer=null, timerLines=null;
+if(new URLSearchParams(location.search).get("gputimer")!=="0") Promise.all([import("/render/gpuTimerGL.mjs"),import("/render/gpuTimer.mjs")]).then(([a,b])=>{ if(gl) gpuTimer=a.createGpuTimerGL(gl); timerLines=b.timerLines; window.__gpuTimer=gpuTimer; });
+const gpuEl=document.createElement("div"); gpuEl.id="gpuTimes"; gpuEl.style.cssText="position:fixed;right:8px;bottom:8px;font:11px ui-monospace,monospace;white-space:pre;color:#8a93b8;pointer-events:none"; document.body.appendChild(gpuEl);
 function frame(){
   resize(); gl.viewport(0,0,canvas.width,canvas.height);
   gl.clearColor(0.012,0.012,0.04,1); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.disable(gl.DEPTH_TEST);
   curVP = viewProj();
-  if(show.gas && gasVAO.n){ gl.useProgram(gasP); gl.uniformMatrix4fv(uGasVP,false,curVP); gl.uniform1f(uGasSize,sizeMul);
-    gl.bindVertexArray(gasVAO.vao); gl.drawArrays(gl.POINTS,0,gasVAO.n); }
-  if(show.stars && starVAO.n){ gl.useProgram(starP); gl.uniformMatrix4fv(uStarVP,false,curVP); gl.uniform1f(uStarBright,bright); gl.uniform1f(uStarSize,sizeMul);
-    gl.bindVertexArray(starVAO.vao); gl.drawArrays(gl.POINTS,0,starVAO.n); }
+  if(show.gas && gasVAO.n){ if(gpuTimer) gpuTimer.begin("gas"); gl.useProgram(gasP); gl.uniformMatrix4fv(uGasVP,false,curVP); gl.uniform1f(uGasSize,sizeMul);
+    gl.bindVertexArray(gasVAO.vao); gl.drawArrays(gl.POINTS,0,gasVAO.n); if(gpuTimer) gpuTimer.end(); }
+  if(show.stars && starVAO.n){ if(gpuTimer) gpuTimer.begin("stars"); gl.useProgram(starP); gl.uniformMatrix4fv(uStarVP,false,curVP); gl.uniform1f(uStarBright,bright); gl.uniform1f(uStarSize,sizeMul);
+    gl.bindVertexArray(starVAO.vao); gl.drawArrays(gl.POINTS,0,starVAO.n); if(gpuTimer) gpuTimer.end(); }
   gl.bindVertexArray(null);
+  if(gpuTimer){ gpuTimer.finish(); const st=gpuTimer.collect(); if(st.frames) gpuEl.textContent=timerLines(st).join("\n"); else if(!st.supported) gpuEl.textContent="GPU timer: this browser offers no EXT_disjoint_timer_query_webgl2"; }
   requestAnimationFrame(frame);
 }
 

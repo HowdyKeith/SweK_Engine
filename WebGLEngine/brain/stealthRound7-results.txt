@@ -1,0 +1,3 @@
+r/v 0.1: plain 11.9 deg (frame 29), 28 spikes (winner 12) | static 30.6 deg (frame 47), 7 spikes ratio 2.57 | moving 4 Hz 22.7 deg (frame 43), 17 spikes ratio 1.90 | moving 2.2 Hz no alarm ratio n/a | receding off no alarm, both no alarm
+r/v 0.3: plain 13.6 deg (frame 98), 64 spikes (winner 12) | static 30.6 deg (frame 141), 17 spikes ratio 2.25 | moving 4 Hz 14.1 deg (frame 101), 61 spikes ratio 1.04 | moving 2.2 Hz 31.5 deg (frame 142), 34 spikes ratio 2.32 | receding off no alarm, both ALARM
+r/v 0.6: plain 17.6 deg (frame 231), 90 spikes (winner 12) | static 29.3 deg (frame 279), 31 spikes ratio 1.67 | moving 4 Hz 11.8 deg (frame 173), 116 spikes ratio 0.67 | moving 2.2 Hz 20.1 deg (frame 246), 75 spikes ratio 1.14 | receding off no alarm, both ALARM

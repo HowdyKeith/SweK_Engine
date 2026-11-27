@@ -37,7 +37,13 @@ function getApiKey(provider) {
 // For each provider whose env var isn't already set, pull it from the vault and
 // set process.env, so existing consumers (e.g. geminiCommentator reading
 // process.env.GEMINI_API_KEY) work unchanged. Returns {provider: source}.
-function loadKeysIntoEnv() {
+// *** v4933 -- ONE VAULT READ PER KEY_TTL_MS, NOT ONE PER CALL. *** On Windows each provider whose env var is unset costs a powershell.exe start (about 2.5 s on the 8 GB rig), and deviceBridge asks for one provider's key at a time: a single /device/list was
+// 4 providers x 4 vault reads = 16 PowerShell starts, and deviceBridge-selfcheck lists twice -- 10 of its 19.8 s on the rig, which is why the sweep killed it at the 20 s cap. The result is kept for KEY_TTL_MS (a key saved to the vault is picked up within that
+// time, and saveApiKey sets the env itself at once); `{ force: true }` re-reads. Callers that want the log line once per read get exactly that.
+const KEY_TTL_MS = 30000;
+let _loaded = null, _loadedAt = 0;
+function loadKeysIntoEnv(opts) {
+    if (!(opts && opts.force) && _loaded && Date.now() - _loadedAt < KEY_TTL_MS) return { ..._loaded };
     const result = {};
     for (const [provider, envVar] of Object.entries(ENV_BY_PROVIDER)) {
         if (process.env[envVar]) { result[provider] = "env"; continue; }
@@ -47,10 +53,11 @@ function loadKeysIntoEnv() {
     }
     console.log("[aiCreds] key sources -> " +
         Object.entries(result).map(([p, s]) => `${p}:${s}`).join(" "));
-    return result;
+    _loaded = result; _loadedAt = Date.now();
+    return { ...result };
 }
 
-module.exports = { getApiKey, loadKeysIntoEnv, saveApiKey, keyStatus };
+module.exports = { getApiKey, loadKeysIntoEnv, saveApiKey, keyStatus, KEY_TTL_MS };
 
 // Write a key to the vault via the PowerShell helper (Windows only). Also
 // updates process.env so the running bridge picks it up immediately.

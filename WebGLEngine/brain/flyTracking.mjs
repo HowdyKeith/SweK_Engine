@@ -1,0 +1,280 @@
+// WebGLEngine/brain/flyTracking.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// THE FLY'S TARGET-TRACKING CIRCUIT WIRED AS THE FLY WIRES IT, AND A GUNNER THAT READS IT. brain/flySteering.mjs gave a helm the fly's steering circuit with its own inputs and outputs and the connectome's own weights, and for the first time a fly's wiring did the work. Keith: "give the gunners the same treatment."
+// The gunners' circuit is the visual pursuit pathway of brain/lc10Topology.mjs -- 275 LC10a cells of the eye, onto AOTU019 and AOTU025, onto the steering neuron DNa02 -- and the search over it through a free encoder kept nothing (tools/ship/trainTrackSeat.mjs: 0 of 100 children). Here, as there, the free parts go:
+//
+//   IN    a target's BEARING e from where the gun points (radians, positive to one side) drives the LC10a cells of ONE EYE -- the left eye's for a target to the positive side, the right's for the other, both within the fly's binocular overlap (15 degrees either side of straight ahead, a linear share) -- and among them
+//         the cells whose DENDRITE IS WHERE THE TARGET IS: each cell has a place across its side's dendritic sheet (brain/lc10Places.mjs, a rank 0..1 from the lateral end to the medial, read off the dataset's synapse coordinates) and responds exp(-(place - p)^2 / 2 sigma^2), sigma 0.15, to a target whose eccentricity
+//         |e| of a half turn maps to the place p.
+//   CORE  the circuit with THE CONNECTOME'S OWN WEIGHTS: a connection's weight is its synapse count over all the synapses its target receives within the circuit, NEGATIVE from an AOTU019 cell (predicted GABA). Three steps of h <- max(0, h + W h + b), b a constant drive of 0.5 on the two DNa02 cells only (so that an
+//         inhibition has something to take from: without it AOTU019, two thirds of the synapses, does nothing). No weight is learned.
+//   OUT   DNa02 on the right less DNa02 on the left, READ THE ODD WAY as the helm's second variant is: asked for e and for -e, half the difference -- exactly zero when the gun is on its target. One number, S(e), over its own peak.
+//
+// WHAT IS NOT KNOWN AND IS FLOWN BOTH WAYS: which end of the sheet's axis is the FRONT of the visual field. `fly:medial` puts straight ahead at the medial end (place 1) and the rear at the lateral; `fly:lateral` the other way. The data used here cannot say (the gate of the vendored positions says so).
+// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond; `scrambled:<seed>` -- THE CONTROL FOR THE PLACES: the fly's circuit and connections with each eye's cells trading places among themselves, so that a target drives as many cells as much but not the fly's own cells for that bearing; `unneighboured:<seed>` -- every cell at ITS place and with its own connections onward, and only the LC10a cells' connections TO EACH OTHER shuffled within an eye (a scramble breaks that neighbourhood too; this breaks only it).
+//
+// WHAT IT COMPUTES (tuning(); the gate pins it): with places, S rises smoothly from zero through the overlap and on to a peak near a quarter turn, then falls toward the rear -- a graded command, larger for a target further off -- where `flat` is at its full value by 15 degrees and stays there (a switch).
+// The two orientations differ little in this (the peak moves): the gradient the positions show in which pathway a cell feeds is real and is small beside the overlap and the sheet's own shape.
+//
+// THE GUNNER (gunnerFor): brain/seatTurretGunner.mjs's gunner -- the sight, the hand's error, the rates turned over a tick -- with this in place of its network: the sight's error in traverse is a bearing, its error in elevation is another, each goes through the circuit, and tanh(gain x S) is the share of the seat's slew
+// rate commanded on that axis. THE TRIGGER IS THE SIGHT'S OWN RULE, untouched. TWO WEIGHTS: the two gains. (Zero gains are a gun that does not move: there is no rule underneath a gunner as there is under a helm.)
+//
+// WHAT A SHIP MAKES OF IT (tools/ship/takeFlyWiredGunner.mjs, registered before its pairs, read once on 600, no cannon): the fly-wired gunner LEADS the seat's hand gunner either way round (medial +0.748, lateral +0.704), cannot be told from the sine's (-0.020) or from the race car's untrained hand rule (+0.024),
+// and THE CELLS' PLACES ARE WORTH +0.101 (z 2.7) over the same circuit with none -- the graded command beats the switch, against my forecast. The shuffled circuit trails (-0.600): one seed, a weak control, said so.
+//
+// *** CHOSEN BY ME, NOT BY A FLY AND NOT IN A FIGHT: sigma 0.15, the 15 degrees of overlap, the constant 0.5 on DNa02, three steps, the normalisation, a rank for a place, and that eccentricity maps linearly to place over a half turn. One axis of the sheet is used; the other (ALONG) is not. A real LC10a cell answers
+// a small MOVING object; nothing here moves. ***
+// THE TARGET'S MOTION (2026-11-18; Keith: "target motion for the tracking circuit"). `moving` (policy seatFlyWired5) drives the cells at the bearing PLUS TAU TIMES THE BEARING'S RATE (the slip: the change since the last tick, 0 on a new target or after a
+//   tick the network was not asked), tau a third weight, 0 the ships-sticky gunner to the bit; `movingWith({ smooth })` low-passes the slip first (a motion detector integrates). NOT REGISTERED, scratch only (seeds 7-10 of each fighter kind; fleets 133001-133006 of each kind):
+//   against eight fighters NO tau beat 0 (117 kills over 64 attacks at tau 0; 97 at 0.05 and 27 at 0.15 unsmoothed, the slip being mostly the sight's own noise differenced; smoothed over 0.4 s, 114 and 108; -0.05 no better), and in fleets of three tau 0.15 smoothed 0.4 s
+//   TRAILS tau 0 (-0.273, se 0.103, without the cannon; -0.233, se 0.099, with it; 24 pairs each), 0.05 is level. So no study was registered and nothing ships: the motion term as modelled here is a cost. NOT TRIED: a slip read off the target's own velocity
+//   (the arena shows it) rather than the sight's noisy aim, a motion term on the cells' own dynamics, the sheet's other axis for elevation.
+// THE SLIP FROM THE TARGET (2026-11-19; round 4): `movingWith({ from: "target" })` reads the slip off the target's own bearing in the ship's frame, from where it really is each tick. On the same scratch fighter attacks tau 0.1 gave 125 kills (128 smoothed over
+//   0.2 s) against 117 at tau 0 (the plain ship 128), 0.2 about level, 0.4 and 0.8 far worse (overshoot); in fleets of three (24 pairs) tau 0.1 was level with and without the cannon (-0.022 to +0.071). So `movingTarget` (seatFlyWired7: tau 0.1, smoothed 0.2 s,
+//   CHOSEN ON THOSE SCRATCH PAIRS) goes to a registered study on fresh pairs: tools/ship/takeFlyWiredGunnerSees.mjs.
+// THE HAND FOR THE LAST DEGREES (2026-11-20; round 2 of the second set). NOT REGISTERED, scratch pairs 133001-133012 of each kind, fleets of three, against seatFlyWired8 (48 pairs each): the hand laying the gun within 6 degrees of the solution
+//   +0.063 with the cannon and +0.056 without, within 10 degrees +0.170 and +0.201, within 20 degrees +0.173 and +0.258; a stiffer circuit instead (the gains -6 and -10) LOST, -0.13 to -0.21. So `holdNear` (seatFlyWired9: 20 degrees) goes to a
+//   registered study on fresh pairs: tools/ship/takeFlyWiredGunnerNear.mjs.
+// READ (2026-11-20): seatFlyWired9 ships (tools/ship/takeFlyWiredGunnerNear.mjs). AND THEN SEEN: with the hand laying the last 20 degrees, the motion term at tau 0.1 changes nothing -- seatFlyWired9 flies tau 0's fight to the bit, and the smoothing does
+//   nothing either (the gate pins it on two fights): the circuit now makes only the big swings, where its command is near the full slew. So the live choice left is the window; `nearTunable` (seatFlyWired10) carries it as a weight for a search.
+// HOLDING THE TRIGGER (2026-11-20). NOT REGISTERED, scratch pairs 136001-136006 of each kind (24 a fight): seatFlyWired11 (the trigger held with a target) less seatFlyWired10, +0.492 (se 0.173) in fleets of three with the cannon, +0.813 (0.171)
+//   without, +0.434 (0.162) with a quarter of every magazine, +0.017 (0.007) against fighters. To a registered study: tools/ship/takeFlyWiredGunnerTrigger.mjs.
+// WHY THE HELD-TRIGGER GUNNER TRAILS THE CAR'S ONE SHIP A SIDE (2026-11-20; round 3). NOT REGISTERED, scratch pairs 137001-137012 of each kind (48), one ship a side, the cannon on, under the cannon-aware helm: seatFlyWired11 fires 4% MORE rounds than the
+//   car's gunner but each does 13% LESS damage (0.041 against 0.047), the aim error to the target the same (median 2.3 against 2.4 degrees) -- its rounds land less often. With NO HAND WINDOW (the circuit lays the gun on ships all the way, the
+//   trigger still held) it is 0.046 a round and leads by +1.796 against the car's +1.768 and the 45-degree window's +1.495; 10 and 20 degrees are as 45. The hand lays the gun at the sight's aim, which shakes from tick to tick; laid by rates the gun
+//   filters that shake, and with the trigger held every round counts. But in fleets under the helm no window TRAILS 45 degrees (-0.176, se 0.106, 24 pairs; level under the bow-on rule, -0.041): there the hand's quick laying onto new targets pays.
+//   So the window is a trade by fight size, which is what tools/ship/takeBySizeLoadout.mjs's button does with the car's gunner one ship a side (as good there as no window).
+// SEVERAL TARGETS AT ONCE (2026-11-20; Keith: "then 2" -- a test the fly's wiring could pass, since a sine sees one bearing). `oddMany(es)` drives the cells with every bearing together. NOT REGISTERED, scratch pairs 138001-138006 of each kind (24),
+//   fleets of three with the cannon under the cannon-aware helm, seatFlyWired11 otherwise: letting the circuit CHOOSE THE SHIP (the side its joint drive turns to, the nearest ship there) LOSES to the sight's own choice (soonest hittable) by -0.438
+//   (se 0.181), and a SUM OF SINES choosing the same way loses by -0.428 -- the two cannot be told (0.01). Choosing by bearing throws away what the sight knows (range, closing); and even with several targets the fly's joint response picks as a
+//   sine does. No study was registered.
+// AN ELEVATION OF ITS OWN (2026-11-19; round 5): `elevatedWith({ front })` reads the gun's pitch off the circuit with its cells at their places ALONG the sheet's other axis. The command is nearly the yaw's (front +1 about 20% steeper close in, -1 about
+//   10%: places are ranks, so either axis spreads the cells evenly, and only how the wiring sits on the axis can differ). On scratch pairs it was level: 117-118 kills against fighters (117 the ships-sticky gunner), and in fleets of three -0.074 to +0.004 against
+//   the ships-sticky gunner, none told. So no study was registered and nothing ships.
+"use strict";
+import * as LC from "./lc10Topology.mjs";
+import * as SY from "./lc10Synapses.mjs";
+import * as PL from "./lc10Places.mjs";
+import * as LC11 from "./lc11Topology.mjs";
+import * as SY11 from "./lc11Synapses.mjs";
+import * as PL11 from "./lc11Places.mjs";
+import * as ST from "./seatTurretGunner.mjs";
+import * as GS from "../physics/mechanics/gunSeats.mjs";
+
+export const POLICY_ID = "seatFlyWired", SIGMA = 0.15, OVERLAP = 15 * Math.PI / 180, BASELINE = 0.5, STEPS = 3, CONTROL_SEED = 4242;
+export const FEATURES = ST.FEATURES, HIDDEN = LC.NEURON_ORDER.length, OUTPUTS = ST.OUTPUTS, WEIGHT_COUNT = 2;   // peerBrain's description of a brain: the seat's eleven features, 281 neurons, the seat's five outputs, two weights (the gains)
+const N = HIDDEN, TYPES = LC.NEURON_TYPES, SOMA = SY.NEURON_SOMA;
+export const signOf = (nt) => (nt === "acetylcholine" ? 1 : -1);
+const EYE_L = [], EYE_R = []; TYPES.forEach((t, i) => { if (t === "LC10a") (SOMA[i] === "L" ? EYE_L : EYE_R).push(i); });
+const DNA02_L = TYPES.findIndex((t, i) => t === "DNa02" && SOMA[i] === "L"), DNA02_R = TYPES.findIndex((t, i) => t === "DNa02" && SOMA[i] === "R");
+const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+function matrixOf(retarget = null) {
+    const rows = Array.from({ length: N }, () => new Map()), total = new Float64Array(N);
+    LC.EDGES.forEach(([to0, from], k) => { const to = retarget ? retarget(TYPES[from], to0) : to0, c = SY.EDGE_COUNTS[k]; rows[to].set(from, (rows[to].get(from) || 0) + signOf(SY.NEURON_NT[from]) * c); total[to] += c; });
+    const start = new Int32Array(N + 1), src = [], val = [];
+    for (let i = 0; i < N; i++) { start[i] = src.length; for (const [j, v] of [...rows[i]].sort((a, b) => a[0] - b[0])) { src.push(j); val.push(v / total[i]); } }
+    start[N] = src.length;
+    return { start, src: Int32Array.from(src), val: Float64Array.from(val) };
+}
+function retargetOf(seed) {
+    const rng = mulberry(seed), byType = {}, maps = new Map(); TYPES.forEach((t, i) => (byType[t] ||= []).push(i));
+    return (sourceType, to) => { const key = sourceType + ">" + TYPES[to]; if (!maps.has(key)) { const cells = byType[TYPES[to]], p = cells.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } maps.set(key, new Map(cells.map((v, k) => [v, p[k]]))); } return maps.get(key).get(to); };
+}
+/** The circuit over a matrix: raw(e) -> DNa02 right less left for a target at bearing e; cells(e) -> the 281 activities. `front`: +1 straight ahead at the medial end of the sheet, -1 at the lateral; `flat`: no places. */
+function circuitOf(M, { front = 1, flat = false, baseline = BASELINE, places = PL.ACROSS } = {}) {
+    function cells(e) {
+        let h = new Float64Array(N); const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
+        if (wl > 0) for (const i of EYE_L) h[i] = wl * g(i);
+        if (wr > 0) for (const i of EYE_R) h[i] = wr * g(i);
+        for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + (i === DNA02_L || i === DNA02_R ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
+        return h;
+    }
+    const raw = (e) => { const h = cells(e); return h[DNA02_R] - h[DNA02_L]; };
+    /** SEVERAL TARGETS AT ONCE (2026-11-20): the cells driven by every bearing in `es` together (each target's drive added), then the same three steps; DNa02 right less left. */
+    function rawMany(es) {
+        let h = new Float64Array(N);
+        for (const e of es) { const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places[i] - p) ** 2) / (2 * SIGMA * SIGMA))); if (wl > 0) for (const i of EYE_L) h[i] += wl * g(i); if (wr > 0) for (const i of EYE_R) h[i] += wr * g(i); }
+        for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + (i === DNA02_L || i === DNA02_R ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
+        return h[DNA02_R] - h[DNA02_L];
+    }
+    return { cells, raw, rawMany };
+}
+/** THE NEIGHBOURHOOD SHUFFLED, THE PLACES KEPT: the retarget for `unneighboured:<seed>` -- only the LC10a-to-LC10a connections move, each to another LC10a cell of the same eye (one random permutation an eye). Every cell stays at its place and keeps its connections onto AOTU019 and AOTU025. */
+function unneighbourOf(seed) {
+    const rng = mulberry(seed), map = new Map();
+    for (const eye of [EYE_L, EYE_R]) { const p = eye.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } eye.forEach((c, k) => map.set(c, p[k])); }
+    return (sourceType, to) => (sourceType === "LC10a" && TYPES[to] === "LC10a" ? map.get(to) : to);
+}
+/** THE PLACES SCRAMBLED: each eye's cells keep their connections and trade PLACES among themselves (one random permutation an eye, from `seed`). The set of places is the same, so a target still drives as many cells as much; WHICH cell is where -- and so which pathway the cells under a target feed -- is not the fly's. */
+function scrambledPlaces(seed) {
+    const rng = mulberry(seed), out = Array.from(PL.ACROSS);
+    for (const eye of [EYE_L, EYE_R]) { const v = eye.map((i) => PL.ACROSS[i]); for (let i = v.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [v[i], v[j]] = [v[j], v[i]]; } eye.forEach((c, k) => { out[c] = v[k]; }); }
+    return out;
+}
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
+/** The odd read-out of a raw read-out, over its own peak, memoised on a fine grid: { S, amplitude }. */
+function oddOf(raw) {
+    const GRID = 720, table = new Float64Array(GRID + 1); let peak = 0;
+    for (let k = 0; k <= GRID; k++) { const e = Math.PI * k / GRID; table[k] = (raw(e) - raw(-e)) / 2; peak = Math.max(peak, Math.abs(table[k])); }
+    const amplitude = peak || 1;
+    /** The command for a bearing: odd in e, exactly 0 at 0, in [-1, 1]; linear between the grid's bearings (a quarter of a degree apart). */
+    function S(e) { const a = wrap(e), x = Math.abs(a) / Math.PI * GRID, k = Math.min(GRID - 1, Math.floor(x)), v = (table[k] + (table[k + 1] - table[k]) * (x - k)) / amplitude; return a < 0 ? -v : v; }
+    return { S, amplitude };
+}
+function libraryOf(name, raw, cells = null, { sticky = false, handOn = null, handRest = true, motion = false, smooth = 0, from = "aim", pitchRaw = null, tunable = false, alwaysFire = false } = {}) {
+    const { S, amplitude } = oddOf(raw), Sp = pitchRaw ? oddOf(pitchRaw).S : S;   // `pitchRaw` (2026-11-19): ANOTHER read-out for the gun's pitch -- the circuit with its cells at their places along the sheet's other axis; without it the pitch is read off the same S as the yaw
+    const count = tunable ? WEIGHT_COUNT + 3 : motion ? WEIGHT_COUNT + 1 : WEIGHT_COUNT,   // `tunable` (2026-11-20): w[3] the slip's smoothing in seconds and w[4] the hand's window in radians, as weights a search can move
+        _c = 0, zeroWeights = () => new Float32Array(count);
+    /** The seat's five outputs from its eleven features: the two rates from the circuit, the trigger the sight's own. With `motion`, `forward(w, x, slip)` drives the cells at the bearing PLUS w[2] (seconds) TIMES ITS RATE, slip = [yaw, pitch] in radians a second (0 when not given). */
+    const forward = (w, x, slip = null) => { const ey = x[1] * Math.PI, ep = x[2] * Math.PI / 2, tau = motion ? w[2] : 0, dy = slip ? slip[0] : 0, dp = slip ? slip[1] : 0; return [Math.tanh(w[0] * S(ey + tau * dy)), Math.tanh(w[1] * Sp(ep + tau * dp)), x[8] > 0 ? 1 : -1, 0, 0]; };
+    const gunnerFor = !motion ? (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, sticky, handOn, handRest, forward, layersOf: () => [], post: (y) => y }) : (w, sight0, opts = {}) => {
+        // THE TARGET'S MOTION (2026-11-18): the slip is the bearing's change since the tick before, over the tick -- 0 on the first tick the network lays the gun on a target (a new target, or after a tick it was not asked: no target, or the hand's)
+        const dt = opts.dt ?? 1 / 30, sight1 = sticky === "ships" ? ST.stickySight(sight0, { only: ST.SHIPS_ONLY }) : sticky ? ST.stickySight(sight0) : sight0, now = { target: null, t: 0 }, prev = { target: null, t: -Infinity, ey: 0, ep: 0, sy: 0, sp: 0 }, sm = tunable ? w[3] : smooth, keep = sm > 0 ? Math.exp(-dt / sm) : 0, win = tunable ? w[4] : null;
+        const sight = (seat, st, body, targets, t = 0) => { const r = sight1(seat, st, body, targets, t); now.target = r.target; now.t = t; if (from === "target") { const tg = r.target == null ? null : targets.find((q) => q.id === r.target); if (tg) { const a = GS.reachOf(seat, body, [tg.pos[0] - body.pos[0], tg.pos[1] - body.pos[1], tg.pos[2] - body.pos[2]]); now.ay = a.yaw; now.ap = a.pitch; } } return r; };   // `from: "target"`: the target's own bearing in the ship's frame, from where it really is (no sight's noise)
+        const fwd = (ww, x) => { const ey = x[1] * Math.PI, ep = x[2] * Math.PI / 2, fresh = now.target !== prev.target || Math.abs(now.t - prev.t - dt) > dt / 2, raw = fresh ? [0, 0] : from === "target" ? [wrap(now.ay - prev.ay) / dt, (now.ap - prev.ap) / dt] : [wrap(ey - prev.ey) / dt, (ep - prev.ep) / dt];
+            if (fresh) { prev.sy = 0; prev.sp = 0; } else { prev.sy = keep * prev.sy + (1 - keep) * raw[0]; prev.sp = keep * prev.sp + (1 - keep) * raw[1]; }   // `smooth` (seconds, 0 none): the slip low-passed, as a motion detector integrates
+            prev.target = now.target; prev.t = now.t; prev.ey = ey; prev.ep = ep; prev.ay = now.ay; prev.ap = now.ap; return forward(ww, x, [prev.sy, prev.sp]); };
+        const hand = tunable ? (q, rule, st) => !ST.SHIPS_ONLY(q) || (rule && st && Math.hypot(wrap(rule.yaw - st.yaw), rule.pitch - st.pitch) < win) : handOn;
+        const d = ST.gunnerFor(w, sight, { ...opts, sticky: false, handOn: hand, handRest, alwaysFire, forward: fwd, layersOf: () => [], post: (y) => y }); d.slip = () => ({ ...prev }); return d;
+    };
+    const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
+    return Object.freeze({ name, amplitude, sticky, motion, ...(motion ? { smooth, from } : {}), elevated: pitchRaw !== null, Sp, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT: count, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
+}
+const FLY_M = circuitOf(matrixOf(), { front: 1 }), LIBS = new Map();
+
+/** ANY EYE-TO-DESCENDING-NEURON PATHWAY, THE SAME MODEL (2026-11-21; Keith: "register and build it" -- the LC11 gunner). The circuit above, over a pathway given
+ *  as data: its baked topology, synapses and places, the eye's cell type and the descending neuron read out (right less left), and `sense` (+1 or -1) -- which
+ *  way round that read-out is taken. Over LC10a/DNa02 with sense +1 it IS circuitOf above to the bit (the gate holds it); nothing else here is new. */
+export function pathwayOf({ topo, syn, places, eye, dn, sense = 1 }) {
+    const n = topo.NEURON_ORDER.length, types = topo.NEURON_TYPES, soma = syn.NEURON_SOMA, eyeL = [], eyeR = [];
+    types.forEach((t, i) => { if (t === eye) (soma[i] === "L" ? eyeL : eyeR).push(i); });
+    const dnL = types.findIndex((t, i) => t === dn && soma[i] === "L"), dnR = types.findIndex((t, i) => t === dn && soma[i] === "R");
+    if (dnL < 0 || dnR < 0 || !eyeL.length || !eyeR.length) throw new Error(`flyTracking.pathwayOf: no ${eye} cells or no ${dn} a side in this topology`);
+    function matrix(retarget = null) {
+        const rows = Array.from({ length: n }, () => new Map()), total = new Float64Array(n);
+        topo.EDGES.forEach(([to0, from], k) => { const to = retarget ? retarget(types[from], to0) : to0, c = syn.EDGE_COUNTS[k]; rows[to].set(from, (rows[to].get(from) || 0) + signOf(syn.NEURON_NT[from]) * c); total[to] += c; });
+        const start = new Int32Array(n + 1), src = [], val = [];
+        for (let i = 0; i < n; i++) { start[i] = src.length; for (const [j, v] of [...rows[i]].sort((a, b) => a[0] - b[0])) { src.push(j); val.push(v / total[i]); } }
+        start[n] = src.length;
+        return { start, src: Int32Array.from(src), val: Float64Array.from(val) };
+    }
+    function retarget(seed) {
+        const rng = mulberry(seed), byType = {}, maps = new Map(); types.forEach((t, i) => (byType[t] ||= []).push(i));
+        return (sourceType, to) => { const key = sourceType + ">" + types[to]; if (!maps.has(key)) { const cs = byType[types[to]], p = cs.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } maps.set(key, new Map(cs.map((v, k) => [v, p[k]]))); } return maps.get(key).get(to); };
+    }
+    function circuit(M, { front = 1, flat = false, baseline = BASELINE } = {}) {
+        const drive = (h, e, add) => { const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places.ACROSS[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
+            if (wl > 0) for (const i of eyeL) h[i] = (add ? h[i] : 0) + wl * g(i); if (wr > 0) for (const i of eyeR) h[i] = (add ? h[i] : 0) + wr * g(i); };
+        const run = (h) => { for (let s = 0; s < STEPS; s++) { const y = new Float64Array(n); for (let i = 0; i < n; i++) { let a = h[i] + (i === dnL || i === dnR ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; } return h; };
+        const cells = (e) => { const h = new Float64Array(n); drive(h, e, false); return run(h); };
+        const raw = (e) => { const h = cells(e); return sense * (h[dnR] - h[dnL]); };
+        const rawMany = (es) => { const h = new Float64Array(n); for (const e of es) drive(h, e, true); const o = run(h); return sense * (o[dnR] - o[dnL]); };
+        return { cells, raw, rawMany };
+    }
+    return Object.freeze({ n, eye, dn, sense, eyeL, eyeR, dnL, dnR, matrix, retarget, circuit });
+}
+export const LC10_PATHWAY = pathwayOf({ topo: LC, syn: SY, places: PL, eye: "LC10a", dn: "DNa02" });
+/** THE SMALL-OBJECT PATHWAY (brain/lc11Topology.mjs: 143 LC11 onto three GABA relays and DNp35, vendor/male-cns/PROVENANCE.md). DNp35 is NOT KNOWN AS A
+ *  STEERING NEURON: reading its right less left as the gun's turn is a modelling choice, registered in tools/ship/takeLc11Gunner.mjs, and so is `sense` --
+ *  LC11_SENSE is the way round that makes the gun turn TOWARD a target at a quarter turn, as LC10a's DNa02 read-out does (chosen once, from the circuit's
+ *  own read-out at 90 degrees, before any fight; the gate pins it). */
+export const LC11_SENSE = (() => { const p = pathwayOf({ topo: LC11, syn: SY11, places: PL11, eye: "LC11", dn: "DNp35" }), c = p.circuit(p.matrix(), { front: 1 }), lc10 = LC10_PATHWAY.circuit(LC10_PATHWAY.matrix(), { front: 1 });
+    const odd = (r) => (r(Math.PI / 2) - r(-Math.PI / 2)) / 2; return Math.sign(odd(c.raw)) === Math.sign(odd(lc10.raw)) ? 1 : -1; })();
+export const LC11_PATHWAY = pathwayOf({ topo: LC11, syn: SY11, places: PL11, eye: "LC11", dn: "DNp35", sense: LC11_SENSE });
+/** The library for a wiring NAME: "fly:medial", "fly:lateral", "flat", "shuffled:<seed>", "sine". See the header. */
+export function wiringOf(name = "fly:medial") {
+    if (LIBS.has(name)) return LIBS.get(name);
+    let lib = null; const m = /^shuffled:(\d+)$/.exec(String(name));
+    if (name === "fly:medial") lib = libraryOf(name, FLY_M.raw, FLY_M.cells);
+    else if (name === "fly:lateral") { const c = circuitOf(matrixOf(), { front: -1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (name === "flat") { const c = circuitOf(matrixOf(), { flat: true }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (name === "sine") lib = libraryOf(name, (e) => -Math.sin(Math.max(-Math.PI / 2, Math.min(Math.PI / 2, e))));
+    else if (m) { const c = circuitOf(matrixOf(retargetOf(Number(m[1]))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^unneighboured:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(unneighbourOf(Number(String(name).slice(14)))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^lc11:(medial|lateral|flat)$/.test(String(name))) { const k = String(name).slice(5), c = LC11_PATHWAY.circuit(LC11_PATHWAY.matrix(), k === "flat" ? { flat: true } : { front: k === "medial" ? 1 : -1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^lc11:shuffled:\d+$/.test(String(name))) { const c = LC11_PATHWAY.circuit(LC11_PATHWAY.matrix(LC11_PATHWAY.retarget(Number(String(name).slice(14)))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^scrambled:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(), { front: 1, places: scrambledPlaces(Number(String(name).slice(10))) }); lib = libraryOf(name, c.raw, c.cells); }
+    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>", "unneighboured:<seed>", or over LC11 "lc11:medial", "lc11:lateral", "lc11:flat", "lc11:shuffled:<seed>" (got ${name})`);
+    LIBS.set(name, lib); return lib;
+}
+const MAIN = wiringOf("fly:medial");
+export const S = MAIN.S, raw = MAIN.raw, cells = MAIN.cells, forward = MAIN.forward, zeroWeights = MAIN.zeroWeights, handWeights = MAIN.handWeights, gunnerFor = MAIN.gunnerFor, gunnerFactory = MAIN.gunnerFactory, topology = LC;
+/** THE STICKY GUNNER (`seatFlyWired2`): the fly-wired gunner (`fly:medial`, the same two gains) behind brain/seatTurretGunner.mjs's stickySight -- it keeps the target it chose while it can still be shot. See tools/ship/takeFlyWiredGunnerFix.mjs. */
+export const POLICY_ID2 = "seatFlyWired2", sticky = libraryOf("fly:medial, sticky", FLY_M.raw, FLY_M.cells, { sticky: true });
+/** THE GUNNER WHOSE SIGHT STICKS TO SHIPS ONLY (`seatFlyWired3`): the sticky gunner trailed the shipped one against fighters (tools/ship/takeFlyWiredGunnerFix.mjs); this one sticks to a capital ship and re-picks among fighters every tick. See tools/ship/takeFlyWiredGunnerShips.mjs. */
+export const POLICY_ID3 = "seatFlyWired3", stickyShips = libraryOf("fly:medial, sticky to ships", FLY_M.raw, FLY_M.cells, { sticky: "ships" });
+/** THE MIXED GUNNER (`seatFlyWired4`): the ships-sticky gunner for a SHIP, and the hand gunner's own laying and trigger for a FIGHTER (brain/seatTurretGunner.mjs's `handOn`). Against fighters alone it is the hand gunner to the bit (with no target its gun goes back to rest, as the hand's does); against ships it is the ships-sticky gunner but for that. See tools/ship/takeFlyWiredGunnerMixed.mjs. */
+export const POLICY_ID4 = "seatFlyWired4", mixed = libraryOf("fly:medial for ships, the hand for fighters", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q) });
+/** THE GUNNER THAT SEES ITS TARGET MOVE (`seatFlyWired5`): the ships-sticky gunner with its LC10a cells driven at the bearing PLUS TAU TIMES THE BEARING'S RATE -- a moving target drives the cells ahead of where it is, as a target sliding across the fly's eye
+ *  excites the cells it is moving towards. Three weights: the two gains and tau (seconds; 0 is the ships-sticky gunner to the bit). Keith, 2026-11-18: "target motion for the tracking circuit". See tools/ship/takeFlyWiredGunnerMotion.mjs. */
+export const POLICY_ID5 = "seatFlyWired5", moving = libraryOf("fly:medial, sticky to ships, seeing its target move", FLY_M.raw, FLY_M.cells, { sticky: "ships", motion: true });
+/** A motion gunner with another low-pass on the slip (seconds): for the study's hand-set choice and the gate. */
+export const movingWith = ({ smooth = 0, from = "aim" } = {}) => { if (from !== "aim" && from !== "target") throw new Error(`flyTracking.movingWith: from is "aim" or "target" (got ${from})`); return libraryOf(`fly:medial, sticky to ships, seeing its target move (from the ${from}), slip smoothed ${smooth} s`, FLY_M.raw, FLY_M.cells, { sticky: "ships", motion: true, smooth, from }); };
+/** THE MIXED GUNNER THAT HOLDS (`seatFlyWired6`): the mixed gunner, but with no target its gun stays where it is (the network gunner's hold), not back at rest -- the rest cost the mixed gunner -0.269 in fleets without escorts (tools/ship/takeFlyWiredGunnerMixed.mjs).
+ *  So in a fleet with no fighters it IS the ships-sticky gunner to the bit; the hand lays the gun only on a fighter. See tools/ship/takeFlyWiredGunnerHold.mjs. */
+export const POLICY_ID6 = "seatFlyWired6", mixedHold = libraryOf("fly:medial for ships, the hand for fighters, holding with no target", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false });
+/** THE GUNNER THAT SEES ITS TARGET MOVE, FROM WHERE IT REALLY IS (`seatFlyWired7`, 2026-11-19): the motion gunner with the slip read off the TARGET'S OWN BEARING in the ship's frame (its true position each tick: no sight's noise), low-passed over
+ *  0.2 s; three weights, the study's tau 0.1 (0 is the ships-sticky gunner to the bit). The slip from the sight's aim was a cost (see the header); this one was not, on scratch pairs. See tools/ship/takeFlyWiredGunnerSees.mjs. */
+export const POLICY_ID7 = "seatFlyWired7", movingTarget = movingWith({ smooth: 0.2, from: "target" });
+/** THE GUNNER WITH AN ELEVATION OF ITS OWN (2026-11-19; round 5): the ships-sticky gunner, its YAW from the cells at their places ACROSS the sheet as before and its PITCH from the same circuit with the cells at their places ALONG the sheet's other axis
+ *  (brain/lc10Places.mjs's ALONG, the rank toward larger y in the dataset's own frame). Which end of that axis is the front of the vertical field is not known: `front` +1 puts the gun's line at the larger-y end, -1 at the smaller (a hand-set choice, flown both ways). */
+const ELEVATED = new Map();
+export const elevatedWith = ({ front = 1 } = {}) => { if (front !== 1 && front !== -1) throw new Error(`flyTracking.elevatedWith: front is 1 or -1 (got ${front})`); if (!ELEVATED.has(front)) ELEVATED.set(front, libraryOf(`fly:medial, sticky to ships, elevation along the sheet (front ${front > 0 ? "+y" : "-y"})`, FLY_M.raw, FLY_M.cells, { sticky: "ships", pitchRaw: circuitOf(matrixOf(), { front, places: PL.ALONG }).raw })); return ELEVATED.get(front); };
+/** THE HOLDING MIXED GUNNER THAT SEES ITS TARGET MOVE (`seatFlyWired8`, 2026-11-19): the two gunners that shipped that day in one -- on a SHIP the cells are driven at the bearing plus tau times the target's own bearing rate (seatFlyWired7's slip, low-passed
+ *  over 0.2 s), on a FIGHTER the seat is the hand gunner, with no target it holds (seatFlyWired6). Three weights, the third tau (0.1 as flown; 0 is seatFlyWired6 to the bit). Against fighters alone it IS seatFlyWired6 whatever tau (the network is never
+ *  asked); in fleets with no fighters it IS seatFlyWired7. See tools/ship/takeFlyWiredGunnerHoldSees.mjs. */
+export const POLICY_ID8 = "seatFlyWired8", holdSees = libraryOf("fly:medial for ships, seeing its target move, the hand for fighters, holding with no target", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0.2, from: "target" });
+/** THE GUNNER WHOSE HAND LAYS THE LAST DEGREES (`seatFlyWired9`, 2026-11-20): the seeing holding gunner (seatFlyWired8), but where the gun is within NEAR (20 degrees) of the sight's solution on a ship, the seat does what the hand does -- the circuit makes
+ *  the big swings, the hand the fine laying. Why: the fly gun, not firing, sat a median 3-5 degrees off the solution, just outside the trigger's window, where the circuit's command is soft (10% of the slew at 2 degrees); a stiffer gain overshot and lost
+ *  (tools/ship/takeFlyWiredGunnerShips.mjs's header). NEAR 20 degrees was CHOSEN ON SCRATCH PAIRS (the module header). `holdSeesNear(near)` builds another. See tools/ship/takeFlyWiredGunnerNear.mjs. */
+export const NEAR = 20 * Math.PI / 180;
+export const holdSeesNear = (near) => libraryOf(`fly:medial for ships until within ${near} rad, then the hand; the hand for fighters; holding; seeing its target move`, FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q, rule, st) => !ST.SHIPS_ONLY(q) || (rule && st && Math.hypot(wrap(rule.yaw - st.yaw), rule.pitch - st.pitch) < near), handRest: false, motion: true, smooth: 0.2, from: "target" });
+export const POLICY_ID9 = "seatFlyWired9", holdNear = holdSeesNear(NEAR);
+/** THE NEAR-HAND GUNNER WITH ITS THREE CHOICES AS WEIGHTS (`seatFlyWired10`, 2026-11-20): five weights -- the two gains, tau, the slip's smoothing (seconds) and the hand's window (radians); at [-3, -3, 0.1, 0.2, NEAR] it IS seatFlyWired9 to the bit.
+ *  For tools/ship/takeFlyWiredGunnerTune.mjs's search; nothing inside the circuit is learned. */
+export const POLICY_ID10 = "seatFlyWired10", nearTunable = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding -- its tau, smoothing and window as weights", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true });
+export const SHIPPED9 = Object.freeze([-3, -3, 0.1, 0.2, NEAR]);
+/** THE PAGE'S GUNNER OVER ANOTHER WIRING (2026-11-20; for tools/ship/takeFlyWiredGunnerControl.mjs): seatFlyWired10 with its read-out S taken from wiringOf(name) -- "shuffled:<seed>", "scrambled:<seed>", "flat", "sine" or "fly:medial" (the gunner itself) -- and every
+ *  other choice the same. The question it asks: once the hand lays the last degrees and every fighter, does the FLY'S wiring still do anything? */
+const NEAR_OVER = new Map();
+export function nearTunableOver(name) {
+    if (name === "fly" || name === "fly:medial") return nearTunable;
+    if (!NEAR_OVER.has(name)) { const w = wiringOf(name); NEAR_OVER.set(name, libraryOf(`${nearTunable.name}, over ${name}`, w.raw, w.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true })); }
+    return NEAR_OVER.get(name);
+}
+export const wiringOf10 = nearTunableOver;
+/** THE PAGE'S GUNNER HOLDING THE TRIGGER (`seatFlyWired11`, 2026-11-20): seatFlyWired10 but with a target the trigger is held, on the circuit's ticks and the hand's -- the race car's trained gunner's one trick (tools/ship/trainTurretSeatBig.mjs). Same five weights. */
+export const POLICY_ID11 = "seatFlyWired11", nearAlways = libraryOf("fly:medial for ships, seeing its target move, the hand for the last degrees and for fighters, holding, the trigger held", FLY_M.raw, FLY_M.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true });
+const ALWAYS_OVER = new Map();
+/** THE PAGE'S HELD-TRIGGER GUNNER OVER ANOTHER WIRING (2026-11-20; for the sine twins, tools/ship/takeSineTwins.mjs): seatFlyWired11 with its read-out taken from wiringOf(name); "fly"/"fly:medial" is seatFlyWired11 itself. */
+export function nearAlwaysOver(name) {
+    if (name === "fly" || name === "fly:medial") return nearAlways;
+    if (!ALWAYS_OVER.has(name)) { const w = wiringOf(name); ALWAYS_OVER.set(name, libraryOf(`${nearAlways.name}, over ${name}`, w.raw, w.cells, { sticky: "ships", handOn: (q) => !ST.SHIPS_ONLY(q), handRest: false, motion: true, smooth: 0, from: "target", tunable: true, alwaysFire: true })); }
+    return ALWAYS_OVER.get(name);
+}
+/** The fly's circuit (fly:medial) asked about SEVERAL bearings at once, read the odd way: half of (all the bearings) less (all of them mirrored). Its sign is the side the circuit turns to (negative: the positive side, as S). */
+export const oddMany = (es) => (FLY_M.rawMany(es) - FLY_M.rawMany(es.map((e) => -e))) / 2;
+export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
+/** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
+export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
+
+/** What a command S computes: its value at each of `degrees`, where it peaks, and the bearing by which it has reached 90% of its peak. */
+export function tuning(Sfn = S, degrees = [1, 3, 6, 10, 15, 25, 40, 60, 90, 120, 150, 175]) {
+    const curve = degrees.map((d) => Sfn(d * Math.PI / 180)); let peakAt = 0, peak = 0, reach = null;
+    for (let d = 0.5; d <= 180; d += 0.5) { const v = Math.abs(Sfn(d * Math.PI / 180)); if (v > peak) { peak = v; peakAt = d; } }
+    for (let d = 0.5; d <= 180 && reach === null; d += 0.5) if (Math.abs(Sfn(d * Math.PI / 180)) >= 0.9 * peak) reach = d;
+    return { degrees, curve, peakAt, peak, reach };
+}
+
+export function reportLines() {
+    const t = tuning(), f = tuning(wiringOf("flat").S), l = tuning(wiringOf("fly:lateral").S);
+    return ["[flyTracking] the fly's target-tracking circuit wired as the fly wires it: a target's bearing onto the LC10a cells of one eye at their own places, the connectome's own signed weights, DNa02 right less left out (read the odd way)",
+        `  ${N} neurons, ${LC.EDGES.length} connections, no learned weight inside; with places the command reaches 90% of its peak at ${t.reach} degrees and peaks at ${t.peakAt} (the other way round: ${l.reach} and ${l.peakAt}); with no places it is there by ${f.reach} degrees: a switch; the gunner on it has two weights (two gains) and the sight's own trigger`];
+}
+
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+}

@@ -15,6 +15,16 @@ export const CELL_TYPES = Object.freeze([
     Object.freeze({ type: "Delta7", cls: "Delta7", nt: "Inh" }), Object.freeze({ type: "PEG", cls: "PEG", nt: "Exc" }),
 ]);
 export const INPUT_CLASSES = Object.freeze(["EPG", "PEN_a", "PEN_b"]), OUTPUT_CLASSES = Object.freeze(["EPG", "PEG"]);
+/** 2026-11-19 -- THE STEERING READOUT (backlog `circuits-next-from-open-data`): the heading loop's five types and the three types of P-FL cell that carry the heading OUT of the central complex towards the steering cells of the lateral accessory lobe
+ * (PFL1, PFL2, PFL3, all cholinergic as the author remembers the literature; TO BE CHECKED like the rest). The inputs stay where heading and turning arrive (E-PG, P-EN); the outputs are the P-FL cells, the circuit's way out. The heading loop is the
+ * default and is unchanged, byte for byte: its file (vendor/hemibrain/hemibrain-cx-heading-loop.json) is what rung 4a was flown on. */
+const PFL_TYPES = Object.freeze([Object.freeze({ type: "PFL1", cls: "PFL1", nt: "Exc" }), Object.freeze({ type: "PFL2", cls: "PFL2", nt: "Exc" }), Object.freeze({ type: "PFL3", cls: "PFL3", nt: "Exc" })]);
+export const CIRCUITS = Object.freeze({
+    headingLoop: Object.freeze({ rule: "headingLoop", label: "heading loop", count: "five", types: CELL_TYPES, inputs: INPUT_CLASSES, outputs: OUTPUT_CLASSES, out: "vendor/hemibrain/hemibrain-cx-heading-loop.json",
+        inputNote: "E-PG and P-EN", outputNote: "E-PG and P-EG" }),
+    steering: Object.freeze({ rule: "steering", label: "steering readout", count: "eight", types: Object.freeze([...CELL_TYPES, ...PFL_TYPES]), inputs: INPUT_CLASSES, outputs: Object.freeze(["PFL1", "PFL2", "PFL3"]), out: "vendor/hemibrain/hemibrain-cx-steering.json",
+        inputNote: "E-PG and P-EN", outputNote: "PFL1, PFL2 and PFL3" }),
+});
 export const DEFAULTS = Object.freeze({ minWeight: 3 });
 export const SIGN_SOURCE = "assigned by cell type from the central-complex literature as remembered by the author, NOT read from the export (which has no signs): E-PG, P-EN and P-EG excitatory (cholinergic), Delta7 inhibitory (glutamatergic, acting as inhibition); to be checked against the papers";
 export const REQUIRED_NEURON_COLUMNS = Object.freeze(["bodyId", "type", "instance"]);
@@ -22,12 +32,14 @@ export const REQUIRED_NEURON_COLUMNS = Object.freeze(["bodyId", "type", "instanc
 const BODY = /^\d+$/;
 /** The hemisphere a cell's instance name ends in (`_L`, `_R`, `_L4`, `_R8`, `_L1L9R8_R` ...): "L", "R", or null for a name that says neither. */
 export function sideOfInstance(instance) {
-    const m = /_([LR])\d*$/.exec(String(instance));
+    // 2026-11-19: or a P-FL name, which gives its bridge glomerulus and THEN its fan-shaped-body column (PFL3(PB12c)_L2_C4, PFL1(PB12a)_L1_C8_irreg): the side is the glomerulus's, the same half of the bridge the other types' names give.
+    // It is NOT the side of the lateral accessory lobe the cell reaches. No heading-loop name has a _C part, so the five types' sides are unchanged.
+    const m = /_([LR])\d*$/.exec(String(instance)) || /_([LR])\d+_C\d+(?:_irreg)?$/.exec(String(instance));
     return m ? m[1] : null;
 }
 /** The cells of the five types out of the rows of traced-neurons.csv ({ bodyId, type, instance } as text): { cells: [...], skipped } in ascending body id (numeric), each { id, cls, nt, layer, side, instance }. A row whose id is not a whole number is skipped and counted. */
-export function neuronsOf(rows) {
-    const byType = new Map(CELL_TYPES.map((t, k) => [t.type, { ...t, layer: k }])), cells = []; let skipped = 0;
+export function neuronsOf(rows, spec = CIRCUITS.headingLoop) {
+    const byType = new Map(spec.types.map((t, k) => [t.type, { ...t, layer: k }])), cells = []; let skipped = 0;
     for (const r of rows) {
         const t = byType.get(String(r.type ?? "").trim());
         if (!t) continue;
@@ -62,21 +74,23 @@ export function edgesAmong(rows, cells, minWeight = DEFAULTS.minWeight) {
     return { edges, stats };
 }
 /** The input and output cells by index: the cells whose class is in INPUT_CLASSES / OUTPUT_CLASSES. */
-export function ioOf(cells) {
+export function ioOf(cells, spec = CIRCUITS.headingLoop) {
     const pick = (names) => cells.map((c, k) => (names.includes(c.cls) ? k : -1)).filter((k) => k >= 0);
-    return { inputs: pick(INPUT_CLASSES), outputs: pick(OUTPUT_CLASSES) };
+    return { inputs: pick(spec.inputs), outputs: pick(spec.outputs) };
 }
 /** Everything: { neurons, edges, io, selection } for the neuron rows and the connection rows. Refuses a table with none of the five types. */
-export function circuitOf(neuronRows, connectionRows, { minWeight = DEFAULTS.minWeight } = {}) {
-    const { cells, skipped } = neuronsOf(neuronRows);
-    if (!cells.length) throw new Error("flyCx.circuitOf: no neuron of the five types (" + CELL_TYPES.map((t) => t.type).join(", ") + ") in the table");
-    const missing = CELL_TYPES.filter((t) => !cells.some((c) => c.cls === t.cls)).map((t) => t.type);
+export function circuitOf(neuronRows, connectionRows, { minWeight = DEFAULTS.minWeight, circuit = "headingLoop" } = {}) {
+    const spec = CIRCUITS[circuit];
+    if (!Object.hasOwn(CIRCUITS, circuit)) throw new Error(`flyCx.circuitOf: no circuit named ${JSON.stringify(circuit)} (${Object.keys(CIRCUITS).join(", ")})`);
+    const { cells, skipped } = neuronsOf(neuronRows, spec);
+    if (!cells.length) throw new Error(`flyCx.circuitOf: no neuron of the ${spec.count} types (` + spec.types.map((t) => t.type).join(", ") + ") in the table");
+    const missing = spec.types.filter((t) => !cells.some((c) => c.cls === t.cls)).map((t) => t.type);
     if (missing.length) throw new Error(`flyCx.circuitOf: no neuron of type ${missing.join(", ")} in the table`);
     const { edges, stats } = edgesAmong(connectionRows, cells, minWeight), count = (f) => cells.reduce((m, c) => { const k = f(c); m[k] = (m[k] || 0) + 1; return m; }, {});
     const pairs = {}; for (const [a, b, n] of edges) { const k = cells[a].cls + ">" + cells[b].cls; pairs[k] = pairs[k] || { edges: 0, synapses: 0 }; pairs[k].edges++; pairs[k].synapses += n; }
     return {
-        neurons: cells, edges, io: ioOf(cells),
-        selection: { rule: "headingLoop", minWeight, neurons: cells.length, edges: edges.length, synapses: edges.reduce((s, e) => s + e[2], 0), excitatoryEdges: edges.filter((e) => e[3] > 0).length, inhibitoryEdges: edges.filter((e) => e[3] < 0).length,
+        neurons: cells, edges, io: ioOf(cells, spec),
+        selection: { rule: spec.rule, minWeight, neurons: cells.length, edges: edges.length, synapses: edges.reduce((s, e) => s + e[2], 0), excitatoryEdges: edges.filter((e) => e[3] > 0).length, inhibitoryEdges: edges.filter((e) => e[3] < 0).length,
             byClass: count((c) => c.cls), bySide: count((c) => c.side || "none"), byClassPair: pairs, skippedNeuronRows: skipped, connectionRows: stats.rows, pairsBetweenChosenCells: stats.between, selfLoops: stats.selfLoops, belowFloorPairs: stats.belowFloor, belowFloorSynapses: stats.belowFloorSynapses },
     };
 }

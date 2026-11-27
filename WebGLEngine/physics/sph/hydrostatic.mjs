@@ -5,6 +5,7 @@
 // physicsSuite has carried this since v2494, in its own words: "THE SPH BACKEND PASSES 3 GREEN GATES AND CANNOT
 // HOLD UP A COLUMN OF WATER. v2484 tested kernels, momentum and density -- never WEIGHT. The fix is a proper
 // equation of state (Tait, gamma = 7) and is a round of its own; RECORDED, NOT FAKED."
+// SETTLED at v2881: this file is that round, and physics/sph/sph.js carries the Tait EOS (taitB).
 //
 // This is that round. It did not go the way the note predicted, and both halves of that are recorded here.
 //

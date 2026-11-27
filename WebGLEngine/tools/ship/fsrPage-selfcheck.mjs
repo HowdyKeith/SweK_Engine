@@ -678,7 +678,7 @@ console.log("\n11. *** WHAT THE PASS IS WORTH (v4665), AND WHAT IT COSTS THE FEA
        && /106\s+->\s+108/.test(pre) && /404 \(1\.03%\)\s+->\s+363/.test(pre)
        && /<select id="dilate">\s*<option value="on"/.test(raw),
        "v4665 said moving the default was a separate round with its own re-measurement. v4667 is that " +
-       "round, and the record says so where it used to say the opposite -- a record that quietly stops " +
+       "round (SETTLED at v4667), and the record says so where it used to say the opposite -- a record that quietly stops " +
        "being true is worse than one that is openly superseded.");
 }
 

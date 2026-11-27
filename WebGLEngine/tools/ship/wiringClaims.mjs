@@ -82,8 +82,15 @@ export const CLAIM_PATTERNS = [
     /imports this module zero/i, /\bis unwired\b/i, /not wired into/i, /no consumer/i,
 ];
 
-/** Every module that IS imported by something else, by real import specifier -- never a substring match. */
-export function importedModules(root = ENG) {
+// *** v4933 -- ONE READ OF A FILE AND ONE STAT OF A CANDIDATE PER CONTEXT, NOT ONE PER PASS. *** The rig's verdict killed this gate at the sweep's 20 s cap alone (26.6 s measured by hand on the win32 8 GB box; 2.2 s warm here): it read each of
+// 7,329 files up to three times (importedModules in the gate, importedModules again inside auditClaims, then auditClaims' own walk -- 20,725 reads, 394 MB) and asked the disk 44,000 times whether a candidate specifier exists. The results are the same
+// objects as before; only the repeated I/O is gone (about 7,300 reads and one stat per distinct candidate). A context is private to the caller that makes it, so a file changed between two contexts is read again.
+export const newContext = () => ({ reads: new Map(), files: new Map() });
+const readText = (ctx, p) => { if (ctx.reads.has(p)) return ctx.reads.get(p); let s = null; try { s = fs.readFileSync(p, "utf8"); } catch { s = null; } ctx.reads.set(p, s); return s; };
+const isFileAt = (ctx, c) => { if (ctx.files.has(c)) return ctx.files.get(c); let ok = false; try { ok = fs.statSync(c).isFile(); } catch { ok = false; } ctx.files.set(c, ok); return ok; };
+
+/** Every module that IS imported by something else, by real import specifier -- never a substring match. `ctx` (newContext()) shares reads with a later auditClaims. */
+export function importedModules(root = ENG, ctx = newContext()) {
     const files = [];
     const walk = (d) => {
         let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
@@ -97,7 +104,7 @@ export function importedModules(root = ENG) {
     walk(root);
     const reached = new Set();
     for (const f of files) {
-        let src; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        const src = readText(ctx, f); if (src === null) continue;
         // Real specifiers only: `from "..."` and `import("...")`. A bare mention in prose is NOT a reference,
         // which is the entire failure this file exists to correct -- do not repeat it while correcting it.
         for (const m of src.matchAll(/from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']/g)) {
@@ -105,7 +112,7 @@ export function importedModules(root = ENG) {
             if (!spec || !/^[./]/.test(spec)) continue;
             const abs = path.resolve(path.dirname(f), spec);
             for (const cand of [abs, abs + ".js", abs + ".mjs"]) {
-                if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+                if (isFileAt(ctx, cand)) {
                     // A module reached ONLY by its own selfcheck is not wired -- orphanScan's own rule.
                     if (!/-selfcheck\.mjs$/.test(f)) reached.add(path.relative(ENG, cand).replace(/\\/g, "/"));
                     break;
@@ -123,8 +130,8 @@ export const MAX_SUBJECTS_PER_CLAIM = 2;
 /** Lines that matched a claim pattern but name too many modules to be a record. Filled by auditClaims(). */
 export const proseBlocks = [];
 
-export function auditClaims(root = ENG) {
-    const reached = importedModules(root);
+export function auditClaims(root = ENG, ctx = newContext()) {
+    const reached = importedModules(root, ctx);
     const out = [];
     const prose = proseBlocks; prose.length = 0;
     const walk = (d) => {
@@ -134,7 +141,7 @@ export function auditClaims(root = ENG) {
             const p = path.join(d, e.name);
             if (e.isDirectory()) { walk(p); continue; }
             if (!/\.(js|mjs|html|md)$/.test(e.name)) continue;
-            let src; try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
+            const src = readText(ctx, p); if (src === null) continue;
             src.split(/\r?\n/).forEach((line, i) => {
                 if (!CLAIM_PATTERNS.some((re) => re.test(line))) return;
                 // The subject is any path-like token on the same line.

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Wide lines: what gl.lineWidth cannot do">
 <meta name="demo:desc" content="gl.lineWidth is clamped to 1 on every desktop driver -- it is in the spec and it silently does nothing. A wide line has to be a triangle strip, with the sideways offset applied in the vertex shader so the width is a number of PIXELS that does not change with distance. Drag the width; watch the same path drawn both ways.">

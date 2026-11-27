@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Sinogram GPU">
 <meta name="demo:desc" content="The whole scan as one texture. A sinogram is an image -- detector across, angle down -- and every pixel is one ray that depends on no other ray, so a fragment shader computing one texture IS the entire scan. This is the Neo Geo trick: Doom ran on a machine with no framebuffer because a raycast column is a vertically scaled sprite, and someone noticed the data already had the shape the hardware wanted. This page adjudicates rather than asserts: it runs the same arithmetic on the GPU and on the CPU and prints the worst disagreement between them, because the arithmetic is proven headless but a GPU executing it faithfully is not. Casting is the real cost -- about ten times the reconstruction -- and it is the embarrassingly parallel half.">

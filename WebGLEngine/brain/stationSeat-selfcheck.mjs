@@ -64,12 +64,12 @@ sec("3. THE POLICY");
 
 sec("4. THE DECODE");
 {
-    const pol = ST.createStationPolicy(3, "s"), plainPol = CS.createPlainPolicy(3, "p"), rule = U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf());
+    const pol = ST.createStationPolicy(3, "s"), plainPol = CS.createPlainPolicy(3, "p"), rule = U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)(ctxOf());
     const ones = () => { const w = new Float32Array(94); for (let o = 0; o < 7; o++) w[pol.offsets.B2 + o] = 1; return w; };
     const A = q(50, 0, 20), B = q(100, 0, 20), C = q(150, 0, 20);
     let bad = [], n = 0;
     for (const depth of [1, 10, 25, 45]) for (const frac of [0.12, 0.3, 0.45, 0.8]) for (const flood of [0, 0.02]) for (const damage of [0, 0.3]) {
-        const st = stateAt(0, 0, depth), obs = obsOf({ t: 100, r: { frac, depth, flood, damage }, stations: [A, B, C] }), seat = pol.seatFor(ones())(ctxOf()), ruleSeat = U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf());
+        const st = stateAt(0, 0, depth), obs = obsOf({ t: 100, r: { frac, depth, flood, damage }, stations: [A, B, C] }), seat = pol.seatFor(ones())(ctxOf()), ruleSeat = U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)(ctxOf());
         const a = seat(st, obs), b = ruleSeat(st, obs); n++;
         if (a.surface !== b.surface || a.cap !== b.cap || a.pump !== b.pump || a.repair !== b.repair || a.station !== b.station) bad.push(`${depth}/${frac}/${flood}/${damage}`);
     }
@@ -86,7 +86,7 @@ sec("4. THE DECODE");
 
 sec("5. THE START");
 {
-    const pol = ST.createStationPolicy(), pilot = pol.pilotFor(pol.handWeights()), rule = T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), bad = []; let n = 0;
+    const pol = ST.createStationPolicy(), pilot = pol.pilotFor(pol.handWeights()), rule = T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)), bad = []; let n = 0;
     for (const kind of ["plain", "deep", "far", "both"]) for (const seed of [501, 502]) for (const gauge of [null, T.GAUGE]) { if (gauge === null && seed === 502) continue; const c = T.scenario(seed, kind), a = T.fly(pilot, c, { gauge }), b = T.fly(rule, c, { gauge }); n++; if (a.fingerprint !== b.fingerprint || a.score !== b.score) bad.push(`${kind}${seed}${gauge ? "+gauge" : ""}`); }
     ok(`!! the untrained station policy IS rule-low06: scores and fingerprints equal on ${n} dives of the four kinds, with and without the noisy gauge`, n === 12 && bad.length === 0, bad.join(", "));
 }

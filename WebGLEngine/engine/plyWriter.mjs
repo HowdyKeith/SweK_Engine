@@ -77,12 +77,13 @@ function propOf(g, name) {
  * file for missing a marker it plainly has. That is not hypothetical -- engine/splatParser.js did exactly
  * this until v4195, and this parameter is how the gate proves it no longer does.
  */
-export function plyHeader(format, count, eol = "\n") {
+export function plyHeader(format, count, eol = "\n", extra = []) {
     return [
         "ply",
         `format ${format} 1.0`,
         `element vertex ${count}`,
         ...PLY_PROPS.map((p) => `property float ${p}`),
+        ...extra.map((p) => `property float ${p}`),
         "end_header",
         "",
     ].join(eol);
@@ -91,17 +92,21 @@ export function plyHeader(format, count, eol = "\n") {
 /**
  * Write Gaussians as a .ply.
  *
- * @param gaussians  [{ x, y, z, scale:[3] (log), rot:[4] (w,x,y,z), color:[3] (raw f_dc), opacity (logit) }]
+ * @param gaussians  [{ x, y, z, scale:[3] (log), rot:[4] (w,x,y,z), color:[3] (raw f_dc), opacity (logit), rest?:[9|24|45] (f_rest_*, the file's order) }]
+ *                   2026-11-21: `rest` on every gaussian (the same length) writes the higher SH bands too (render/splatSH.mjs)
  * @param format     "binary_little_endian" | "binary_big_endian" | "ascii"
  * @param eol        header line ending -- "\n" or "\r\n"
  * @returns Uint8Array
  */
 export function writePly(gaussians, { format = "binary_little_endian", eol = "\n" } = {}) {
     if (!Array.isArray(gaussians) || !gaussians.length) throw new RangeError("plyWriter: no gaussians");
-    const head = new TextEncoder().encode(plyHeader(format, gaussians.length, eol));
+    const nRest = gaussians[0].rest ? gaussians[0].rest.length : 0;
+    if (gaussians.some((g) => (g.rest ? g.rest.length : 0) !== nRest)) throw new RangeError("plyWriter: every gaussian must carry the same number of f_rest values");
+    const extra = Array.from({ length: nRest }, (_, r) => "f_rest_" + r), val = (g, p) => (p.startsWith("f_rest_") ? g.rest[Number(p.slice(7))] : propOf(g, p)), ALL = [...PLY_PROPS, ...extra];
+    const head = new TextEncoder().encode(plyHeader(format, gaussians.length, eol, extra));
     if (format === "ascii") {
         const body = new TextEncoder().encode(
-            gaussians.map((g) => PLY_PROPS.map((p) => propOf(g, p)).join(" ")).join("\n") + "\n");
+            gaussians.map((g) => ALL.map((p) => val(g, p)).join(" ")).join("\n") + "\n");
         const out = new Uint8Array(head.length + body.length);
         out.set(head, 0); out.set(body, head.length);
         return out;
@@ -110,12 +115,12 @@ export function writePly(gaussians, { format = "binary_little_endian", eol = "\n
         throw new Error("plyWriter: unknown format " + format);
     }
     const le = format === "binary_little_endian";
-    const stride = PLY_PROPS.length * 4;
+    const stride = ALL.length * 4;
     const out = new Uint8Array(head.length + gaussians.length * stride);
     out.set(head, 0);
     const dv = new DataView(out.buffer, head.length);
     let o = 0;
-    for (const g of gaussians) for (const p of PLY_PROPS) { dv.setFloat32(o, propOf(g, p), le); o += 4; }
+    for (const g of gaussians) for (const p of ALL) { dv.setFloat32(o, val(g, p), le); o += 4; }
     return out;
 }
 

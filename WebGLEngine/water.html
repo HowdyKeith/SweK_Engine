@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WebGL2 Water &mdash; ripples, caustics, Fresnel</title>
 <style>
@@ -257,14 +258,15 @@ function drawScene() {
   gl.disable(gl.BLEND);
 }
 
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 let frame = 0;
 function loop() {
   if (!paused) {
     if (rain && frame % 45 === 0) drop(Math.random(), Math.random(), 0.10 + Math.random()*0.05);
-    for (let i=0;i<3;i++) stepSim();
-    renderCaustics();
+    gpuTime("sim", () => { for (let i=0;i<3;i++) stepSim(); });
+    gpuTime("caustics", renderCaustics);
   }
-  drawScene();
+  gpuTime("scene", drawScene);
   frame++;
   setStatus(`sim ${SIM_N}\u00b2 \u00b7 mesh ${MESH_N}\u00b2 \u00b7 caustics ${useCaustic?"on":"off"}${paused?" \u00b7 paused":""}`);
   requestAnimationFrame(loop);

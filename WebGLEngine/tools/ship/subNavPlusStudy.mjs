@@ -14,8 +14,8 @@ import * as P from "../../brain/subNavPlus.mjs";
 import * as AP from "../../brain/autopilotSub.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
-export const STUDIES = Object.freeze({ margin: "held70", current: "held71", reactive: "held72" });
-export const OUT = Object.freeze({ margin: "brain/subNavPlusMarginHeld70.jsonl", current: "brain/subNavPlusCurrentHeld71.jsonl", reactive: "brain/subNavPlusReactiveHeld72.jsonl" });
+export const STUDIES = Object.freeze({ margin: "held70", current: "held71", reactive: "held72", crab: "held73" });
+export const OUT = Object.freeze({ margin: "brain/subNavPlusMarginHeld70.jsonl", current: "brain/subNavPlusCurrentHeld71.jsonl", reactive: "brain/subNavPlusReactiveHeld72.jsonl", crab: "brain/subNavPlusCrabHeld73.jsonl" });
 export const THRESH = Object.freeze({ gain: 5, partlyGain: 3, p: 0.10, harmful: -5 });
 export const MARGIN_KINDS = Object.freeze(["hard-islands", "hard-gaps", "hard-current", "hard-traffic"]), STATIC_KINDS = Object.freeze(["hard-islands", "hard-gaps", "hard-current"]);
 export const MARGIN_ARM = Object.freeze({ "hard-islands": "any", "hard-gaps": "any", "hard-current": "any", "hard-traffic": "any+predict+edge+yield" });
@@ -151,6 +151,46 @@ export function reactiveVerdictLines(j) {
         `R1 the reaction changes the assumed-velocity arm's reach by at least 5 on the same seeds: ${yn(j.r1)} (reactive ${j.react}, not reactive ${j.plain})`, `R2 the reaction RAISES that arm's reach: ${yn(j.r2)}`, `R3 the designated arm reaches at least as many as any+replan: ${yn(j.r3)}`,
         `R4 SUPPORTED: ${yn(j.r4)}; NOT SUPPORTED: ${yn(j.r4b)}`, `R5 a stops ship is hit less often than a holds ship, per ship: ${yn(j.r5)}`, `R6 no flight of the designated arm times out: ${yn(j.r6)}`, `VERDICT: ${j.verdict}`];
 }
+// ---- the crab replicate (brain/NAV_PLUS_WIP.md, ITEM 2 REPLICATE, registered 2026-11-17 before this code) -------------------------------------------------------------------------------------------------------
+export const CRAB_ARMS = Object.freeze(["any", "any+crab"]), CRAB_DESIGNATED = "any+crab", CRAB_P = 0.05, CRAB_REPRO_SEEDS = 5;
+export function crabRuns(seeds, o = {}) { return CURRENT_KINDS.flatMap((k) => seeds.flatMap((s) => { const sc = P.plusScenario(s, k); return CRAB_ARMS.map((arm) => P.flyPlus(o.pilot || pilot, sc, arm)); })); }
+/** The checks: SAME SCENARIOS, THE ARMS ARE ITEM 2'S (`repro`: true when both arms reproduce the stored HELD71 flights, computed by the caller), THE CRAB BITES. */
+export function crabChecks(runs, repro) {
+    const of = (arm) => runs.filter((r) => r.arm === arm), a = of("any"), c = of(CRAB_DESIGNATED);
+    const same = a.length > 0 && a.length === c.length && a.every((r, i) => r.kind === c[i].kind && r.seed === c[i].seed);
+    const bites = a.some((r, i) => c[i] && (r.status !== c[i].status || r.ticks !== c[i].ticks || r.path !== c[i].path));
+    return [{ name: "SAME SCENARIOS", ok: same, text: `both arms fly the same ${a.length} scenarios in the same order: ${same}` },
+        { name: "THE ARMS ARE ITEM 2'S", ok: repro === true, text: `both arms reproduce item 2's stored HELD71 flights on its first ${CRAB_REPRO_SEEDS} seeds of each kind (status, ticks, path): ${repro}` },
+        { name: "THE CRAB BITES", ok: bites, text: `the two arms differ on at least one flight: ${bites}` }];
+}
+/** Check 2, flown: both arms on item 2's first CRAB_REPRO_SEEDS HELD71 seeds of each kind against `stored` (the lines of brain/subNavPlusCurrentHeld71.jsonl). */
+export function crabRepro(stored, fly = (sc, arm) => P.flyPlus(pilot, sc, arm)) {
+    const want = new Map(stored.map((r) => [`${r.arm}|${r.kind}|${r.seed}`, r]));
+    return CURRENT_KINDS.every((k) => P.PLUS_SETS.held71.slice(0, CRAB_REPRO_SEEDS).every((s) => { const sc = P.plusScenario(s, k); return CRAB_ARMS.every((arm) => { const w = want.get(`${arm}|${k}|${s}`), g = fly(sc, arm); return !!w && w.status === g.status && w.ticks === g.ticks && w.path === g.path; }); }));
+}
+/** The registered verdict: SUPPORTED iff gain >= THRESH.gain, p <= CRAB_P and the crab has no more collisions than any; PARTLY SUPPORTED iff gain >= THRESH.partlyGain otherwise; HARMFUL beside it iff gain <= THRESH.harmful. E2 to E4 are the expectations. */
+export function judgeCrab(runs) {
+    const of = (arm, kind) => runs.filter((r) => r.arm === arm && (!kind || r.kind === kind)), pr = paired(of(CRAB_DESIGNATED), of("any")), cc = cell(of(CRAB_DESIGNATED)), ac = cell(of("any"));
+    const supported = pr.gain >= THRESH.gain && pr.p <= CRAB_P && cc.collided <= ac.collided, partly = !supported && pr.gain >= THRESH.partlyGain, harmful = pr.gain <= THRESH.harmful;
+    const ratio = (rs) => median(rs.map((r) => r.path / r.chord)), byKind = (k) => paired(of(CRAB_DESIGNATED, k), of("any", k));
+    return { pr, cc, ac, supported, partly, harmful, verdict: supported ? "SUPPORTED" : partly ? "PARTLY SUPPORTED" : "NOT SUPPORTED",
+        e2: cell(of(CRAB_DESIGNATED, "hard-current")).reached >= 0.97 * cell(of(CRAB_DESIGNATED, "hard-current")).n, e3: ratio(of(CRAB_DESIGNATED, "hard-current")) < ratio(of("any", "hard-current")),
+        e4: byKind("hard-current").gain > byKind("hard-current-gap").gain, kinds: Object.fromEntries(CURRENT_KINDS.map((k) => [k, byKind(k)])) };
+}
+export function crabLines(runs, title, checks) {
+    const L = [`ITEM 2 REPLICATE (the crab alone): ${title}`];
+    for (const c of checks) L.push(`  ${c.ok ? "PASS" : "FAIL"} ${c.name}: ${c.text}`);
+    if (checks.some((c) => !c.ok)) { L.push("A CHECK FAILED: the verdict is NOT WEIGHED.", "VERDICT: NOT WEIGHED"); return L; }
+    L.push("kind               arm        reached  collided  left  timeout  median path/chord");
+    for (const k of CURRENT_KINDS) for (const a of CRAB_ARMS) { const rs = runs.filter((r) => r.kind === k && r.arm === a), c = cell(rs); L.push(`  ${k.padEnd(17)} ${a.padEnd(9)} ${String(c.reached).padStart(3)}/${c.n}  ${String(c.collided).padStart(6)}  ${String(c.left).padStart(4)}  ${String(c.timeout).padStart(6)}  ${median(rs.map((r) => r.path / r.chord)).toFixed(3)}`); }
+    const j = judgeCrab(runs), yn = (b) => (b ? "HELD" : "MISSED");
+    L.push(`${CRAB_DESIGNATED} against any (pooled, paired): ${j.pr.aOnly} only the crab, ${j.pr.bOnly} only any, both ${j.pr.both}, neither ${j.pr.neither}; gain ${j.pr.gain}, exact sign p ${j.pr.p.toFixed(4)}; collisions ${j.cc.collided} against ${j.ac.collided}${j.harmful ? "   HARMFUL" : ""}`);
+    for (const k of CURRENT_KINDS) L.push(`  ${k}: ${j.kinds[k].aOnly} only the crab, ${j.kinds[k].bOnly} only any, gain ${j.kinds[k].gain} (reported)`);
+    L.push(`E2 the crab reaches at least 97 percent on hard-current: ${yn(j.e2)}`, `E3 the crab's median path/chord is below any's on hard-current: ${yn(j.e3)}`, `E4 the gain is larger on hard-current than on the gap kind: ${yn(j.e4)}`, `E1 SUPPORTED: ${yn(j.supported)}`);
+    L.push(`VERDICT: ${j.verdict}`);
+    return L;
+}
+
 /** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile, flights } (flights replaces the flying: { margin(seeds), current(seeds), reactive(seeds) }). */
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync;
@@ -166,7 +206,7 @@ export function command(argv, io = {}) {
     if (!o.study) { err(`subNavPlusStudy: --study needs one of ${Object.keys(STUDIES).join(", ")}`); return 2; }
     if (o.set !== "dev" && o.set !== STUDIES[o.study]) { err(`subNavPlusStudy: the ${o.study} study reads ${STUDIES[o.study]} only`); return 2; }
     if (o.write && o.set === "dev") { err(`subNavPlusStudy: --write goes with --set ${STUDIES[o.study]} only`); return 2; }
-    const pick = (n) => (o.seeds ? P.PLUS_SETS[n].slice(0, o.seeds) : P.PLUS_SETS[n]), fly = io.flights || { margin: marginRuns, current: currentRuns, reactive: reactiveRuns };
+    const pick = (n) => (o.seeds ? P.PLUS_SETS[n].slice(0, o.seeds) : P.PLUS_SETS[n]), fly = io.flights || { margin: marginRuns, current: currentRuns, reactive: reactiveRuns, crab: crabRuns, crabRepro: () => crabRepro(fs.readFileSync(path.join(ENG, OUT.current), "utf8").trim().split("\n").map((l) => JSON.parse(l))) };
     let flights;
     if (o.study === "margin") {
         const dev = fly.margin(pick("dev")), choice = chooseMargin(dev);
@@ -178,6 +218,10 @@ export function command(argv, io = {}) {
     } else if (o.study === "current") {
         const runs = fly.current(pick(o.set)); out(`${o.set.toUpperCase()} set: ${pick(o.set).length} seeds of each of ${CURRENT_KINDS.length} kinds`); out(currentLines(runs, `tau ${P.TAU_C} s, K ${P.CUR_K} s, ${H.SECONDS_HARD} s a flight`).join("\n"));
         const j = judgeCurrent(runs); out(currentVerdictLines(j).join("\n")); if (o.set !== "dev") flights = runs;
+    } else if (o.study === "crab") {
+        const runs = fly.crab(pick(o.set)), checks = crabChecks(runs, fly.crabRepro());
+        out(`${o.set.toUpperCase()} set: ${pick(o.set).length} seeds of each of ${CURRENT_KINDS.length} kinds${o.set === "dev" ? " (DEV: a sanity run, not a result)" : ""}`); out(crabLines(runs, `tau ${P.TAU_C} s, ${H.SECONDS_HARD} s a flight`, checks).join("\n"));
+        if (o.set !== "dev") flights = runs;
     } else {
         const seeds = pick(o.set), runs = fly.reactive(seeds); out(`${o.set.toUpperCase()} set: ${seeds.length} seeds of hard-reactive (and the reference on hard-traffic)`); out(reactiveLines(runs, `reaction: sense ${P.SENSE} m, clear ${P.SHIP_CLEAR} m, turn ${P.SHIP_TURN_RATE} rad/s to ${(P.SHIP_MAX_TURN * 180 / Math.PI).toFixed(0)} deg, decel ${P.SHIP_DECEL} m/s^2; filter tau ${P.TAU_V} s`).join("\n"));
         const scs = seeds.map((s) => P.plusScenario(s, "hard-reactive")), j = judgeReactive(runs, scs); out(reactiveVerdictLines(j).join("\n"));

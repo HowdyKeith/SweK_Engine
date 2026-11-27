@@ -716,6 +716,10 @@ window.addEventListener("load", function () {
             <a href="/blobulator-gpu.html" target="_blank" rel="noopener" title="Blobulator GPU: raymarched SDF metaballs evaluated per-pixel in WGSL -- a fragment-bound load rather than a compute one.">Blobulator GPU</a>
             <a href="/celltrack-viewer-gpu.html" target="_blank" rel="noopener" title="Cell Volume Viewer (WebGPU): volumetric microscopy data raymarched on the GPU, the accelerated twin of the Canvas viewer.">Cell Viewer (WebGPU)</a>
             <a href="/blackhole.html" target="_blank" rel="noopener" title="Schwarzschild Black Hole (WebGPU): null geodesics integrated in the fragment shader -- a photon ring and an accretion disc lensed by the real metric.">Black Hole (WebGPU)</a>
+            <a href="/splat-gpu.html" target="_blank" rel="noopener" title="Gaussian splats on the card: a GPU radix sort, a WebGPU renderer, spherical harmonics, level of detail; ?aa=t2x for SMAA T2x, ?gizmo=1 to move the cloud.">Splats (WebGPU)</a>
+            <a href="/gizmo-demo.html" target="_blank" rel="noopener" title="Translate, rotate and scale gizmos, a view cube and an infinite grid; ?fog=1 for the volumetric fog.">Gizmos, View Cube &amp; Grid</a>
+            <a href="/lights-demo.html" target="_blank" rel="noopener" title="Clustered lighting with a shadow atlas on WebGL2: 64 moving lights, spot and point shadows, a moon with cascades, cookies; ?soft=1 for soft shadows.">Clustered Lights (WebGL2)</a>
+            <a href="/lights-gpu.html" target="_blank" rel="noopener" title="The same many-lights scene on WebGPU; ?soft=1 for soft contact-hardening shadows, ?fog=1 for fog with light shafts.">Clustered Lights (WebGPU)</a>
             <a href="/wormhole.html" target="_blank" rel="noopener" title="Ellis Wormhole (WebGPU): traversable-wormhole lensing, integrating rays through the throat rather than faking it with a warp.">Wormhole (WebGPU)</a>
             <a href="/wormhole-jump.html" target="_blank" rel="noopener" title="Wormhole Jump: Ellis-metric lensing showing the living nebula of each system -- the far one through the throat, the near one bending around it. Hit Jump to fly through. WebGPU with WebGL2 and Canvas2D fallbacks.">Wormhole Jump</a>
             <a href="/nebula.html" target="_blank" rel="noopener" title="Nebula: a parallax volumetric nebula -- domain-warped gas, a starfield, and depth from a drifting camera, with ships flying inside the cloud. WebGPU, with WebGL2 and Canvas2D fallbacks.">Nebula</a>
@@ -739,6 +743,7 @@ window.addEventListener("load", function () {
             <a href="/rotor-league.html" target="_blank" rel="noopener" title="Rotor League: every helicopter and quadrotor pilot against every other on the same scenarios, a fight being one scenario compared by score, with a Bradley-Terry rating and a matrix. The pilots fly alone: it is a way of counting the board's flights, not a contest." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128641; Rotor League</a>
             <a href="/flight-coop.html" target="_blank" rel="noopener" title="Co-op lockstep flight (Endless Sky on Box3D): two machines fly the same deterministic simulation in lockstep." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9992; Flight co-op</a>
             <a href="/battleship3d.html" target="_blank" rel="noopener" title="ABYSS 3D Battleship: ships on the physics sea (render/seaThree.mjs)." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9875; Battleship 3D</a>
+            <a href="/space-duel.html" target="_blank" rel="noopener" title="Space duel: a capital ship against a capital ship -- choose each side's gunners, helm and cannon, and see which gun seats a network works and how many networks are asked each tick." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9876; Space duel</a>
             <a href="/settings.html" target="_blank" rel="noopener" title="Settings -- engine, cloud, tunnel, brain and hosting configuration; most of its controls drive other subsystems, so it is filed with the System Tools it operates.">Settings</a>
             <a href="/node-bun.html" target="_blank" rel="noopener" title="Node / Bun -- which runtime is serving this box, the Bun-vs-Node capability surface run on demand, and the one optional dependency (ws) that Bun ships built in. Filed with System Tools because it operates the rig: it reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under each runtime.">Node / Bun</a>
             <!-- v4009 -- webgpu-llm.html SHIPPED AT v4007 AND WAS NEVER LINKED. The same defect this round fixed
@@ -1280,6 +1285,7 @@ window.addEventListener("load", function () {
         <!-- v3022 -- rig jobs have LIVE STATE (running, elapsed, exit code, and whether the job EDITS SOURCE)
              and had no gauge. Same shape the roundhouse was in one round ago, found by the same question. -->
         <button class="gtab" data-tab="rigjob"><span class="gtabTog">&#9656;</span><span>&#9203; Rig Jobs</span><span class="gtabState" id="rjStat"></span></button>
+        <button class="gtab" data-tab="peerjobs"><span class="gtabTog">&#9656;</span><span>&#129504; Brain Job Runner</span><span class="gtabState" id="pjStat"></span></button>
         <!-- v3023 -- the last two services with state that outlives a click. -->
         <button class="gtab" data-tab="terrain"><span class="gtabTog">&#9656;</span><span>&#127956; Terrain WASM</span><span class="gtabState" id="tbStat"></span></button>
         <button class="gtab" data-tab="crossarch"><span class="gtabTog">&#9656;</span><span>&#129518; Cross-Arch</span><span class="gtabState" id="caStat"></span></button>
@@ -1342,6 +1348,8 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="fsr"><span class="gtabTog">&#9656;</span><span>&#128269; FSR</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="denoiser"><span class="gtabTog">&#9656;</span><span>&#10024; Denoiser</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="flightsim"><span class="gtabTog">&#9656;</span><span>&#9992;&#65039; Flight Simulation</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="spacecombat"><span class="gtabTog">&#9656;</span><span>&#128640; Space Combat</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="recentnew"><span class="gtabTog">&#9656;</span><span>&#127381; Recent New Pages</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1977,6 +1985,18 @@ window.addEventListener("load", function () {
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Every page that flies something under a physics model: free flight (flight.html, flight-gpu.html, flight-coop.html), real 6DOF flight with pilots to choose (es-flight6dof.html, es-aircraft.html), 6DOF and dogfight combat (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), and the water: the tank of submarines and its tournament (sub-aquarium.html, sub-tournament.html), the Sea OGRE the subs defend against (sea-ogre.html) and the ships on the physics sea (battleship3d.html).</div>
           <div data-panel-pages="flightsim" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
+        <!-- UNNUMBERED (2026-11-14) -- Keith: "'Space Combat' is good". The pages that fight in vacuum; the first two stay in Flight Simulation as well (pageSections.mjs clones them here). -->
+        <div class="gpanel" data-panel="spacecombat" hidden>
+          <div class="gpanelHdr">&#128640; Space Combat</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The pages that fight in vacuum: two fleets of 6DOF fighters (es-box3d-6dof.html), a capital ship with thirteen gun seats against the fighters that attack it (space-battleship.html), and a capital ship against a capital ship, with a choice of who works each side's gun seats and helm (space-duel.html).</div>
+          <div data-panel-pages="spacecombat" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- UNNUMBERED (2026-11-23) -- Keith: a page with no drawer goes here by default, for one week from its file's first commit (pageSections.mjs, section recentnew). -->
+        <div class="gpanel" data-panel="recentnew" hidden>
+          <div class="gpanelHdr">&#127381; Recent New Pages</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">New pages with no drawer yet. A page is listed here for one week from the day its file was first committed, then it goes into a drawer (pageSections.mjs holds the date, and pageSections-selfcheck goes red when one is overdue).</div>
+          <div data-panel-pages="recentnew" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
@@ -2388,6 +2408,44 @@ A password fetches a token from the list server; an unregistered callsign needs 
             <a href="/rig.html" target="_blank" rel="noopener" style="color:#9fe6c0;">start a long run on the Rig page &rarr;</a>
           </div>
         </div>
+        <!-- UNNUMBERED (2026-11-23) -- THE BRAIN JOB REPO REPORT RUNNER (Keith: "the watcher wired into the SweK server as a panel and a service ... a default off checkbox in the Server.html Boot-Up Options").
+             This panel only DRIVES ai-bridge/peerJobsBridge.js, which drives tools/ship/peerJobsCmd.mjs: it computes nothing itself. OFF by default. -->
+        <div class="gpanel" data-panel="peerjobs" hidden>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:6px;">
+            The <b>Brain Job Repo Report Runner</b>: this box watches a git branch for signed training jobs, runs <b>one at a time</b> in a clean checkout of the job's commit
+            (a GPU box takes the jobs that ask for a GPU, the Intel box the ones that ask for it), and pushes the result back to the branch. <b>Off by default.</b>
+            A job is data: the box builds the command itself and runs nothing whose signature does not verify under this box's key (<code>docs/PEER_JOBS.md</code>).
+          </div>
+          <div id="pjBody" style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;">checking&hellip;</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;font-size:11px;margin-top:6px;max-width:640px;">
+            <label for="pjUrl">Queue repo</label><input id="pjUrl" type="text" placeholder="git address of the repo that holds the peer-jobs branch" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+            <label for="pjName">This peer's name</label><input id="pjName" type="text" placeholder="(this computer's name)" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+            <label for="pjGpu">GPU box?</label><select id="pjGpu" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:2px 5px;"><option value="auto">detect (nvidia-smi)</option><option value="yes">yes, this is a GPU box</option><option value="no">no GPU</option></select>
+            <label for="pjInt">Look every (s)</label><input id="pjInt" type="number" min="30" max="3600" value="120" style="width:90px;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+            <label for="pjEngine" id="pjEngineLbl">Engine repo</label><input id="pjEngine" type="text" placeholder="only if this engine is not a git checkout: where to clone it from" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+            <label for="pjKey">Signing key</label><span><form onsubmit="return false" style="display:contents" autocomplete="off"><input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="pjKey" type="password" autocomplete="off" placeholder="the secret every peer holds (write-only)" style="width:70%;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" /></form> <button id="pjKeySave" style="font-size:11px;padding:2px 9px;cursor:pointer;">Save key</button> <span id="pjKeyState" style="color:var(--dim);"></span></span>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button id="pjSave" style="font-size:11px;padding:3px 11px;cursor:pointer;">Save settings</button>
+            <button id="pjStart" style="font-size:11px;padding:3px 11px;background:#14241a;color:#9fe;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;">&#9654; Start watching</button>
+            <button id="pjStop" style="font-size:11px;padding:3px 11px;background:#3a1c1c;color:#f99;border:1px solid #6a3a3a;border-radius:5px;cursor:pointer;">&#9209; Stop</button>
+            <button id="pjQueue" style="font-size:11px;padding:3px 11px;cursor:pointer;">Show the queue</button>
+            <span id="pjMsg" style="font-size:11px;color:var(--dim);"></span>
+          </div>
+          <pre id="pjQueueOut" style="display:none;white-space:pre-wrap;font-size:10px;background:#0c1410;border:1px solid var(--line);border-radius:5px;padding:6px;max-height:160px;overflow:auto;margin:6px 0 0;user-select:text;"></pre>
+          <div style="margin-top:8px;font-size:11px;border-top:1px solid var(--line);padding-top:6px;">
+            <b>Submit a job</b> (pinned to this checkout's current commit &mdash; push it first)
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+              <input id="pjId" type="text" placeholder="job id, e.g. h69-search" style="width:150px;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+              <input id="pjRounds" type="text" placeholder="rounds, e.g. 69,70" style="width:120px;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+              <select id="pjTarget" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:2px 5px;"><option value="any">any box</option><option value="required">GPU box only</option><option value="forbidden">CPU-only box</option></select>
+              <input id="pjCpu" type="text" placeholder="CPU contains, e.g. Intel" style="width:140px;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font:11px ui-monospace,monospace;" />
+              <button id="pjSubmit" style="font-size:11px;padding:3px 11px;cursor:pointer;">Submit</button>
+              <button id="pjCancel" title="Ask the peers to stop wanting the job with this id" style="font-size:11px;padding:3px 11px;cursor:pointer;">Cancel this id</button>
+            </div>
+          </div>
+          <pre id="pjLog" style="display:none;white-space:pre-wrap;font-size:10px;color:var(--dim);background:#0c1410;border:1px solid var(--line);border-radius:5px;padding:6px;max-height:200px;overflow:auto;margin:6px 0 0;user-select:text;"></pre>
+        </div>
         <div class="gpanel" data-panel="roundhouse" hidden>
           <div style="font-size:11px;color:var(--dim);margin-bottom:6px;">
             This box and the fleet. <b>UNATTENDED</b> is a run nothing has updated &mdash; not a run in progress.
@@ -2669,6 +2727,11 @@ A password fetches a token from the list server; an unregistered callsign needs 
             <label id="rvzMailWrap" title="When on, incoming mail is scanned for peer announcements: an email from a trusted sender with 'SWEK-PEER' in the subject and an address in the body gets added to the peer list. Set trusted senders in Settings. Only LAN/mesh/CGNAT addresses are ever added (public IPs are rejected)." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--go);cursor:pointer;">
               <input type="checkbox" id="rvzMail" style="cursor:pointer;" /> <span>Sync Peer to GMail</span>
             </label>
+            <!-- UNNUMBERED (2026-11-23) -- BRAIN JOB REPO REPORT RUNNER, DEFAULT OFF (Keith). Ticked: this engine starts the watcher at boot and runs signed training jobs it finds on the queue branch. Unticked: no process, no network. -->
+            <label id="peerJobsWrap" title="When on, this engine watches a git branch for signed training jobs (docs/PEER_JOBS.md), runs one at a time in a clean checkout of the job's commit when this box is free and fits the job's target (GPU box, CPU-only box, Intel box...), and pushes the result back. OFF by default: nothing runs and nothing is fetched until it is ticked. Set the queue repo and the signing key in its panel first." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--go);cursor:pointer;">
+              <input type="checkbox" id="peerJobsOn" style="cursor:pointer;" /> <span>Brain Job Repo Report Runner</span>
+            </label>
+            <div id="peerJobsLine" style="font-size:10px;color:var(--dim);margin:-2px 0 2px 20px;line-height:1.45;">off &mdash; set its queue repo and key in the <b>Brain Job Runner</b> panel first &middot; <a href="#" id="peerJobsOpen">open its panel</a></div>
             <!-- v3809 -- Partial downloads lives in Boot Options, NOT in the Tunnels/Public-tunnel panel where it
                  had been left behind. It is about the UPDATE/download pipeline (an interrupted EngineProject zip
                  leaves a .zip.part), which is this drawer's whole subject; a .part sweep beside a Cloudflare URL
@@ -8472,6 +8535,45 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
     }
     const t=document.querySelector('[data-tab="rigjob"]');
     if(t) t.addEventListener("click", () => setTimeout(rjLoad, 30));
+  })();
+
+  // UNNUMBERED (2026-11-23) -- BRAIN JOB REPO REPORT RUNNER panel + the Boot Options checkbox. Both only talk to /peerjobs/* (ai-bridge/peerJobsBridge.js, trusted-only), and the checkbox is OFF
+  // until the saved config says enabled. Nothing here runs a job: the bridge starts and stops the command.
+  (function(){
+    const $=(id)=>document.getElementById(id), esc=(x)=>String(x==null?"":x).replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const post=(route,body)=>fetch("/peerjobs/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then((r)=>r.json());
+    const say=(t,bad)=>{ const m=$("pjMsg"); if(m){ m.textContent=t||""; m.style.color=bad?"#f28b8b":"var(--dim)"; } };
+    let last=null;
+    function paint(j){
+      last=j; const cb=$("peerJobsOn"), ln=$("peerJobsLine"), st=$("pjStat"), body=$("pjBody");
+      if(!j||!j.ok){ if(body) body.textContent="the runner is for this machine's owner (or the bridge is unreachable)"; if(st) st.textContent=""; return; }
+      const c=j.config||{};
+      if(cb) cb.checked=!!c.enabled;
+      const state=j.running?"watching":(c.enabled?"enabled, not running":"off");
+      if(ln) ln.innerHTML=esc(state)+(j.keySet?"":" &mdash; <span style=\"color:#e6c877\">no signing key yet</span>")+(c.url?"":" &mdash; <span style=\"color:#e6c877\">no queue repo yet</span>")+" &middot; <a href=\"#\" id=\"peerJobsOpen\">open its panel</a>";
+      if(st) st.textContent=j.running?"watching":(c.enabled?"idle":"off");
+      if(body) body.innerHTML='<div><span style="color:'+(j.running?"#7fe0a4":"#9fb8ab")+'">'+esc(state)+'</span>'+(j.running?' <span style="color:#6f8a7c">pid '+esc(j.pid)+', since '+new Date(j.startedAt).toLocaleTimeString()+'</span>':(j.exit!=null?' <span style="color:#6f8a7c">last exit '+esc(j.exit)+'</span>':''))+'</div>'+
+        '<div style="color:#6f8a7c">key '+(j.keySet?'saved':'<span style="color:#e6c877">not saved</span>')+' &middot; engine '+(j.engineIsGit?'is a git checkout':'is NOT a git checkout (give an engine repo below, so a job can run at its commit)')+'</div>';
+      const set=(id,v)=>{ const e=$(id); if(e && document.activeElement!==e) e.value=v; };
+      set("pjUrl",c.url||""); set("pjName",c.name||""); set("pjGpu",c.gpu||"auto"); set("pjInt",c.intervalS||120); set("pjEngine",c.engineUrl||"");
+      const el=$("pjEngine"), lb=$("pjEngineLbl"); if(el&&lb){ el.style.display=lb.style.display=j.engineIsGit?"none":""; }
+    }
+    function load(){ return fetch("/peerjobs/status",{cache:"no-store"}).then((r)=>r.json()).then(paint).catch(()=>paint(null)); }
+    function logLoad(){ fetch("/peerjobs/log",{cache:"no-store"}).then((r)=>r.json()).then((j)=>{ const l=$("pjLog"); if(l&&j&&j.ok){ l.style.display=j.log?"block":"none"; l.textContent=j.log||""; l.scrollTop=1e6; } }).catch(()=>{}); }
+    function tick(){ const p=document.querySelector('[data-panel="peerjobs"]'); if(p&&!p.hidden){ load(); logLoad(); } }
+    const cb=$("peerJobsOn");
+    if(cb) cb.onchange=function(){ const on=cb.checked; post("config",{enabled:on}).then((j)=>{ if(j&&j.ok===false){ cb.checked=!on; say(j.message||j.error,true); } else { paint(j); if(j&&j.start&&j.start.ok===false){ cb.checked=false; post("config",{enabled:false}).then(paint); say(j.start.message,true); } } }).catch(()=>{ cb.checked=!on; }); };
+    if($("pjSave")) $("pjSave").onclick=()=>post("config",{url:$("pjUrl").value.trim(),name:$("pjName").value.trim(),gpu:$("pjGpu").value,intervalS:Number($("pjInt").value)||120,engineUrl:$("pjEngine").value.trim()}).then((j)=>{ if(j&&j.ok===false) say(j.message||j.error,true); else { say("saved"); paint(j); } });
+    if($("pjKeySave")) $("pjKeySave").onclick=()=>post("key",{key:$("pjKey").value}).then((j)=>{ if(j&&j.ok){ $("pjKey").value=""; $("pjKeyState").textContent="saved"; load(); } else $("pjKeyState").textContent=(j&&j.message)||"not saved"; });
+    if($("pjStart")) $("pjStart").onclick=()=>{ say("starting\u2026"); post("config",{enabled:true}).then((j)=>{ paint(j); say(j&&j.start&&j.start.ok===false?j.start.message:"started",j&&j.start&&j.start.ok===false); logLoad(); }); };
+    if($("pjStop")) $("pjStop").onclick=()=>post("config",{enabled:false}).then((j)=>{ paint(j); say("stopped"); });
+    if($("pjQueue")) $("pjQueue").onclick=()=>{ const o=$("pjQueueOut"); o.style.display="block"; o.textContent="reading the queue\u2026"; fetch("/peerjobs/queue",{cache:"no-store"}).then((r)=>r.json()).then((j)=>{ o.textContent=(j&&j.out)||"(nothing)"; }).catch(()=>{ o.textContent="unreachable"; }); };
+    if($("pjSubmit")) $("pjSubmit").onclick=()=>{ const rounds=$("pjRounds").value.split(",").map((x)=>x.trim()).filter(Boolean), b={id:$("pjId").value.trim(),gpu:$("pjTarget").value}; if(rounds.length) b.rounds=rounds; else b.kind="selftest"; if($("pjCpu").value.trim()) b.cpuMatch=$("pjCpu").value.trim(); post("submit",b).then((j)=>say((j&&(j.out||j.message))||"?",!(j&&j.ok))); };
+    if($("pjCancel")) $("pjCancel").onclick=()=>post("cancel",{id:$("pjId").value.trim()}).then((j)=>say((j&&(j.out||j.message))||"?",!(j&&j.ok)));
+    const t=document.querySelector('[data-tab="peerjobs"]'); if(t) t.addEventListener("click", () => setTimeout(()=>{ load(); logLoad(); }, 30));
+    const line=$("peerJobsLine"); if(line) line.onclick=(e)=>{ if(e.target && e.target.id==="peerJobsOpen"){ e.preventDefault(); if(t) t.click(); } };
+    setInterval(() => swekTick("peer-jobs", tick), 8000);
+    load();
   })();
 
   // v3023 -- TERRAIN + CROSS-ARCH gauges. Both report state that outlives a click, and both have a distinction

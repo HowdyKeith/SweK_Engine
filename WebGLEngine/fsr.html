@@ -126,6 +126,7 @@
   </div>
   <div class="stat" id="metric">idle</div>
   <div class="stat" id="engine">spatial engine: starting up</div>
+  <div class="stat" id="gpuTimes" style="font-family:ui-monospace,monospace;white-space:pre;color:#7e9a92"></div>
   <div class="stat" id="accstat"></div>
   <div class="stat" id="disstat"></div>
   <div class="stat" id="objstat"></div>
@@ -251,6 +252,7 @@ import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
 import { requestDevice } from "./gfx/device.js";
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
+import { createGpuTimer, timerLines } from "./render/gpuTimer.mjs";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
 import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
@@ -750,6 +752,11 @@ async function initGPU() {
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
         const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
         gpu = new FSRGPU(dev);
+        // 2026-11-21 (render/gpuTimer.mjs): EASU and RCAS timed on the card when the device has timestamp-query; the line under the engine's shows them
+        if (dev.features.includes("timestamp-query") && new URLSearchParams(location.search).get("gputimer") !== "0") {
+            const t = createGpuTimer(dev.gpu); gpu.timer = t; window.__fsrGpuTimer = t;
+            setInterval(async () => { const st = await t.collect(); if (st.frames) $("gpuTimes").textContent = timerLines(st).join("\n"); }, 400);
+        } else $("gpuTimes").textContent = "GPU timer: " + (dev.features.includes("timestamp-query") ? "off (?gputimer=0)" : "this device has no timestamp-query");
         try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
         try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
         try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }

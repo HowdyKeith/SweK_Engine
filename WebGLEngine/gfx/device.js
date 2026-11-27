@@ -767,7 +767,12 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             if (timing && !qset) qset = gpu.createQuerySet({ type: "timestamp", count: QN });
             const qres = timing ? gpu.createBuffer({ size: QN * 8, usage: BU().QUERY_RESOLVE | BU().COPY_SRC }) : null;
             const qstage = timing ? gpu.createBuffer({ size: QN * 8, usage: BU().COPY_DST | BU().MAP_READ }) : null;
-            const computeWrites = () => { if (!timing) return undefined; const k = Math.min(tw.compute++, 30); return { timestampWrites: { querySet: qset, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 } }; };
+            // 2026-11-21 -- `timer` (render/gpuTimer.mjs, made on device.gpu) and `labels`: each compute pass k is timed under labels[k] (or the one
+            // label given, or "compute") into the caller's timer -- read back later, without stalling -- rather than this frame's own gpuMs. Not with timing.
+            const ptimer = o && o.timer && o.timer.writes ? o.timer : null; let pk = 0;
+            if (ptimer && timing) throw new Error("gfx/device: frame({ timer }) and frame({ timing: true }) both time the passes -- ask for one");
+            const labelOf = (k) => (Array.isArray(o.labels) ? (o.labels[k] ?? "compute") : (o.labels || "compute"));
+            const computeWrites = () => { if (ptimer) { const w = ptimer.writes(labelOf(pk++)); return w ? { timestampWrites: w } : undefined; } if (!timing) return undefined; const k = Math.min(tw.compute++, 30); return { timestampWrites: { querySet: qset, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 } }; };
             const renderWrites = () => (timing ? { timestampWrites: { querySet: qset, beginningOfPassWriteIndex: QN - 2, endOfPassWriteIndex: QN - 1 } } : {});
             const readTiming = () => qstage.mapAsync(MM().READ).then(() => {
                 const t = new BigUint64Array(qstage.getMappedRange().slice(0)); qstage.unmap(); qstage.destroy(); qres.destroy();
@@ -851,6 +856,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             };
             fn({ pass, device: dev }); if (rp) rp.end();
             if (timing) { enc.resolveQuerySet(qset, 0, QN, qres, 0); enc.copyBufferToBuffer(qres, 0, qstage, 0, QN * 8); }
+            if (ptimer) ptimer.finish(enc);
             if (!(o && o.read)) { gpu.queue.submit([enc.finish()]); frameCheck(); return timing ? readTiming().then((gpuMs) => ({ gpuMs, backend: "webgpu" })) : undefined; }
             // Level 11 -- the readback: copy the presented texture before submit, then map. bytesPerRow is padded
             // to 256 as the API requires, and a bgra8unorm canvas is swizzled to RGBA so a caller comparing this

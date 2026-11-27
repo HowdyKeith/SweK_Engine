@@ -1,0 +1,1635 @@
+{
+ "written": "2026-11-23",
+ "captured": "2026-11-23, by hand from the deferral census's UNDECIDED rows read one by one (no tool writes this file); deferralLedger-selfcheck holds each row to the census",
+ "what": "Adjudication of the deferral census's UNDECIDED rows (tools/ship/deferralCensus.mjs): one row per hit, keyed by file and a hash of the trimmed line, with a verdict. SETTLED hits are not here: they carry a `SETTLED at vNNNN` marker beside the claim and are counted by the census as satisfied.",
+ "verdicts": {
+  "NOT_A_DEFERRAL": "the phrase is used for something else (a reader's note, a guard against a later change, a quotation); nothing is owed",
+  "OWED_UNTRACKED": "the line states work as owed in its own round; it was NOT individually proven still open and no nextRounds entry names it, except through its theme entry"
+ },
+ "rows": [
+  {
+   "file": "ai/ColdStartPrimer.js",
+   "hash": "319136efcac0",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "//              mean posting a real workflow JSON — belongs in its own round."
+  },
+  {
+   "file": "bomber.html",
+   "hash": "cad079d4113d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "and a gunner brain that is a network (a later round). The hit spheres can be shown (the box below): they are what a round has to reach, and "
+  },
+  {
+   "file": "brain/dogfightTask.mjs",
+   "hash": "da96140df5c3",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// the geometry is a later round, graded on this same job."
+  },
+  {
+   "file": "es-box3d-fly3d.html",
+   "hash": "ea7d0425fe11",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "collision is a later round on spatial (addBox) bodies. Math pinned in ev/flightModel3d-selfcheck.mjs. -->"
+  },
+  {
+   "file": "ev/flightModel3d.js",
+   "hash": "029d5fd8b45a",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// and altitude flies free. True volumetric collision is a later round on spatial (addBox) bodies."
+  },
+  {
+   "file": "face/MediaPipeHandTracker.js",
+   "hash": "a4277dd64f6b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// etc. are consumer wiring for a later round (same as the face tracker did)."
+  },
+  {
+   "file": "fx/krbnPaint.mjs",
+   "hash": "dbcb0b0120e9",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// ---- WHY THIS IS WORTH A ROUND AND NOT JUST A WIRE ---------------------------------------------------------"
+  },
+  {
+   "file": "gfx/frontDoor-selfcheck.mjs",
+   "hash": "dca01e5e11d6",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"render/tslSource.mjs and an effect through the door is its own round; this one opens the device\");"
+  },
+  {
+   "file": "gpu/glbTexture.mjs",
+   "hash": "0710f8b1e9de",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "* is a round of its own."
+  },
+  {
+   "file": "gravity-waves.html",
+   "hash": "66736f390b99",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "<code>g</code> and a real depth is a separate round with its own keys.</div>"
+  },
+  {
+   "file": "maps/uvtt/presets-selfcheck.mjs",
+   "hash": "92555d7ed425",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "\"staircase coordinate at (22,20). *** WIRING THE SLIDER TO A REAL PAIR IS A ROUND OF ITS OWN and the \" +"
+  },
+  {
+   "file": "nav/partitionScore.mjs",
+   "hash": "51c0cbb77797",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "* ON EVERY RUN. *** The record exists so a later round can see which numbers moved, not so a check can compare"
+  },
+  {
+   "file": "nav/pathCost.mjs",
+   "hash": "c74e967f7016",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "* v4538, kept so a later round can see which of them moved and not so a check can compare one to itself."
+  },
+  {
+   "file": "phase-change.html",
+   "hash": "aef02e19053e",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "<code>voxel/voxelRLE.js</code> already stores per run, so the join exists and 3D is a different round with the same"
+  },
+  {
+   "file": "physics/backendLimits-selfcheck.mjs",
+   "hash": "2b07d95cf38f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"engines against a baseline recorded from one, which is its own round with its own red. Filed \" +"
+  },
+  {
+   "file": "physics/blobSpace-selfcheck.mjs",
+   "hash": "283ec819509f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"-- NOT DONE HERE, because changing the function is a different round from keying it.\");"
+  },
+  {
+   "file": "physics/blobVitals-selfcheck.mjs",
+   "hash": "cb1cd832d452",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"simply sampling each blob's own centre -- both cheap. CHANGING THE GAUGE IS A DIFFERENT ROUND \" +"
+  },
+  {
+   "file": "physics/character/groundProbe.mjs",
+   "hash": "8824b24f1e3a",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// mesh.\" It is right that the oracle takes the topmost. Everything else about the sentence is worth a round."
+  },
+  {
+   "file": "physics/em/gridRefine-selfcheck.mjs",
+   "hash": "7443738cd32f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "say(\"   field that is already propagating. Each is its own round with its own key.\");"
+  },
+  {
+   "file": "physics/em/skinDepth-selfcheck.mjs",
+   "hash": "a80da1a84e78",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "say(\"   magnetic loss, or an absorbing boundary -- each is its own round with its own key.\");"
+  },
+  {
+   "file": "physics/fluid/gravityWaves-selfcheck.mjs",
+   "hash": "117b83ebcfa6",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"it is the dispersion relation plus an analysis of the scheme the tree already ships; a solver with a real g and a real depth is a separate "
+  },
+  {
+   "file": "physics/instruments.mjs",
+   "hash": "0e8fd3936aee",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "key: \"*** THE TERRAIN MODEL REPORTS A STAND HEIGHT INSIDE SOLID ROCK IN 6.0% TO 9.4% OF COLUMNS, AND NOTHING HAD EVER PUT THE TWO ANSWERS SI"
+  },
+  {
+   "file": "physics/mechanics/bomber.mjs",
+   "hash": "91fdc5fc9881",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// it from behind by 10 m/s; at s = 4 it cannot catch it at all. Raising the scale needs a faster fighter class, which is a later round and "
+  },
+  {
+   "file": "physics/mechanics/freeRotation-selfcheck.mjs",
+   "hash": "268aa79123cd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"and its own round.\");"
+  },
+  {
+   "file": "physics/mechanics/freeRotation.mjs",
+   "hash": "343facddcfd2",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// LINEAR ONLY, so neither backend will report w. The comparison is a separate round and it needs a decision"
+  },
+  {
+   "file": "physics/mechanics/reposeOps-selfcheck.mjs",
+   "hash": "898be1286dbe",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "say(\"   the same treatment for restitution -- each is its own round.\");"
+  },
+  {
+   "file": "physics/mesh/bvhPairOverlap-selfcheck.mjs",
+   "hash": "d53813a1293d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// triangle intersection math a LATER round would add, where degeneracy is a genuine numerical hazard) -- this"
+  },
+  {
+   "file": "physics/mesh/meshBoolean-selfcheck.mjs",
+   "hash": "d70113b3be36",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "ok(\"   ...and round 6's ungated path, kept reachable by option, still measures its own round-6 baseline\","
+  },
+  {
+   "file": "physics/render/albedoEstimator-selfcheck.mjs",
+   "hash": "2049115e1992",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// shortfall as its own round's reason to exist: \"v4408's QUADRATURE IS 49% LOW AT THE SAME POINT ... THE TWO"
+  },
+  {
+   "file": "physics/render/btdfDomain-selfcheck.mjs",
+   "hash": "557619b189b8",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// taken on trust -- and it is the check that would go red if a later round quietly reverted either parameter."
+  },
+  {
+   "file": "physics/render/btdfDomain.mjs",
+   "hash": "f27e4c63a232",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// The measurements this round is willing to be held to. Frozen so a later round that moves them has to say so."
+  },
+  {
+   "file": "physics/render/btdfDomain.mjs",
+   "hash": "d0d45c42fb8f",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// walk to 1e-4. Recorded so a later round that moves either parameter has to move these too."
+  },
+  {
+   "file": "physics/render/conductorFresnel-selfcheck.mjs",
+   "hash": "c2e24ac5186d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "path-tracer-and-materials",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"  ----  still compute Schlick with a three-channel F0. Substituting is a separate round with a\");"
+  },
+  {
+   "file": "physics/render/energyCompWgsl-selfcheck.mjs",
+   "hash": "c6d088ecce75",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "path-tracer-and-materials",
+   "basis": "read of the line and its neighbours",
+   "note": "\"GPU is a different round with a different key. And COLOUR: F = 1 throughout, so there is one channel \" +"
+  },
+  {
+   "file": "physics/render/microfacetAnisoWgsl-selfcheck.mjs",
+   "hash": "b0496ea55646",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "path-tracer-and-materials",
+   "basis": "read of the line and its neighbours",
+   "note": "\"azimuth too -- a 2D table, and a round of its own. And COLOUR, still F = 1.\");"
+  },
+  {
+   "file": "physics/render/microfacetWgsl-selfcheck.mjs",
+   "hash": "8816d9c45453",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "`the smallest |wo + wi| the quadrature ever sees is ${minHl.toExponential(3)}. wi = -wo is a single direction and a midpoint grid does not c"
+  },
+  {
+   "file": "physics/render/pathTracer.mjs",
+   "hash": "2864326bbc14",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "path-tracer-and-materials",
+   "basis": "read of the line and its neighbours",
+   "note": "// round only -- extending it to emitters is a round of its own."
+  },
+  {
+   "file": "physics/render/pathTracerGpu.mjs",
+   "hash": "d572bf859ffc",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "* What v4415 measured, so a later round reads a number rather than re-deriving one and calling it the same."
+  },
+  {
+   "file": "physics/render/principled.mjs",
+   "hash": "d36a1295a342",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// THE FALSIFIER IS THE BOUNDARY, and it is why this is worth a round rather than a copy. A composed model must"
+  },
+  {
+   "file": "physics/sph/hydrostatic.mjs",
+   "hash": "9dddceae3405",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// equation of state (Tait, gamma = 7) and is a round of its own; RECORDED, NOT FAKED.\""
+  },
+  {
+   "file": "physics/sph/levelClaim-selfcheck.mjs",
+   "hash": "bf4a8ba702cd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"at rest is a different round.\");"
+  },
+  {
+   "file": "physics/sph/stability.mjs",
+   "hash": "3968ec052729",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"DEPTH IS MANY CELLS -- more particles or a smaller h against the same box -- and that is its own round.\","
+  },
+  {
+   "file": "physics/thermal/phaseOps-selfcheck.mjs",
+   "hash": "2c161782596b",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"in the first place; if a later round adds one here, PUT IT IN A SEPARATE FILE rather than deleting this\");"
+  },
+  {
+   "file": "physics/wheelJoint-selfcheck.mjs",
+   "hash": "3aa61b268d63",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"integration and a round of its own -- and until that exists, 'which model jitters less' has one side \" +"
+  },
+  {
+   "file": "predictions.html",
+   "hash": "9cef5cca0578",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "pred: \"Keith asked the question that catches the flaw: if I release three incrementals and he downloads only the most recent, does it includ"
+  },
+  {
+   "file": "render/aiPresenceOrbTsl.mjs",
+   "hash": "a421915f7d51",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "// `drive` -- the RESPONDING lean, 45 references -- for its own round. SETTLED and COMPLETE are"
+  },
+  {
+   "file": "render/backendParity.mjs",
+   "hash": "089d1a581cdb",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// *** AND A CORRECTION THIS FILE OWES ITS OWN ROUND. *** v4269 said the port could only be checked"
+  },
+  {
+   "file": "render/colourReach.mjs",
+   "hash": "6838da3926f5",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "* NOT CHANGED HERE: narrowing it moves this census and the hot one with it, and that is a round of its own. The count is"
+  },
+  {
+   "file": "render/cubeBake-selfcheck.mjs",
+   "hash": "0645039a8ab1",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// primitives and the three bakes that ride on them. If a later round retunes the cube geometry on purpose, these"
+  },
+  {
+   "file": "render/emitterCompile.mjs",
+   "hash": "0575ed2da1cf",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "note: \"nine uniforms, none bound here, so the output is flat; a value grade needs them and is its own round\" }),"
+  },
+  {
+   "file": "render/emitterCompile.mjs",
+   "hash": "4c66c5333de1",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "* *** THE FINDING, AS NUMBERS A LATER ROUND CAN RE-DERIVE. ***"
+  },
+  {
+   "file": "render/exactHash.mjs",
+   "hash": "a3f5c19948a6",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// `b < 0.66`, so it read as a threshold site worth a round, and no page runs it. Its comment \"BIOME"
+  },
+  {
+   "file": "render/fireColour-selfcheck.mjs",
+   "hash": "3c9d641c3f00",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"  ----  name meant two things for 4,412 versions, and widening that scan is its own round.\");"
+  },
+  {
+   "file": "render/fireColour.mjs",
+   "hash": "55aa00a4aeeb",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "// than repaired by widening the scan -- widening it is a round of its own, with its own count to argue about."
+  },
+  {
+   "file": "render/fireColour.mjs",
+   "hash": "04d2c18c4ea8",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "/** What v4412 measured, so a later round reads a number rather than re-deriving one and calling it the same. */"
+  },
+  {
+   "file": "render/flightViews.mjs",
+   "hash": "8bb0424144ef",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "// and outputs, said so in the label; a gunner brain that is a network (the fruit fly, the GPU Brain) is a later round."
+  },
+  {
+   "file": "render/flowCost-selfcheck.mjs",
+   "hash": "e425bebe1362",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"no setting here finds and FSR3 meets with a larger pyramid -- which the level grid makes cheap, and which a later round measures.\");"
+  },
+  {
+   "file": "render/flowReconcile-selfcheck.mjs",
+   "hash": "a16a4d37a560",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "ok(\"*** the shipped default is NOT tuned on this sweep, and this row exists so that a later round cannot pretend it was ***\","
+  },
+  {
+   "file": "render/genGate-selfcheck.mjs",
+   "hash": "cec3bf777dcd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "// hypothesis, the statistic and the threshold, and the measurement is a later round's. What is on trial here"
+  },
+  {
+   "file": "render/kernelAudit-selfcheck.mjs",
+   "hash": "5b053c04c8d2",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "report(\"the footprint is NOT widened here: that moves every number temporalResolve-selfcheck records and is a round of its own. What v4570 c"
+  },
+  {
+   "file": "render/opticalFlowGPU.mjs",
+   "hash": "f46b770c7c49",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "* Wiring the device pyramid in is a later round and is named in the gate's closing line."
+  },
+  {
+   "file": "render/ringFloor-selfcheck.mjs",
+   "hash": "42fcce11dc53",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "* that is a round of its own -- this one establishes the number and reports the comparison."
+  },
+  {
+   "file": "render/ringFloor-selfcheck.mjs",
+   "hash": "4614dfbc6244",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"v4553 onward recorded and is a round of its own -- this gate establishes the number and reports the \" +"
+  },
+  {
+   "file": "render/ringFloorPerspective-selfcheck.mjs",
+   "hash": "123d31cd704b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"still a round of its own.\");"
+  },
+  {
+   "file": "render/temporalResolve.mjs",
+   "hash": "72036eb8e66a",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "* records, which is a round of its own; and the 3x3 window is a legitimate choice as long as it is described"
+  },
+  {
+   "file": "render/temporalRidgeMargin-selfcheck.mjs",
+   "hash": "0821feea0b8d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"is a round of its own rather than a line in this one; and the blind budget of 0.1, which is this file's \" +"
+  },
+  {
+   "file": "render/temporalRingContent-selfcheck.mjs",
+   "hash": "8a520b73550b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"onward recorded and is still a round of its own.\");"
+  },
+  {
+   "file": "render/temporalRingFloor-selfcheck.mjs",
+   "hash": "b7c36822f6e7",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "\"number v4553 onward recorded and is still a round of its own.\");"
+  },
+  {
+   "file": "render/temporalTsl-selfcheck.mjs",
+   "hash": "78d19dcde495",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "render-and-gpu",
+   "basis": "read of the line and its neighbours",
+   "note": "// than the render resolution, which is the question FSR2's locks answer (render/temporalLock.mjs; a later round)"
+  },
+  {
+   "file": "rig/cinematicShot-selfcheck.mjs",
+   "hash": "57835ead092a",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// load). So the CAMERA gives way, which is a cinematic camera's own job. This check exists so a later round"
+  },
+  {
+   "file": "server.html",
+   "hash": "a37b9bccc97b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "comment stripper should not be run over markup, and that is its own round. -->"
+  },
+  {
+   "file": "simulation/CSMapGenerator.js",
+   "hash": "9b6e0d101c34",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// Real bomb semantics come in a later round."
+  },
+  {
+   "file": "simulation/CSRoundManager.js",
+   "hash": "435722b0f119",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// Real T-vs-CT matches arrive when bots land in a later round."
+  },
+  {
+   "file": "simulation/PlayerCombat.js",
+   "hash": "06d14f79d599",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// deferred to a later round."
+  },
+  {
+   "file": "simulation/SpaceSuit.js",
+   "hash": "e62c7c6273cf",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// several brain-hook patches, and deserves its own round the way CSBomb.js got one after BossPhaseManager.js proved"
+  },
+  {
+   "file": "simulation/lbm/onsetTrend-selfcheck.mjs",
+   "hash": "84e3ace01190",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "\"varying the PERTURBATION rather than the drive, and it is a different round.\");"
+  },
+  {
+   "file": "simulation/lbm/settleCurve-selfcheck.mjs",
+   "hash": "678cc8d6dbf4",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "physics-fixtures",
+   "basis": "read of the line and its neighbours",
+   "note": "// establishing it needs an onset sweep at this blockage, which is a different round."
+  },
+  {
+   "file": "statistical-mechanics.html",
+   "hash": "750ff0a44db8",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "\"sampled, not a second implementation with a nicer shape. Making these interactive is a round of its own, \" +"
+  },
+  {
+   "file": "tools/frontDoor-selfcheck.mjs",
+   "hash": "f4723ccfe7c3",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// on a later round: \"The Fabric button, not sure what we do with that. that is an old concept... not sure"
+  },
+  {
+   "file": "tools/render-qa/render-qa.mjs",
+   "hash": "6fdd34ba96d6",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "other",
+   "basis": "read of the line and its neighbours",
+   "note": "// so these run, get written into the record, and a later round earns thresholds from what they report."
+  },
+  {
+   "file": "tools/roundhouse/airySlitAdoption-selfcheck.mjs",
+   "hash": "8452bec8fd02",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"           changes what the field MEANS, so it wants its own round with the reframing documented.\");"
+  },
+  {
+   "file": "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+   "hash": "c07c58e81746",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// so they cannot quietly improve by being forgotten: if a later round narrows the portability taint or fills in"
+  },
+  {
+   "file": "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+   "hash": "fdc7f4a41678",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"timings; persisting them is a caller's job and a round of its own.\");"
+  },
+  {
+   "file": "tools/roundhouse/costRecord.mjs",
+   "hash": "ec702dfaa4cd",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "* than folded silently into a margin so a later round can measure the other 115 and replace it."
+  },
+  {
+   "file": "tools/roundhouse/defaultPlacementSweep-selfcheck.mjs",
+   "hash": "8f8d27b5b7a0",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// full run, which is worth a round of its own on a machine with time."
+  },
+  {
+   "file": "tools/roundhouse/defaultPlacementSweep-selfcheck.mjs",
+   "hash": "2f592fb30205",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"         of three placements rather than one, and the mode deserves its own round.\");"
+  },
+  {
+   "file": "tools/roundhouse/detectionMap-selfcheck.mjs",
+   "hash": "598ae7908983",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"agree on a parameter shape, which is a different round and a much larger one\");"
+  },
+  {
+   "file": "tools/roundhouse/edgeFresnel-selfcheck.mjs",
+   "hash": "1dace8cee6a1",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"         itself worth a round: one BASELINE regeneration could take the exact Airy constant, the\");"
+  },
+  {
+   "file": "tools/roundhouse/externalLinalg-selfcheck.mjs",
+   "hash": "d673660f0fc7",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"a symmetric A would make this claim as blind as rank and det are. IF A LATER ROUND TIDIES THIS \""
+  },
+  {
+   "file": "tools/roundhouse/externalLinalg.mjs",
+   "hash": "fa588826b780",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// the gate ASSERTS that rather than trusting this comment -- a later round that \"tidies\" one into a symmetric"
+  },
+  {
+   "file": "tools/roundhouse/fdtd-selfcheck.mjs",
+   "hash": "f8ab5f2131fc",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// ANSWERS DIFFERENTLY, which is the thing that makes a mode a mode. WHEN A LATER ROUND ADDS A SIXTH, THIS"
+  },
+  {
+   "file": "tools/roundhouse/flip2dBind.mjs",
+   "hash": "96b69fec3aff",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"  NOT PLANTED: the curriculum asked for a grade; a plant for flip2d is a separate round.\");"
+  },
+  {
+   "file": "tools/roundhouse/fluidBind-selfcheck.mjs",
+   "hash": "1d60c8bc400b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"a FIXTURE question -- domain size and tau, not steps -- and that is a different round. ***\");"
+  },
+  {
+   "file": "tools/roundhouse/fluidBind.mjs",
+   "hash": "6be96be1c65d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// and that is a different round from planting the reader."
+  },
+  {
+   "file": "tools/roundhouse/knobPromotions-selfcheck.mjs",
+   "hash": "17a40fe736b0",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "\"*** A NUISANCE KNOB THAT MOVES NOTHING AT ALL CANNOT DISTINGUISH A DEVICE THAT IS INVARIANT FROM ONE THAT NEVER READ THE PARAMETER. The lik"
+  },
+  {
+   "file": "tools/roundhouse/labExport-selfcheck.mjs",
+   "hash": "450ed5c512b1",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"  ----  guarantee, and a front door for it is a separate round.\");"
+  },
+  {
+   "file": "tools/roundhouse/lensCorroborated-selfcheck.mjs",
+   "hash": "33bfc6492408",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// in its own round with its own evidence."
+  },
+  {
+   "file": "tools/roundhouse/lensNuisance-selfcheck.mjs",
+   "hash": "2c4906bf37bc",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"         to answer, and running that battery is its own round with its own evidence.\");"
+  },
+  {
+   "file": "tools/roundhouse/mpmDruckerBind-selfcheck.mjs",
+   "hash": "8f163fd61833",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"IT IS ITS OWN ROUND with its own effect on every number the column device reports.\");"
+  },
+  {
+   "file": "tools/roundhouse/nuisanceKnobs.mjs",
+   "hash": "9f52c9ff8839",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// ALLOWED to move. ITS OWN ROUND. ***"
+  },
+  {
+   "file": "tools/roundhouse/plantedCoverage.mjs",
+   "hash": "893079a6d286",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// BIND SPELLS IT -- not to make 79 devices agree on a parameter shape, which is a different round and"
+  },
+  {
+   "file": "tools/roundhouse/refinementWindow-selfcheck.mjs",
+   "hash": "001abd77939a",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"         change to the battery every device must then survive, and that is its own round.\");"
+  },
+  {
+   "file": "tools/roundhouse/responseCensus.mjs",
+   "hash": "51c05ae2ff8a",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// records the step it used so a later round can vary it rather than inherit it."
+  },
+  {
+   "file": "tools/roundhouse/spacefillBind.mjs",
+   "hash": "bd2b97ef8c2b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "// break the curve's own continuity or bijection -- and that is a different round from noticing this."
+  },
+  {
+   "file": "tools/roundhouse/sweepBudget-selfcheck.mjs",
+   "hash": "8c8d43377096",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"Re-freezing the record is a four-hour run and its own round; until then every derived budget carries \" +"
+  },
+  {
+   "file": "tools/roundhouse/thermalScaling-selfcheck.mjs",
+   "hash": "d956d593ce8c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"         is a change to the SIMULATION, not to the grading, and is its own round.\");"
+  },
+  {
+   "file": "tools/roundhouse/zeroControl-selfcheck.mjs",
+   "hash": "55c13870acc8",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"percolation -- a second control elsewhere is a round of its own\");"
+  },
+  {
+   "file": "tools/roundhouse/zeroRangeSweep-selfcheck.mjs",
+   "hash": "a7383510dfd2",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "roundhouse-battery",
+   "basis": "read of the line and its neighbours",
+   "note": "\"running it is worth a round of its own, and the two zeros found in this small scope suggest the yield \" +"
+  },
+  {
+   "file": "tools/ship/absenceScope.mjs",
+   "hash": "5c2c7365d28c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// is certain is the count and what it counts; a split is a separate round with a rule somebody defends."
+  },
+  {
+   "file": "tools/ship/adapterRecord.mjs",
+   "hash": "29c6f459b426",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// does -- the measurement is printed so a later round can enter it, and the row does NOT fail, because a new"
+  },
+  {
+   "file": "tools/ship/advisorLive.mjs",
+   "hash": "99e18030f7e7",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// This file does not decide how good a model's advice is: it scores a practice run with the brain alone beside it and says so. The register"
+  },
+  {
+   "file": "tools/ship/advisorLive.mjs",
+   "hash": "15101cbb49fb",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "L.push(\"  A PRACTICE RUN: a handful of dives off every registered audit. It says whether the loop works and what a model does on these dives"
+  },
+  {
+   "file": "tools/ship/asciiFrames-selfcheck.mjs",
+   "hash": "09a515e7c5fd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// against it, and SweK inherits nothing. Vendoring it later is a LICENCE DECISION and a separate round; this"
+  },
+  {
+   "file": "tools/ship/auditCap-selfcheck.mjs",
+   "hash": "eb0f7ac5160a",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "ok(\"the rule is stated as a rule, so a later round changes the RULE and not a number\","
+  },
+  {
+   "file": "tools/ship/auditCap.mjs",
+   "hash": "0e48aba77e4c",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "/** How the cap is arrived at, so a later round changes the RULE and not a number. */"
+  },
+  {
+   "file": "tools/ship/backlogAbsence.mjs",
+   "hash": "e477b760fa11",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "//       number \"so a later round can see it moved, and named in the header as unreachable from here\"."
+  },
+  {
+   "file": "tools/ship/backlogAbsence.mjs",
+   "hash": "128d2e5b892c",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// here as a number so a later round can see it moved, and named in the header as unreachable from here."
+  },
+  {
+   "file": "tools/ship/budgetEvidence-selfcheck.mjs",
+   "hash": "31adb7e7f0c6",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"itself -- the antidote khMichalke's entry records firing on its own round\");"
+  },
+  {
+   "file": "tools/ship/cameraFall-selfcheck.mjs",
+   "hash": "ed101f59eb63",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"capsule question and its own round; and the gravity and terminal disagreements v4547 measured are \" +"
+  },
+  {
+   "file": "tools/ship/copypartyRegistry-selfcheck.mjs",
+   "hash": "8b00ad889e9c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// verifiedPrefix's contract and wants its own round."
+  },
+  {
+   "file": "tools/ship/copypartyRegistry-selfcheck.mjs",
+   "hash": "b1738fcf5a64",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "console.log(\"  ----  comparison uncovered, which changes verifiedPrefix's contract and wants its own round.\");"
+  },
+  {
+   "file": "tools/ship/definitionGates-selfcheck.mjs",
+   "hash": "62addbed0a84",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// and before v4845 (364 against 362), each found only when a later round happened to run it by hand. The reads and the"
+  },
+  {
+   "file": "tools/ship/dracoWeld-selfcheck.mjs",
+   "hash": "545ed778ee6a",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// checks below assert the REFUSALS as hard as the features -- a later round that \"finishes the port\" by adding"
+  },
+  {
+   "file": "tools/ship/dracoWeld-selfcheck.mjs",
+   "hash": "7fa759689f0f",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "console.log(\"\\n6. what was refused, asserted so a later round cannot quietly add it\");"
+  },
+  {
+   "file": "tools/ship/floors.mjs",
+   "hash": "5b987b5e0aa9",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// change and wants its own round (v3132's rule). RECORDED WITH THE NUMBER SO IT CANNOT BE MISSED AGAIN."
+  },
+  {
+   "file": "tools/ship/frozenRecords.mjs",
+   "hash": "ace2efbf00e1",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// are partly built from documentation and that is a round of its own."
+  },
+  {
+   "file": "tools/ship/fsrContent-selfcheck.mjs",
+   "hash": "b42d064f43dd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// population and says what the population is; using it is a later round's business and owes a fresh"
+  },
+  {
+   "file": "tools/ship/fsrContent-selfcheck.mjs",
+   "hash": "1bc1c9866d5c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"properties nobody knows, and a later round would fold it in as if they did.\");"
+  },
+  {
+   "file": "tools/ship/fsrPage-selfcheck.mjs",
+   "hash": "f435cb452df5",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "\"agree with a later round is a record nobody can audit, and this arc's whole method is the audit.\");"
+  },
+  {
+   "file": "tools/ship/fsrPageField-selfcheck.mjs",
+   "hash": "da41d6cca2b7",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "`*** AND IT IS A TENTH OF A dB WITH ONE FRAME DOWN. *** That is a direction and not a result; a pre-registered confirmation on this scene is"
+  },
+  {
+   "file": "tools/ship/gateBudget.mjs",
+   "hash": "4ba9984461b4",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// 573s on an idle box, and it PASSES. Its own header said ~90s. The antidote fired on its own round: the"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "c66763a1d421",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "\"mark its own work passed. *** IT FOUND ITS OWN ROUND'S THREE COSTS IN 250 ms, WHICH IS THE \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "6dfa4bce1412",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "\"than left for a later round to find as drift.\","
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "ea9bdd0333d7",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"about, and eight is a round of its own; they are named so the next round starts from a list \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "50c700067def",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"temporalResolve-selfcheck records and is a round of its own, and 3x3 is a legitimate choice \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "47482b0cc396",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"the margin would move every number v4553 onward recorded and is a round of its own; and \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "79d2f71ba3a3",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"so whichever commit lands second owes the re-take. Recorded as its own round's work with the \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "f053fc11b79e",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"85.7% while this tree keeps 1 chart over 42.2% of the square. Filed as its own round. *** \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "1da1fa164c3b",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"region began inside a block. Found while measuring, and a later round's: the flow LOSES to the vectors at a 13 px \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "ab0885f6c460",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"gate reads it. A fourth level is cheap on this grid and loses a small fast square on both; that is a later round's.\","
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "e4361bcbf850",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"entries as live. That dependence of two gates on a full record is a separate round. Four rows grade the writer, \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "fde54683e37f",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "why: \"this round's verify sweep REFILED two timings and its margin row then failed: frozenRecords-selfcheck 2003 -> 2318 ms and recordDrift-"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "7b659014bdf7",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"that is a round of its own, and claiming it here would be claiming work not done.\","
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "b052fe57c87f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"pyramid is a later round and the closing line names it. No gate added.\","
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "444f1e53fcf9",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "\"rewritten to match a later round is a record nobody can audit. A gate row fails if it \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "d67d45eca3dd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"on that arm, and moving it is a separate round with its own re-measurement. \" +"
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "d04672d8cf39",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// this is now the SIXTH collision; a list is still the answer and is still owed its own round."
+  },
+  {
+   "file": "tools/ship/gateSweep.mjs",
+   "hash": "c72ea3c77912",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"is its own round' -- and the answer is FOURTEEN. render/backendParity.mjs finds a shader by \" +"
+  },
+  {
+   "file": "tools/ship/glbTexture-selfcheck.mjs",
+   "hash": "9b464e30bb62",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "BUDGET.notMeasured + \" -- taking that number is a round of its own, and it is the one that would \" +"
+  },
+  {
+   "file": "tools/ship/gltfConformance-selfcheck.mjs",
+   "hash": "0d17cf929916",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"(added a later round) gates a real bug fix in a DIFFERENT part of the same file, the unskinnedPrims \" +"
+  },
+  {
+   "file": "tools/ship/graveyard-selfcheck.mjs",
+   "hash": "172df0a86111",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// its own round, deliberately, because a first attempt moved this count 22 -> 97 -> 228 as the resolver learned"
+  },
+  {
+   "file": "tools/ship/hostScale-selfcheck.mjs",
+   "hash": "370e69d971dc",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"who wrote it. Making fifteen readers host-aware is its own round.\");"
+  },
+  {
+   "file": "tools/ship/licenceSweep-selfcheck.mjs",
+   "hash": "afc2febd597e",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"file, hash prefix and line count -- so a later round can tell a reading from a recollection\");"
+  },
+  {
+   "file": "tools/ship/loopSearch-selfcheck.mjs",
+   "hash": "dce4c3287d20",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"which is a decision about shipped physics and deserves its own round rather than riding along inside one \" +"
+  },
+  {
+   "file": "tools/ship/murmurLive2-selfcheck.mjs",
+   "hash": "fa7447148297",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"defect, and its own round.\");"
+  },
+  {
+   "file": "tools/ship/orreryFleetScan.mjs",
+   "hash": "4ad41059dd44",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// *** THE HONEST COUNTER-ARGUMENT, RECORDED SO A LATER ROUND CAN DISAGREE WITH IT: *** it really does"
+  },
+  {
+   "file": "tools/ship/physicsSuite.mjs",
+   "hash": "a57bcf548d80",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"SPH COLLAPSES UNDER SUSTAINED GRAVITY (v2494, found by chasing the mutation survivor). Building the hydrostatic check that WOULD guard the "
+  },
+  {
+   "file": "tools/ship/playerSlope-selfcheck.mjs",
+   "hash": "2fe07aeb223e",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"is its own round; the climb has no slope test of its own and rides on STEP_UP_MAX, which is the same \" +"
+  },
+  {
+   "file": "tools/ship/quickSweep.mjs",
+   "hash": "5108619be12e",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// record says who wrote it. Making fifteen readers host-aware is a different round with a different risk."
+  },
+  {
+   "file": "tools/ship/recordDrift.mjs",
+   "hash": "dd2ec4f12783",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// cheaper first-add query, which is its own round."
+  },
+  {
+   "file": "tools/ship/recordReach-selfcheck.mjs",
+   "hash": "ec665898cfc1",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// now guarded by three gates. A LATER ROUND RE-CLASSIFYING A RECORD IS THE OUTCOME THIS FILE EXISTS TO"
+  },
+  {
+   "file": "tools/ship/redCensus.mjs",
+   "hash": "e97bb5e5ff39",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "/** How the v4279 measurement was taken, so a later round can repeat it rather than trust it. */"
+  },
+  {
+   "file": "tools/ship/redCensus.mjs",
+   "hash": "6088c6559475",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "* Confirming them serially is roughly three hours (measured: 20 of the 64 done, all green so far), which is a round of its own and is record"
+  },
+  {
+   "file": "tools/ship/redCensus.mjs",
+   "hash": "c6ddc9f3dbc2",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// runs at the defaults\". The repair is on main under its own round -- \"the claim was true and the count"
+  },
+  {
+   "file": "tools/ship/redCensus.mjs",
+   "hash": "79e508606b11",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"is a layout change to a shipped page and a round of its own -- NOT by re-skipping the section, \" +"
+  },
+  {
+   "file": "tools/ship/redCensus.mjs",
+   "hash": "e85b7137671f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// THE CAUSE IS THE ONE THE RECORD ITSELF FILED AS ITS OWN ROUND: serial and parallel readings share the"
+  },
+  {
+   "file": "tools/ship/referenceKind-selfcheck.mjs",
+   "hash": "15d00a9e610c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// down by the same three routes is real work and a separate round; this fixing pass added none of the 39"
+  },
+  {
+   "file": "tools/ship/roughDiffuseWired-selfcheck.mjs",
+   "hash": "15e182068738",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// every existing image, which is its own round with its own before-and-after.\" v4280 and v4281 then both"
+  },
+  {
+   "file": "tools/ship/seamCensus-selfcheck.mjs",
+   "hash": "641c6e93b244",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "ok(\"...and the jump test isolates the STITCH from the genuine slope, down to its own round-off floor\","
+  },
+  {
+   "file": "tools/ship/shaderPairs-selfcheck.mjs",
+   "hash": "3df69780391c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// arithmetic has inverted is a decision about the engine's shape and belongs to a round of its own\"."
+  },
+  {
+   "file": "tools/ship/shaderPairs.mjs",
+   "hash": "b02370d776bd",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// shape and belongs to a round of its own\"."
+  },
+  {
+   "file": "tools/ship/shipyard-selfcheck.mjs",
+   "hash": "1a99758189d1",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// intended -- it asserts the argument's FAILURE, so that a later round cannot quietly reinstate it."
+  },
+  {
+   "file": "tools/ship/slowCensus-selfcheck.mjs",
+   "hash": "fc6dfdaf191a",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"an empty register yields nothing, so a later round that teaches redRegister to read the verdicts \" +"
+  },
+  {
+   "file": "tools/ship/slowCensus-selfcheck.mjs",
+   "hash": "e4c6e9c3a1f4",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "ok(\"  and a repair from a LATER round stays out of an earlier round's record\","
+  },
+  {
+   "file": "tools/ship/slowCensus-selfcheck.mjs",
+   "hash": "13aab2c9dc39",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "ok(\"  the runner is exported so a later round repeats the measurement rather than trusting it\","
+  },
+  {
+   "file": "tools/ship/slowCensus.mjs",
+   "hash": "cf94a8543599",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "* the register quickSweep actually builds, so it cannot drift from it: if a later round teaches redRegister"
+  },
+  {
+   "file": "tools/ship/spaceSuit-selfcheck.mjs",
+   "hash": "c2023f84c6f4",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// deliberately deferred to its own round, the same way CSBomb.js followed BossPhaseManager.js rather than being"
+  },
+  {
+   "file": "tools/ship/spaceSuit-selfcheck.mjs",
+   "hash": "d819543d7df9",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "\"for ui/guards.mjs during this round's audit, deliberately deferred to its own round given the real combat \" +"
+  },
+  {
+   "file": "tools/ship/sweepCoverage-selfcheck.mjs",
+   "hash": "2c73cd73c3b4",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// Filed as its own round: two fields in the timings file, one per measurement."
+  },
+  {
+   "file": "tools/ship/sweepCoverage-selfcheck.mjs",
+   "hash": "08c1ee3fba72",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// live number is reported. Filed as its own round: two fields, one per measurement."
+  },
+  {
+   "file": "tools/ship/sweepCoverage.mjs",
+   "hash": "8d1246cec05f",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// them go red on the ordering rather than on anything being wrong. Filed as its own round; what"
+  },
+  {
+   "file": "tools/ship/sweepCoverage.mjs",
+   "hash": "dc55469b75c1",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "* them across a line. That is a round of its own and is filed as one in tools/ship/nextRounds.mjs; until it"
+  },
+  {
+   "file": "tools/ship/timingKind-selfcheck.mjs",
+   "hash": "de48b235cfdf",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"branch on kind, which is 71 references and a separate round.\");"
+  },
+  {
+   "file": "tools/ship/timingSemantics-selfcheck.mjs",
+   "hash": "016db29fea26",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"and writing one means changing quickSweep and everything that reads it, which is a round of its own and \" +"
+  },
+  {
+   "file": "tools/ship/todo.mjs",
+   "hash": "42e83c0d99ef",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "note: \"SLICES, IN ORDER. (1) THE AIRFRAME: flightModel6dof is a 1,000 kg trainer; a B-29-class aircraft is a FROUDE-SCALED COPY of its spec "
+  },
+  {
+   "file": "tools/ship/todo.mjs",
+   "hash": "137a4ef3c2fa",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "note: \"PROGRESS (unnumbered, on the working branch, nothing shipped): DONE -- physics/mechanics/terrain.mjs (a JSON-spec height function wit"
+  },
+  {
+   "file": "tools/ship/todo.mjs",
+   "hash": "31b8a8537b82",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "note: \"DEPENDS ON attack-helicopters slice 4 (the weapons and the seeker). LIKELY SLICES: (1) a decoy is a short-lived hot point that a seek"
+  },
+  {
+   "file": "tools/ship/tslPhysics-selfcheck.mjs",
+   "hash": "2cd26099d3e9",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"uniform so the two are answering one question. A graph whose step count comes from a buffer is a round of its own.\");"
+  },
+  {
+   "file": "tools/ship/unwiredRegister.mjs",
+   "hash": "3b47ad707d00",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// fired on its own round (multigridGPU was the first). reportingTools.mjs names it and toolsBridge runs it,"
+  },
+  {
+   "file": "tools/ship/vendoredLicences-selfcheck.mjs",
+   "hash": "aa3d522a7410",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "\"gate depends on and wants its own round and its own measurement of what it costs; the second \" +"
+  },
+  {
+   "file": "tools/ship/wgslCorpus.mjs",
+   "hash": "e6c3b51a21b1",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "ship-tooling",
+   "basis": "read of the line and its neighbours",
+   "note": "// says its output is integral -- is a change to compare() and a round of its own."
+  },
+  {
+   "file": "tools/trainSubTail.mjs",
+   "hash": "feadc6c6363c",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "other",
+   "basis": "read of the line and its neighbours",
+   "note": "const seed = +arg(\"--seed\", 9300), tailFiles = (arg(\"--tail\") || \"\").split(\",\"), iters = +arg(\"--iters\", 300), out = arg(\"--out\"), tailW = +"
+  },
+  {
+   "file": "tools/wadThingSpawner.js",
+   "hash": "127de857771b",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// pickup system on the kaiju side); a later round can spawn those as"
+  },
+  {
+   "file": "ui/demoChrome.js",
+   "hash": "76006ae71e0e",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "//   - Avatar stamp = a tinted placeholder tile (live GLB is a later round)."
+  },
+  {
+   "file": "ui/morphSvg-selfcheck.mjs",
+   "hash": "b2ccf932d376",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "say(\"   DONE' UNTIL THE WIRING LANDED IN THE SAME ROUND -- a scope note that outlives its own round is the\");"
+  },
+  {
+   "file": "ui/stageFlags.mjs",
+   "hash": "16b129d79de8",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "/** What v4419 measured, so a later round reads a number rather than re-deriving one and calling it the same. */"
+  },
+  {
+   "file": "universal-viewer.html",
+   "hash": "492b6b862967",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// motion phases are Kaggle-only for now (local backend = a later round)."
+  },
+  {
+   "file": "vba/runtimeGap.mjs",
+   "hash": "efb34b7d2696",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "read",
+   "note": "// gate red on its own round: a census that moves together has to be re-taken together."
+  },
+  {
+   "file": "vba/runtimeGap.mjs",
+   "hash": "8b142e2e5774",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// added here, because it is a different round's work and this one already grew past its rung; recorded"
+  },
+  {
+   "file": "world/licenceSweep.mjs",
+   "hash": "0b1913ef9bae",
+   "verdict": "NOT_A_DEFERRAL",
+   "theme": "",
+   "basis": "phrase pattern, then read of the line",
+   "note": "// was read off a file on disk in this session, and the evidence is recorded so a later round can tell a real"
+  },
+  {
+   "file": "world/orreryFleet.mjs",
+   "hash": "3dfb21827d09",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// WHAT IT ALSO EXPOSED, worth a later round rather than a fix here: between the two commits, xatlas"
+  },
+  {
+   "file": "world/reachedLicences.mjs",
+   "hash": "2b1c3ba88d6d",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "\"substrate, which is a round of its own and is not this one.\","
+  },
+  {
+   "file": "world/surfaceProbe.mjs",
+   "hash": "97f25e2d73ba",
+   "verdict": "OWED_UNTRACKED",
+   "theme": "game-brain-and-ui",
+   "basis": "read of the line and its neighbours",
+   "note": "// defect elsewhere in the engine and is filed as its own round; it is not repaired here.)"
+  }
+ ]
+}

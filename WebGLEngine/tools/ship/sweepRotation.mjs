@@ -25,7 +25,44 @@ import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
 import { canonicalId } from "./hostScale.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
-export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
+// *** v4916 -- ONE BOX ID, MORE THAN ONE MACHINE, AND TWO THINGS THE ROTATION DOES ABOUT IT. ***
+// boxId() is derived from the CPU's model string, its core count and its memory, and the cloud containers that
+// carry `linux-x64-4c-16gb-142c0d` are not one machine: at v4915 this tool, on that id, timed three browser-page gates
+// 2x to 6x away from the record the same id had written a fortnight before (subAquariumPage 32.6 s alone against a
+// ring of 3.3 to 5.4 s, and killed at the 20 s cap first). Each reading was true of the host that took it. Written
+// into the record as the owner's they turned declaredCost, sweepCoverage and relativeBudget red, and v4915 shipped
+// by not committing a rotation at all. Keith's decision (2026-11-15): the shared id keeps the record, and the
+// writer is what learns to doubt a reading.
+//   A CAP IS RETRIED ONCE, ALONE, AT A LONGER CAP, BEFORE IT IS RECORDED AS ONE. A kill is "no verdict", and
+//     on a slow host it is a no-verdict about the host. If the retry finishes, that run is the row.
+//   A GREEN READING MORE THAN HOST_OUTLIER_FACTOR FROM THE GATE'S OWN RING IS HELD, NOT WRITTEN. The ring keeps its
+//     history; the reading goes to the ledger's `heldOutliers`. It is written once same-side outliers SPAN A DAY
+//     (v4917, HOLD_SPAN_MS below -- v4916's "the second in a row" was one host saying it twice).
+// What is never held: a red, a kill that survived its retry, a skip, or a gate with fewer than two prior readings.
+//   v4926 -- NOR A GREEN READING OF A GATE THE RECORD CALLS RED. The hold protects a TIMING; it was also keeping a VERDICT
+//   the newer run contradicts. On the rig, pilotLateness and slugMorph were recorded red by a verify, re-run alone as
+//   that verify told the reader to, finished green -- and were held as slow, so the red stayed in the record and the next
+//   verify would have failed on it again. The advice the pool prints could never clear such a red. A held green reading
+//   of a recorded red is written instead: the old timing came from a failing run and is not a ring worth protecting.
+export const HOST_OUTLIER_FACTOR = 2;
+export const RETRY_CAP_MS = 120000;
+// *** v4917 -- "THE SECOND IN A ROW IS WRITTEN" LASTED ONE ROUND. *** v4916 wrote the second same-side outlier, on the
+// argument that a real change says so twice. The next rotation ran four hours later ON THE SAME SLOW HOST and said so
+// twice: subAquariumPage went into the record at 31.9 s and dogfightPage at 12.4, and declaredCost was red again.
+// Two readings a few hours apart are one host's opinion, twice. What separates a host from a change is that a change
+// is still there when the host is not, so a held reading is written only once the same-side outliers SPAN A DAY --
+// the first held and the one in hand at least HOLD_SPAN_MS apart. Until then every one is held and counted.
+export const HOLD_SPAN_MS = 24 * 3600 * 1000;
+const medianOf = (v) => { const a = [...v].sort((x, y) => x - y), n = a.length; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; };
+/** Which side of its own ring a finished green reading falls on: "slow", "fast", or null when it is within the factor. */
+export function hostOutlier(ring, ms, factor = HOST_OUTLIER_FACTOR) {
+    if (!Array.isArray(ring) || ring.length < 2 || !(ms > 0)) return null;
+    const m = medianOf(ring);
+    if (!(m > 0)) return null;
+    return ms > m * factor ? "slow" : ms < m / factor ? "fast" : null;
+}
+
+export function runSlice(picked, { capMs = CAP_MS, onProgress = null, retryCapMs = 0, run = runGate } = {}) {
     const rows = [];
     for (let i = 0; i < picked.length; i++) {
         const g = picked[i];
@@ -34,8 +71,15 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // v4647k -- `skipped` comes from the SAME run that produced the millisecond, exactly as the sweep's
         // `serialSkipped ?? parallelSkipped` mirrors `serialMs ?? parallelMs`. A label taken from another
         // run is the drift kindsInferred exists to prevent.
-        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
-        const ms = Date.now() - t0;
+        try { const r = run(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
+        let ms = Date.now() - t0, retriedFrom = null;
+        // v4916 -- a kill is retried once at the longer cap; the retry's own run supplies every field of the row
+        if (code === "timeout/signal" && retryCapMs > capMs) {
+            reclaimStrandedFixtures();
+            const t1 = Date.now();
+            try { const r = run(g, { timeoutMs: retryCapMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
+            ms = Date.now() - t1; retriedFrom = capMs;
+        }
         // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
         // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
         // quickSweep reclaims at this point (v4692); the rotation did not.
@@ -45,7 +89,7 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
         // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
         // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
-        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped, failRows });
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped, failRows, ...(retriedFrom != null ? { retriedFrom, capMs: retryCapMs } : {}) });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
@@ -260,7 +304,10 @@ export function writeBase(file, target, { root = ENG, read = (f) => fs.readFileS
         : { base: file, from: "the shared record (the local file names another box)" };
 }
 
-export function mergeTimings(file, rows, stamp, capMs = null) {
+export function mergeTimings(file, rows, stamp, capMs = null, { heldBefore = null, factor = HOST_OUTLIER_FACTOR, spanMs = HOLD_SPAN_MS } = {}) {
+    // v4916 -- heldBefore is the ledger's `heldOutliers` from the last write, or null for a caller that wants every row
+    // written as it always was. held/heldOut are what this write holds back and what the ledger should now carry.
+    const held = [], heldOut = { ...(heldBefore || {}) };
     const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
     const finished = { ...(file.finished || {}) };
     const serial = { ...(file.serial || {}) }, serialAt = { ...(file.serialAt || {}) };
@@ -280,6 +327,21 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
     const priorMs = {};
     for (const r of rows) {
         priorMs[r.gate] = (file.timings || {})[r.gate];
+        if (heldBefore) {
+            const recordedRed = (file.codes || {})[r.gate] !== undefined && (file.codes || {})[r.gate] !== 0;   // v4926 -- see the header
+            const side = r.finished && !r.skipped && r.code === 0 && !recordedRed ? hostOutlier((file.serialRing || {})[r.gate], r.ms, factor) : null;
+            const before = heldBefore[r.gate];
+            if (side) {
+                const same = before && before.side === side;
+                const since = same ? (before.since || before.at) : stamp, count = same ? (before.count || 1) + 1 : 1;
+                const span = Date.parse(stamp) - Date.parse(since);
+                if (!(same && span >= spanMs)) {                       // not yet a day of it: held, and counted
+                    heldOut[r.gate] = { ms: r.ms, at: stamp, side, since, count, median: medianOf((file.serialRing || {})[r.gate]) };
+                    held.push({ ...r, side, count, since }); continue;
+                }
+            }
+            delete heldOut[r.gate];                                    // in range, or a day of the same answer: written
+        }
         timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
         serial[r.gate] = r.ms; serialAt[r.gate] = stamp; contended[r.gate] = false;
         serialRing[r.gate] = (serialRing[r.gate] || []).concat(r.ms).slice(-3);
@@ -293,12 +355,26 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
         // sweepCoverage's last three rows.
         kinds[r.gate] = r.skipped ? "skipped" : r.finished ? "alone" : "capped";
         inferred.delete(r.gate);
-        if (capMs != null) capAt[r.gate] = capMs;
+        if ((r.capMs ?? capMs) != null) capAt[r.gate] = r.capMs ?? capMs;
         if (r.finished && !r.skipped && r.ms <= budgetMs) delete crossings[r.gate];
     }
     backfillStamps(timings, at);
-    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds, crossings,
-                       kindsInferred: [...inferred].sort() }, priorMs };
+    // *** v4917 -- THE SCALE ENTRIES THIS WRITE ORPHANS ARE PRUNED BY THIS WRITE. *** quickSweep files each capture pass's
+    // boxScale under two keys, its serial stamp and its `at` stamp, and prunes a key once no gate carries it. This
+    // writer re-stamps gates and pruned nothing, so after a 50-gate rotation a pass could lose every gate on its serial
+    // stamp while some kept its `at` stamp: an alias with no twin, which relativeBudget-selfcheck reads as a hand edit.
+    // It was red in the first verdict after every large rotation (v4915, v4916) and green in the second, because the
+    // sweep's own write pruned it. Same rule as the sweep's, plus the twin: an `at` alias survives only while a
+    // serial-stamped entry still holds the same measurement.
+    const out = { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds, crossings,
+                  kindsInferred: [...inferred].sort() };
+    if (file.boxScale) {
+        const atS = new Set(Object.values(at)), serS = new Set(Object.values(serialAt));
+        const live = Object.entries(file.boxScale).filter(([k]) => atS.has(k) || serS.has(k));
+        const twins = new Set(live.filter(([k]) => serS.has(k)).map(([, v]) => JSON.stringify(v)));
+        out.boxScale = Object.fromEntries(live.filter(([k, v]) => serS.has(k) || twins.has(JSON.stringify(v))));
+    }
+    return { merged: out, priorMs, held, heldOut };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
@@ -313,7 +389,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // This file WRITES sweep-timings.json, so an argument it misreads becomes a number the tree carries.
     const CLI = Object.freeze({
         values: Object.freeze({ "--budget-s": "number", "--slots": "number", "--gate": "path",
-                                "--cap-s": "number", "--band": "string" }),
+                                "--cap-s": "number", "--band": "string", "--retry-cap-s": "number" }),
         flags: Object.freeze(["--rebuild-finished", "--restore-lost", "--write", "--killed"]),
     });
     const cli = parseArgs(process.argv.slice(2), CLI);
@@ -438,7 +514,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[rotation] over-budget pool ${rot.pool}, taking ${rot.picked.length} (est ${(rot.cost / 1000).toFixed(0)}s), ` +
             `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
     }
-    const rows = runSlice(picked, { capMs, onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
+    const retryCapMs = arg("--retry-cap-s", RETRY_CAP_MS / 1000) * 1000;      // v4916; 0 turns the retry off
+    const rows = runSlice(picked, { capMs, retryCapMs, onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
     const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
@@ -459,7 +536,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         const stamp = new Date().toISOString();
         const target = timingsTarget(file);
         const { base } = writeBase(file, target);
-        const { merged: mergedTimings, priorMs } = mergeTimings(base, rows, stamp, capMs);
+        let heldBefore = {};
+        try { heldBefore = JSON.parse(fs.readFileSync(path.join(ENG, ledgerFile(target)), "utf8")).heldOutliers || {}; } catch {}
+        const { merged: mergedTimings, priorMs, held, heldOut } = mergeTimings(base, rows, stamp, capMs, { heldBefore });
+        for (const h of held) console.log(`[rotation]   HELD      ${h.gate}  ${h.ms} ms is ${h.side} against its ring's median ${heldOut[h.gate].median} ms -- not written (${h.count} held since ${h.since}; written once they span ${HOLD_SPAN_MS / 3600000} h)`);
+        for (const r of rows) if (r.retriedFrom != null) console.log(`[rotation]   retried   ${r.gate}  killed at ${r.retriedFrom / 1000} s, then ${r.finished ? "finished in " + r.ms + " ms" : "killed again"} at ${retryCapMs / 1000} s`);
+        const heldGates = new Set(held.map((h) => h.gate));
         if (target.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${target.why}`);
         fs.writeFileSync(path.join(ENG, target.file),
             JSON.stringify({ ...mergedTimings, host: target.host }, null, 1) + "\n");
@@ -490,7 +572,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             priorAt = prev.at || null;
             for (const r of prev.rotated || []) priorLedger[r.gate] = r.at ? r : { ...r, at: priorAt };
         } catch {}
-        for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
+        for (const r of rows) if (!heldGates.has(r.gate)) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
         const ledgerOut = ledgerFile(target);
         if (target.foreign) console.log(`[rotation] NOT writing the shared ledger either -- ${ledgerOut} instead`);
@@ -504,9 +586,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "`poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached " +
                   "every entry stamped earlier and none stamped at or after it.",
             ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode }), poolHorizon),
-            budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
+            budgetMs: BUDGET_MS, lastRun: rows.length, heldOutliers: heldOut, rotated: merged,
         }, null, 1) + "\n");
-        console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);
+        console.log(`[rotation] wrote ${rows.length - held.length} entries with at=${stamp} to ${target.file}` + (held.length ? `, held ${held.length}` : ""));
     } else console.log("[rotation] dry run -- pass --write to record");
     process.exit(k.reds.length ? 1 : 0);
 }

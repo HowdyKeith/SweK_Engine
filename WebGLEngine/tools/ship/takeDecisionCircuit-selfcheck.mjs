@@ -303,7 +303,7 @@ sec("8. THE COMMAND");
 
 sec("9. REAL DIVES (a few, at a shortened length where it helps)");
 {
-    const R = { from: 1, to: 2 }, K = ["far"], rule = T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), want = T.evaluate(rule, T.setOf(K, 1, 2), { gauge: T.GAUGE });
+    const R = { from: 1, to: 2 }, K = ["far"], rule = T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)), want = T.evaluate(rule, T.setOf(K, 1, 2), { gauge: T.GAUGE });
     const rl = X.flyArm("rule-low06", [], { range: R, kinds: K });
     ok("!! the rule arm flown through the switchboard IS the task's own: keys far:1 and far:2, scores and bad flags equal to T.evaluate of the same pilot, the range and kinds recorded, no champion on a rule arm", J(rl.runs.map((r) => r.key)) === J(["far:1", "far:2"]) && rl.runs.every((r, i) => r.score === want.runs[i].score && r.bad === !!(want.runs[i].crushed || want.runs[i].stranded)) && J(rl.range) === J(R) && J(rl.kinds) === J(K) && rl.seconds === null && rl.champion === undefined && rl.arm === "rule-low06");
     const r8 = X.flyArm("rule-r8", [], { range: R, kinds: K }), cut = X.flyArm("rule-low06", [], { range: R, kinds: K, seconds: 60 });

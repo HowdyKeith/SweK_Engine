@@ -120,6 +120,7 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { ledgerState, readLedger, engineVersion, shippedVersions, num, LEDGER, ENG, ROOT } from "./releaseLedger.mjs";
 import { rowsFrom, ledgerUpdate } from "./refreshReleases.mjs";
+import { createRequire } from "node:module";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 let fails = 0;
@@ -167,6 +168,8 @@ const LED = readLedger();
        "stops proving anything and should be re-examined rather than trusted.");
 }
 
+// 2026-11-17 SABOTAGE (the v4921 refresh race, section 4's last four rows): rowsFrom without one-row-per-tag -> 1 red; stableRead
+//   ignoring order -> 2; the panel's fetch taking its first pass -> 2; accepting any second pass -> 1. Every file restored, sha-256 checked.
 console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
 {
     ok("releases.json exists and parses", !!led && Array.isArray(led.releases), LEDGER);
@@ -497,6 +500,33 @@ console.log("\n4. THE REFRESH DECIDES WHAT COUNTS AS PUBLISHED, AND IT IS DRIVEN
         "build releases/latest will never hand out");
     ok("...and the result is sorted newest-first like the ledger it writes",
         rows.map((r) => r.tag).join(",") === "v4438,v4400,v4296");
+    // 2026-11-17 -- the v4921 refresh ran while v4921 was being published: page 2 began one release early, the ledger
+    // wrote v3961 twice and no v4921, and the newest-first row went red on the rig. Two defences, each driven here.
+    const dup = rowsFrom([...fixture, { draft: false, prerelease: false, tag_name: "v4296", published_at: "2026-09-01T20:42:55Z" }]);
+    ok("!! one row per tag: a release the API pages hand back twice is recorded once",
+        dup.filter((r) => r.tag === "v4296").length === 1 && dup.map((r) => r.tag).join(",") === "v4438,v4400,v4296");
+    const { stableRead } = await import("./refreshReleases.mjs");
+    const ids = (a) => a.map((id) => ({ id })), A = ids([3, 2, 1]);
+    ok("!! stableRead: two reads agree only on the same ids in the same order with none repeated",
+        stableRead(A, ids([3, 2, 1])) && !stableRead(A, ids([4, 3, 2])) && !stableRead(ids([3, 2, 2]), ids([3, 2, 2])) && !stableRead(A, null) && !stableRead(A, ids([3, 2])));
+}
+{
+    // the panel's fetch (ai-bridge/githubBridge.js _allReleasesRaw), driven with a fake API in which a release is published
+    // between page 1 and page 2 of the first pass -- the v4921 event, at a page size the fake makes 2 instead of 100.
+    const G = createRequire(import.meta.url)("../../ai-bridge/githubBridge.js");
+    const make = (n) => Array.from({ length: n }, (_, i) => ({ id: 1000 - i, draft: false, prerelease: false, tag_name: "v" + (4900 - i), published_at: "2026-11-01T00:00:00Z" }));
+    let list = make(150), calls = 0;
+    const readPage = async (url) => {
+        calls++; const page = +url.match(/[?&]page=(\d+)/)[1];
+        if (calls === 2) list = [{ id: 2000, draft: false, prerelease: false, tag_name: "v4921", published_at: "2026-11-17T04:17:04Z" }, ...list];
+        return { ok: true, data: list.slice((page - 1) * 100, page * 100) };
+    };
+    const got = await G._allReleasesRaw("o/r", readPage), tags = got.ok ? rowsFrom(got.raw).map((r) => r.tag) : [];
+    ok("!! a release published between two pages is not lost and no release is doubled: the panel reads until two passes agree",
+        got.ok && tags.length === 151 && tags[0] === "v4921" && new Set(tags).size === 151, `${tags.length} rows, newest ${tags[0]}, ${calls} page reads`);
+    let flips = 0;
+    const never = await G._allReleasesRaw("o/r", async (url) => { flips++; return { ok: true, data: make(3).map((r) => ({ ...r, id: r.id + flips })) }; });
+    ok("!! a list that never holds still is refused, and the ledger is then not written", never.ok === false && /changed between three reads/.test(never.error));
 }
 
 // SABOTAGE v4641 (section 4b): 5 mutations, 5 caught, no 0-RED.
@@ -510,6 +540,50 @@ console.log("\n4. THE REFRESH DECIDES WHAT COUNTS AS PUBLISHED, AND IT IS DRIVEN
 //   L  releaseLedger.mjs's supersededBy = max(floor, latest) cut to `floor` -> 5 red across sections 3 and 4b,
 //      including the two v4461 wrote. The stale-ledger row rides on the same mechanism, which is the point:
 //      a stale `latest` and a broken supersede are the same failure arriving by different routes.
+console.log("\n4c. *** v4926 -- A RELEASE IS SOMETHING THE FLEET CAN RUN ONLY IF IT CARRIES ITS ZIP ***");
+{
+    // 2026-11-19: v4926 was published with an EMPTY asset list. publishVersion returned ok:true because the release was
+    // created, the verified-clone chain printed "publish OK", refreshReleases recorded the tag, and this gate went green --
+    // while releases/latest was a release fetchEngineBuild refuses ("has no .zip asset"). release.yml did go red on the
+    // tag (it waits for the asset), and nobody was looking at it. Three changes, each driven here without the network.
+    const { zipOf, FLEET_ZIP } = await import("./refreshReleases.mjs");
+    const G2 = createRequire(import.meta.url)("../../ai-bridge/githubBridge.js");
+    const rel = (tag, assets) => Object.assign({ draft: false, prerelease: false, tag_name: tag, published_at: "2026-11-19T14:29:21Z" }, assets === undefined ? {} : { assets });
+    const live = { name: "SweK_Engine_v4926.zip", size: 102857613, state: "uploaded" };   // the asset as attached at 14:40:44Z
+    const rows = rowsFrom([rel("v4926", [live]), rel("v4925", []), rel("v4924", [{ name: "notes.txt", size: 9, state: "uploaded" }, { name: "other.zip", size: 5, state: "starter" }]), rel("v4923")]);
+    const by = Object.fromEntries(rows.map((r) => [r.tag, r]));
+    ok("!! rowsFrom records each release's zip: the fleet's named zip with its size and state; null for an empty asset list; a payload with no asset list leaves the field off",
+        JSON.stringify(by.v4926.zip) === JSON.stringify(live) && by.v4925.zip === null && !("zip" in by.v4923) &&
+        JSON.stringify(by.v4924.zip) === JSON.stringify({ name: "other.zip", size: 5, state: "starter" }),
+        JSON.stringify(rows.map((r) => [r.tag, r.zip === undefined ? "absent" : r.zip && r.zip.name])));
+    ok("  ...the named zip wins over any other .zip, by fetchEngineBuild's own rule (githubBridge.js spells the same pattern)",
+        zipOf(rel("v1", [{ name: "x.zip", state: "uploaded" }, { name: "EngineProject_v1.zip", state: "uploaded" }])).name === "EngineProject_v1.zip" &&
+        fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8").includes(FLEET_ZIP.source));
+    const cr = { ok: true, id: 451460738, tag: "v4926", url: "u", uploadUrl: "x" };
+    const failed = G2._publishOutcome(cr, { ok: false, error: "upload HTTP 422" }, "C:/SweK_release/SweK_Engine_v4926.zip");
+    const none = G2._publishOutcome(cr, null, "C:/z.zip"), good = G2._publishOutcome(cr, { ok: true, name: "z.zip" }, "C:/z.zip"), noZip = G2._publishOutcome(cr, null, "");
+    ok("!! publishVersion's outcome: a release CREATED whose zip did not upload is NOT ok, and the error names the release id and says not to publish again",
+        failed.ok === false && failed.releaseCreated === true && /451460738/.test(failed.error) && /upload HTTP 422/.test(failed.error) && /do not publish the tag again/.test(failed.error) &&
+        none.ok === false && good.ok === true && noZip.ok === true,
+        String(failed.error || "NO ERROR: the outcome said ok=" + failed.ok).slice(0, 120));
+    // the live ledger: once a refresh has recorded assets, the newest release must carry an uploaded zip
+    const zipReady = (z) => !!z && z.state === "uploaded" && /\.zip$/i.test(z.name || "") && z.size > 0;
+    ok("!! the rule for 'carries its zip': uploaded, a .zip, non-empty -- an upload still in progress, an empty list or a zero-byte zip is refused",
+        zipReady(live) && !zipReady({ ...live, state: "starter" }) && !zipReady({ ...live, state: "new" }) && !zipReady(null) && !zipReady({ ...live, size: 0 }) && !zipReady({ ...live, name: "SweK_Engine_v4926.txt" }));
+    const newest = (led.releases || []).filter((r) => !r.prerelease)[0];
+    if (newest && "zip" in newest) {
+        ok("!! *** the newest release in the ledger carries an UPLOADED zip -- what fetchEngineBuild will download ***",
+            zipReady(newest.zip),
+            newest.tag + ": " + JSON.stringify(newest.zip));
+    } else report("the ledger's newest row (" + (newest && newest.tag) + ") was written before refreshes recorded assets -- the next `refreshReleases --write` records it, and this row then grades it", "");
+}
+// SABOTAGE (v4926), each restored by copy, sha-256 checked:
+//   S1 _publishOutcome back to ok:true when the release was created (v4925's rule) -> 1 red ("publishVersion's outcome"). Its first
+//      run CRASHED the gate instead (the detail read failed.error, which that sabotage leaves undefined); the detail now guards it.
+//   S2 zipOf ignoring the asset list (always undefined) -> 1 red ("rowsFrom records each release's zip").
+//   S3 zipReady accepting any state (an upload still in progress counts) -> 1 red ("the rule for 'carries its zip'").
+//   S4 githubBridge's fetch pattern edited (SweK_Engine -> SweKEngine) -> 1 red ("the named zip wins").
+
 console.log("\n4b. *** THE REFRESH THAT COULD NOT RUN, AND WHAT A STALE LEDGER DOES TO THE RATCHET ***");
 {
     // *** v4641 -- THE LEDGER WAS ELEVEN DAYS AND THREE RELEASES STALE AND THE GATE READ THAT AS DEBT. ***
@@ -637,8 +711,9 @@ console.log("\n4b. *** THE REFRESH THAT COULD NOT RUN, AND WHAT A STALE LEDGER D
 
 console.log("\n5. WHAT THIS DOES NOT CHECK, STATED RATHER THAN IMPLIED");
 {
-    ok("the ledger records TAGS, and this gate never claims an asset exists", true,
-        "a release with no zip attached would pass every line above. .github/workflows/release.yml is what " +
+    ok("the ledger records whether the newest release CARRIES a zip (section 4c, since v4926), and never whether that zip is any good", true,
+        "until v4926 a release with no zip attached passed every line above, and v4926 itself was published that way. " +
+        "Whether the zip's CONTENTS are sound is still not asked here: .github/workflows/release.yml is what " +
         "catches that: on the tag push it waits for the asset, refuses after five minutes, unzip -t's it, " +
         "runs verify_zip.py and sweeps it for credentials -- ON THE PUBLISHED ARCHIVE since v4070. THIS FILE " +
         "ASKS WHETHER A RELEASE EXISTS; THAT WORKFLOW ASKS WHETHER IT IS ANY GOOD.");

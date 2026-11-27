@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7e7ab7102816b88949c80757cf36bd513b49cf9a",
+ "head": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -131,7 +131,7 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 24503,
+    "bytes": 25002,
     "sha": "171f3111e8f89d077853d5c1fa6e0cc93653b128"
    },
    {
@@ -187,8 +187,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "slug-curved.html",
@@ -217,8 +217,8 @@
    },
    {
     "path": "slug-text.html",
-    "bytes": 12133,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 12286,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "slug-ticker.html",
@@ -335,13 +335,28 @@
   "hemibrain": [
    {
     "path": "ai-bridge/subAquariumCore-selfcheck.mjs",
-    "bytes": 28463,
-    "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
+    "bytes": 28981,
+    "sha": "a14cd3e543a51a89bc198107f3ac7bb2e757965f"
+   },
+   {
+    "path": "brain/lesionFlyCx-selfcheck.mjs",
+    "bytes": 19536,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
+   },
+   {
+    "path": "brain/reservoirGpu-selfcheck.mjs",
+    "bytes": 16972,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "brain/reservoirPilotGpu-selfcheck.mjs",
+    "bytes": 26527,
+    "sha": "f4a4f2fc5d36190c42ce6c63484429b32056cef9"
    },
    {
     "path": "render/brainPanel-selfcheck.mjs",
@@ -354,19 +369,39 @@
     "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
+    "path": "render/subAquariumKinds-selfcheck.mjs",
+    "bytes": 10878,
+    "sha": "0b432755f177e35f59ae0d57de0f2f34a6a4da4c"
+   },
+   {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 56655,
-    "sha": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb"
+    "bytes": 57854,
+    "sha": "aff6734bb19ca97f583da9bfd8ca8dd1bc189e78"
+   },
+   {
+    "path": "render/switchboardView-selfcheck.mjs",
+    "bytes": 14222,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 50634,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 61813,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
-    "path": "tools/flyCx.mjs",
-    "bytes": 6499,
-    "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
+    "path": "switchboard.html",
+    "bytes": 17395,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "tools/flyCx-selfcheck.mjs",
+    "bytes": 31144,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
+   },
+   {
+    "path": "tools/flyCxLib.mjs",
+    "bytes": 10103,
+    "sha": "3ca013f5d790d70eef64e96684f5bc5b894b5a8f"
    },
    {
     "path": "tools/ship/flyCxPilotFile-selfcheck.mjs",
@@ -394,6 +429,31 @@
     "sha": "f56f08f95fa766ecacceb62742eda6fce9fa2f7c"
    },
    {
+    "path": "tools/ship/latenessStudy.mjs",
+    "bytes": 7183,
+    "sha": "9bf85c6297e31eebd546581ac5515903878adec1"
+   },
+   {
+    "path": "tools/ship/lesionLeftSide-selfcheck.mjs",
+    "bytes": 13371,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "tools/ship/lesionLeftSideCmd.mjs",
+    "bytes": 3189,
+    "sha": "6f50c3a6913121b34c41bcfe71faae96ddb7a86c"
+   },
+   {
+    "path": "tools/ship/takeReservoirGpu.mjs",
+    "bytes": 6561,
+    "sha": "7781aea0987370e472803910700cf8799ed8949e"
+   },
+   {
+    "path": "tools/ship/takeSwitchboard.mjs",
+    "bytes": 4028,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "tools/ship/trainNeedsCircuit.mjs",
     "bytes": 33594,
     "sha": "c1ec0cb0c471b04d1bfdcc8687c04f77a95f2617"
@@ -409,6 +469,11 @@
     "sha": "d66beb17f067dff0e9bc21ff7ccb44e7d7f1576d"
    },
    {
+    "path": "tools/subReservoirV6-selfcheck.mjs",
+    "bytes": 15368,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
     "path": "tools/tankFlyCxBench.mjs",
     "bytes": 16011,
     "sha": "70d12d8be420fd1c89f0fa014a4deb1668303400"
@@ -422,8 +487,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "clients.html",
@@ -432,8 +497,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 904940,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -461,13 +526,13 @@
   "kenney-city": [
    {
     "path": "rtx-viewer.html",
-    "bytes": 15443,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "bytes": 19609,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 131378,
-    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
+    "bytes": 178380,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -497,8 +562,8 @@
    },
    {
     "path": "krbn-compare.html",
-    "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "bytes": 37536,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-lyapunov.html",
@@ -532,15 +597,15 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    }
   ],
   "male-cns": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29890,
-    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
+    "bytes": 30089,
+    "sha": "523672b4140f443d2e9c15050bdf4eabf18b3293"
    },
    {
     "path": "ai-bridge/subAquariumBridge.js",
@@ -548,9 +613,54 @@
     "sha": "e336692128303e452c50f7fe9c9f385cc47c81b2"
    },
    {
+    "path": "brain/flyEmdLplc2Gf-selfcheck.mjs",
+    "bytes": 39533,
+    "sha": "18d638c114bb37d6f6d8b992f6c3dc5cc6e9397b"
+   },
+   {
+    "path": "brain/flySteering-selfcheck.mjs",
+    "bytes": 25896,
+    "sha": "3c0a92b61c64888952aec42a2a93c9a2a980f32e"
+   },
+   {
+    "path": "brain/flyTracking-selfcheck.mjs",
+    "bytes": 51031,
+    "sha": "743ff3d46654f5cf6f42a9228d85c89105306123"
+   },
+   {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
     "bytes": 40686,
     "sha": "caf901a66f7fbb39120fe93ab294af676736a7cb"
+   },
+   {
+    "path": "brain/helmCompassPolicy-selfcheck.mjs",
+    "bytes": 15993,
+    "sha": "aed20ecb362fbfc3dcd8df508283d0d1af1634c7"
+   },
+   {
+    "path": "brain/helmSteerPolicy-selfcheck.mjs",
+    "bytes": 20185,
+    "sha": "7c4cbd77fa1f519725d6cd4c25a8fc387282cd27"
+   },
+   {
+    "path": "brain/maleCnsCircuits-selfcheck.mjs",
+    "bytes": 34110,
+    "sha": "bea9121fea16dec7840d815183a79f4b5ef1f50e"
+   },
+   {
+    "path": "brain/openItems1-run.mjs",
+    "bytes": 2286,
+    "sha": "12fac7508f2e8f519baf016fc19eb0a1eace2998"
+   },
+   {
+    "path": "brain/seatTrackGunner-selfcheck.mjs",
+    "bytes": 18427,
+    "sha": "31be7a6d6e04448f4d1520993c46f743500893d6"
+   },
+   {
+    "path": "brain/stealthRound3-run.mjs",
+    "bytes": 2133,
+    "sha": "418ca94cd6a99ac157e10383700b93523853f1fb"
    },
    {
     "path": "fly-connectome.html",
@@ -608,6 +718,23 @@
    }
   ],
   "slug": [],
+  "smaa": [
+   {
+    "path": "render/smaaPass.js",
+    "bytes": 19688,
+    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a"
+   },
+   {
+    "path": "render/smaaPassGPU.mjs",
+    "bytes": 27714,
+    "sha": "be9689c3796cb55de6cb70d6d7dbed0233bec793"
+   },
+   {
+    "path": "tools/ship/smaaPass-selfcheck.mjs",
+    "bytes": 14251,
+    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a"
+   }
+  ],
   "snowflow": [
    {
     "path": "render/aerial-selfcheck.mjs",
@@ -666,8 +793,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -676,8 +803,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 159167,
-    "sha": "7d423e172187a6c68e46843700f01ba9de3ddb22"
+    "bytes": 164897,
+    "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
    }
   ],
   "taichi-js": [
@@ -710,8 +837,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1499390,
-    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "aquarelle.html",
@@ -890,8 +1017,8 @@
    },
    {
     "path": "index.html",
-    "bytes": 23021,
-    "sha": "ca8b8f0ce2cd7678617f50a01920d68eddd146f7"
+    "bytes": 23174,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-avatar.html",
@@ -900,8 +1027,8 @@
    },
    {
     "path": "krbn-compare.html",
-    "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "bytes": 37536,
+    "sha": "3ed8bae38c15d43937d3b53f29336eb6ae161c53"
    },
    {
     "path": "krbn-rigged.html",
@@ -920,8 +1047,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3750970,
-    "sha": "e399472c310adfaa09f38066e3eeb7108ee6c25e"
+    "bytes": 3831441,
+    "sha": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2"
    },
    {
     "path": "mpm3d.html",
@@ -950,13 +1077,13 @@
    },
    {
     "path": "render/seaPicker-selfcheck.mjs",
-    "bytes": 17420,
-    "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
+    "bytes": 18881,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "render/seaThree-selfcheck.mjs",
-    "bytes": 12601,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "bytes": 13105,
+    "sha": "1756d6a67c1d556c686010636198ed878628cf2b"
    },
    {
     "path": "render/skyBake-selfcheck.mjs",
@@ -965,8 +1092,18 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 22770,
-    "sha": "8964284314deb31910ce6f27836f215cba4c90a0"
+    "bytes": 25349,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
+   },
+   {
+    "path": "render/subAquarium3dDark-selfcheck.mjs",
+    "bytes": 5727,
+    "sha": "c7afabbbd7f030597600f79d955d460d58f1a41f"
+   },
+   {
+    "path": "render/subAquarium3dMarks-selfcheck.mjs",
+    "bytes": 16484,
+    "sha": "5fd137be3c15f6b629dff50e9471e426abb7f503"
    },
    {
     "path": "render/subBallastCues-selfcheck.mjs",
@@ -1015,8 +1152,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 904940,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "shipavatar.html",
@@ -1040,8 +1177,13 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 85612,
-    "sha": "dc45bed917a8026025d60dc34473ab0c717bde6e"
+    "bytes": 85912,
+    "sha": "23c03b0360cab54c19ec66b7b2e669211fe1714c"
+   },
+   {
+    "path": "space-duel.html",
+    "bytes": 25698,
+    "sha": "896ffc6ef4791b57fd597806b1555b23e51da4c8"
    },
    {
     "path": "splat_viewer.html",
@@ -1050,8 +1192,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 50634,
-    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+    "bytes": 61813,
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "svg-forge.html",
@@ -1105,8 +1247,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1357,8 +1499,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",
@@ -1412,8 +1554,8 @@
    },
    {
     "path": "render/temporalTsl-selfcheck.mjs",
-    "bytes": 46135,
-    "sha": "79b92373c5ea3d067c9c44fd341f66dfaca6995d"
+    "bytes": 46196,
+    "sha": "c7c159f3a0588e5aa371c1462aa570e27ec3ac98"
    },
    {
     "path": "render/temporalTslCompute-selfcheck.mjs",
@@ -1579,8 +1721,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1638,8 +1780,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 40471,
-    "sha": "2f79195c3c02883711536cccba4f33de65b86054"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",
@@ -1697,8 +1839,8 @@
   "zebrafish": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29890,
-    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
+    "bytes": 30089,
+    "sha": "523672b4140f443d2e9c15050bdf4eabf18b3293"
    },
    {
     "path": "brain/pilotSubCircuit-selfcheck.mjs",

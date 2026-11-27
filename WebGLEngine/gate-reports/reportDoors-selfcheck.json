@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/reportDoors-selfcheck.mjs",
- "at": "2026-11-01",
+ "at": "2026-11-17",
  "tables": [
   {
    "title": "the reportLines convention, by kind",
@@ -12,22 +12,22 @@
    "rows": [
     [
      "members",
-     "219",
+     "238",
      "modules exporting reportLines"
     ],
     [
      "self-reports",
-     "197",
+     "204",
      "callable with nothing"
     ],
     [
      "formatters",
-     "22",
+     "34",
      "REQUIRE an argument (Function.length)"
     ],
     [
      "  of those, refuse a bare call",
-     "20",
+     "32",
      "an honest throw a consumer can catch"
     ],
     [
@@ -37,7 +37,7 @@
     ],
     [
      "no sibling gate",
-     "16",
+     "17",
      "provide the convention, cannot check it"
     ]
    ],

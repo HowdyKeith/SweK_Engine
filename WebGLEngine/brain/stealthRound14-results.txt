@@ -1,0 +1,29 @@
+== A. loom, stripes none/static/down/up; peak count and ratio to the same detector's plain ellipse (lumScale 255)
+r/v 0.05 U: plain 1300 | static 1150 (0.885) | down 983 (0.756) | up 1173 (0.902)
+r/v 0.05 G: plain 1300 | static 1150 (0.885) | down 983 (0.756) | up 1173 (0.902)
+r/v 0.05 L: plain 1300 | static 1150 (0.885) | down 983 (0.756) | up 1173 (0.902)
+r/v 0.1 U: plain 1820 | static 1738 (0.955) | down 1820 (1.000) | up 1808 (0.993)
+r/v 0.1 G: plain 1820 | static 1738 (0.955) | down 1820 (1.000) | up 1808 (0.993)
+r/v 0.1 L: plain 1820 | static 1738 (0.955) | down 1820 (1.000) | up 1808 (0.993)
+
+retention of the pure loom (plain / U plain) and the up-stripe control (up / U up):
+r/v 0.05 G: plain 1.000, up 1.000
+r/v 0.05 L: plain 1.000, up 1.000
+r/v 0.1 G: plain 1.000, up 1.000
+r/v 0.1 L: plain 1.000, up 1.000
+
+== B. Round 13 ordering (r/v 100 ms), C1 to C4
+G/lum255: 0.2: 1.00/0.95/1.00  0.4: 1.00/0.95/1.00  0.6: 1.00/0.95/1.00  0.8: 1.00/0.95/1.00  1: 1.00/0.95/1.00
+   C1 true C2 false C3 true C4 false -> 2/4
+G/lum1: 0.2: 0.00/0.00/0.00  0.4: 0.00/0.00/0.00  0.6: 0.00/0.00/0.00  0.8: 0.39/0.54/0.61  1: 0.92/0.97/1.00
+   C1 true C2 false C3 false C4 false -> 1/4
+L/lum255: 0.2: 1.00/0.95/1.00  0.4: 1.00/0.95/1.00  0.6: 1.00/0.95/1.00  0.8: 1.00/0.95/1.00  1: 1.00/0.95/1.00
+   C1 true C2 false C3 true C4 false -> 2/4
+L/lum1: 0.2: 0.00/0.00/0.00  0.4: 0.00/0.00/0.00  0.6: 0.00/0.00/0.00  0.8: 0.39/0.54/0.61  1: 0.92/0.97/1.00
+   C1 true C2 false C3 false C4 false -> 1/4
+
+SUMMARY
+G/lum255  C1 Y C2 n C3 Y C4 n  score 2
+G/lum1  C1 Y C2 n C3 n C4 n  score 1
+L/lum255  C1 Y C2 n C3 Y C4 n  score 2
+L/lum1  C1 Y C2 n C3 n C4 n  score 1

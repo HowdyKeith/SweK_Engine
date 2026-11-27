@@ -112,7 +112,7 @@ export class CSMapGenerator {
         ];
 
         // Bombsite markers (visual only — pillars at the plant spots).
-        // Real bomb semantics come in a later round.
+        // Real bomb semantics come in a later round. SETTLED at v324: simulation/CSBomb.js.
         const props = [
             { x:  58, z:  60, kind: "altar" },   // A bomb plant marker
             { x: -18, z:  60, kind: "altar" },   // B bomb plant marker

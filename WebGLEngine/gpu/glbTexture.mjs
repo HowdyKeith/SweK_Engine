@@ -162,6 +162,7 @@ export function needsKtx2(buf) {
  * STREAMED assets -- gpu/khronosSamples.mjs's catalogue, city packs, avatars -- whose textures are not in this
  * repository and were NOT measured here. That is the number to take before this is reconsidered, and taking it
  * is a round of its own.
+ * SETTLED at v4474: the number was taken -- STREAMED below holds the VRAM measurement (the transcode-time half is still unmeasured, as it says).
  */
 /**
  * *** v4474 -- THE NUMBER BUDGET SAID WOULD OVERTURN IT, TAKEN. AND IT OVERTURNS IT. ***

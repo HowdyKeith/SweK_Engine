@@ -20,7 +20,7 @@ import * as ST from "./seaThree.mjs";
 import { buildWater } from "../world/oceanWater.mjs";
 import { createSurface, defaultComponents, defaultSurface } from "../physics/ocean/oceanSurface.mjs";
 import { surfaceStats } from "../ui/oceanSea.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, holdFrames, heldFrames, FRAME_HOLD_MS } from "../tools/ship/playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -122,12 +122,14 @@ console.log("\n4. THE BATTLESHIP PAGE, RUNNING");
         const br = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
         try {
             const pg = await (await br.newContext({ viewport: { width: 900, height: 600 } })).newPage(); const errs = [];
+            await holdFrames(pg);   // v4923 -- the frame loop held while this gate looks: see frameHold in tools/ship/playwrightResolve.mjs, and the row below. Measured: 7.9 and 6.8 s for this gate unheld, 4.8 and 5.6 s held.
             pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|WebSocket connection/.test(m.text())) errs.push(m.text()); });
             await pg.goto(base + "/battleship3d.html", { waitUntil: "load" });
             await pg.waitForTimeout(2500);
-            const shot = (await pg.screenshot()).toString("base64");   // the compositor's view of the page: a WebGL canvas without preserveDrawingBuffer cannot be read back from script after the frame
+            const shot = (await pg.screenshot()).toString("base64"); const held = await heldFrames(pg);   // the compositor's view of the page: a WebGL canvas without preserveDrawingBuffer cannot be read back from script after the frame
             const lit = await pg.evaluate(async (b64) => { const im = new Image(); im.src = "data:image/png;base64," + b64; await im.decode(); const t = document.createElement("canvas"); t.width = 90; t.height = 60; const g = t.getContext("2d"); g.drawImage(im, 0, 0, 90, 60); const d = g.getImageData(0, 0, 90, 60).data; let n = 0; const seen = new Set(); for (let i = 0; i < d.length; i += 4) { if (d[i] + d[i + 1] + d[i + 2] > 30) n++; seen.add((d[i] >> 4) + "," + (d[i + 1] >> 4) + "," + (d[i + 2] >> 4)); } return n * 1000 + seen.size; }, shot);
             ok("!! battleship3d.html runs with the physics sea: no script or console error in 2.5 s, and its canvas is lit and not flat", errs.length === 0 && lit > 0 && Math.floor(lit / 1000) > 90 * 60 * 0.3 && lit % 1000 > 8, errs.join(" | ").slice(0, 200) + " lit/colours " + lit);
+            ok(`  and its frame loop was HELD to one frame per ${FRAME_HOLD_MS} ms while it was captured, and ran: ${held} frames`, held > 0, "-1: the hold was never installed; 0: it stopped the loop");
         } finally { await br.close(); server.close(); }
     }
 }

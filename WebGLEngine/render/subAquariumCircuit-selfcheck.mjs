@@ -6,13 +6,15 @@
 //   1  THE WEIGHTS   the generated file holds the plain-net champion of the decision-circuit round NUMBER FOR NUMBER (brain/decisionCircuitTraining.jsonl, family plain, k 2, seed 96522), the digest c916e7f5 (the committed digest of the audits' `circuit-plain`), 2,443 weights = the net's weight count at 84 hidden units, and they are frozen.
 //   2  THE PROFILES  the two names, in order, and the test of a name: the planner profiles of brain/surveySeat.mjs, a wrong case, an empty name and no name are not circuit profiles.
 //   3  THE SEATS     `rule` decides exactly as the tuned rule at the survey seat's constants (brain/tunedRule.mjs) on a grid of 64 observations; `circuit` exactly as the plain net seated over the champion's weights, and differs from the rule on some of them (so it is the net and not the rule in disguise); an unknown name is refused by its words.
-//   4  THE AUDIT'S SEAT   a real dive of the task flown by the circuit profile's seat IS the dive the audits flew for `circuit-plain` (the same score and fingerprint, three scenarios), and the rule profile's the dive of `rule-low06`.
+//   4  THE AUDIT'S SEAT   a real dive of the task flown by the circuit profile's seat IS the dive the audits flew for `circuit-plain` (the same score and fingerprint, three scenarios), and the rule profile's the dive of the tuned rule on the shipped seat's constants (low -0.04 since Round 39, 2026-11-19; it was `rule-low06`).
 //   5  BROWSER-LIGHT the module and its weights import nothing from node: and read no file.
 // NOT CHECKED, said plainly: that the tank's dynamics make the net's decisions good (they are not the task's dynamics: the page says so); the looks of the page.
 //
 // SABOTAGE LOG (2026-11-07), render/subAquariumCircuit.mjs and render/subAquariumCircuitWeights.mjs -- 16 mutants: 4 mechanical and 8 by hand of the module (the rule profile returning the circuit's seat, the circuit profile the untrained net, `standard` counted as a circuit profile, the weight-count refusal removed, the names in another order, the rule seat on the default bounds, the policy rebuilt on every call, the unknown-profile message without the names) and 4 by hand of the weights (the digest, the hidden width, ONE weight's last digit, the champion's k),
 // each applied to an isolated tree and this gate run; the files restored. FIRST PASS: 9 red, 4 threw, 3 went 0 red. THE THREE: the weight-count refusal could not be provoked (the weights are right) -- `circuitSeat` now takes the champion as a seam and the gate hands it 2 weights; the policy cache was untested -- identity row; the rule seat on the default bounds is EQUIVALENT for these constants (they lie inside both the default and the wide bounds, which a row now states: the normalised constants are equal).
 // SECOND PASS (with the seam): the two fixed and a mutant of the seam itself (the generated champion always used): 3 red; 1 remains, the bounds one, argued above.
+// SABOTAGE (2026-11-19, Round 40's replacement, each restored byte-identical): the profile's default put back to PLAIN_CHAMPION -> 3 red; the circuit seat's base put back to
+//   SURVEY_ROUND33 (-0.06) -> 1 red.
 "use strict";
 import fs from "node:fs";
 import * as T from "../brain/needsTask.mjs";
@@ -24,6 +26,7 @@ import * as D from "../tools/ship/trainDecisionCircuit.mjs";
 import { digestOf } from "../tools/ship/takeDecisionCircuit.mjs";
 import * as C from "./subAquariumCircuit.mjs";
 import * as W from "./subAquariumCircuitWeights.mjs";
+import * as R40 from "../tools/ship/circuitRetrain.mjs";
 
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished, which is a failure of whatever it was asking: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exit(1); };
@@ -49,6 +52,10 @@ sec("1. THE WEIGHTS");
     const recs = fs.readFileSync(new URL("../brain/decisionCircuitTraining.jsonl", import.meta.url), "utf8").trim().split("\n").map((l) => JSON.parse(l)), file = D.championOf(recs, "plain").record, w = W.PLAIN_CHAMPION;
     ok("!! the generated weights are the committed plain champion NUMBER FOR NUMBER (family plain, k 2, seed 96522; 2,443 of them), their digest is c916e7f5 (the audits' circuit-plain) and the file's champion is that search", file.index === 2 && file.seed === 96522 && w.family === "plain" && w.k === 2 && w.seed === 96522 && w.digest === "c916e7f5" && w.weights.length === 2443 && file.weights.length === 2443 && w.weights.every((v, i) => v === file.weights[i]) && digestOf(w.weights) === "c916e7f5");
     ok("!! the net they go into takes exactly that many weights (84 hidden units: 21 x 84 + 84 + 7 x 84 + 7 = 2,443), and the weights and the record are frozen", w.hidden === 84 && C.plainPolicy().WEIGHT_COUNT === 2443 && C.plainPolicy().hidden === 84 && Object.isFrozen(w) && Object.isFrozen(w.weights) && C.PLAIN_CHAMPION === w);
+    // 2026-11-19, Round 40: the profile flies CIRCUIT_CHAMPION, the retrained net; PLAIN_CHAMPION (above) is kept as what Rounds 38 and 40 name as C06
+    const r40 = [0, 1, 2, 3].map((k) => JSON.parse(fs.readFileSync(new URL(`../brain/rig-results/circuit-retrain/search-${k}.json`, import.meta.url), "utf8"))), champ = R40.championOf(r40).record, cw = W.CIRCUIT_CHAMPION;
+    ok("!! *** Round 40: CIRCUIT_CHAMPION is the retrained champion NUMBER FOR NUMBER (search k 1, seed 97501, chosen by the registered rule from the four committed searches), digest 0ec046a3, on the -0.04 base ***",
+        champ.k === 1 && champ.seed === 97501 && cw.k === 1 && cw.seed === 97501 && cw.family === "plain-bias" && cw.hidden === 84 && cw.base === "low -0.04" && cw.weights.length === 2443 && cw.weights.every((v, i) => v === champ.weights[i]) && digestOf(cw.weights) === "0ec046a3" && cw.digest === "0ec046a3" && Object.isFrozen(cw) && Object.isFrozen(cw.weights) && C.CIRCUIT_CHAMPION === cw);
     ok("!! the champion is not the untrained net: some readout weight is not zero (the readout started at zero)", Array.from(w.weights).slice(C.plainPolicy().offsets.W2).some((v) => v !== 0));
 }
 
@@ -59,9 +66,11 @@ sec("2. THE PROFILES");
 
 sec("3. THE SEATS");
 {
-    const walk = (seat) => grid.map(({ st, obs }) => seat(st, obs)), ruleRef = walk(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf()));
+    const walk = (seat) => grid.map(({ st, obs }) => seat(st, obs)), ruleRef = walk(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctxOf()));   // 2026-11-19 (Round 39): the rule profile moved from SURVEY_ROUND33 (low -0.06) to SURVEY_CONSTANTS (low -0.04)
     const rule = walk(C.circuitSeat("rule")(ctxOf())), circuit = walk(C.circuitSeat("circuit")(ctxOf()));
-    const Pol = CS.createPlainPolicy(84, "plain"), netRef = walk(Pol.seatFor(Float32Array.from(W.PLAIN_CHAMPION.weights))(ctxOf())), untrained = walk(Pol.seatFor(Pol.handWeights())(ctxOf()));
+    // 2026-11-19, Round 40: the reference net is CIRCUIT_CHAMPION's on the -0.04 base (was PLAIN_CHAMPION through Pol.seatFor, on circuitSeat's BASE_PARAMS, low -0.06)
+    const Pol = CS.createPlainPolicy(84, "plain"), on04 = (w) => CS.makeSeat(Pol.stepper(w), { params: SV.SURVEY_CONSTANTS, bounds: U.WIDE_BOUNDS });
+    const netRef = walk(on04(Float32Array.from(W.CIRCUIT_CHAMPION.weights))), untrained = walk(on04(Pol.handWeights()));
     ok(`!! the rule profile decides exactly as the tuned rule at the survey seat's constants on all ${grid.length} observations of a grid walked in order (surfacing, cap, pump, repair and the station)`, grid.length === 64 && rule.every((d, i) => same(d, ruleRef[i])));
     ok("!! the circuit profile decides exactly as the plain net over the champion's weights on the same grid, and the UNTRAINED net would decide as the rule on all of them (so the grid sees the net)", circuit.every((d, i) => same(d, netRef[i])) && untrained.every((d, i) => same(d, ruleRef[i])));
     const differ = circuit.filter((d, i) => !same(d, ruleRef[i])).length;
@@ -77,10 +86,11 @@ sec("3. THE SEATS");
 
 sec("4. THE SEAT THE AUDITS FLEW");
 {
-    const w = Float32Array.from(W.PLAIN_CHAMPION.weights), planned = D.familyPolicy("plain"), gauge = T.GAUGE, scenarios = [T.scenario(18001, "far"), T.scenario(18002, "both"), T.scenario(7, "plain")].map((s) => s);
+    // 2026-11-19, Round 40: the audited pilot is Round 40's NEW arm (circuitRetrain.pilotOf with the champion's weights); it was the decision-circuit round's circuit-plain (D.familyPolicy)
+    const w = Float32Array.from(W.CIRCUIT_CHAMPION.weights), planned = { pilotFor: (x) => R40.pilotOf("NEW", { weights: Array.from(x) }) }, gauge = T.GAUGE, scenarios = [T.scenario(18001, "far"), T.scenario(18002, "both"), T.scenario(7, "plain")].map((s) => s);
     const flown = (seatOf, sc) => { const r = T.fly(T.flyDecision(seatOf), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; };
-    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit"), sc), a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS), sc) }));
-    ok("!! three real dives of the task (seeds of the DEV and spare ranges, 200 s): the circuit profile's seat gives the dive of the audited circuit-plain pilot (the same score and fingerprint), and the rule profile's the dive of the tuned rule's seat", rows.every((x) => J(x.c) === J(x.a) && J(x.r) === J(x.l)));
+    const rows = scenarios.map((sc) => ({ c: flown(C.circuitSeat("circuit"), sc), a: (() => { const r = T.fly(planned.pilotFor(w), sc, { gauge, seconds: 200 }); return [r.score, r.fingerprint]; })(), r: flown(C.circuitSeat("rule"), sc), l: flown(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS), sc) }));   // 2026-11-19 (Round 39): was SURVEY_ROUND33
+    ok("!! three real dives of the task (seeds of the DEV and spare ranges, 200 s): the circuit profile's seat gives the dive of Round 40's audited NEW pilot (the same score and fingerprint; until 2026-11-19 the decision-circuit round's circuit-plain), and the rule profile's the dive of the tuned rule's seat", rows.every((x) => J(x.c) === J(x.a) && J(x.r) === J(x.l)));
     ok("!! and the trained net is a different pilot from the rule on at least one of the three dives (the net acts)", rows.some((x) => J(x.c) !== J(x.r)));
 }
 

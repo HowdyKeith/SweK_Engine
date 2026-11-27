@@ -48,12 +48,31 @@ import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool d
  * a prerelease at the top of this list would otherwise read as "the fleet is up to date" when the fleet
  * cannot see it.
  */
+// v4926 -- the asset the fleet downloads, by the rule fetchEngineBuild uses (ai-bridge/githubBridge.js: the named zip,
+// else any .zip). Kept here as one pattern so the gate can check that file still spells the same one.
+export const FLEET_ZIP = /^(?:SweK_Engine|EngineProject)_v\d+\.zip$/i;
+/** The release's fleet zip as {name, size, state}, null when it has none; undefined when the payload carries no asset list. */
+export function zipOf(r) {
+    if (!r || !Array.isArray(r.assets)) return undefined;
+    const a = r.assets.find((x) => x && FLEET_ZIP.test(x.name || "")) || r.assets.find((x) => x && /\.zip$/i.test(x.name || ""));
+    return a ? { name: a.name, size: a.size, state: a.state } : null;
+}
 export function rowsFrom(apiJson) {
     return (Array.isArray(apiJson) ? apiJson : [])
         .filter((r) => r && !r.draft && /^v\d+$/.test(r.tag_name || ""))
-        .map((r) => Object.assign({ tag: r.tag_name, publishedAt: r.published_at }, r.prerelease ? { prerelease: true } : {}))
+        // v4926 -- AND THE ZIP, because a release is only something the fleet can run if it carries one (v4926 was
+        // published with an empty asset list and the ledger recorded it as published). A payload with no asset
+        // list (a hand fixture) leaves the field off rather than claiming "none".
+        .map((r) => { const z = zipOf(r); return Object.assign({ tag: r.tag_name, publishedAt: r.published_at }, r.prerelease ? { prerelease: true } : {}, z === undefined ? {} : { zip: z }); })
+        // 2026-11-17 -- ONE ROW PER TAG. The v4921 refresh ran two seconds after v4921 was published: page 1 was read before
+        // it showed and page 2 after, so page 2 began one release early and the ledger wrote v3961 twice and v4921 not at
+        // all (the newest-first row went red on the rig). A tag seen twice is the same release; the fetch below also
+        // re-reads until two passes agree, which is what puts the missing release back.
+        .filter((r, i, all) => all.findIndex((x) => x.tag === r.tag) === i)
         .sort((a, b) => (+b.tag.slice(1)) - (+a.tag.slice(1)));
 }
+/** The fetch's stability test: two reads of the whole list are the same release ids in the same order, and no id repeats. */
+export const stableRead = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((r, i) => r && b[i] && r.id === b[i].id) && new Set(a.map((r) => r.id)).size === a.length;
 
 const RUN = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1] || "").href;
 if (!RUN) { /* imported for rowsFrom() -- no network, no exit */ }
@@ -93,7 +112,13 @@ if (RUN && fromFile) {
     }
     all = raw;
     console.log("[refreshReleases] --from " + fromFile + ": " + all.length + " row(s), no fetch attempted; via " + via);
-} else if (RUN) for (let page = 1; page <= 10; page++) {
+} else if (RUN) {
+  // 2026-11-17 -- READ UNTIL TWO PASSES AGREE (stableRead): a release published while the pages are read shifts every later
+  // page by one, so one pass can repeat a release and miss the new one. Up to three passes; if none agree, nothing is written.
+  let prevPass = null;
+  for (let pass = 1; pass <= 3; pass++) {
+    all = [];
+    for (let page = 1; page <= 10; page++) {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100&page=${page}`, { headers });
     if (!r.ok) {
         console.error("[refreshReleases] HTTP " + r.status + " from the releases API -- ledger NOT written." +
@@ -109,6 +134,11 @@ if (RUN && fromFile) {
     if (!Array.isArray(j) || !j.length) break;
     all = all.concat(j);
     if (j.length < 100) break;
+    }
+    if (stableRead(all, prevPass)) break;
+    if (pass === 3) { console.error("[refreshReleases] the releases list changed between three reads (a release being published?) -- ledger NOT written; run it again in a minute."); process.exit(1); }
+    prevPass = all;
+  }
 }
 
 // *** v4450 -- WHAT A LEDGER UPDATE IS, DECLARED ONCE. *** This block used to live inside the `if (RUN)`

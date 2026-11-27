@@ -396,6 +396,11 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     Object.freeze({ module: "world/raceTrack.mjs", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
     Object.freeze({ module: "ui/upscalerSwitch.mjs", why: "v4912 -- main.js's static import at line ~7106 (mountUpscalerSwitch, renderScaleFor: the engine's own render-scale switch), measured against origin/main's walk of 772 modules, where it was the one module missing; it arrived with the merge of the render lines" }),
     Object.freeze({ module: "brain/subCountermeasures.mjs", why: "v4913 -- reached through brain/subDuel.mjs (the lazy import of the sub brains, v4901, like the other sub modules above): the decoy, bubble screen and anti-torpedo interceptor the duel arena now carries (the countermeasures round); measured against origin/main's walk of 773 modules, where it was the one module missing; loaded on the console call, not at boot" }),
+    Object.freeze({ module: "physics/mechanics/subNeeds.mjs", why: "v4927 -- reached through brain/subDuel.mjs (the lazy import of the sub brains, v4901, like the other sub modules above): the duel's opt-in energy cost (`needs`, claude/fish-vestibular-helper) steps a boat through stepNeeds; its own imports, subModel6dof and rigidBody6dof, were already reached" }),
+    Object.freeze({ module: "render/smaaPass.js", why: "v4933 -- reached directly from main.js: the SMAA 1x anti-aliasing pass, imported by the page's render path like the FXAA pass." }),
+    Object.freeze({ module: "vendor/smaa/smaaLookup.mjs", why: "v4933 -- reached through render/smaaPass.js: the vendored SMAA area and search lookup textures the pass binds." }),
+    Object.freeze({ module: "render/splatSH.mjs", why: "v4933 -- reached through engine/SplatRenderer.js: the spherical-harmonic colour table and its WGSL/GLSL function bodies, which the splat renderer pastes into its vertex shader." }),
+    Object.freeze({ module: "ui/tvOut.js", why: "v4933 -- reached through ui/dockedGauges.js and ui/svgGaugeSet.js: the TV-out display module the docked gauge set imports." }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

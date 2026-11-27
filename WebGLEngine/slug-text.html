@@ -11,6 +11,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:desc" content="The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.">
 <title>SweK &middot; Slug text</title>

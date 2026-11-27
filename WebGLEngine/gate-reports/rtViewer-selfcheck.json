@@ -1,0 +1,104 @@
+{
+ "gate": "tools/ship/rtViewer-selfcheck.mjs",
+ "at": "2026-11-17",
+ "tables": [
+  {
+   "title": "accumulate kernel and the real mesh render, measured",
+   "columns": [
+    "case",
+    "input",
+    "n / frames",
+    "result"
+   ],
+   "rows": [
+    [
+     "accumulate n=1",
+     "[10,0,-5,100]",
+     "[2,2,2,2]",
+     "[2,2,2,2]"
+    ],
+    [
+     "accumulate n=4",
+     "[10,0,-5,100]",
+     "[2,2,2,2]",
+     "[8,0.5,-3.25,75.5]"
+    ],
+    [
+     "cube, microfacet+msComp",
+     "unit cube",
+     "6 frames",
+     "range [0.0000, 0.6611]"
+    ],
+    [
+     "cube, envMap",
+     "unit cube",
+     "6 frames",
+     "range [0.3194, 0.7756]"
+    ],
+    [
+     "cube, direct:nee",
+     "unit cube + light",
+     "6 frames",
+     "mean 0.124229 vs bsdf 0.123277"
+    ],
+    [
+     "cube, direct:mis",
+     "unit cube + light",
+     "6 frames",
+     "mean 0.124225 vs bsdf 0.123277"
+    ],
+    [
+     "cube, sceneCapture",
+     "unit cube",
+     "6 frames",
+     "range [0.2032, 0.3921]"
+    ],
+    [
+     "accumulate convergence (task #99)",
+     "6x spp2 vs 1x spp12",
+     "6+8 seeded trials",
+     "|ratio-1|=1.29e-3, bound=1.38e-2"
+    ],
+    [
+     "pavement.glb",
+     "20 tris",
+     "8 frames",
+     "242 distinct, range [0.379, 0.631]"
+    ],
+    [
+     "city scene",
+     "120 tris",
+     "8 frames",
+     "258 distinct, range [0.289, 0.622]"
+    ],
+    [
+     "city scene, vertexColors",
+     "120 tris",
+     "8 frames",
+     "mean 0.471207 vs flat-albedo 0.497373"
+    ],
+    [
+     "city scene, meshMaterials",
+     "120 tris, 4 records",
+     "8 frames",
+     "mean 0.490061 vs flat-albedo 0.497373"
+    ],
+    [
+     "nine instances vs nine baked",
+     "1728 of 1728 pixels bit-identical",
+     "tree vs list 1728 of 1728",
+     "cutout 1728 of 1728"
+    ],
+    [
+     "two meshes, nine instances, vs baked",
+     "1728 of 1728 within 1e-3",
+     "226 covered vs 226",
+     "none"
+    ]
+   ],
+   "note": "A number that only reached this terminal is a measurement nobody else can re-read."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -51,12 +51,14 @@ export class FSRGPU {
                 `got ${device ? JSON.stringify(device.backend) : "nothing"}. There is no compute stage in WebGL2 ` +
                 "to fall back to, so the caller picks easuCPU/rcasCPU instead rather than being handed a silent one.");
         this.device = device;
+        this.timer = null;   // 2026-11-21: a render/gpuTimer.mjs timer on device.gpu -- set it and every pass is timed on the card as easu / rcas (fsr.html shows them)
         this.pEasu = device.compute({ wgsl: EASU_WGSL });
         this.pRcas = device.compute({ wgsl: RCAS_WGSL });
         for (const [n, p] of [["EASU", this.pEasu], ["RCAS", this.pRcas]])
             if (p && p.error) throw new Error(`fx/fsr/fsrGPU: the ${n} kernel did not compile -- ${p.error}`);
     }
 
+    _frameOpts(labels) { return this.timer ? { offscreen: true, timer: this.timer, labels } : { offscreen: true }; }
     _uEasu(rw, rh, dw, dh) { return this.device.buffer({ data: new Uint32Array([rw, rh, dw, dh]), usage: "uniform" }); }
     // P { w:u32, h:u32, denoise:u32, sharp:f32 } -- mixed, so it is laid out by hand rather than by one typed array
     _uRcas(w, h, denoise, sharp) {
@@ -73,7 +75,7 @@ export class FSRGPU {
         const u = this._uEasu(rw, rh, dw, dh);
         this.pEasu.bind("src", src).bind("dst", dst).bind("u", u);
         const g = groups(dw, dh);
-        dev.frame(({ pass }) => { pass.dispatch(this.pEasu, g); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        dev.frame(({ pass }) => { pass.dispatch(this.pEasu, g); pass.clear([0, 0, 0, 1]); }, this._frameOpts(["easu"]));
         const data = new Float32Array(await dev.read(dst));
         for (const b of [src, dst, u]) b.destroy();
         return { data, w: dw, h: dh, range: rangeOf(data, dw * dh) };
@@ -95,7 +97,7 @@ export class FSRGPU {
         const u = this._uRcas(w, h, denoise, sharpness);
         this.pRcas.bind("src", src).bind("dst", dst).bind("u", u);
         const g = groups(w, h);
-        dev.frame(({ pass }) => { pass.dispatch(this.pRcas, g); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        dev.frame(({ pass }) => { pass.dispatch(this.pRcas, g); pass.clear([0, 0, 0, 1]); }, this._frameOpts(["rcas"]));
         const data = new Float32Array(await dev.read(dst));
         for (const b of [src, dst, u]) b.destroy();
         return { data, w, h, range: rangeOf(data, w * h) };
@@ -124,7 +126,7 @@ export class FSRGPU {
             pass.dispatch(this.pEasu, g);
             pass.dispatch(this.pRcas, g);
             pass.clear([0, 0, 0, 1]);
-        }, { offscreen: true });
+        }, this._frameOpts(["easu", "rcas"]));
         const data = new Float32Array(await dev.read(dst));
         for (const b of [src, mid, dst, uE, uR]) b.destroy();
         return { data, w: dw, h: dh, range: rangeOf(data, dw * dh) };

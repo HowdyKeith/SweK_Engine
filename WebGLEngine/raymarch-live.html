@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<script src="render/gpuTimerAuto.js"></script>   <!-- the GPU timer: render/gpuTimerAuto.js, first so it sees the context made; ?gputimer=0 for none -->
 <title>Live Region Ray March (v3045)</title>
 <style>
   html, body { margin:0; background:#0a0e0c; color:#cfe9d8; font:12px/1.6 ui-monospace, Menlo, Consolas, monospace; }
@@ -215,8 +216,8 @@ function draw() {
     const cam = { eye, fwd: f, right: rt, up, tanFov: 0.6 };
     // The marcher goes FIRST and writes depth; the boxes are then arbitrated against it by the depth test rather
     // than by draw order. Drawing them first would still look right and would prove nothing.
-    active.render(cam, canvas.width, canvas.height);
-    if (probe && useDepth) probe.draw(cam, canvas.width / canvas.height, NEAR, FAR, BOXES.map((b) => ({ ...b, offset: [b.offset[0] - o.x, b.offset[1], b.offset[2] - o.z] })));
+    gpuTime("march", () => active.render(cam, canvas.width, canvas.height));
+    if (probe && useDepth) gpuTime("boxes", () => probe.draw(cam, canvas.width / canvas.height, NEAR, FAR, BOXES.map((b) => ({ ...b, offset: [b.offset[0] - o.x, b.offset[1], b.offset[2] - o.z] }))));
 }
 
 // v3051 -- IDLE WHEN THERE IS NOTHING TO DRAW. This closes the follow-up v2778 wrote down and never did
@@ -229,6 +230,7 @@ function draw() {
 // Two guards, both already laws in this tree: a HIDDEN-PAGE guard (v2771 -- a backgrounded page does zero work,
 // the lever that ended the render-QA server death) and a BACKOFF when the chain is broken. A page with nothing
 // to draw polls once a second; it does not render nothing at 60fps.
+const gpuTime = (label, fn) => (globalThis.__gpuTimerAuto ? globalThis.__gpuTimerAuto.time(label, fn) : fn());   // the GPU timer's per-pass label (render/gpuTimerAuto.js)
 let _idleTimer = null;
 function schedule(ms) {
     if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }
