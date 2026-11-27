@@ -54,3 +54,35 @@ its invented cues were worth here, not what the animal's ring class is for. Noth
 `node tools/ship/takeFlySceneGains.mjs run` -> `brain/flySceneGainsRound.jsonl`, committed byte for byte, whole, before it
 is read; `node tools/ship/takeFlySceneGains.mjs read` prints the checks and the reading. The verdict will be section 10,
 "The result".
+
+## 10. The result (the whole results file committed unread at 69e4f26a, then read once)
+One start, 292.7 minutes, beside three other rounds on four cores; 13 records (sha256 3eaf89494e2645ea...). **The checks
+hold**: the scene-trained round's file as committed and passing its own checks; 12 HOMEG draws, each once, HOMEP's
+recipe on its own battery, 14 weights each; draw 1 audited the same twice.
+* **G26: WITH A GAIN FOR EACH RING CLASS THE FLY CANNOT BE TOLD APART IN THE 26-TYPE SCENE AT FINDING HOME** (5 above,
+  7 below, p 0.77).
+* **GP: WITH A GAIN FOR EACH RING CLASS THE FLY CANNOT BE TOLD APART IN THE PLAIN SCENE AT FINDING HOME** (6 above,
+  6 below, p 1.0).
+
+| arm | home, 26-type scene | home, plain | course, 26-type scene | p_c |
+|---|---|---|---|---|
+| HOMEG | 0.5943 | 0.5471 | 0.7178 | 1.989 |
+| HOMET | 0.6000 | 0.5474 | 0.7135 | 2.132 |
+
+Each class's mean gain over the 12 draws (how many draws switch it off): ER1 0.87 (3), ER2 1.26 (0), ER3a 0.90 (0),
+ER3d 1.16 (1), ER3m 0.73 (1), ER3p 1.21 (0), ER3w 1.30 (1), ER4d 1.59 (0), ER4m 0.67 (2), ER5 1.14 (0), ER6 0.99 (2).
+
+**Both expectations came**: G26 CANNOT (55) and GP CANNOT (75). So, as section 5 put it, 11 more weights give this
+trainer nothing it can tell in 12 draws, or cost it as much as they give.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** **the gains move, but not
+together.** Every class's gain ranges widely across draws, and six draws of 12 switch at least one class off (ten
+switch-offs in all). One class stands out: ER4d's gain is above 1 in 11 draws of 12 (mean 1.59, never below 0.81);
+ER2's in 10 of 12. HOMEG's lift over the plain scene is narrower than HOMET's in 8 of 12 (0.0054 on average) and its
+p_c lower in 9 of 12 (1.989 against 2.132); its course in the 26-type scene is the same (6 above, 6 below). Against
+HOMEP it is above in 6 of 12 in the 26-type scene and in 6 of 12 in the plain.
+
+**What it does not mean.** Section 7 holds. Both readings are CANNOT: this trainer, in 12 draws, does not find the class
+gains worth anything it can tell. ER4d's 11 of 12 is one of eleven classes looked at after the results, so it is not a
+test, and a gain says what that class's invented cues were worth here, not what the animal's ring class is for. Which
+landmarks each ring class sees is invented here. Nothing here is of the animal.

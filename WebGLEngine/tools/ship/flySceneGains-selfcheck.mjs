@@ -11,11 +11,15 @@
 //   3  THE TRAINING             in the 26-type scene, the same twice, not the plain one's; its gains and audits the fly's
 //   4  THE RECORDS              12 draws and a second audit, made here; G26, GP, the gains and the broken sets
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the committed results file by its hash; its checks, G26 and GP, the means and gains, what was described after the reading; HOMEG draw 5 audited again to the bit; the note says it
 // SABOTAGE LOG (2026-11-27) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the
 // command as a process); every one red by name, none 0 (the number is the rows red):
 //   Y1 the gains not applied 2 | Y2 the gains not held at 0 3 | Y3 a gain for each of the 26 types 5 | Y4 trained in the plain scene 1 | Y5 G26 against HOMET's plain 1 | Y6 GP against HOMET's 26-type 1 |
 //   Y7 the gains not checked 1 | Y8 three weights taken 1 | Y9 the second audit's plain not compared 1 | Y10 the scene-trained file's own checks skipped 1 | Y11 a class off only below 0 2 |
 //   Y12 BETTER read as WORSE 2 | K1 the command runs HOMET's jobs 1 | K2 the command's usage another 2 (voxelHome) | M1 an expectation moved 1
+//   THE VERDICT (after the reading, the same runner, this gate alone): V1 the results file's hash another 1 | V2 alpha 0.05 1 (both readings CANNOT at either alpha, so it is red
+//   by section 1's pinned constant) | V3 G26 against HOMET's plain home 3 | V4 a class off below 0.5 1 | V5 a mean in the note's table 1 | V6 the note's ER4d 10 of 12 1 |
+//   V7 an expectation in section 10 moved 1 | V8 the backlog row G26 BETTER 1 | V9 the re-audit compared to draw 6 1 | V10 the class that stands out ER3d 1 -- every one red by name, none 0
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -31,6 +35,7 @@ import { CLASSES, NG } from "../../brain/rl/classGainFly.mjs";
 import { classesOf } from "../../brain/rl/typedSceneEnv.mjs";
 import { NR } from "../../brain/rl/compassEnv.mjs";
 import { packWeights, hashWeights, unpackWeights } from "./paintingFly.mjs";
+import { signTest } from "./voxelHome.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -130,8 +135,36 @@ section(() => {
         /usage: node tools\/ship\/takeFlySceneGains\.mjs run \[--jobs N\] \| read \| job ARM S/.test(csrc) && !/console\.log\([^)]*\.(home|plain)\b/.test(csrc));
     const me = src("tools/ship/flySceneGains-selfcheck.mjs"), calls = [...me.matchAll(/G\.trainOne\(([^)]*\)?)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE RUNS NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is of 2 iterations on draw 901 on its own 2 battery lives, audited on lives not the round's; it starts no process; the file's size and time are what they were",
-        calls.length === 3 && calls.every((c) => /^901, TINY, TWO, \[TWO\[0\]\], BAT\(901/.test(c)) && TINY.iters === 2 && !TWO.some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) &&
-        !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `${calls.length} trainings; the file ${before === "absent" ? "absent" : "unchanged"}`);
+        calls.length === 3 && (me.match(/G\.auditOne\(/g) || []).length === 2 && /G\.auditOne\(r5\)/.test(me) && calls.every((c) => /^901, TINY, TWO, \[TWO\[0\]\], BAT\(901/.test(c)) && TINY.iters === 2 && !TWO.some((x) => T.AUDIT.includes(x) || V.AUDIT.includes(x)) &&
+        !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `${calls.length} trainings, one audit of the round's (HOMEG draw 5 in section 6); the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the results file committed unread at 69e4f26a, then read once; HOMEG draw 5 audited home again here in both scenes, a minute or two)");
+section(() => {
+    const RS = "3eaf89494e2645ea55be355e054e1992b6f80024d983961b225fc72545ab85cd", RF = G.fileOf(fs.readFileSync(path.join(ENG, G.RESULTS))), R = G.reading(RF.lines, F), f4 = (x) => x.toFixed(4), m = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    ok("!! THE RESULTS FILE IS THE ONE COMMITTED UNREAD (sha256 3eaf8949...), 13 records, and its checks hold", RF.sha256 === RS && RF.lines.length === 13 && R.checks.length === 0, R.checks.join("; "));
+    ok("!! G26 CANNOT (5 above, 7 below, p 0.77); GP CANNOT (6 above, 6 below, p 1.0)", R.G26.word === G.WORDS.G26[2] && R.G26.above === 5 && R.G26.below === 7 && R.G26.ties === 0 && R.G26.p.toExponential(3) === "7.744e-1" &&
+        R.GP.word === G.WORDS.GP[2] && R.GP.above === 6 && R.GP.below === 6 && R.GP.ties === 0 && R.GP.p.toExponential(3) === "1.000e+0");
+    const row = (a) => [f4(R.means[a].type), f4(R.means[a].plain), f4(R.means[a].course), R.means[a].pc.toFixed(3)].join(" ");
+    ok("the means and gains the note prints", row("homeg") === "0.5943 0.5471 0.7178 1.989" && row("homet") === "0.6000 0.5474 0.7135 2.132" &&
+        R.gains.map((g) => `${g.cls} ${g.mean.toFixed(2)} (${g.off})`).join(", ") === "ER1 0.87 (3), ER2 1.26 (0), ER3a 0.90 (0), ER3d 1.16 (1), ER3m 0.73 (1), ER3p 1.21 (0), ER3w 1.30 (1), ER4d 1.59 (0), ER4m 0.67 (2), ER5 1.14 (0), ER6 0.99 (2)");
+    const d = G.SEEDS.map((s) => RF.lines.find((r) => r.kind === "draw" && r.s === s)), ht = G.SEEDS.map((s) => F.scene.lines.find((r) => r.kind === "draw" && r.s === s)), hp = G.SEEDS.map((s) => N.committedOf("HOMEP", s, F));
+    const typ = (s) => F.types.lines.find((r) => r.kind === "fly" && r.arm === "HOMEP" && r.s === s).type.home, offs = d.map((r) => r.gains.filter((g) => g === 0).length), ab = (x) => { const t = signTest(x, 0); return `${t.above}/${t.below}`; };
+    const gi = (k) => CLASSES.keys.indexOf(k), above1 = (k) => d.filter((r) => r.gains[gi(k)] > 1).length;
+    ok("!! DESCRIBED AFTER THE READING: six draws switch a class off, ten in all; ER4d above 1 in 11 of 12 (never below 0.81), ER2 in 10; the lift narrower than HOMET's in 8 of 12 (0.0054), p_c lower in 9; course the same (6/6); against HOMEP 6 of 12 in each scene",
+        offs.filter((x) => x > 0).length === 6 && offs.reduce((a, b) => a + b, 0) === 10 && above1("ER4d") === 11 && Math.min(...d.map((r) => r.gains[gi("ER4d")])).toFixed(2) === "0.81" && above1("ER2") === 10 &&
+        ab(d.map((r, i) => (r.home - r.plain) - (ht[i].home - ht[i].plain))) === "4/8" && f4(-m(d.map((r, i) => (r.home - r.plain) - (ht[i].home - ht[i].plain)))) === "0.0054" &&
+        ab(d.map((r, i) => unpackWeights(r.weights)[2] - unpackWeights(ht[i].weights)[2])) === "3/9" && ab(d.map((r, i) => r.measures.course - ht[i].measures.course)) === "6/6" &&
+        ab(d.map((r, i) => r.home - typ(G.SEEDS[i]))) === "6/6" && ab(d.map((r, i) => r.plain - hp[i].home)) === "6/6");
+    const r5 = d[4], again = G.auditOne(r5);
+    ok("!! HOMEG draw 5 audited again here: its home in the 26-type scene and in the plain, over the homing round's 200 audit lives, are the record's to the bit", r5.s === 5 && again.home === r5.home && again.plain === r5.plain);
+    const note = src("brain/FLY_SCENE_GAINS_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 10 says it: the file and its hash, both words, the means and gains, both expectations came, what was described and what it does not mean; the backlog row DONE",
+        /## 10\. The result \(the whole results file committed unread at 69e4f26a, then read once\)/.test(note) && /sha256 3eaf89494e2645ea/.test(note) && note.includes("**G26: " + R.G26.word + "**") && note.includes("**GP: " + R.GP.word + "**") &&
+        /\| HOMEG \| 0\.5943 \| 0\.5471 \| 0\.7178 \| 1\.989 \|/.test(note) && /\| HOMET \| 0\.6000 \| 0\.5474 \| 0\.7135 \| 2\.132 \|/.test(note) && note.includes("ER4d 1.59 (0), ER4m 0.67 (2)") &&
+        /\*\*Both expectations came\*\*: G26 CANNOT \(55\) and GP CANNOT \(75\)/.test(note) && note.includes("**Described after the reading, not registered (the gate recomputes it from the records):**") &&
+        /ER4d's gain is above 1 in 11 draws of 12 \(mean 1\.59, never below 0\.81\)/.test(note) && note.includes("**What it does not mean.**") &&
+        /\| `fly-scene-gains` \|[^\n]*\*\*REGISTERED[^\n]*DONE 2026-11-27[^\n]*G26 CANNOT \(5 of 12[^\n]*GP CANNOT \(6 of 12/.test(back));
 });
 
 console.log(`\nflySceneGains-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
