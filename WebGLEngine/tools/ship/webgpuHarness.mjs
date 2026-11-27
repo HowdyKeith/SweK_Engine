@@ -38,7 +38,7 @@
 
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, playwrightVersion } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords, LIVENESS_SENTINEL, ADAPTER_LIMITS } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
@@ -1062,7 +1062,10 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
             SOFTWARE_HINTS.test([adapter.vendor, adapter.architecture, adapter.device, adapter.description].filter(Boolean).join(" "))) : null;
         // v4764: a real-hardware run (tools/ship/realGpuRun.mjs) sets SWEK_ADAPTER_LOG, and each call says what it ran on and how
         if (process.env.SWEK_ADAPTER_LOG) {
-            try { fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(root, path.resolve(process.argv[1] || "")).replace(/\\/g, "/"), adapter, software, launchArgs: [...launchArgs] }) + "\n"); } catch {}
+            // section 196: and which browser build -- Chromium's own version, the shell it was launched from, and the Playwright package's
+            let bv = null; try { bv = browser.version(); } catch { /* an older Playwright */ }
+            const browserRec = { version: bv, shell: HEADLESS_SHELL || null, playwright: playwrightVersion(pw && pw.from) };
+            try { fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(root, path.resolve(process.argv[1] || "")).replace(/\\/g, "/"), adapter, software, launchArgs: [...launchArgs], browser: browserRec }) + "\n"); } catch {}
         }
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes

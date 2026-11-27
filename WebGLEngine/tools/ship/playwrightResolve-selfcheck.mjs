@@ -32,7 +32,7 @@
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
          HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright, globalNpmPaths, siblingCopies,
-         resolvePlaywright, absoluteFrom, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
+         resolvePlaywright, absoluteFrom, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice, playwrightVersion } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import { treePaths } from "./treeRead.mjs";
 import path from "node:path";
@@ -496,6 +496,19 @@ console.log("\nTHE FRAME HOLD -- frameHold() against a fake window and a clock t
     const asked = (w) => ({ evaluate: async (fn) => { const real = globalThis.window; globalThis.window = w; try { return fn(); } finally { globalThis.window = real; } } });
     const n = await heldFrames(asked({ __heldFrames: 7 })), none = await heldFrames(asked({})), broken = await heldFrames({ evaluate: async () => { throw new Error("closed"); } });
     ok("heldFrames reads the count back, and says -1 where the hold was never installed or the page cannot be asked", n === 7 && none === -1 && broken === -1, `${n}, ${none}, ${broken}`);
+}
+
+{   // section 196: playwrightVersion, which realGpuRun's reports now carry beside Chromium's own version
+    // SABOTAGED, restored byte-identical: B3 the package name misread -> red here and in realGpuRun-selfcheck's live row.
+    const os = await import("node:os"), pw = resolvePlaywright(), v = playwrightVersion(pw.from);
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), "swek-pwv-")), sub = path.join(d, "node_modules", "playwright-core", "lib");
+    fs.mkdirSync(sub, { recursive: true }); fs.writeFileSync(path.join(d, "node_modules", "playwright-core", "package.json"), JSON.stringify({ name: "playwright-core", version: "9.8.7" }));
+    fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ name: "not-playwright", version: "1.0.0" }));
+    const nested = playwrightVersion(path.join(sub, "index.js")), none = playwrightVersion(path.join(d, "x.js")), blank = playwrightVersion("");
+    fs.rmSync(d, { recursive: true, force: true });
+    let want = null; if (pw.from) { let dir = path.dirname(pw.from); for (let i = 0; i < 8 && !want; i++) { try { const q = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); if (/^playwright(-core)?$/.test(q.name)) want = q.version; } catch {} dir = path.dirname(dir); } }
+    ok("!! playwrightVersion: the nearest package.json above a file that names playwright or playwright-core (9.8.7 found two levels up, past nothing else); another package's is not taken; no path, null; this box's resolved package read as it is",
+        nested === "9.8.7" && none === null && blank === null && (pw.from ? v === want && /^\d+\.\d+/.test(v || "") : v === null), `here: ${v}`);
 }
 
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

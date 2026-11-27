@@ -989,6 +989,7 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // tools/ship/gpuTimer-selfcheck.mjs, which this round's same-named gates had replaced and which were given back their names): every one defines and uses ok() name-first, so usesOk,
     // definesOk and nameFirst each rose by the same 106; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
     // v4934 -- +79 gates, this branch's navigation and head-to-head rounds meeting main at the merge: every one defines and uses ok() name-first, so usesOk, definesOk and nameFirst each rose by the same 79; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
+    // round 86 (section 192) on the merged tree -- one more, render/countDenoiser-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2345 -> 2346, usesOk 2324 -> 2325, definesOk 2316 -> 2317, nameFirst 2206 -> 2207, read off the code's own report.
     gates: 2609, usesOk: 2588, definesOk: 2580, importsOk: 0,
     distinctDefinitions: 49, nameFirst: 2470, condFirst: 99, unknownSignature: 19,
     suspects: 0,

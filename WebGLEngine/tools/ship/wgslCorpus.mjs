@@ -1306,6 +1306,11 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "splatSH.SH_WGSL", kind: "render pass, graded through the device", why: "a function-body fragment (the SH colour) the splat renderer pastes into its vertex shader; graded through tools/ship/splatRendererGPU-selfcheck.mjs and tools/ship/splatSH-selfcheck.mjs against shRest" }),
     Object.freeze({ id: "volumetricFog.FOG_WGSL", kind: "render pass, graded through the device", why: "the fog's full-screen post pass; tools/ship/volumetricFog-selfcheck.mjs draws it on WebGPU and holds it to fogCPU" }),
     Object.freeze({ id: "volumetricFog.fogWGSL", kind: "render pass, graded through the device", why: "the generator of FOG_WGSL and of its shafts variant (the sun's shadow sampled per step, and since 2026-11-27 each spot light's shadowed in-scattering, clusteredLights' clInScatter); tools/ship/softShadows-selfcheck.mjs holds the shafts and the beams to fogCPU's march with the shadows cast on the CPU, on WebGL2 and WebGPU alike" }),
+    // round 88 (section 195) -- U_TQ's own two passes, by 4: first and last of its six
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN4_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TQ's first pass, the 17 channels averaged over 4 x 4 with one thread per quarter-size value, feeding the quarter-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs reads it back and holds it to quarterInput (within 1e-6)" }),
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD4_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TQ's last pass, the quarter-size head's residual upsampled by 4 and the hold at full size, reading what the four conv passes wrote; held to holdCpu(4) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
 ]);
 
 /**

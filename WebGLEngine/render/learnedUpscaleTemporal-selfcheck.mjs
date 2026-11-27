@@ -19,6 +19,21 @@
 // corners and S3 the study's training without the variant -> *** 0 RED at first ***, then 1 each with the two rows added for them.
 // SECTION 170: V170a round 72's candidate typed 2, V170b H72a's count typed 15, V170c the gain typed 0.0644, V170d the test's commit
 // typed 670c28bd -> 1 red each. Each restored byte-identical.
+// ROUND 84 (section 190), against this gate, denoiseLearnedUpscaleGPU-selfcheck and denoiseScenes-selfcheck, each restored byte-identical:
+//   E3 U_TH8's crops at odd corners, E5 U0 graded as U, E6 the kept fraction inverted, E7 round 84 without its baseline, E10 temporalRound(84)
+//   round 72's, E15 the odd-crop refusal U_TH's alone -> 1 red each; E8 its R seeds onto round 72's and E9 its seeds not reserved -> 2 red
+//   each (here and denoiseScenes-selfcheck); E1 isHalfT 16 wide only -> 4 red; E2 U_TH8 12 wide and E4 shapeOfT's half8 U_TH's shape ->
+//   5 red each. This gate's v4909 row pinned UT_VARIANTS to "full,half" and was widened to "full,half,half8" with the variant.
+// SECTION 191 (round 84's verdict rows, sabotaged in the committed files and the registration, each restored byte-identical): Y1 the
+//   test's cache hits typed 0, Y2 H84a's count typed 22, Y4 a U_TH grade nudged, Y5 seed 2's validation altered in the 1080's net, Y6 one
+//   loss altered in the Intel's, Y7 section 191 reading round 85, Y8 it calling P2 held -> 1 red each; Y3 a U_TH8 grade nudged -> 2 red.
+// ROUND 87 (section 195), against this gate, denoiseLearnedUpscaleGPU-selfcheck and denoiseScenes-selfcheck, each restored byte-identical:
+//   Q5 U_TQ's corner grid by 2, Q6 no refusal of a crop off the 4 grid, Q7 the loss's gradient scaled, Q8 encodeNet and Q9 decodeNet dropping
+//   the scale, Q10 round 87's variant half, Q13 temporalRound(87) round 84's -> 1 red each; Q2 upQuarter's taps by 2, Q3 upQuarterT
+//   scattering to the wrong tap, Q11 its R seeds onto round 84's, Q12 its seeds not reserved -> 2 red each; Q1 quarterInput over 15 -> 3
+//   red; Q19 scaleOfT ignoring the scale -> 6 red; Q4 makeUpscalerT not marking the scale -> 7 red. Writing U_TQ's corners, I first named
+//   the grid `step`, which the training loop's own `step` shadowed, so the corners fell on multiples of 2: the corner row was red on the
+//   first run and the constant is now `grid`. This gate's v4909 row was widened again, to "full,half,half8,quarter".
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -221,6 +236,110 @@ console.log("\n6. ROUND 72 (section 167): U_TH -- THE NETWORK AT HALF SIZE AND 1
         /RD = LT\.temporalRound\(/.test(ta) && /variant: RD\.variant/.test(ta) && /RD = LT\.temporalRound\(/.test(tb) && /round: RD\.round, harvest: true/.test(tb));
 }
 
+console.log("\n6b. ROUND 84 (section 190): U_TH8 -- U_TH AT 8 WIDE");
+{
+    const hw = W / 2, u0 = T.makeUpscalerT(4, "half8");
+    ok("!! an untrained U_TH8 is Bt exactly; it is three 3 x 3 layers of 8 and a 1 x 1 3-channel head at half size, the half-size kind; shapeOfT names each variant's shape",
+        T.temporalChain(u0, ex).every((v, i) => Object.is(v, ex.bt[i])) && T.UTH8_WIDTH === 8 && T.UTH8_SHAPE.map((l) => `${l[0]}-${l[1]}-${l[3] ?? 3}`).join() === "17-8-3,8-8-3,8-8-3,8-3-1" &&
+        u0.layers.map((L) => `${L.Cin}-${L.Cout}-${L.k}`).join() === "17-8-3,8-8-3,8-8-3,8-3-1" && T.isHalfT(u0) && T.temporalUpscale(u0, ex.x, W, W).rh.length === hw * hw * 3 &&
+        T.shapeOfT("half8") === T.UTH8_SHAPE && T.shapeOfT("half") === T.UTH_SHAPE && T.shapeOfT("full") === T.UT_SHAPE && Object.isFrozen(T.UTH8_SHAPE));
+    const nh = T.makeUpscalerT(5, "half8");
+    nh.layers.forEach((L, li) => { const qq = seededRandom(180 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.3 * (qq.u() - 0.5); for (let i = 0; i < L.b.length; i++) L.b[i] += 0.3 * (qq.u() - 0.5); });
+    const G = T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E), Lf = () => T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [0, 17 * 9 + 2], [1, 100], [2, 300], [3, 5], [3, 20]]) { const Wt = nh.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = Lf(); Wt[wi] = keep - e; const b1 = Lf(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_TH8's gradient matches central differences within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const a2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half8" }), b2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half8" }), corners = [];
+    T.trainTemporal(seqs, { seed: 4, steps: 20, batch: 2, crop: 16, variant: "half8", onCrop: (cx, cy) => corners.push(cx, cy) });
+    let odd = null; try { T.trainTemporal(seqs, { seed: 1, steps: 1, crop: 15, variant: "half8" }); } catch (e) { odd = e.message; }
+    ok("!! U_TH8 trains deterministically by seed, 8 wide, at even corners reaching the far edge, an odd crop refused",
+        a2.net.layers.every((L, i) => L.W.every((v, j) => Object.is(v, b2.net.layers[i].W[j]))) && a2.net.layers[0].Cout === 8 && corners.length === 80 && corners.every((v) => v % 2 === 0 && v >= 0 && v <= W - 16) && corners.some((v) => v > 0) && /even crops/.test(odd || ""));
+    const long = T.trainTemporal(seqs, { seed: 2, steps: 150, batch: 2, crop: 16, variant: "half8" }), m = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length;
+    const g2 = (y, e) => relMSE(Float64Array.from(y, toPerceptual), Float64Array.from(e.ref, toPerceptual));
+    ok("!! ...and it learns: 150 steps on four sequences bring their loss below Bt's on the mean", m(seqs.map((e) => g2(T.temporalChain(long.net, e), e))) < m(seqs.map((e) => g2(e.bt, e))));
+    const miniH = Object.freeze({ train: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990951, 990952]) }),
+                                  val: Object.freeze({ family: "R", families: Object.freeze(["R"]), seeds: Object.freeze([990955]) }) });
+    const th = LT.runTemporalTraining({ splits: miniH, net, ...o, seeds: [1], train: { steps: 4, batch: 2, crop: 16 }, variant: "half8" });
+    ok("!! the study's training under round 84's variant trains U_TH8 for every seed and C2, and records the variant and its shape",
+        th.runs.every((qq) => qq.net.layers[0].Cout === 8) && th.c2.net.layers[0].Cout === 8 && th.config.variant === "half8" && th.config.shape === T.UTH8_SHAPE);
+    // the test with round 72's U_TH beside: U0 graded on every scene, H1 still U against Bt; without U0 the output is round 72's shape
+    const miniT = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990956, 990957]) }) });
+    const Ua = th.runs[0].net, U0 = T.makeUpscalerT(9, "half"); U0.layers[3].b[0] = 0.2;
+    const te = LT.runTemporalTest({ splits: miniT, net, U: Ua, Uc2: th.c2.net, U0, ...o, sppRef: 8, round: 84, c1Min: 0 }), t0n = LT.runTemporalTest({ splits: miniT, net, U: Ua, Uc2: th.c2.net, ...o, sppRef: 8, round: 84, c1Min: 0 });
+    const mm = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length, es = miniT.T1.seeds.map((sd, i) => T.temporalExample(miniT.T1.families[i], sd, net, { ...o, sppRef: 8, ref2: true }));
+    const { gradeDisplay } = await imp("render/learnedUpscaleStudy.mjs"), u0g = es.map((e) => gradeDisplay(T.temporalChain(U0, e), e)), sec = te.secondary;
+    ok("!! round 84's test grades round 72's U_TH (U0) beside U_TH8 on every scene, H1 still U against Bt; the gains re-derive (U0's over Bt, U_TH8's as a fraction of it, U_TH8 against U0); without U0 none of it",
+        te.tables.U0.every((v, i) => Object.is(v, u0g[i])) && te.tables.U.every((v, i) => Object.is(v, t0n.tables.U[i])) && te.verdict.hypotheses.H1.d.every((v, i) => Object.is(v, t0n.verdict.hypotheses.H1.d[i])) &&
+        sec.u0GainOverBt === 1 - mm(te.tables.U0) / mm(te.tables.bt) && sec.keep === sec.gainOverBt / sec.u0GainOverBt && sec.overU0 === 1 - mm(te.tables.U) / mm(te.tables.U0) &&
+        !("U0" in t0n.tables) && !("keep" in t0n.secondary) && !("u0GainOverBt" in t0n.secondary));
+    const R84 = LT.ROUND_UPSCALE_TEMPORAL_84, S84 = D.SPLITS_UPSCALE_TEMPORAL_84, R72 = LT.ROUND_UPSCALE_TEMPORAL_72;
+    const prev = new Set([...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_LIGHTS.T1.seeds, ...D.SPLITS_UPSCALE_SAMPLING.T1.seeds]);
+    ok("!! ROUND_UPSCALE_TEMPORAL_84: U_TH8's variant, round 72's training, validation and samples, 24 new test scenes (91000-91011 R, 92000-92011 C), round 72's U_TH as its baseline, its own two files; temporalRound 84",
+        R84.variant === "half8" && R84.round === 84 && R84.splits === S84 && S84.train === D.SPLITS_UPSCALE_TEMPORAL_72.train && S84.val === D.SPLITS_UPSCALE_TEMPORAL_72.val &&
+        S84.T1.seeds.slice(0, 12).every((x, i) => x === 91000 + i && S84.T1.families[i] === "R") && S84.T1.seeds.slice(12).every((x, i) => x === 92000 + i && S84.T1.families[12 + i] === "C") &&
+        S84.T1.seeds.every((x) => D.isDatasetSeed(x) && !prev.has(x)) && ["image", "sppIn", "sppRef", "sppRefTest", "c1Min", "minGain", "seeds", "train", "test"].every((key) => R84[key] === R72[key]) &&
+        R84.baseline === "render/upscale-net-r72.json" && !R84.moving && R84.net === "render/upscale-net-r84.json" && R84.results === "render/denoise-results-upscale-temporal-r84.json" && LT.temporalRound(84) === R84);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
+    const tb = br("--harvest-upscale-temporal-test");
+    ok("  the test command loads the round's baseline (round 72's candidate) as U0 and hands it to the runner, recording which file and commit it came from",
+        /const b0 = RD\.baseline \? JSON\.parse/.test(tb) && /U0 = b0 \? decodeNet\(b0\.runs\.find\(\(x\) => x\.seed === b0\.candidate\)\.net\)/.test(tb) && /\(\{ U0, gamma/.test(tb) && /if \(b0\) out\.baseline = \{ file: RD\.baseline, candidate: b0\.candidate, commit: b0\.commit \}/.test(tb));
+}
+
+console.log("\n6c. ROUND 87 (section 195): U_TQ -- U_TH's NETWORK AT A QUARTER OF THE SIZE");
+{
+    const C = T.UT_CHANNELS, qw = W / 4, xq = T.quarterInput(ex.x, W, W), pq = 3 * qw + 5, k = 11;
+    let s16 = 0; for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) s16 += ex.x[((12 + dy) * W + 20 + dx) * C + k];
+    let refused = null; try { T.quarterInput(new Float64Array(6 * 6 * C), 6, 6); } catch (e) { refused = e.message; }
+    ok("!! quarterInput averages each of the 17 channels over its 4 x 4 block, summed row by row then / 16: quarter pixel (5, 3) is full (20-23, 12-15); a size not a multiple of 4 refused",
+        xq.length === qw * qw * C && xq[pq * C + k] === s16 / 16 && /no quarter size/.test(refused || ""));
+    const r = { u: (() => { let s7 = 13; return () => ((s7 = (s7 * 1103515245 + 12345) >>> 0) >>> 8) / 16777216 - 0.5; })() };
+    const a = Float64Array.from({ length: 5 * 4 * 3 }, r.u), gF = Float64Array.from({ length: 20 * 16 * 3 }, r.u), ua = T.upQuarter(a, 5, 4), tg = T.upQuarterT(gF, 5, 4);
+    let lhs = 0, rhs = 0; for (let i = 0; i < ua.length; i++) lhs += ua[i] * gF[i]; for (let i = 0; i < a.length; i++) rhs += a[i] * tg[i];
+    const flat = T.upQuarter(Float64Array.from({ length: 5 * 4 * 3 }, () => 0.3), 5, 4);
+    // by hand: full pixel (6, 9) sits at quarter coordinates u = 6.5 / 4 - 0.5 = 1.125, v = 9.5 / 4 - 0.5 = 1.875
+    const tap = (x0, y0) => a[(y0 * 5 + x0) * 3], hand = 0.875 * 0.125 * tap(1, 1) + 0.125 * 0.125 * tap(2, 1) + 0.875 * 0.875 * tap(1, 2) + 0.125 * 0.875 * tap(2, 2);
+    ok("!! upQuarter is bilinear by 4 at pixel centres (full (6, 9) re-derived by hand), edges clamped (a flat field stays flat), and upQuarterT is its transpose: <up a, g> = <a, up^T g>",
+        Math.abs(lhs - rhs) < 1e-12 && flat.every((v) => Math.abs(v - 0.3) < 1e-15) && ua.length === 20 * 16 * 3 && Math.abs(ua[(9 * 20 + 6) * 3] - hand) < 1e-15, `${lhs.toExponential(6)} against ${rhs.toExponential(6)}`);
+    const u0 = T.makeUpscalerT(4, "quarter");
+    ok("!! an untrained U_TQ is Bt exactly; it is U_TH's shapes (17 -> 16 -> 16 -> 16 at 3 x 3, 16 -> 3 at 1 x 1) at a quarter of the size, scale 4, its head's output quarter-size",
+        T.temporalChain(u0, ex).every((v, i) => Object.is(v, ex.bt[i])) && u0.scale === 4 && T.scaleOfT(u0) === 4 && u0.layers.map((L) => `${L.Cin}-${L.Cout}-${L.k}`).join() === "17-16-3,16-16-3,16-16-3,16-3-1" &&
+        T.shapeOfT("quarter") === T.UTH_SHAPE && T.temporalUpscale(u0, ex.x, W, W).rh.length === qw * qw * 3 && T.scaleOfT(T.makeUpscalerT(4, "half")) === 2);
+    const nq = T.makeUpscalerT(5, "quarter");
+    nq.layers.forEach((L, li) => { const qq = seededRandom(280 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.3 * (qq.u() - 0.5); for (let i = 0; i < L.b.length; i++) L.b[i] += 0.3 * (qq.u() - 0.5); });
+    const G = T.temporalLoss(nq, ex.x, W, W, ex.ref, ex.cov, ex.E), Lf = () => T.temporalLoss(nq, ex.x, W, W, ex.ref, ex.cov, ex.E).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [0, 17 * 9 + 2], [1, 200], [2, 1000], [3, 5], [3, 40]]) { const Wt = nq.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = Lf(); Wt[wi] = keep - e; const b1 = Lf(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_TQ's gradient, through the hold, the upsample by 4 (its transpose) and the quarter-size network, matches central differences within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const a2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "quarter" }), b2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "quarter" }), corners = [];
+    T.trainTemporal(seqs, { seed: 4, steps: 20, batch: 2, crop: 16, variant: "quarter", onCrop: (cx, cy) => corners.push(cx, cy) });
+    let odd = null; try { T.trainTemporal(seqs, { seed: 1, steps: 1, crop: 18, variant: "quarter" }); } catch (e) { odd = e.message; }
+    ok("!! U_TQ trains deterministically by seed, scale 4 kept, at corners on multiples of 4 reaching the far edge; a crop not a multiple of 4 refused",
+        a2.net.layers.every((L, i) => L.W.every((v, j) => Object.is(v, b2.net.layers[i].W[j]))) && a2.net.scale === 4 && corners.length === 80 && corners.every((v) => v % 4 === 0 && v >= 0 && v <= W - 16) &&
+        corners.some((v) => v === W - 16) && /multiples of 4/.test(odd || ""));
+    const long = T.trainTemporal(seqs, { seed: 2, steps: 150, batch: 2, crop: 16, variant: "quarter" }), m = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length;
+    const g2 = (y, e) => relMSE(Float64Array.from(y, toPerceptual), Float64Array.from(e.ref, toPerceptual));
+    ok("!! ...and it learns: 150 steps on four sequences bring their loss below Bt's on the mean", m(seqs.map((e) => g2(T.temporalChain(long.net, e), e))) < m(seqs.map((e) => g2(e.bt, e))));
+    const { encodeNet } = await imp("render/denoiseDevice.mjs"), back = decodeNet(JSON.parse(JSON.stringify(encodeNet(long.net)))), r72 = JSON.parse(fs.readFileSync(path.join(ENG, "render", "upscale-net-r72.json"), "utf8"));
+    const c72 = r72.runs.find((x) => x.seed === r72.candidate).net;
+    ok("!! the net file carries U_TQ's scale: encodeNet then decodeNet give scale 4 and the same chain bit for bit; a net with no scale (round 72's committed U_TH) encodes exactly as its file holds it",
+        back.scale === 4 && T.scaleOfT(back) === 4 && T.temporalChain(back, ex).every((v, i) => Object.is(v, T.temporalChain(long.net, ex)[i])) &&
+        JSON.stringify(encodeNet(decodeNet(c72))) === JSON.stringify(c72) && !("scale" in c72) && !("scale" in decodeNet(c72)));
+    const miniH = Object.freeze({ train: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990951, 990952]) }),
+                                  val: Object.freeze({ family: "R", families: Object.freeze(["R"]), seeds: Object.freeze([990955]) }) });
+    const th = LT.runTemporalTraining({ splits: miniH, net, ...o, seeds: [1], train: { steps: 4, batch: 2, crop: 16 }, variant: "quarter" });
+    ok("!! the study's training under round 87's variant trains U_TQ (scale 4) for every seed and C2, and records the variant and its shape",
+        th.runs.every((qq) => qq.net.scale === 4) && th.c2.net.scale === 4 && th.config.variant === "quarter" && th.config.shape === T.UTH_SHAPE);
+    const R87 = LT.ROUND_UPSCALE_TEMPORAL_87, S87 = D.SPLITS_UPSCALE_TEMPORAL_87, R84 = LT.ROUND_UPSCALE_TEMPORAL_84;
+    const prev = new Set([...D.SPLITS_UPSCALE_TEMPORAL_84.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_COUNT_86.T1.seeds, ...D.SPLITS_UPSCALE_LIGHTS.T1.seeds]);
+    ok("!! ROUND_UPSCALE_TEMPORAL_87: U_TQ's variant, round 84's everything else (round 72's training, samples, U_TH as baseline), 24 new test scenes (95000-95011 R, 96000-96011 C), its own two files; temporalRound 87",
+        R87.variant === "quarter" && R87.round === 87 && R87.splits === S87 && S87.train === D.SPLITS_UPSCALE_TEMPORAL_72.train && S87.val === D.SPLITS_UPSCALE_TEMPORAL_72.val &&
+        S87.T1.seeds.slice(0, 12).every((x, i) => x === 95000 + i && S87.T1.families[i] === "R") && S87.T1.seeds.slice(12).every((x, i) => x === 96000 + i && S87.T1.families[12 + i] === "C") &&
+        S87.T1.seeds.every((x) => D.isDatasetSeed(x) && !prev.has(x)) && ["image", "sppIn", "sppRef", "sppRefTest", "c1Min", "minGain", "seeds", "train", "test", "baseline"].every((key) => R87[key] === R84[key]) &&
+        R87.net === "render/upscale-net-r87.json" && R87.results === "render/denoise-results-upscale-temporal-r87.json" && LT.temporalRound(87) === R87);
+}
+
 console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH BEAT Bt BY 5.4 %");
 {
     const R = LT.ROUND_UPSCALE_TEMPORAL_72, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), Tb = res.tables;
@@ -250,9 +369,12 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
     const x = T.temporalInput(v(1), v(2), v(3), nn, v(4), v(5), dep, W, H), at = (p, c) => x[p * T.UT_CHANNELS + c];
     ok("  v4909: temporalInput lays out U_T's 17 channels -- A, Au, C, n / 8, albedo, normal, depth d / (1 + d) with a miss as 0",
         x.length === n * 17 && at(4, 0) === 1.12 && at(4, 4) === 2.13 && at(4, 8) === 3.14 && at(4, 9) === 5 / FRAMES && at(4, 11) === 4.13 && at(4, 15) === 5.14 && at(4, 16) === 4 / 5 && at(0, 16) === 0);
-    ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full and half, and makeUpscalerT builds each",
-        T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half" && Object.isFrozen(T.UT_VARIANTS) &&
-        T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true");
+    // round 84 (section 190) added "half8": this row read "full,half" until then
+    // round 87 (section 195) added "quarter": this row read "full,half,half8" until then
+    ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full, half, half8 (round 84) and quarter (round 87), and makeUpscalerT builds each",
+        T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half,half8,quarter" && Object.isFrozen(T.UT_VARIANTS) &&
+        T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true,true,true" &&
+        T.UT_VARIANTS.map((vv) => T.scaleOfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "1,2,2,4");
 }
 
 {   // round 77 (section 176): exampleFrames, the eight frames temporalExample takes (moved out of it so a moving frame can be held to sceneAt)
@@ -263,6 +385,43 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
     const C = TU.shiftResample(fr[FRAMES - 1].y, 16, 16, ...fr[FRAMES - 1].shift), c6 = []; for (let p = 0; p < 256; p++) for (let c = 0; c < 3; c++) c6.push(ex.x[p * T.UT_CHANNELS + 6 + c]);
     ok("  exampleFrames: eight frames, each W x W after EASU with its jitter's full-size shift, and the last one, re-sampled, is the example's C (channels 6-8) bit for bit",
         fr.length === FRAMES && fr.every((f, k) => f.y.length === 768 && f.input.length === 192 && f.shift.join() === TU.halfShift(TU.JITTER[k]).join()) && c6.every((v, i) => Object.is(v, C[i])));
+}
+
+{   // round 77 (section 176): exampleFrames, the eight frames temporalExample takes (moved out of it so a moving frame can be held to sceneAt)
+    // SABOTAGED, restored byte-identical: X1 each frame's shift the unscaled jitter -> 2 red (this row, and section 1's channels 6-8);
+    // O1 the test's start commit dropped from the command -> 1 red (the order row in section 4, re-pointed at round 77's call site).
+    const TU = await imp("render/denoiseTemporalUpscale.mjs"), net0 = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
+    const S = D.makeScene("R", 990950), fr = T.exampleFrames(S, net0, { W: 16, sppIn: 1 }), ex = T.temporalExample("R", 990950, net0, { W: 16, sppIn: 1, sppRef: 2 });
+    const C = TU.shiftResample(fr[FRAMES - 1].y, 16, 16, ...fr[FRAMES - 1].shift), c6 = []; for (let p = 0; p < 256; p++) for (let c = 0; c < 3; c++) c6.push(ex.x[p * T.UT_CHANNELS + 6 + c]);
+    ok("  exampleFrames: eight frames, each W x W after EASU with its jitter's full-size shift, and the last one, re-sampled, is the example's C (channels 6-8) bit for bit",
+        fr.length === FRAMES && fr.every((f, k) => f.y.length === 768 && f.input.length === 192 && f.shift.join() === TU.halfShift(TU.JITTER[k]).join()) && c6.every((v, i) => Object.is(v, C[i])));
+}
+
+console.log("\n8. SECTION 191: ROUND 84's VERDICT, RE-DERIVED FROM ITS COMMITTED FILES");
+{
+    const R = LT.ROUND_UPSCALE_TEMPORAL_84, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), tri = JSON.parse(fs.readFileSync(path.join(ENG, "render", "upscale-net-r84-intel.json"), "utf8"));
+    const r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, Tb = r.tables, sec = r.secondary, { effects } = await imp("render/denoiseStats.mjs");
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    const core = (q) => JSON.stringify({ candidate: q.candidate, runs: q.runs, c2: q.c2, config: q.config, shipped: q.shipped });
+    const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+    ok("!! the training: U_TH8 (half8, 17-8-8-8-3) at 57edf87e, candidate seed 1 (validation 1.6881e-3, 1.7056e-3, 1.6989e-3); the Intel machine's training is the same nets, losses, validation and C2 bit for bit, its file differing only in time and cache",
+        tr.round === 84 && tr.commit === "57edf87e" && tr.config.variant === "half8" && JSON.stringify(tr.config.shape) === JSON.stringify(T.UTH8_SHAPE) && tr.candidate === 1 &&
+        tr.runs.map((q) => q.valMean.toExponential(4)).join() === "1.6881e-3,1.7056e-3,1.6989e-3" && core(tr) === core(tri) && tri.commit === "57edf87e" && tr.cache.hits === 0 && tri.cache.hits === 140 && tr.ms !== tri.ms);
+    ok("!! the test read that net: round 84 at 57edf87e, the candidate from render/upscale-net-r84.json at 57edf87e, round 72's U_TH beside it, 1 of 24 sequences cached",
+        r.round === 84 && r.commit === "57edf87e" && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "57edf87e" && r.baseline.file === "render/upscale-net-r72.json" &&
+        r.cache.hits === 1 && r.cache.misses === 23 && r.determinism === true && Tb.U.length === 24 && Tb.U0.length === 24);
+    ok("!! *** H84a SUPPORTED: U_TH8 9.72 % below Bt, 23 of 24, p 1.8e-7 under Holm's 0.025; H84b SUPPORTED: 9.62 % below B1, 19 of 24, p 0.0029 ***",
+        H.H1.status === "supported" && H.H1.k === 23 && near(H.H1.p, 1.788e-7, 1e-9) && H.H1.threshold === 0.025 && same(H.H1.d, effects(Tb.bt, Tb.U)) && near(g(Tb.U, Tb.bt), 0.0972) &&
+        H.H2.status === "supported" && H.H2.k === 19 && near(H.H2.p, 0.00286, 1e-5) && same(H.H2.d, effects(Tb.b1, Tb.U)) && near(g(Tb.U, Tb.b1), 0.0962) &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.0698, 1e-4) && H.H1.c3.resolvable);
+    ok("!! the table: Bt 2.2505e-3, B1 2.2480e-3, U_TH8 2.0317e-3, U_TH 1.9988e-3 (11.18 % below Bt, 21 of 24); U_TH8 keeps 87 % of U_TH's gain and is 1.65 % above it (10 of 24); C 11.67 %, R 3.35 % -- P2 MISSED, P4 HELD",
+        near(mean(Tb.bt), 2.2505e-3, 5e-8) && near(mean(Tb.b1), 2.2480e-3, 5e-8) && near(mean(Tb.U), 2.0317e-3, 5e-8) && near(mean(Tb.U0), 1.9988e-3, 5e-8) && near(g(Tb.U0, Tb.bt), 0.1118) && fewer(Tb.U0, Tb.bt) === 21 &&
+        near(sec.keep, 0.8693) && sec.keep === sec.gainOverBt / sec.u0GainOverBt && near(sec.overU0, -0.0165) && fewer(Tb.U, Tb.U0) === 10 && sec.gainOverBt > 0.05 && sec.keep >= 0.55 && sec.keep <= 0.95 &&
+        near(g(Tb.U.slice(12), Tb.bt.slice(12)), 0.1167) && near(g(Tb.U.slice(0, 12), Tb.bt.slice(0, 12)), 0.0335));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), iX = reg.indexOf("## 191."), sX = reg.slice(iX, reg.indexOf("\n## ", iX + 1) > 0 ? reg.indexOf("\n## ", iX + 1) : undefined);
+    ok("  section 191 says both hold, P2 missed, that the two machines' trainings are the same net, and that round 85 is not read (the Intel's runs without Playwright) and is owed again",
+        iX > 0 && /\*\*H84a SUPPORTED:\*\*/.test(sX) && /\*\*H84b SUPPORTED:\*\*/.test(sX) && /\*\*P2 MISSED:\*\*/.test(sX) && /\*\*P4 HELD:\*\*/.test(sX) && /trained the same U_TH8 bit for bit/.test(sX) &&
+        /\*\*ROUND 85: NOT READ\.\*\*/.test(sX) && /without Playwright/.test(sX) && /committed unread/.test(sX));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

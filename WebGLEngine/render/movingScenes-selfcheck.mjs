@@ -172,7 +172,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81, 82 or 83/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81, 82, 83, 84 or 87/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -616,7 +616,7 @@ console.log("\n13. ROUND 83 (section 188): MOVING LIGHTS");
         out.secondary.lights === true && out.secondary.btOverB1.moving === 1 - mean(gB) / mean(gB1) && out.secondary.btOverB1.still === 1 - mean(gBs) / mean(gB1),
         `Bt ${gB.map((v) => v.toExponential(3)).join(", ")} with the lights moving, ${gBs.map((v) => v.toExponential(3)).join(", ")} still`);
     const study = fs.readFileSync(path.join(ENG, "render", "learnedUpscaleTemporalStudy.mjs"), "utf8"), cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
-    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s188 = reg.slice(reg.indexOf("## 188."), reg.indexOf("## 189.") > 0 ? reg.indexOf("## 189.") : undefined);
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i188 = reg.indexOf("## 188."), s188 = reg.slice(i188, reg.indexOf("\n## ", i188 + 1) > 0 ? reg.indexOf("\n## ", i188 + 1) : undefined);
     ok("  a moving-light sequence has its own cache entry, the test command passes the round's `lights`, and section 188 states the motion, H83a/H83b and the seeds",
         /movingKey\(fam, sd, o\) \+ \(lights \? "-lights" : ""\)/.test(study) && /\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli) &&
         /Every light, and nothing else, moves/.test(s188) && /\*\*H83a:\*\* with moving lights, U_TH's chain beats Bt's/.test(s188) && /\*\*H83b:\*\* with moving lights, Bt beats B1/.test(s188) && /89000-89011/.test(s188) && /90000-90011/.test(s188) && s188.includes(R.results));

@@ -11706,3 +11706,318 @@ is not opened.
 
 **Not registered, a lead only:** the history's loss is almost all in family C (7.15 % to 0.68 %, 5 of 12). Whether a luminance-change
 rejection would win C back is a question for a new registration on fresh scenes. This file cannot answer it: it has been read, once.
+## 190. ROUNDS 84 AND 85 -- U_TH AT 8 WIDE FOR THE INTEL: DOES A THIRD OF THE LAYERS' COST KEEP THE GAIN, AND DOES IT FIT THE INTEL's FRAME? FIXED BEFORE THE CODE
+
+**Why.** Section 171: U_TH costs the Intel's integrated graphics 153 ms at 1920 x 1080, 0.28-0.30 of a traced frame, against the 0.25 H71's
+rule allows. Its four layers were ~110 ms of that, the down pass ~20 and the upsample and hold ~21. Section 171 said a cheaper U_TH would need a
+new quality round, and Keith asked for it. Of the two cuts named then (8 wide, or a quarter-size input) this round takes **8 wide**. It keeps
+U_TH's half-size correction, its device passes and its kernel, and changes only the width.
+
+**U_TH8 (render/learnedUpscaleTemporal.mjs's "half8" variant).** U_TH with its three 3 x 3 layers **8** wide instead of 16: 17 -> 8, 8 -> 8,
+8 -> 8 (ReLU), then the 1 x 1 head 8 -> 3, its weights and biases zero, at half size. The input, the upsample and section 159's hold are
+U_TH's. **Its cost, from the shapes:** 2,400 multiply-adds a half-size pixel against U_TH's 7,104, a third. A net is the half-size kind when its
+first layer is narrower than U_T's 32 (16 or 8).
+
+**ROUND 84, the quality, as round 72's (section 167) in every way but the width.**
+- **Training and validation:** round 72's 200 + 20 scenes as sequences, 512 samples, seeds 1-3, the candidate by validation, and C2 on
+  shuffled targets. File: render/upscale-net-r84.json.
+- **Test:** 24 new scenes, 12 R (91000-91011) and 12 C (92000-92011), against two 2048-sample references. File:
+  render/denoise-results-upscale-temporal-r84.json.
+- **H84a:** U_TH8's chain beats Bt's, by section 159's rule (a mean display relMSE at least 1 % below), through verdict() (the sign-flip
+  test, Holm with H84b, C1-C5).
+- **H84b:** U_TH8's chain beats B1's, as H72b.
+- **Descriptive, deciding nothing:** round 72's U_TH graded beside it on every scene; U_TH8's gain over Bt as a fraction of U_TH's; each
+  scene's mean correction.
+
+**ROUND 85, the cost, as round 74's (section 169) in every way but the width.**
+- **The passes on the device (render/learnedUpscaleTemporalGPU.mjs):** round 74's coalesced down pass, four layers on the fast kernel at
+  half size (8 wide), and the upsample and hold.
+- **Held to the CPU** at 64 x 64 on family R's seed 990914 as round 73's was, on a seeded U_TH8 with its head made non-zero: the cost does not
+  depend on the weights, so round 85 does not wait for round 84's training.
+- **Timed at 1920 x 1080** on the device's clock against T read off the same run: the gate's "section 190" line, read by readH85.
+- **H85: U <= 0.25 x T on both GPUs, in both of each GPU's runs** (H71's threshold and counting rule, h71).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 84.
+- **P2:** H84a is supported, at a gain over Bt of 2.5-5 % (U_TH's was 5.4 % on round 72's scenes).
+- **P3:** H84b is supported.
+- **P4:** on round 84's scenes U_TH8 keeps 55-95 % of U_TH's gain over Bt.
+- **P5:** on the Intel, U is 70-100 ms and U / T 0.13-0.20, so H85 holds there. The layers fall from ~110 ms to 37-55 (a third of the work, and
+  8-wide vec4 groups run less efficiently, so up to 1.5 x that); the down pass and the upsample and hold stay at ~41.
+- **P6:** on the 1080, U is 2.5-4.5 ms, U / T 0.06-0.12.
+
+**What each outcome means, fixed now.**
+- **H84a and H85 both hold:** U_TH8 is the Intel class's U_TH. Whether the chain and the page run it there (an entry in UTH_BY_ADAPTER beside
+  the 1080's) is Keith's call.
+- **H84a holds and H85 fails on the Intel:** 8 wide is not cheap enough; the quarter-size input is the next cut.
+- **H84a fails:** 8 wide threw away the gain; the quarter-size input at 16 wide is the other cut, and U_TH stays the 1080 class's alone.
+
+**The runs, on Keith's rig, at the rounds' commit.**
+- The training and then the test, in one clone: `--harvest-upscale-temporal-train --round 84`, then `--harvest-upscale-temporal-test --round 84`.
+- The device: two `realGpuRun --only denoise` on each GPU.
+
+All are committed byte for byte before they are read. Section 191 reads them.
+
+## 192. ROUND 86 -- A DENOISER THAT KNOWS EACH PIXEL's SAMPLE COUNT: WAS ROUND 82's LOSS THE DENOISER'S OR THE SAMPLES'? FIXED BEFORE ITS CODE
+
+**Why.** Section 187: moving round 82's samples to the pixels whose history would be rejected made Bt 9.28 % worse. The rejected pixels
+gained (6.77 %), and the other ~86 % lost more at ~3.65 samples. The shipped denoiser was trained at a uniform 4 samples and is not told how
+many a pixel had, so a 3-sample pixel's noise reaches it as if it were a 4-sample pixel's. Two causes are mixed in that 9.28 %:
+- **the mismatch:** a denoiser that does not know the counts, and
+- **the information:** fewer samples where most of the frame is.
+Section 187 named the question that separates them, a denoiser trained on uneven samples, and Keith asked for it.
+
+**D_S (render/countDenoiser.mjs).** Round 11's network (the large kernel-predicting one, the emitter mask) with ONE more input channel: the
+pixel's sample count over the mean budget, m / 4 (1 for every pixel of a uniform frame). Its kernel taps keep the emitter mask's rule. The
+first layer takes 11 channels; nothing else changes.
+
+**Its training: round 11's in every way but the inputs.**
+- **Scenes:** round 11's 192 training scenes (96 R, 96 C) and 8 validation scenes, at 64 x 64, against round 11's 1,024-sample references.
+- **Inputs:** each scene traced as SAMPLING.maxSpp (12) one-sample passes from its own seeds. Each pixel averages its first m passes.
+- **The counts:** m comes from round 82's rule (allocate: 4 a pixel on the mean, 1-12, weight 1 + 2 s) over a share map s drawn from the
+  scene's own stream. The map has 0-3 disks of radius 3-12 pixels where s = 1, and s = 0 elsewhere. A scene with no disk has the uniform 4.
+  The disks stand for disoccluded regions; the training sees no history.
+- **Schedule:** 4,500 steps of 4 crops of 32, seeds 1-3, the candidate by validation (display relMSE on the 8 scenes, each with its
+  count map), and C2: the candidate's seed retrained on shuffled targets.
+- File: render/denoise-net-count-r86.json.
+
+**ROUND 86, the test: round 82's (section 186), on new scenes, with D_S.**
+- **Scenes:** 24 new ones whose objects move (section 176's motion), 12 R (93000-93011) and 12 C (94000-94011), against two 2,048-sample
+  references.
+- **The same one-sample passes per frame give four arms:**
+  - S_U, the uniform 4 through the shipped denoiser (round 82's uniform arm, today's chain);
+  - S_A, the adaptive allocation through the shipped denoiser (round 82's adaptive arm);
+  - D_U, the uniform 4 through D_S;
+  - D_A, the adaptive allocation through D_S.
+- Each goes through the chain as it is (the fill, EASU, Bt's history) and is graded on Bt's image.
+- **H86a:** D_A's Bt beats D_U's, by section 159's rule, through verdict() (the sign-flip test, Holm with H86b, C1-C5). With the denoiser
+  told the counts, does the history-guided allocation pay?
+- **H86b:** D_A's Bt beats S_U's, by the same rule. Does the new pair beat today's chain?
+- **C2:** C2's D_S on the adaptive frames, against D_A.
+- **Descriptive, deciding nothing:**
+  - S_A against S_U (round 82's comparison again);
+  - D_U against S_U;
+  - every arm on the rejected pixels;
+  - B1 in each arm.
+- File: render/denoise-results-count-r86.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H86a is NOT supported: D_A is within 1 % of D_U or worse. I expect most of round 82's loss to be the information, which no
+  denoiser gets back.
+- **P3:** H86b is NOT supported.
+- **P4:** D_A loses less to D_U than S_A loses to S_U. The mismatch is a real part of the cost: D_A is between 6 % worse and 2 % better than
+  D_U, while S_A is 5-12 % worse than S_U (round 82's was 9.28 %).
+- **P5:** D_U is within 2 % of S_U. Being told the counts costs a uniform frame nothing.
+- **P6:** on the rejected pixels, D_A beats D_U by 5-15 %.
+
+**What each outcome means, fixed now.**
+- **H86a holds:** a denoiser that knows the counts makes history-guided sampling pay. H86b then says whether the pair beats today's chain;
+  if it does, D_S and the allocation on the device is the next round.
+- **H86a fails and P4 holds:** the mismatch was part of round 82's cost and the information the rest. History-guided sampling closes at
+  this budget. A larger budget, where the rest of the frame can spare samples, is the only form left, and it is not set up.
+- **H86a fails and D_A loses as much as S_A:** the denoiser was not the problem. History-guided sampling closes.
+
+**The runs, on Keith's rig, at the round's commit, in one clone:** `--harvest-count-train --round 86` (render/denoise-net-count-r86.json), then
+`--harvest-count-test --round 86` (render/denoise-results-count-r86.json). Each is committed byte for byte before it is read. Section 193
+reads them.
+
+## 191. ROUND 84's VERDICT -- BOTH HOLD: U_TH8 IS 9.72 % BELOW Bt AND KEEPS 87 % OF U_TH's GAIN. ROUND 85 HAS NO VERDICT YET: THE INTEL's TWO RUNS DID NOT COUNT
+
+**The runs.**
+- **The training** ran on BOTH rig machines at 57edf87e, the rounds' commit:
+  - the 1080's machine: 5.55 h, nothing from a cache;
+  - the Intel's machine: 3.77 h, 140 of 220 sequences from a cache.
+- **The two machines trained the same U_TH8 bit for bit:** every seed's weights, losses and validation, and C2. The files differ only in their
+  timing and cache counts. The 1080 machine's file is render/upscale-net-r84.json (c1f365e, sha-256 15cacaa0...), the net its test read; the
+  Intel machine's is kept unchanged as render/upscale-net-r84-intel.json (first committed at 902b352 under the round's name, sha-256
+  9c4c925a...). The candidate is seed 1 (validation 1.6881e-3 against 1.7056e-3 and 1.6989e-3).
+- **The test**, render/denoise-results-upscale-temporal-r84.json (852c70da...), ran on the 1080's machine at 57edf87e in 4.0 h. 1 of its 24
+  sequences came from the cache.
+- **All of these came zipped and were committed unread.**
+
+**The verdict: BOTH SUPPORTED** (verdict(), the sign-flip test, Holm, C1-C5 all holding; C2's shuffled-target U_TH8 far worse, mean d -3.07).
+- **H84a SUPPORTED:** U_TH8's chain is **9.72 %** below Bt's, better on 23 of 24, p 1.8e-7 under Holm's 0.025.
+- **H84b SUPPORTED:** it is 9.62 % below B1's, better on 19 of 24, p 0.0029 under 0.05.
+
+**The description, deciding nothing.**
+
+| on round 84's 24 scenes | mean display relMSE | against Bt |
+|---|---|---|
+| Bt | 2.2505e-3 | |
+| B1 | 2.2480e-3 | Bt 0.11 % above it |
+| U_TH8 on Bt | 2.0317e-3 | 9.72 % below (23 of 24) |
+| round 72's U_TH on Bt | 1.9988e-3 | 11.18 % below (21 of 24) |
+
+- **U_TH8 keeps 87 % of U_TH's gain over Bt on the same scenes,** and is 1.65 % above U_TH (better on 10 of 24).
+- **This set is an easy one for the correction:** U_TH's own gain here is 11.18 %, against 5.4 % on round 72's set. The gain is again C's:
+  U_TH8 takes 11.67 % off Bt on C and 3.35 % on R.
+- Its mean correction is 0.83 %.
+
+**The predictions.**
+- **P1 HELD:** C1 and C3 hold.
+- **P2 MISSED:** H84a is supported, but at 9.72 %, above the 2.5-5 % predicted. I took U_TH's 5.4 % from round 72's set as this set's level.
+- **P3 HELD:** H84b is supported.
+- **P4 HELD:** U_TH8 keeps 87 % of U_TH's gain (55-95 %).
+
+**ROUND 85: NOT READ.** The Intel's two realGpuRun reports (render/denoise-rig-s190-{a,b}-intel.json, 902b352, committed unread) were run in
+the fresh clone without Playwright.
+- The gate that times U_TH8 (render/denoiseLearnedUpscaleGPU-selfcheck.mjs) runs in a browser. It failed in 0.4 s in both runs ("NOT A
+  PASS"), as did denoiseFrameGenCost-selfcheck's browser half, and printed no section 190 line.
+- So readH85 reads no U from either, and neither run counts (every gate must be green).
+- The 1080's two runs have not been made. Both GPUs' runs are owed again, with Playwright installed in the clone (tools/render-qa's npm
+  install, which fetches Chromium). P5 and P6 wait for them, and section 194 reads them.
+
+**What it means, as section 190 fixed it, so far.** U_TH8 keeps the gain: 8 wide is enough for the quality. Whether it is cheap enough for
+the Intel is round 85's, still owed. Nothing changes in the chain or the page until it is read.
+
+## 193. ROUND 86's VERDICT -- NEITHER HOLDS: TOLD THE COUNTS, THE DENOISER MAKES HISTORY-GUIDED SAMPLING NO BETTER. ROUND 82's LOSS WAS THE SAMPLES', AND HISTORY-GUIDED SAMPLING CLOSES
+
+**The runs.** Both ran on the 1080's machine at 57edf87e, the round's commit. They came zipped and were committed unread (c1f365e).
+- **The training**, render/denoise-net-count-r86.json (df9030a2...), took 3.5 h, nothing from a cache. 49 of the 192 training images drew no
+  disk (the uniform 4). The candidate is seed 2 (validation 3.6264e-3 against 3.8571e-3 and 3.8823e-3).
+- **The test**, render/denoise-results-count-r86.json (0506040e...), took 4.4 h, nothing from a cache.
+
+**The verdict: NEITHER SUPPORTED** (verdict(), the sign-flip test, Holm, C1-C5 all holding; C2's shuffled-target D_S far worse, mean d -2.71).
+- **H86a NOT SUPPORTED:** D_A's Bt is **9.97 % ABOVE** D_U's, better on 4 of 24 (p 1.00).
+- **H86b NOT SUPPORTED:** D_A's Bt is 6.52 % above S_U's, today's chain, better on 8 of 24 (p 0.99).
+
+**The description, deciding nothing.**
+
+| Bt, mean display relMSE | through the shipped denoiser | through D_S |
+|---|---|---|
+| uniform 4 | S_U 2.0966e-3 | D_U 2.0308e-3 (3.14 % below S_U, 16 of 24) |
+| adaptive | S_A 2.2557e-3 (7.59 % above S_U, 6 of 24) | D_A 2.2333e-3 (9.97 % above D_U, 4 of 24) |
+
+- **Telling the denoiser the counts did not soften the loss; it grew.** D_A loses 9.97 % to D_U, and S_A loses 7.59 % to S_U (round 82's
+  comparison again, 9.28 % there). By family, D_A loses 6.15 % on R and 10.92 % on C.
+- **Where the samples went, they helped about equally either way.** On the rejected pixels (8.7 % of the frame, at 6.52 samples), D_A is
+  6.67 % below D_U and S_A 6.33 % below S_U.
+- **D_S is better than the shipped denoiser on uniform frames:** D_U is 3.14 % below S_U (16 of 24), and its B1 3.47 % below. Nothing was
+  pre-registered on this. It is a second network trained on round 11's scenes with more varied noise and a different seed, and this round
+  does not say which of those made it better.
+- **On these moving scenes B1 beats Bt** in the uniform arm (Bt 8.08 % above it), as in round 82: a fast set by round 81's measure.
+
+**The predictions.**
+- **P1 HELD:** C1 and C3 hold.
+- **P2 HELD:** H86a is not supported.
+- **P3 HELD:** H86b is not supported.
+- **P4 MISSED:** D_A loses MORE to D_U (9.97 %) than S_A to S_U (7.59 %). I predicted less: between 6 % worse and 2 % better. The mismatch was
+  not part of the cost.
+- **P5 MISSED:** D_U is 3.14 % below S_U, outside the 2 % predicted.
+- **P6 HELD:** on the rejected pixels, D_A is 6.67 % below D_U (5-15 %).
+
+**What it means, as section 192 fixed it** (its "D_A loses as much as S_A" reading). The denoiser was not the problem:
+round 82's loss is the samples' information, which moving them takes from most of the frame, and no denoiser gives it back.
+**History-guided sampling closes** at this budget. A larger budget is not set up.
+
+D_U's 3.14 % over the shipped denoiser on uniform frames is the one thing here that could change the chain. It would need its own round,
+pre-registered: is a denoiser retrained this way better on today's frames, and what does an 11th channel cost on the device? Whether to open
+it is Keith's call.
+
+## 194. ROUND 85's VERDICT -- H85 FAILS: U_TH8 COSTS THE INTEL 0.18-0.20 OF A FRAME IN THREE RUNS AND 0.27 IN ONE, AND EVERY RUN MUST HOLD
+
+**The runs.** Eight realGpuRun reports at the rounds' commit, each committed byte for byte before it was read. Six of them count.
+- **The Intel's first pair** (denoise-rig-s190-{a,b}-intel.json, at 57edf87e, 902b352) does not count: run without Playwright (section 191).
+- **The Intel's second upload** held FOUR reports at e40fb591 (7fd5f4b), all on intel gen-9 (D3D12 31.0.101.2137), every gate green:
+  - c and d, the pair the commands named for it;
+  - two more written to the 1080's names (the 1080's commands run on the Intel machine), committed under those names and then renamed,
+    bytes unchanged, -e-intel (15:47 UTC) and -f-intel (16:05) (3265a73).
+- **The 1080's pair** (denoise-rig-s190-{a,b}-gtx1080.json, at e40fb591, 98e7ef2), nvidia pascal (D3D12 32.0.15.8180):
+  - **run a does not count.** denoiseCompile-selfcheck's native children crashed: exit 3221225477, an access violation, with four children
+    giving no result. That gate is not U_TH8's; U_TH8's own gate was green and printed its line.
+  - run b counts.
+
+**How the Intel's runs are counted, fixed before the 1080's were read.** H85 asks for U <= 0.25 T "in both of each GPU's runs", and h71
+holds only when every counting run holds. The Intel made four counting runs, so all four are its runs. Counting only c and d, the pair the
+commands named, would have been chosen after e was seen, so they are not taken alone.
+
+| run | GPU | U_TH8 (ms) | T (ms) | **U_TH8 / T** | U_TH (round 74's line) / T |
+|---|---|---|---|---|---|
+| e | Intel | 117.731 | 429.104 | **0.274** | 0.385 |
+| f | Intel | 79.339 | 432.014 | **0.184** | 0.265 |
+| c | Intel | 88.124 | 444.180 | **0.198** | 0.317 |
+| d | Intel | 83.077 | 442.420 | **0.188** | 0.260 |
+| a (not counted) | 1080 | 3.423 | 39.689 | 0.086 | 0.146 |
+| b | 1080 | 3.395 | 37.831 | **0.090** | 0.154 |
+
+**The verdict: H85 FAILS as fixed.**
+- **The Intel fails:** run e is at 0.274, over 0.25. The other three are 0.18-0.20.
+- **The 1080 has no verdict by h71:** only one run counts. Its counting run is at 0.090, and the run that does not count read 0.086.
+- A failure on either GPU fails H85, so it fails whatever a second counting 1080 run would read.
+
+**The description, deciding nothing.**
+- **Run e was slow throughout.** U_TH in the same run read 0.385, against 0.26-0.32 in the other three. It was the first of the four.
+- **Without e, U_TH8 is 0.18-0.20 of the Intel's frame,** against U_TH's 0.26-0.32 in the same runs: 63-72 % of U_TH's time, run by run.
+- **On the Intel the full-size passes are now nearly half of it.** In runs f, c and d, the down pass and the upsample with the hold take
+  32-36 ms of 79-88; the four layers 47-53. On the 1080, U_TH8 is 3.4 ms against U_TH's 5.8.
+
+**The predictions.**
+- **P5 MISSED:** I predicted U 70-100 ms and U / T 0.13-0.20, so that H85 would hold on the Intel. Three runs land inside both ranges; run e
+  (117.7 ms, 0.274) does not, and H85 fails there.
+- **P6 HELD:** on the 1080, U is 3.40 ms and U / T 0.090 in the counting run (2.5-4.5 ms, 0.06-0.12).
+
+**What it means, as section 190 fixed it** (its "H84a holds and H85 fails on the Intel" reading). 8 wide is not cheap enough by the rule as
+fixed, and U_TH stays the 1080 class's alone. The quarter-size input is the next cut. It fails by one run of four, a run that was slow for
+U_TH too; that is said here and changes nothing.
+
+Two things would come before a round on that cut:
+- the full-size passes, now half the Intel's cost, which a quarter-size network does not shrink;
+- whether the slow first run is the machine warming up, in which case the timing rule should say how runs are warmed.
+
+Neither is set up.
+
+## 195. ROUNDS 87 AND 88 -- U_TH's NETWORK AT A QUARTER OF THE SIZE: DOES IT KEEP THE GAIN, AND DOES IT FIT THE INTEL's FRAME? FIXED BEFORE THE CODE
+
+**Why.** Section 194: U_TH8 kept the gain (section 191) and missed the Intel's frame by one run of four: 0.274 in the first, 0.18-0.20 in the
+other three. Section 190 named the quarter-size input as the next cut, and Keith chose it. On the Intel, U_TH's four layers were 80-102 ms of
+its 114-141 in section 194's runs f, c and d. At a quarter of the pixels they should fall to about a quarter of that. The down pass and the
+upsample with the hold stay at full size.
+
+**U_TQ (render/learnedUpscaleTemporal.mjs's "quarter" variant).** U_TH's network in every way (three 3 x 3 layers of 16, ReLU, a zero-started
+1 x 1 head of 3) run on the 17 channels averaged over 4 x 4 blocks, at a quarter of the width and height (480 x 270 at 1080p). The head's r is
+upsampled bilinearly by 4 to full size: pixel centres, edges clamped, as U_TH's by 2. Section 159's hold is then applied on Bt's light at
+full size. A U_TQ net carries its scale (4) in its file, because its layers have U_TH's shapes.
+
+**ROUND 87, the quality, as round 84's (section 190) in every way but the network.**
+- **Training and validation:** round 72's 200 + 20 sequences, 512 samples, seeds 1-3, the candidate by validation, and C2. Crops are 32 at
+  corners that are multiples of 4. File: render/upscale-net-r87.json.
+- **Test:** 24 new scenes, 12 R (95000-95011) and 12 C (96000-96011), against two 2,048-sample references, with round 72's U_TH graded
+  beside it. File: render/denoise-results-upscale-temporal-r87.json.
+- **H87a:** U_TQ's chain beats Bt's, by section 159's rule (1 %), through verdict() (the sign-flip test, Holm with H87b, C1-C5).
+- **H87b:** U_TQ's chain beats B1's.
+- **Descriptive:** U_TQ's gain as a fraction of U_TH's on the same scenes, and each scene's mean correction.
+
+**ROUND 88, the cost, as round 85's in every way but the network.**
+- **The passes:**
+  - the 17 channels averaged over 4 x 4, one thread a quarter-size value, coalesced as round 74's pass;
+  - the four layers on the fast kernel at quarter size;
+  - the upsample by 4 with the hold.
+- **Held to the CPU** at 64 x 64 on R 990914, on a seeded U_TQ with its head made non-zero.
+- **Timed at 1920 x 1080:** the gate's "section 195" line, read by readH88.
+- **H88: U <= 0.25 x T on both GPUs, in every run that counts on each** (h71). The counting is section 194's: every run in the reports is
+  counted. **So exactly two runs are made on each GPU, each written to its own GPU's file name.**
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 87.
+- **P2:** H87a is supported.
+- **P3:** H87b is supported.
+- **P4:** U_TQ keeps 50-90 % of U_TH's gain over Bt on round 87's scenes. U_TH8 kept 87 % at half size; a quarter-size correction is
+  smoother, and I expect it to lose more.
+- **P5:** on the Intel, U_TQ is 50-80 ms and U / T 0.11-0.19 in both runs, so H88 holds there. The layers fall to ~20-26 ms, and the down pass
+  and the upsample with the hold stay at ~30-45.
+- **P6:** on the 1080, U is 2.0-3.5 ms and U / T 0.05-0.09.
+
+**What each outcome means, fixed now.**
+- **H87a and H88 both hold:** U_TQ is the Intel class's learned temporal upscaler. Whether the chain and the page run it there (an entry beside
+  the 1080's in UTH_BY_ADAPTER) is Keith's call.
+- **H87a holds and H88 fails on the Intel:** the network is no longer the cost. The full-size passes are what is left, and they are the next
+  round.
+- **H87a fails:** a quarter-size correction is too coarse, and the learned temporal upscaler stays the 1080 class's.
+
+**The runs, on Keith's rig, at the rounds' commit.**
+- **In one clone:** `--harvest-upscale-temporal-train --round 87`, then `--harvest-upscale-temporal-test --round 87`, each with its own
+  `--cache` directory.
+- **On each GPU:** tools/render-qa's npm install first (Playwright), then two `realGpuRun --only denoise` with that GPU's file names.
+
+All are committed byte for byte before they are read. Section 196 reads them.

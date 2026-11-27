@@ -55,20 +55,24 @@ export function allocate(weights, { budget = SAMPLING.budget, lo = 1, hi = SAMPL
  * y, shift } -- so render/learnedUpscaleTemporal.mjs's temporalExample takes them as `frames`), and for each frame the adaptive allocation
  * (`spp`) and the share it was made from.
  */
-export function samplingFrames(S, net, { W, motion = null, budget = SAMPLING.budget, maxSpp = SAMPLING.maxSpp, weight = SAMPLING.weight }) {
-    const w = W / 2, n = w * w, path = cameraPath(S), uniform = [], adaptive = [], spp = [], share = [];
+export function samplingFrames(S, net, { W, motion = null, budget = SAMPLING.budget, maxSpp = SAMPLING.maxSpp, weight = SAMPLING.weight, alts = [] }) {
+    // round 86 (section 192): each of `alts` ({ net, prep }) takes the same passes through its own denoiser, its input prep(x10, counts) --
+    // the counts the uniform budget everywhere for the uniform arm, the allocation for the adaptive one; alts[k] is { uniform, adaptive }
+    const w = W / 2, n = w * w, path = cameraPath(S), uniform = [], adaptive = [], spp = [], share = [], alt = alts.map(() => ({ uniform: [], adaptive: [] })), flat = new Int32Array(n).fill(budget);
     const hits = path.eyes.map((eye, f) => firstHits({ ...S, scene: sceneAt(S, motion, f) }, eye, W, W));
-    const chain = (Sf, input, jitter) => { const g = guideBuffers(Sf, w, w, jitter), cov = emitterCoverage(Sf, w, w, jitter);
-        const den = denoise(net, withMask(inputChannels(input, g.albedo, g.normal, w, w), cov), w, w).y;
+    const chain = (Sf, input, jitter, dn = net, counts = null, prep = null) => { const g = guideBuffers(Sf, w, w, jitter), cov = emitterCoverage(Sf, w, w, jitter), x10 = withMask(inputChannels(input, g.albedo, g.normal, w, w), cov);
+        const den = denoise(dn, prep ? prep(x10, counts) : x10, w, w).y;
         return { input, cov, y: upscale(fillEmitters(den, cov, w, w), w, w, W, W, "easu"), shift: halfShift(jitter) }; };
     path.eyes.forEach((eye, f) => {
         const Sf = { ...S, scene: sceneAt(S, motion, f), eye }, jitter = JITTER[f];
         const passes = Array.from({ length: maxSpp }, (_, j) => render(Sf.scene, { w, h: w, spp: 1, seed: samplingSeed(S.seed, f, j), rgb: true, eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, pixelOffset: jitter }));
         const sh = f === 0 ? new Float64Array(n) : rejectedShare(hits[f - 1], hits[f], W), m = allocate(Array.from(sh, (s) => 1 + weight * s), { budget, hi: maxSpp });
         const mean = (cnt) => { const o = new Float64Array(n * 3); for (let p = 0; p < n; p++) { const k = cnt(p); for (let j = 0; j < k; j++) for (let c = 0; c < 3; c++) o[p * 3 + c] += passes[j][p * 3 + c]; for (let c = 0; c < 3; c++) o[p * 3 + c] /= k; } return o; };
-        uniform.push(chain(Sf, mean(() => budget), jitter)); adaptive.push(chain(Sf, mean((p) => m[p]), jitter)); spp.push(m); share.push(sh);
+        const mu = mean(() => budget), ma = mean((p) => m[p]);
+        uniform.push(chain(Sf, mu, jitter)); adaptive.push(chain(Sf, ma, jitter)); spp.push(m); share.push(sh);
+        alts.forEach((A, k) => { alt[k].uniform.push(chain(Sf, mu, jitter, A.net, flat, A.prep)); alt[k].adaptive.push(chain(Sf, ma, jitter, A.net, m, A.prep)); });
     });
-    return { uniform, adaptive, spp, share, hits };
+    return { uniform, adaptive, spp, share, hits, alts: alt };
 }
 
 /** The measured frame's rejected pixels at full size: 1 where its first hit is a surface with no valid history from the frame before. */
