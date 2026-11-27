@@ -184,5 +184,28 @@ console.log("\n7. FOLLOW-UP 12: STUCK, THE LEAST BAD HEADING");
     let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEAST_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
     ok("!! GOLDEN: the least arm on DEV seeds 1-6 fires 3781, turns 3107, stuck 674, statuses lrrrrr (the edge arm's golden, section 6, is unchanged)", same({ f, t, k, st }, { f: 3781, t: 3107, k: 674, st: "lrrrrr" }), JSON.stringify({ f, t, k, st }));
 }
+console.log("\n8. FOLLOW-UP 13: THE LEAST BAD HEADING, PRICING THE EDGE");
+{
+    ok("!! the least-edge arm and its reference (FOLLOW-UP 12's designated), HELD13 = 9901 to 9960, disjoint from HELD8 to HELD12", same(A.LEASTEDGE_ARMS, ["any+predict+edge+avoid-arc-edge-least", "any+predict+edge+avoid-arc-edge-least-edge"])
+        && A.LEASTEDGE_REFERENCE === A.LEAST_DESIGNATED && A.LEASTEDGE_DESIGNATED === "any+predict+edge+avoid-arc-edge-least-edge" && A.HELD13.length === 60 && A.HELD13[0] === 9901 && A.HELD13[59] === 9960
+        && !A.HELD13.some((x) => [A.HELD8, A.HELD9, A.HELD10, A.HELD12].some((h) => h.includes(x)) || (x >= 9201 && x <= 9260)));
+    const V = N.CRUISE;
+    ok("!! minClearArc's edge: from (0, 0) heading east with nothing near, the nearest side is the west one, 40 m off less the 20 m band: 20 (Infinity without edge); from (400, 0) heading east the 25 s sample is 420 - (400 + 25 V)",
+        A.minClearArc(0, 0, 0, 0, 0, [], -Infinity, { edge: true }) === 20 && A.minClearArc(0, 0, 0, 0, 0, [], -Infinity) === Infinity && Math.abs(A.minClearArc(400, 0, 0, 0, 0, [], -Infinity, { edge: true }) - (20 - 25 * V)) < 1e-9,
+        A.minClearArc(400, 0, 0, 0, 0, [], -Infinity, { edge: true }));
+    ok("...it is MINIMISED with the obstacles': a ship dead ahead at 100 m (-19) far from every side gives -19 either way; by the east side (start 380, the ship at 480) the edge's 40 - 25 V wins", A.minClearArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true }) === -19
+        && Math.abs(A.minClearArc(380, 0, 0, 0, 0, [ship(480, 0, 0, 0)], -Infinity, { edge: true }) - Math.min(-19, 40 - 25 * V)) < 1e-9);
+    ok("...the north side too (heading -90 degrees from (200, 100) runs to y = 100 + 25 V: 20 - 25 V)", Math.abs(A.minClearArc(200, 100, 0, -Math.PI / 2, -Math.PI / 2, [], -Infinity, { edge: true }) - (20 - 25 * V)) < 1e-9);
+    // stuck 100 m north of the south side: a ship 115 m ahead and a fan of ships 60 m off on the north side only. Every candidate conflicts (the south ones with the band). Without the edge in the
+    // measure the least-bad heading is +60 (obstacles -2.1, but 30.7 m past the band); with it, +30 (-13.0 overall).
+    const ox = 200, oy = -100, fan = [ship(ox + 115, oy, 0, 0)]; for (let j = 1; j <= 6; j++) { const ang = -j * Math.PI / 12; fan.push(ship(ox + 60 * Math.cos(ang), oy - 60 * Math.sin(ang), 0, 0)); }
+    const lo = A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, least: true }), le = A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, least: true, leastEdge: true });
+    ok("!! STUCK BY THE SOUTH SIDE: least flies +60 degrees toward the edge, least-edge flies +30 (the largest of the combined minimum clearances, first in order on a tie)", lo.stuck && le.stuck && !le.turned && Math.abs(lo.heading - Math.PI / 3) < 1e-12 && Math.abs(le.heading - Math.PI / 6) < 1e-12
+        && A.minClearArc(ox, oy, 0, 0, Math.PI / 6, fan, -Infinity, { edge: true }) === Math.max(...[0, ...A.OFFSETS].map((d) => A.minClearArc(ox, oy, 0, 0, d, fan, -Infinity, { edge: true }))), JSON.stringify({ least: lo.heading, leastEdge: le.heading }));
+    ok("...leastEdge changes nothing without least, nor when a candidate clears", same(A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true, leastEdge: true }), A.avoidHeadingArc(ox, oy, 0, 0, 0, fan, -Infinity, { edge: true }))
+        && same(A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true, least: true, leastEdge: true }), A.avoidHeadingArc(0, 0, 0, 0, 0, [ship(100, 0, 0, 0)], -Infinity, { edge: true })));
+    let f = 0, t = 0, k = 0, st = ""; for (const sd of A.SETS.dev.slice(0, 6)) { const r = safe(() => A.flyAvoid(pilot, H.hardScenario(sd, "hard-traffic"), A.LEASTEDGE_DESIGNATED)) || { fires: -1, turns: -1, stuck: -1, status: "?" }; f += r.fires; t += r.turns; k += r.stuck; st += r.status[0]; }
+    ok("!! GOLDEN: the least-edge arm on DEV seeds 1-6 fires 5355, turns 3275, stuck 2080, statuses rrrrrr (the least arm's golden, section 7, is unchanged)", same({ f, t, k, st }, { f: 5355, t: 3275, k: 2080, st: "rrrrrr" }), JSON.stringify({ f, t, k, st }));
+}
 console.log(fails === 0 ? "\nall checks pass" : `\n${fails} FAIL`);
 process.exit(fails === 0 ? 0 : 1);
