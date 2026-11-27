@@ -3156,7 +3156,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-zhou-source",
-        blocker: "OPEN",
+        blocker: "OPEN -- READ 2026-11-27 (brain/FLY_RETINOTOPY_RF_WIP.md Part 13): Zhou 2022 agrees on the subtractive form and adds that the inhibition spans the WHOLE receptive field (Part 9's covers only outside the disks); no strength in the text -- next, the trained weights in github.com/ClarkLabCode/LoomDetectionANN",
         what: "fly-lplc2-surround-balance waits on a source for the inhibition's strength; Klapoetke 2017 gives the form only (Part 12).",
         how: "Read Zhou et al. 2022 (eLife, shallow networks trained to detect collisions recover features of loom-selective neurons) for an LPLC2-like model with fitted inhibitory weights; if it states a balance between excitation and inhibition that can be carried over, write it into brain/FLY_RETINOTOPY_RF_WIP.md and register the round on it.",
         why: "A weight chosen from a published model is a principle; one chosen now would be a fit.",
