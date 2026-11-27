@@ -60,10 +60,15 @@ section(() => {
     const agree = z.central.length === z.local.length && z.central.every((c, i) => c.name === z.local[i].name && c.crc === z.local[i].crc && c.size === z.local[i].size && c.localAt === z.local[i].localAt);
     ok("!! EVERY FILE STORED, ITS DATA ON A 64-BYTE BOUNDARY, ITS CRC-32 RIGHT, THE STAGE FIRST; the central directory agrees with the local headers", aligned && stored && crcs && agree && z.local[0].name === "Probe.usda" && z.local.length === 2 && /^textures\/.*\.png$/.test(z.local[1].name), z.local.map((f) => `${f.name}@${f.dataOffset}`).join(", "));
     const tmp = path.join(os.tmpdir(), `usdz-selfcheck-${process.pid}.usdz`); fs.writeFileSync(tmp, r.bytes);
-    const py = spawnSync("python3", ["-I", "-c", "import sys, zipfile, json; z = zipfile.ZipFile(sys.argv[1]); print(json.dumps({'bad': z.testzip(), 'names': z.namelist(), 'stored': all(i.compress_type == 0 for i in z.infolist()), 'offsets': [i.header_offset for i in z.infolist()]}))", tmp], { encoding: "utf8" });
+    // 2026-11-27 (the publish merge) -- the second reader is whichever of python3 and python this machine has: Windows often has only `python`, and a red
+    // for a missing interpreter says nothing about the archive. With neither, the row is a NAMED SKIP below, and the structural checks above have run.
+    // SABOTAGED, restored byte for byte: U1 the second reader handed a path that is not the archive -> 1 red.
+    const runPy = (exe) => spawnSync(exe, ["-I", "-c", "import sys, zipfile, json; z = zipfile.ZipFile(sys.argv[1]); print(json.dumps({'bad': z.testzip(), 'names': z.namelist(), 'stored': all(i.compress_type == 0 for i in z.infolist()), 'offsets': [i.header_offset for i in z.infolist()]}))", tmp], { encoding: "utf8" });
+    const exeFound = ["python3", "python"].find((e) => { const v = spawnSync(e, ["-c", "import sys; print(sys.version_info[0])"], { encoding: "utf8" }); return v.status === 0 && v.stdout.trim() === "3"; }), py = exeFound ? runPy(exeFound) : null;
     fs.unlinkSync(tmp);
-    const pr = py.status === 0 ? JSON.parse(py.stdout) : null;
-    ok("!! PYTHON'S zipfile, A SECOND READER, OPENS IT: every CRC tested good, the same files in the same order, all stored", pr && pr.bad === null && pr.stored && JSON.stringify(pr.names) === JSON.stringify(z.local.map((f) => f.name)), pr ? JSON.stringify(pr) : (py.stderr || "python3 did not run").slice(0, 200));
+    const pr = py && py.status === 0 ? JSON.parse(py.stdout) : null;
+    if (!exeFound) console.log("  SKIP  PYTHON'S zipfile, the second reader, did not run: neither python3 nor python (3.x) is on this machine's PATH -- the archive's structure was checked above; this row was NOT");
+    else ok("!! PYTHON'S zipfile, A SECOND READER, OPENS IT: every CRC tested good, the same files in the same order, all stored", pr && pr.bad === null && pr.stored && JSON.stringify(pr.names) === JSON.stringify(z.local.map((f) => f.name)), pr ? JSON.stringify(pr) : (py.stderr || "python3 did not run").slice(0, 200));
     let refused = false; try { U.packUsdz([{ name: "a.png", bytes: png }]); } catch { refused = true; }
     ok("!! an archive whose first file is not a stage is refused", refused);
 });
