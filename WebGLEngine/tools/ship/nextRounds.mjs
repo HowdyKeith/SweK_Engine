@@ -3139,6 +3139,35 @@ export const NEXT_ROUNDS = [
         how: "Add the rows to brain/capabilityMap.mjs with their citations (brain/SUB_STATIONS_WIP.md sections 37-49) and regenerate; the map's gate checks every quote is in its cited file.",
         why: "The stations line is largely settled; the map is where that is visible.",
     },
+    // ---- 2026-11-27 -- after follow-up 10, stealth Round 31 and the LPLC2 reading.
+    {
+        id: "nav-avoid-arc-edge-replicate",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 10 (brain/SUB_FIELD_NAV_WIP.md): EDGE BEATS ARC on one set of 60 (5 to 0, p 0.031); the series moves about 9 flights from set to set.",
+        how: "Register first: the same two arms and verdict on a fresh hard-traffic set, flown once.",
+        why: "Before the rule goes anywhere it should hold on a second set.",
+    },
+    {
+        id: "nav-avoid-stuck-fallback",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 10's edge rule is stuck twice as often (35.6 % of fires) and, stuck, flies the plan's heading into the ship: collisions 3 to 6, 4 with ships.",
+        how: "Register first one change: when stuck, the candidate with the largest minimum clearance over the look (the least bad) instead of the plan's heading; the edge arm as the reference, fresh seeds.",
+        why: "It is where the edge rule's added collisions come from.",
+    },
+    {
+        id: "fly-lplc2-zhou-source",
+        blocker: "OPEN",
+        what: "fly-lplc2-surround-balance waits on a source for the inhibition's strength; Klapoetke 2017 gives the form only (Part 12).",
+        how: "Read Zhou et al. 2022 (eLife, shallow networks trained to detect collisions recover features of loom-selective neurons) for an LPLC2-like model with fitted inhibitory weights; if it states a balance between excitation and inhibition that can be carried over, write it into brain/FLY_RETINOTOPY_RF_WIP.md and register the round on it.",
+        why: "A weight chosen from a published model is a principle; one chosen now would be a fit.",
+    },
+    {
+        id: "aquarium-courier-arc-edge",
+        blocker: "OPEN -- after nav-avoid-arc-edge-replicate holds",
+        what: "The turn-away rule along the real turn and off the edge (FOLLOW-UP 10) is in brain/subAvoidNav.mjs only; the Sub Aquarium's couriers do not use it.",
+        how: "If the replication holds: a gated change putting the edge arm's heading test into the aquarium courier's navigator (render/subAquariumSim.mjs), off by default or as the default by the same never-over-a-choice rule as the captains; rows and mutants.",
+        why: "Where a person would see the improvement.",
+    },
     {
         id: "fly-gf-input-signs",
         blocker: "UPSTREAM -- needs the neuPrint male-cns service (neuprint.janelia.org, and a token)",

@@ -1149,3 +1149,11 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **What this says.** The arc rule's exits were its whole loss, and keeping its candidates out of the plan's own edge band turns most of them into arrivals (15 exits to 7, 42 arrivals to 47). The price is visible: refusing edge-ward headings leaves the rule stuck twice as often, and when it is stuck it flies the plan's heading into the ship, so collisions rose from 3 to 6 (4 with ships, against none). Across FOLLOW-UPS 8 to 10 the turn-away rule has gone from 40 of 60 (instant turn) to 47 of 60, with a different seed set each time.
 
 **What this would not say.** FOLLOW-UP 9's list stands; the 20 m band is the plan's own, not swept; one set of 60.
+
+## FOLLOW-UP 11 [SERIES B]: FOLLOW-UP 10 ON A FRESH SET (backlog `nav-avoid-arc-edge-replicate`; Keith, 2026-11-27: "start with 1 and 3 together"; REGISTERED BEFORE ITS SET IS FLOWN)
+
+**What.** FOLLOW-UP 10 found EDGE BEATS ARC (5 to 0, p 0.031) on HELD10; the series moves about 9 flights from set to set. The same two arms (`any+predict+edge+avoid-arc` the reference, `any+predict+edge+avoid-arc-edge` designated), the same verdict word for word, on a fresh set; NO code changes.
+
+**The set.** NEW: **HELD11, seeds 9201 to 9260 of hard-traffic (60 scenarios, 120 flights), flown ONCE**, committed unread, read once. (9001 to 9040 belong to brain/subNav3d.mjs's sets, so they are not used; no file uses 9201 to 9260.) No DEV: nothing is built.
+
+**Predictions.** **R1**: EDGE BEATS ARC again (p at most 0.05). 40 percent. **R2**: the edge arm reaches at least as many as the reference. 70 percent. **R3**: the edge arm's exits are at most half the reference's. 50 percent. **R4**: the edge arm's collisions exceed the reference's. 65 percent.
