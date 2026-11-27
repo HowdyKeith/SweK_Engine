@@ -3178,13 +3178,15 @@ export const NEXT_ROUNDS = [
         what: "FOLLOW-UP 6 found that the best way to plan around a ship depends on whether the ship keeps its schedule: prediction wins by 12 flights when ships hold course (44 against 32 of 60) and loses by 21 when they wait (38 against 59). The planner does not know which world it is in.",
         how: "An arm that watches the ships it has been told about (each ship's observed position against the position its schedule gives, over the last EST_S seconds) and plans from where the ship IS when the two disagree by more than a margin and from where it will be when they agree; a registration with its own fresh seeds, the three behaviours of subReactNav and a mixed one (some ships keep the schedule, some do not), designated arm against the best fixed arm in each.",
         why: "No fixed arm of FOLLOW-UP 6 is best in every behaviour, so an arm that picks is the obvious next thing; whether it can pick from the evidence a vessel has is the question.",
+        note: "2026-11-27: FOLLOW-UP 14 (HELD14) gave this entry its numbers: the nominal arm reaches 51 of 60 where ships hold course and 47 where they stop; the Kalman filter at 3 m reaches 45 and 57; the plain replan 29 and 59. An arm that trusts the schedule while the observations agree and switches to the filter when they do not could reach about 51 and 57. The test of agreement needs the noisy observations of FOLLOW-UP 14 (a chi-square of the innovation, or a residual of the position against the schedule). 2026-11-27: REGISTERED as FOLLOW-UP 15 of brain/SUB_FIELD_NAV_WIP.md (before any code): a per-ship choice between the schedule and the Kalman filter by a chi-squared test of the position residual (3.72 sigma, two in a row, latched), four behaviours including a mixed one, 8 arms with a perfect-detector oracle, HELD15 = seeds 16001 to 16060, tests S1 to S4 and predictions E1 to E10 written first. Nothing built or flown yet."
     },
     {
         id: "nav-estimate-with-noise",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-27 (FOLLOW-UP 14 of brain/SUB_FIELD_NAV_WIP.md, HELD14, PARTLY SUPPORTED): ships observed once a second with an error of 1.5, 3 and 6 m, a constant-velocity Kalman filter against the naive two-point difference. The filter keeps the exact estimate's gain where ships stop (57 against the nominal arm's 47 of 60 at 3 m) and the naive difference does not (49); the filter costs 6 flights where ships hold course (45 against 51) and the naive difference 11. WAS: FOLLOW-UP 6's estimating arm sees every ship's position exactly and estimates velocity by a two-point difference over 3 s; it repaired most of the stop world (56 of 60) and none of the turn world (+3).",
         how: "Add noise to the observed positions (a standard deviation of a few metres) and replace the difference by a filter (an alpha-beta or a constant-velocity Kalman filter); read the same three behaviours on fresh seeds. The gate's identity (react-none is flyHard, and the estimating arm equals the nominal one with no reaction and no noise) is the control.",
         why: "A noiseless difference is the best case; the result is a ceiling for estimation, and a noisy one could be worse than the schedule.",
+        note: "2026-11-26: REGISTERED as FOLLOW-UP 14 of brain/SUB_FIELD_NAV_WIP.md (before any code): the observation once a second with an error of 1.5, 3 and 6 m, a constant-velocity Kalman filter against the two-point difference, three ship behaviours, 10 arms, HELD14 = seeds 14001 to 14060, tests C1 to C3 and predictions E1 to E9 written first. Nothing built or flown yet.",
     },
     {
         id: "nav-current-in-field",
@@ -3236,6 +3238,7 @@ export const NEXT_ROUNDS = [
         what: "FOLLOW-UP 10 found that on the 3 MJ battery a three-leg mission of 600 to 850 m uses 1.6 to 2.3 MJ and energy ended 1 mission in 60; collisions with ships decide. The metre's cost is real (the 2.5 m/s arm spends 0.65 MJ less) but it did not bind.",
         how: "The same missions on a battery sized so the cruise reference ends at a registered fraction of its charge (1.0 MJ, where the chord window needs 1.6 to 2.3 MJ at cruise), the speed cap swept (2.0, 2.5, 3.0 m/s) on DEV and the chosen speed read once on a fresh held set against the reference, the paired test beside it.",
         why: "Whether a slower, cheaper vessel beats a faster one is only a question once the energy can run out.",
+        note: "2026-11-26: FOLLOW-UP 13 measured where energy binds on the 3 MJ battery: at cruise the reference ends energy-out on 0, 5, 17 and 24 of 30 missions at median chords of 702, 828, 935 and 1,060 m (half at about 935 m, next to the 927 m the needs model gives). So the design this entry asks for exists: chords of 900 to 1,050 m. What it still needs is a time limit wide enough that a slow arm is not cut off (series B's 450 s limit timed out the 2.5 m/s arm on 16 of 30 at 935 m).",
     },
     {
         id: "nav-3d-terrain",
@@ -3272,6 +3275,35 @@ export const NEXT_ROUNDS = [
         what: "v4934 raised three definitionGates ratchets (tools/ship/definitionGates-selfcheck.mjs: wide 412 -> 462, all-shapes 865 -> 1467, import-owned 669 -> 1206) for exports in the 66 head-to-head and navigation files this branch added: constants and helpers re-exported from earlier rounds that their gates do not name one by one. The raise was said as one and was not Keith's direction.",
         how: "Name each of the 602 exports in the gate of its module with a row that exercises it (or, where a re-export is only a pass-through, point the gate at the original definition), sabotage-confirm each batch, and ratchet the three numbers back down to 412, 865 and 669 as they close.",
         why: "A ratchet raised for 600 symbols is a ratchet that no longer notices the next 600; the split that proved the whole rise is the branch's own is the evidence the debt is nameable.",
+    },
+    {
+        id: "nav-series-reconcile",
+        blocker: "OPEN",
+        what: "Two navigation series were written in parallel and both closed overlapping items. Main's (brain/NAV_MISSIONS_WIP.md, brain/navMission.mjs, brain/navEnergy.mjs, HELD83) and the sub field series B (brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 10, brain/subMissionNav.mjs, tools/ship/subMissionStudy.mjs, HELD10) disagree on missions: main's reference arm completed 5 of 60 missions and ran flat (battery empty) on 41, and its eco arm at 2 m/s completed 49; series B's reference ran out of energy on 1 of 60. The battery accounting per metre agrees (about 2.7 kJ/m at cruise in both), so the gap is somewhere else, most likely in the length and layout of the missions. The depth rounds (main's HELD77 and series B's HELD11) and the fleet rounds (main's fleet avoidance in subTankNav and series B's HELD12) overlap the same way and were never compared.",
+        how: "Missions first. Read both energy models and both scenario generators side by side and list every difference (battery size, power model, speed, leg length, what counts as flat or energy-out). Register the hypotheses BEFORE flying. Fly each series' mission arms on the OTHER's scenario generator, on a fresh held set, once, and say which difference explains the gap, or that none does. Then the same for depth and fleet. Keep the result in a new file and append to SUB_FIELD_NAV_WIP.md only, because that file and this register are where both series write and where they collided at the v4934 merge.",
+        why: "Two answers to one question stand in the repository and the changelog says they are not reconciled. Until one is explained, neither mission result can be cited.",
+        note: "2026-11-26: THE MISSIONS PART IS DONE (FOLLOW-UP 13 of brain/SUB_FIELD_NAV_WIP.md, SUPPORTED, HELD13): the gap is the mission's length. Main's missions have a median chord of 981 m against a cruise break-even of about 927 m and series B's 731 m; each series' flyer on the other's missions gives its own answer (43 of 60 energy-out and 1 of 60), and on four chord bins of a fresh set the energy-out rate is 0, 5, 17, 24 of 30. STILL OPEN: the depth rounds (main's HELD77 and series B's HELD11) and the fleet rounds (main's fleet avoidance and series B's HELD12) were not compared; the eight missions of 120 on which the two flyers differ in outcome were not bisected (the minimum-depth rule, the time caps, the order of the tests); and the slow arm's time limit differs between the series (series B's 450 s cuts its 2.5 m/s arm off past about 850 m, main's eco completed 49 of 60 under 780 s), which no round has reconciled.",
+    },
+    {
+        id: "peer-queue-h83-h86",
+        blocker: "OPEN",
+        what: "The peer queue (branch peer-jobs) holds rig-h64 to rig-h82, pinned to commit 3b69658a3, and nothing has run through it. H83 to H86 are in tools/ship/rigOrder.json (H86 priority 7 and about 2 h, H83 -1 and about 6 h, H84 and H85 -2 and about 9 h each) but are not queued.",
+        how: "Whoever holds the queue signing key runs, from a checkout of current main with that commit pushed: node tools/ship/peerJobsCmd.mjs submit --id rig-h86 --rounds 86 --gpu any --priority 7, then the same for rig-h83 (--priority -1), rig-h84 and rig-h85 (--priority -2). Submit pins to HEAD. Steps for a peer to start watching are in docs/PEER_JOBS.md. The key is never printed or committed.",
+        why: "Four built rounds that no machine has flown; the queue is the way the peers take them in order.",
+    },
+    {
+        id: "rig-results-h64-h86",
+        blocker: "HARDWARE",
+        what: "H64 to H86 are built and gated and none has been flown by a rig or a peer, so none has a RESULT section in brain/SUB_FIELD_NAV_WIP.md or its own WIP note. The earlier rig runs of H64 were deleted with their folder and need no merge.",
+        how: "As each rig or peer zip comes back, write its RESULT section and the paired post hoc statistics, as the series does. Two things to say plainly in the write-up: H66's miscount (16 against 17) and that H70 replicates H46 at 800 ids. Do not queue a round by hand while its peer job is queued; the queue cannot see manual runs and the round would be flown twice.",
+        why: "The series records a result only after it is flown; this is the largest block of built rounds without one.",
+    },
+    {
+        id: "nav-estimate-filter-variants",
+        blocker: "OPEN",
+        what: "FOLLOW-UP 14 flew one filter: a constant-velocity Kalman filter at one observation interval (1 s) with a process noise taken from the stopping ship's greatest acceleration (0.5 m/s squared), neither tuned. At 3 m of noise it kept the exact estimate's gain where ships stop (57 against 47 of 60) and cost 6 flights where they hold course (45 against 51); where ships turn nothing separated any belief from the schedule.",
+        how: "On fresh seeds and the same three behaviours and the same noise (1.5, 3 and 6 m): the observation interval 0.25, 1 and 4 s; the process noise 0.3 and 3 times; and a turn-aware filter (an interacting multiple model, or a constant-turn-rate model) for the turning ships, read for the price (react-none) and the gain (react-stop and react-turn). The control is FOLLOW-UP 14's arms on the same seeds.",
+        why: "One filter at one rate is one point; whether the price falls with a faster rate or a better model, and whether a turn-aware filter finds the gain in the turn world, decides whether estimation is worth its cost.",
     },
     {
         id: "nav-match-consumes-layer",
