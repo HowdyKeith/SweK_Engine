@@ -60,3 +60,34 @@ detached (a background job is stopped at 2 hours).
 `node tools/ship/takeFlySceneStrong.mjs run` -> `brain/flySceneStrongRound.jsonl`, committed byte for byte, whole, before
 it is read; `node tools/ship/takeFlySceneStrong.mjs read` prints the checks and the reading. The verdict will be section
 10, "The result".
+
+## 10. The result (the whole results file committed unread at b6c8aac8, then read once)
+One start, 491.3 minutes, beside three other rounds on four cores, two trainings at a time; 13 records (sha256
+2eaf6a3e33f37190...). **The checks hold**: the scene-types, home-gradient and scene-trained rounds' files as committed
+and passing their own checks; 12 HOMET16 draws, each once, HOME16's recipe on its own battery; draw 1 audited the same
+twice.
+* **S26: WITH THE STRONGER TRAINER THE FLY TRAINED IN THE 26-TYPE SCENE CANNOT BE TOLD APART THERE** (8 above, 4 below,
+  p 0.39).
+* **SP: WITH THE STRONGER TRAINER THE FLY TRAINED IN THE 26-TYPE SCENE CANNOT BE TOLD APART IN THE PLAIN** (2 above,
+  10 below, p 0.039).
+
+| arm | home, 26-type scene | home, plain | course, 26-type scene |
+|---|---|---|---|
+| HOMET16 | 0.5993 | 0.5502 | 0.7170 |
+| HOME16 | 0.5900 | 0.5517 | 0.7149 |
+| HOMET | 0.6000 | 0.5474 | 0.7135 |
+
+**Both expectations came**: S26 CANNOT (65) and SP CANNOT (70). So, as section 5 put it, the 16-life trainer cannot tell
+the scene's gain apart either.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** **the stronger trainer buys
+nothing in the 26-type scene that the weaker one did not.** HOMET16 against HOMET, the same scene with HOMEP's 4-life
+recipe, is above in 5 of 12 there (0.0007 below on average) and in 9 of 12 in the plain (0.0029 above). Its lift over
+the plain scene is wider than HOME16's in 10 of 12 (0.0491 against 0.0383; p 0.039), and its p_c higher than HOME16's
+in 9 of 12 (2.030 against 1.685) but lower than HOMET's in 10 of 12 (against 2.132). Where training kept its best
+ranges from iteration 4 to 56 (31.8 on average, of 60; HOMET's 32.9).
+
+**What it does not mean.** Section 7 holds. Both readings are CANNOT: what this trainer finds in 12 draws, not that
+training in the 26-type scene gains nothing there. The comparisons with HOMET, the lift and p_c are read after the
+results, so their p are not tests this round made. Which landmarks each ring type sees is invented here. Nothing here
+is of the animal.
