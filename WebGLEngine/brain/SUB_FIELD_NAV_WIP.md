@@ -1157,3 +1157,14 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **The set.** NEW: **HELD11, seeds 9201 to 9260 of hard-traffic (60 scenarios, 120 flights), flown ONCE**, committed unread, read once. (9001 to 9040 belong to brain/subNav3d.mjs's sets, so they are not used; no file uses 9201 to 9260.) No DEV: nothing is built.
 
 **Predictions.** **R1**: EDGE BEATS ARC again (p at most 0.05). 40 percent. **R2**: the edge arm reaches at least as many as the reference. 70 percent. **R3**: the edge arm's exits are at most half the reference's. 50 percent. **R4**: the edge arm's collisions exceed the reference's. 65 percent.
+
+## RESULT OF FOLLOW-UP 11: FOLLOW-UP 10 ON A FRESH SET (2026-11-27; `brain/subAvoidHeld11.{0,1}.jsonl`, HELD11 = seeds 9201 to 9260, 120 flights, committed unread at `2ad418ca4`, read ONCE): **NO DIFFERENCE SHOWN**
+
+| arm | reached | collided (with ships) | left | timeout |
+|---|---|---|---|---|
+| any+predict+edge+avoid-arc (reference) | 47 / 60 | 4 (1) | 8 | 1 |
+| any+predict+edge+avoid-arc-edge (designated) | 49 / 60 | 9 (6) | 2 | 0 |
+
+**The verdict (registered):** the edge arm arrives where the reference does not on 4 seeds and the reverse on 2 -- p = 0.34: **NO DIFFERENCE SHOWN.** FOLLOW-UP 10's EDGE BEATS ARC does not replicate at the registered bar.
+**Predictions.** **R1 MISSED** (not EDGE BEATS ARC). **R2 held** (49 against 47). **R3 held** (2 exits, at most half of 8). **R4 held** (9 collisions against 4).
+**What it says, across the two sets (120 scenarios).** The edge rule's effect is the same in direction both times -- exits fall sharply (15 to 7, 8 to 2) and collisions rise (3 to 6, 4 to 9; with ships 0 to 4, 1 to 6) -- and the net on arrivals is +5 and +2. The exits it saves are partly spent as collisions: stuck more often, the rule flies the plan's heading into the ship. So the next change is the stuck fallback (backlog `nav-avoid-stuck-fallback`), not the aquarium; `aquarium-courier-arc-edge` waits, by its own condition.

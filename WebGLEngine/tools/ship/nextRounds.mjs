@@ -3142,8 +3142,8 @@ export const NEXT_ROUNDS = [
     // ---- 2026-11-27 -- after follow-up 10, stealth Round 31 and the LPLC2 reading.
     {
         id: "nav-avoid-arc-edge-replicate",
-        blocker: "OPEN",
-        what: "FOLLOW-UP 10 (brain/SUB_FIELD_NAV_WIP.md): EDGE BEATS ARC on one set of 60 (5 to 0, p 0.031); the series moves about 9 flights from set to set.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27 as FOLLOW-UP 11 (brain/SUB_FIELD_NAV_WIP.md): NO DIFFERENCE SHOWN on HELD11 (49 against 47, 4 to 2, p 0.34) -- the same direction as FOLLOW-UP 10 (exits 8 to 2) and the same cost (collisions 4 to 9, ships 1 to 6); FOLLOW-UP 10 does not replicate at the registered bar. Was: FOLLOW-UP 10 (brain/SUB_FIELD_NAV_WIP.md): EDGE BEATS ARC on one set of 60 (5 to 0, p 0.031); the series moves about 9 flights from set to set.",
         how: "Register first: the same two arms and verdict on a fresh hard-traffic set, flown once.",
         why: "Before the rule goes anywhere it should hold on a second set.",
     },
@@ -3163,7 +3163,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "aquarium-courier-arc-edge",
-        blocker: "OPEN -- after nav-avoid-arc-edge-replicate holds",
+        blocker: "OPEN -- WAITING: nav-avoid-arc-edge-replicate did NOT hold (FOLLOW-UP 11, NO DIFFERENCE SHOWN); revisit after nav-avoid-stuck-fallback",
         what: "The turn-away rule along the real turn and off the edge (FOLLOW-UP 10) is in brain/subAvoidNav.mjs only; the Sub Aquarium's couriers do not use it.",
         how: "If the replication holds: a gated change putting the edge arm's heading test into the aquarium courier's navigator (render/subAquariumSim.mjs), off by default or as the default by the same never-over-a-choice rule as the captains; rows and mutants.",
         why: "Where a person would see the improvement.",
