@@ -3085,7 +3085,7 @@ export const NEXT_ROUNDS = [
     {
         id: "fly-lplc2-surround-balance",
         blocker: "UPSTREAM -- READ 2026-11-26 (brain/FLY_RETINOTOPY_RF_WIP.md Part 12): Klapoetke 2017 supports Part 9's FORM (periphery motion of either direction, subtracted -- LPi4-3 depolarization cut weak responses, not looming) but gives NO strength; needs a source that states it (a published LPLC2 model with fitted inhibition, or a recording of the inhibition)",
-        what: "Parts 9-11 of brain/FLY_RETINOTOPY_RF_WIP.md: the surround is active at the wide bars' peaks but at w = 1 the arms' drive outweighs it (S10 78 %, S11 66 % against S9's 29 %).",
+        what: "UPDATE 2026-11-27 (Part 14): no published strength exists to carry over -- Zhou's trained models span I/E 0 to 0.66 at the looming disk's peak. A registrable form: the inhibition over the whole field, at a range registered in advance (0, 1/16, 2/3), asking which of P1-P8 hold across it. Parts 9-11 of brain/FLY_RETINOTOPY_RF_WIP.md: the surround is active at the wide bars' peaks but at w = 1 the arms' drive outweighs it (S10 78 %, S11 66 % against S9's 29 %).",
         how: "Find the balance's form in the literature (Klapoetke 2017's LPi inhibition, or a divisive normalization with a stated constant from a published model) before choosing; then register Part 7's stimuli and P1-P8 unchanged, run once. Do not pick a weight from Part 10's numbers.",
         why: "The one remaining lever on the wide-bar tuning; choosing it by eye would make the verdict mean little.",
     },
@@ -3163,10 +3163,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-zhou-source",
-        blocker: "OPEN (next: the trained weights, read-only from github.com/ClarkLabCode/LoomDetectionANN, for the inhibitory/excitatory weight ratio) -- READ 2026-11-27 (brain/FLY_RETINOTOPY_RF_WIP.md Part 13): Zhou 2022 agrees on the subtractive form and adds that the inhibition spans the WHOLE receptive field (Part 9's covers only outside the disks); no strength in the text -- next, the trained weights in github.com/ClarkLabCode/LoomDetectionANN",
-        what: "fly-lplc2-surround-balance waits on a source for the inhibition's strength; Klapoetke 2017 gives the form only (Part 12).",
-        how: "Read Zhou et al. 2022 (eLife, shallow networks trained to detect collisions recover features of loom-selective neurons) for an LPLC2-like model with fitted inhibitory weights; if it states a balance between excitation and inhibition that can be carried over, write it into brain/FLY_RETINOTOPY_RF_WIP.md and register the round on it.",
-        why: "A weight chosen from a published model is a principle; one chosen now would be a fit.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27: DONE (brain/FLY_RETINOTOPY_RF_WIP.md Parts 13-14). Zhou 2022 agrees on the subtractive, rectified form, and its filters share the whole field. The repository holds NO trained weights (Part 13 corrected), but its notebook output gives three trained M = 256 models' peak I/E at a looming disk: 0.66, 0.063 and 0. The strength is a range that training leaves free, not a value.",
+        how: "Done: the paper, then the repository read-only at e496e77a4 (AGPL-3.0; nothing copied but three printed numbers).",
+        why: "A weight chosen from a published model is a principle; one chosen now would be a fit. The source gives a range, so a round must register the range.",
     },
     {
         id: "aquarium-courier-arc-edge",
