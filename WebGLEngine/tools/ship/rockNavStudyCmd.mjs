@@ -26,8 +26,8 @@ const mode = cli.rest[0], arg = (k) => cli.values[k] ?? null;
 const DIR = path.resolve(arg("--dir") || path.join(ENG, "brain", "rig-results", "rock-nav"));
 const out = (name) => path.join(DIR, name);
 const readJson = (name) => JSON.parse(fs.readFileSync(out(name), "utf8"));
-const write = (name, obj) => { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(out(name), JSON.stringify(obj, null, 1) + "\n"); console.log(`[rock-nav] wrote ${path.relative(ENG, out(name))}`); };
-const refuse = (name) => { if (fs.existsSync(out(name))) { console.error(`[rock-nav] REFUSED: ${path.relative(ENG, out(name))} exists -- a registered set is flown once`); process.exit(2); } };
+const write = (name, obj) => { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(out(name), JSON.stringify(obj, null, 1) + "\n"); console.log(`[rock-nav] wrote ${path.relative(ENG, out(name)).replace(/\\/g, "/")}`); };
+const refuse = (name) => { if (fs.existsSync(out(name))) { console.error(`[rock-nav] REFUSED: ${path.relative(ENG, out(name)).replace(/\\/g, "/")} exists -- a registered set is flown once`); process.exit(2); } };
 const fmt = (x, d = 3) => (x === null || x === undefined ? "-" : typeof x === "number" ? (Number.isFinite(x) ? x.toFixed(d) : String(x)) : String(x));
 
 function partArg() {

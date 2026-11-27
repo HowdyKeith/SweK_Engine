@@ -26,7 +26,7 @@ const id = cli.values["--study"] ?? "", s = SJ.studyOf(id);
 if (!s) { console.error(`[study] no study ${JSON.stringify(id)}; known: ${SJ.STUDIES.map((x) => x.id).join(", ")}`); process.exit(2); }
 const workers = cli.values["--workers"] === undefined ? os.cpus().length : Number(cli.values["--workers"]);
 if (!Number.isInteger(workers) || workers < 1 || workers > 64) { console.error("[study] --workers must be a whole number from 1 to 64"); process.exit(2); }
-const work = path.join(OUT, `${id}-work`), plan = SJ.planOf(id, path.relative(ENG, work));
+const work = path.join(OUT, `${id}-work`), plan = SJ.planOf(id, path.relative(ENG, work).replace(/\\/g, "/"));
 if (cli.flags.has("--dry-run")) { say(`[study] ${id} (${s.mode}): ${s.what}`); for (const p of plan) say(`  part ${p.k}/${s.parts}: node ${p.argv.join(" ")}`); process.exit(0); }
 
 fs.mkdirSync(OUT, { recursive: true });

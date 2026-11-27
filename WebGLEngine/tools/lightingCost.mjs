@@ -132,7 +132,7 @@ export async function run(argv = process.argv.slice(2), { log = console.log } = 
     if (software && !o.allowSoftware) { log("REFUSED: a software adapter or renderer timed these; its times are a CPU's (--allow-software writes them anyway)"); return { report, written: null, code: 2 }; }
     const out = o.out || path.join(ENG, "render", `lighting-cost-${report.box}-${report.when.replace(/[:.]/g, "-")}.json`);
     if (fs.existsSync(out)) throw new Error(`lightingCost: ${out} exists; a report is never overwritten`);
-    fs.writeFileSync(out, JSON.stringify(report, null, 1) + "\n"); log(`wrote ${path.relative(ENG, out)}`);
+    fs.writeFileSync(out, JSON.stringify(report, null, 1) + "\n"); log(`wrote ${path.relative(ENG, out).replace(/\\/g, "/")}`);
     return { report, written: out, code: rows.some((r) => r.error) ? 1 : 0 };
 }
 

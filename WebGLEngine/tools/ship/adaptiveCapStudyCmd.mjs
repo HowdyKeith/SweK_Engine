@@ -19,8 +19,8 @@ const cli = parseOrExit("adaptive-cap", { values: { "--part": "string", "--dir":
 const mode = cli.rest[0], arg = (k) => cli.values[k] ?? null;
 const DIR = path.resolve(arg("--dir") || path.join(ENG, "brain", "rig-results", "adaptive-cap"));
 const out = (n) => path.join(DIR, n), readJson = (n) => JSON.parse(fs.readFileSync(out(n), "utf8"));
-const write = (n, o) => { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(out(n), JSON.stringify(o, null, 1) + "\n"); console.log(`[adaptive-cap] wrote ${path.relative(ENG, out(n))}`); };
-const refuse = (n) => { if (fs.existsSync(out(n))) { console.error(`[adaptive-cap] REFUSED: ${path.relative(ENG, out(n))} exists -- a registered set is flown once`); process.exit(2); } };
+const write = (n, o) => { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(out(n), JSON.stringify(o, null, 1) + "\n"); console.log(`[adaptive-cap] wrote ${path.relative(ENG, out(n)).replace(/\\/g, "/")}`); };
+const refuse = (n) => { if (fs.existsSync(out(n))) { console.error(`[adaptive-cap] REFUSED: ${path.relative(ENG, out(n)).replace(/\\/g, "/")} exists -- a registered set is flown once`); process.exit(2); } };
 const fmt = (x, d = 3) => (x === null || x === undefined ? "-" : typeof x === "number" ? (Number.isFinite(x) ? x.toFixed(d) : String(x)) : String(x));
 function partArg() {
     const m = /^(\d+)\/(\d+)$/.exec(arg("--part") || "1/1"), k = m ? +m[1] : 0, K = m ? +m[2] : 0;
