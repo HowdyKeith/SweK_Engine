@@ -3104,11 +3104,18 @@ export const NEXT_ROUNDS = [
         why: "Closed.",
     },
     {
-        id: "stealth-static-texture-mask",
+        id: "stealth-texture-contrast-ratio",
         blocker: "OPEN",
-        what: "Rounds 31-32: on the probability scale the drift gain at g 100 fits the moving stripes but leaves the low-contrast static drop (0.086 against the animal's 0.191); no single drift gain fits both, and static stripes have no drift.",
-        how: "Register first ONE static-texture term (for example a divisive normalisation of the patch's looming drive by the stripes' own static edge energy, which matters only where the object's contrast is low), g fixed at 100, the readout as Round 31, the term's one constant chosen on a held-out geometry by the STATIC trials at contrast 0.2 ONLY, then tested once on another held-out geometry with C1-C4 and the striped likelihood against the null.",
-        why: "It is the one part of the animal's pattern the drift gain cannot give.",
+        what: "Round 33: the static-texture term gives the low-contrast static drop (C2 holds) but masks at every contrast, because S^ is contrast-free; the animal's static masking is gone by contrast 0.6 (C3 fails).",
+        how: "Register first one change: the texture term scaled by the background texture's contrast relative to the target's (it falls as the target stands out), g 100 fixed, the scale's one constant chosen on an unused geometry by the static trials at contrast 0.2 and at 1.0 together, then C1-C4 and the null on another unused geometry.",
+        why: "It is the one property the Round 33 term lacked, named by its own failure.",
+    },
+    {
+        id: "stealth-static-texture-mask",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27: DONE, Round 33 (brain/STEALTH_ROUNDS_WIP.md): NOT SUPPORTED (C3, the null). h = 1 chosen; C2 held for the first time (the low-contrast static drop), but the contrast-free term also masks static stripes at high contrast (grey minus static 0.23 to 0.38, the animal's 0.03 to 0.04), and the null fits the striped trials better by 4.49.",
+        how: "Done: textureGain in brain/crabMlg1.mjs, brain/crabOrder33.mjs, brain/crabTexture33Agg.mjs; step A then step B, each committed unread and read once.",
+        why: "It found the half of the static drop the drift gain could not give, and named why it overshoots.",
     },
     {
         id: "ship-census-rederive",

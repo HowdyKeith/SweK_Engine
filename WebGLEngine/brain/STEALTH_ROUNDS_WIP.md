@@ -745,3 +745,19 @@ Rounds 13, 29 and 30's C1 to C4, applied word for word to the ANIMAL's response 
 **Step A, choosing h (geometry A': azimuth 45 degrees, segment 2, r/v 0.75 s -- unused).** h in **{0.3, 1, 3, 10, 30}**, contrasts 0.2 to 1.0 (25 runs, a new worker `brain/crabOrder33.mjs`, crabOrder30's with h as an argument). **h is chosen by the log-likelihood of the animal's STATIC-stripe trials at contrast 0.2 ONLY** (46 trials); a tie goes to the smaller h.
 **Step B, the test (geometry B': azimuth 157.5 degrees, segment 7, r/v 0.4 s -- unused).** The chosen h only (5 runs). **C1-C4 word for word on the predicted probabilities; verdict SUPPORTED iff C2, C3 and C4 hold AND the striped trials' log-likelihood beats the null**; otherwise NOT SUPPORTED, naming each failure. Reported: step A's likelihoods, step B's 15 cells, the striped likelihood against Round 32's (-289.6 at its geometry).
 **Predictions (confidence).** The chosen h is not the smallest (60 %); C2 holds (40 %); C4 still holds (45 %: the term also lowers the moving stripes); the stripes beat the null (50 %); SUPPORTED (15 %).
+
+## Round 33 RESULTS (2026-11-27; `brain/crabTexture33Runs/`, step A committed unread at `8df7a2391`, step B at `ead433445`, each read ONCE by `brain/crabTexture33Agg.mjs`): **NOT SUPPORTED (C3, the null)**
+**Step A (geometry A', g 100).** The log-likelihood of the 46 static trials at contrast 0.2: h 0.3 -14.45, **h 1 -14.22**, h 3 -15.22, h 10 -20.81, h 30 -22.60. **Chosen h = 1.**
+**Step B (geometry B', g 100, h 1).** The readout a = -15.35, b = 21.78.
+
+| contrast | predicted grey | predicted static | predicted moving | observed grey | observed static | observed moving |
+|---|---|---|---|---|---|---|
+| 0.2 | 0.261 | 0.027 | 0.107 | 0.278 | 0.087 | 0.041 |
+| 0.4 | 0.616 | 0.235 | 0.261 | 0.528 | 0.340 | 0.480 |
+| 0.6 | 0.720 | 0.342 | 0.424 | 0.647 | 0.608 | 0.460 |
+| 0.8 | 0.705 | 0.476 | 0.550 | 0.811 | 0.784 | 0.566 |
+| 1.0 | 0.720 | 0.397 | 0.672 | 0.761 | 0.733 | 0.577 |
+
+**C1** true (reported). **C2 TRUE** (grey minus static 0.234, grey minus moving 0.154, static against moving 0.080). **C3 FALSE**: grey minus static is 0.379, 0.229 and 0.324 at contrasts 0.6 to 1.0, against at most 0.1. **C4 true** (0.297, 0.155, 0.048: two of three above 0.1). **The striped trials' log-likelihood is -321.29 under the predictions and -316.80 under the null: the null fits better, by 4.49** (Round 32's was -289.6 at its own geometry).
+**Predictions.** The chosen h not the smallest: **held**. C2 holds: **held**. C4 still holds: **held**. The stripes beat the null: **MISSED**. SUPPORTED: no.
+**What it says.** The texture term does the one thing Rounds 31-32 lacked: it gives the low-contrast static drop, and C2 holds for the first time. It also masks the static stripes at HIGH contrast, where the animal shows none (observed grey minus static is 0.03 to 0.04 at contrasts 0.6 to 1.0). That is C3's failure, and it costs the likelihood. The cause is in the term's own definition: S^ is contrast-free by construction, the same at every contrast (the DEV check printed identical S^ at contrasts 0.2 and 1.0). So it divides the drive by the same amount whether the target stands out or not. In the animal, static texture masks only while the target is faint. **The lever this names:** masking that falls as the target's contrast against the texture rises, e.g. h S^ scaled by the background's contrast relative to the target's. That must be registered first, as its own round; it is not tuned here.
