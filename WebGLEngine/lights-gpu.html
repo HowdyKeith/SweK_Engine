@@ -20,7 +20,7 @@ import { createCameraControls, bindCameraControls } from "./render/cameraControl
 import { perspective, lookAt } from "./render/gpuDriven.mjs";
 import { createClusteredLightingGPU, clusteredWGSL, ZO, makeCookieAtlas } from "./render/clusteredLights.mjs";
 import { sceneOf } from "./render/lightsDemoScene.mjs";
-import { createFogGPU } from "./render/volumetricFog.mjs";   // ?fog=1: the moonlit haze, with shafts (&shafts=0 without)
+import { createFogGPU } from "./render/volumetricFog.mjs";   // ?fog=1: the moonlit haze, with the moon's shafts and the spot lights' beams (&shafts=0 neither; &spots=0 no beams)
 import { mat4Invert } from "./render/motionVectors.mjs";
 
 const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsGpu = { ready: false, frames: 0, error: null };
@@ -71,7 +71,7 @@ const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0
 state.capture = () => new Promise((res) => { state._want = res; });
 const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now();
 let last = performance.now(), depthTex = null, sceneTex = null;
-const fog = FOG ? createFogGPU(device, FORMAT, SHAFTS ? { lighting } : {}) : null;
+const fog = FOG ? createFogGPU(device, FORMAT, SHAFTS ? { lighting, ...(Q.get("spots") === "0" ? { fogLights: [] } : {}) } : {}) : null;
 async function frame() {
     const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
     const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;

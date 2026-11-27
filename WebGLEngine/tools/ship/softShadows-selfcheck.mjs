@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/softShadows-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/softShadows-selfcheck.mjs      (two or three minutes: lights-demo.html on WebGL2 and lights-gpu.html on WebGPU in headless Chromium)
+// Run: node tools/ship/softShadows-selfcheck.mjs      (a few minutes: lights-demo.html on WebGL2 and lights-gpu.html on WebGPU in headless Chromium)
 //
 // SHADOW QUALITY, HELD (Keith: "shadow quality -- softer edges, and shadows inside the fog"). render/clusteredLights.mjs's SOFT SHADOWS (CLUSTERED_SOFT / clusteredWGSL({ soft })):
 // percentage-closer soft shadows, contact-hardening, the penumbra the light's size by similar triangles; render/volumetricFog.mjs's LIGHT SHAFTS (createFogGPU(..., { lighting })):
@@ -11,9 +11,12 @@
 //   2, 3  THE PAGES    each backend, ?soft=1 against the hard shadows of the same frame (one moving light, no cookie): away from any shadow's edge the picture is the same, to
 //                      2 levels; across the edges the gradient falls (the median under 0.6 of the hard one's); and THE EDGES HARDEN AT CONTACT -- at a pillar's foot the edge
 //                      keeps half again as much of its sharpness as 0.6 or more away
-//   4  THE SHAFTS      lights-gpu.html ?fog=1 against &shafts=0: the moon's shadow only ever takes light away, and takes a good deal; the GPU's fog is fogCPU's march with the moon
-//                      hidden wherever a ray toward it meets a pillar (cast on the CPU, the cascades' 28-unit reach respected) -- far closer than the march that never hides
-//                      it; and on the CPU, a march where nothing is hidden is the closed form, one where all is hidden has the ambient alone
+//   4  ON THE CPU      a march where nothing is hidden is the closed form, one where all is hidden has the ambient alone; a spot's in-scattering is light added at each step;
+//                      inScatterCPU is the radiance times the phase, nothing outside the cone or in shadow
+//   5, 6  THE FOG      each backend (WebGL2's shafts and both backends' beams added 2026-11-27, Keith's "close the shadow gaps"): ?fog=1&spots=0 against &shafts=0 -- the moon's
+//                      shadow only ever takes light away, and the page is fogCPU's march with the moon hidden wherever a ray toward it meets a pillar or the canopy (cast on the
+//                      CPU, the cascades' 28-unit reach respected), far closer than the march that never hides it; ?fog=1 against &spots=0 -- THE SPOTS' BEAMS only add light,
+//                      the page is the march with each spot's in-scattering (cone, falloff, cookie), and where a spot's own shadow matters, the page is the hidden march
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -114,32 +117,65 @@ await softChecks("WEBGL2", "lights-demo.html", "__lights", ["--use-angle=swiftsh
 console.log("3. THE WEBGPU PAGE");
 await softChecks("WEBGPU", "lights-gpu.html", "__lightsGpu", [...PRESENT_ARGS]);
 
-console.log("4. THE SHAFTS");
+// the CPU's march for a page's fog: the moon hidden wherever a ray toward it meets a pillar or a board (past the cascades' 28-unit reach along the view, never -- the GPU has
+// no moon shadow there); with `spots`, each spot light's in-scattering (lightAt: window, cone, cookie), hidden where the segment to the light meets one
+const COOKIES = CL.makeCookieAtlas(256);
+const segHit = (p, q, b) => { const d = [0, 1, 2].map((i) => q[i] - p[i]), L = Math.hypot(...d); return boxHit(p, d.map((v) => v / L), b) < L; };
+const fogTwin = (r, { spots, spotShadows = true }) => {
+    const P = r.fogParams, inv = invert4(r.vp), toSun = norm(P.lightDir), boxes = r.pillars;
+    const V = [T4(inv, [0, 0, 1, 1]), T4(inv, [0, 0, -1, 1])].map((q) => q.map((v) => v / q[3])), look = norm([0, 1, 2].map((i) => V[0][i] - V[1][i]));
+    const shadowOf = (p) => { const along = [0, 1, 2].reduce((s, i) => s + (p[i] - r.eye[i]) * look[i], 0); if (along > 28) return 1; return boxes.some((b) => boxHit(p, toSun, b) < Infinity) ? 0 : 1; };
+    const spotL = spots ? r.lights.filter((l) => l.type === "spot") : [];
+    return (dir) => ({ dir, shadowOf, localOf: spotL.length ? (p) => spotL.reduce((acc, l) => { const sh = spotShadows && boxes.some((b) => segHit(p, l.position, b)) ? 0 : 1, v = CL.inScatterCPU(l, p, dir, P.g, { shadow: sh, cookies: COOKIES }); return acc.map((a, i) => a + v[i]); }, [0, 0, 0]) : null });
+};
+// the CPU's picture at a 5-pixel lattice, against the page's: rows top first; WebGL2's jitter counts rows from the bottom
+const latticeErr = (r, clear, twin, glRows, want) => {
+    const inv = invert4(r.vp), rows = [];
+    for (let y = 1; y < r.h; y += 5) for (let x = 2; x < r.w; x += 5) {
+        const d = rayOf(r, inv, x, y), hit = castOf(r, r.pillars, r.eye, d), k = (y * r.w + x) * 4, color = [0, 1, 2].map((i) => clear.px[k + i] / 255);
+        const args = { origin: r.eye, dir: d, distance: hit ? hit.t : 1e9, color, px: x, py: glRows ? r.h - 1 - y : y }, t = twin(d);
+        const got = [0, 1, 2].map((i) => r.px[k + i]), err = (o) => Math.max(...[0, 1, 2].map((i) => Math.abs(got[i] - fogCPU(r.fogParams, { ...args, ...o }).map((v) => v * 255)[i])));
+        rows.push(want(err, t));
+    }
+    return rows;
+};
+
+const shaftChecks = (title, file, stateVar, args, glRows) => section(async () => {
+    const browser = await chromium.launch({ args, ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [], grab = grabber(browser, file, stateVar, errors);
+    const [shafts, flat, clear, spots] = await Promise.all([grab("&fog=1&spots=0"), grab("&fog=1&shafts=0"), grab("&canopy=1"), grab("&fog=1")]);   // the same scene, canopy and all, without the fog
+    await browser.close();
+    const w = shafts.w, h = shafts.h, N = w * h; let brighter = 0, darker = 0, sUp = 0, sDown = 0;
+    for (let k = 0; k < N; k++) { const dl = lum(shafts.px, k * 4) - lum(flat.px, k * 4); if (dl > 1) brighter++; if (dl < -3) darker++; const ds = lum(spots.px, k * 4) - lum(shafts.px, k * 4); if (ds > 3) sUp++; if (ds < -1) sDown++; }
+    ok(`!! ${title}: THE MOON'S SHADOW ONLY TAKES LIGHT FROM THE FOG, AND TAKES A GOOD DEAL`, brighter === 0 && darker > N * 0.05 && errors.length === 0, `${darker} pixels darker by more than 3 levels, ${brighter} brighter${errors[0] ? "; " + errors[0] : ""}`);
+    const moon = latticeErr(shafts, clear, fogTwin(shafts, { spots: false }), glRows, (err, t) => [err({ shadowOf: t.shadowOf }), err({})]);
+    const n = moon.length, within = moon.filter(([e]) => e <= 4).length, eS = moon.reduce((s, [e]) => s + e, 0), eF = moon.reduce((s, [, f]) => s + f, 0);
+    ok(`!! ${title}: THE SHAFTS ARE THE CPU'S MARCH WITH THE MOON HIDDEN BEHIND THE PILLARS AND THE CANOPY: nine pixels in ten to 4 levels (a 5-pixel lattice), and on average far closer than the march that never hides it`, within >= n * 0.9 && eS < 0.4 * eF, `${within} of ${n} to 4 levels; mean error ${(eS / n).toFixed(2)} levels against ${(eF / n).toFixed(2)} unhidden`);
+    // THE SPOTS' BEAMS (2026-11-27)
+    ok(`!! ${title}: THE SPOT LIGHTS' BEAMS ONLY ADD LIGHT TO THE FOG, AND SHOW`, sDown === 0 && sUp > N * 0.01, `${sUp} pixels brighter by more than 3 levels, ${sDown} darker`);
+    const sp = latticeErr(spots, clear, fogTwin(spots, { spots: true }), glRows, (err, t) => { const tu = fogTwin(spots, { spots: true, spotShadows: false })(t.dir); return [err(t), err({ shadowOf: t.shadowOf }), err(tu)]; });
+    const m = sp.length, w4 = sp.filter(([e]) => e <= 4).length, beam = sp.filter(([e, f]) => Math.abs(f - e) > 3), eNo = beam.reduce((s, [, f]) => s + f, 0), eYes = beam.reduce((s, [e]) => s + e, 0);
+    ok(`!! ${title}: THE BEAMS ARE THE CPU'S MARCH WITH EACH SPOT'S IN-SCATTERING (cone, falloff, cookie): nine pixels in ten to 4 levels, and in the beams (where the spots change the answer by over 3 levels) a quarter the error of the march without them`, w4 >= m * 0.9 && beam.length > 50 && eYes < 0.25 * eNo, `${w4} of ${m} to 4 levels; in ${beam.length} beam pixels, mean error ${(eYes / beam.length).toFixed(2)} against ${(eNo / beam.length).toFixed(2)} without the spots`);
+    const lit = sp.filter(([e, , u]) => Math.abs(u - e) > 3), closer = lit.filter(([e, , u]) => e < u).length;
+    ok(`!! ${title}: AND EACH SPOT'S OWN SHADOW CUTS ITS BEAM -- where hiding the spot behind the pillars and boards matters (over 3 levels), the page is the hidden march`, lit.length > 20 && closer >= lit.length * 0.85, `${closer} of ${lit.length} closer to the hidden march`);
+});
+
+console.log("4. THE SHAFTS AND THE BEAMS");
 await section(async () => {
     const P0 = { density: 0.05, falloff: 0, albedo: 0.9, ambient: [0.01, 0.012, 0.018], lightDir: [0.45, 1, 0.35], lightColor: [1.2, 1.3, 1.7], g: 0.5, maxDistance: 40, steps: 48, jitter: true };
     const ray = { origin: [3, 2, 9], dir: norm([-0.3, -0.2, -1]), distance: 14, color: [0.2, 0.3, 0.4], px: 17, py: 5 };
     const a = fogCPU(P0, ray), b = fogCPU(P0, { ...ray, shadowOf: () => 1 }), c = fogCPU(P0, { ...ray, shadowOf: () => 0 }), d = fogCPU({ ...P0, lightColor: [0, 0, 0] }, ray);
     ok("!! ON THE CPU: THE SHAFTS' MARCH WITH NOTHING HIDDEN IS THE CLOSED FORM; WITH ALL HIDDEN, THE AMBIENT ALONE", a.every((v, i) => Math.abs(v - b[i]) < 1e-12) && c.every((v, i) => Math.abs(v - d[i]) < 1e-12) && c[0] < a[0], `${b.map((v) => v.toFixed(4))} / ${c.map((v) => v.toFixed(4))}`);
-    const browser = await chromium.launch({ args: [...PRESENT_ARGS], ...(HEADLESS_SHELL ? { executablePath: HEADLESS_SHELL } : {}) }), errors = [], grab = grabber(browser, "lights-gpu.html", "__lightsGpu", errors);
-    const [shafts, flat, clear] = await Promise.all([grab("&fog=1"), grab("&fog=1&shafts=0"), grab("&canopy=1")]);   // the same scene, canopy and all, without the fog
-    await browser.close();
-    const w = shafts.w, h = shafts.h, N = w * h; let brighter = 0, darker = 0;
-    for (let k = 0; k < N; k++) { const dl = lum(shafts.px, k * 4) - lum(flat.px, k * 4); if (dl > 1) brighter++; if (dl < -3) darker++; }
-    ok("!! THE MOON'S SHADOW ONLY TAKES LIGHT FROM THE FOG, AND TAKES A GOOD DEAL", brighter === 0 && darker > N * 0.05 && errors.length === 0, `${darker} pixels darker by more than 3 levels, ${brighter} brighter${errors[0] ? "; " + errors[0] : ""}`);
-    // the CPU's march, the moon hidden wherever a ray toward it meets a pillar; past the cascades' reach (28 along the view) the GPU has no moon shadow, nor does this
-    const P = shafts.fogParams, inv = invert4(shafts.vp), toSun = norm(P.lightDir);
-    const V = [T4(inv, [0, 0, 1, 1]), T4(inv, [0, 0, -1, 1])].map((q) => q.map((v) => v / q[3])), look = norm([0, 1, 2].map((i) => V[0][i] - V[1][i]));
-    const hidden = (p) => { const along = [0, 1, 2].reduce((s, i) => s + (p[i] - shafts.eye[i]) * look[i], 0); if (along > 28) return 1; return shafts.pillars.some((b) => boxHit(p, toSun, b) < Infinity) ? 0 : 1; };
-    let n = 0, errShadow = 0, errFlat = 0, within = 0;
-    for (let y = 1; y < h; y += 5) for (let x = 2; x < w; x += 5) {
-        const d = rayOf(shafts, inv, x, y), hit = castOf(shafts, shafts.pillars, shafts.eye, d), k = (y * w + x) * 4;
-        const color = [0, 1, 2].map((i) => clear.px[k + i] / 255), args = { origin: shafts.eye, dir: d, distance: hit ? hit.t : 1e9, color, px: x, py: y };
-        const want = fogCPU(P, { ...args, shadowOf: hidden }).map((v) => v * 255), wantFlat = fogCPU(P, args).map((v) => v * 255);
-        const e = Math.max(...[0, 1, 2].map((i) => Math.abs(shafts.px[k + i] - want[i]))), ef = Math.max(...[0, 1, 2].map((i) => Math.abs(shafts.px[k + i] - wantFlat[i])));
-        n++; errShadow += e; errFlat += ef; if (e <= 4) within++;
-    }
-    ok("!! THE GPU'S SHAFTS ARE THE CPU'S MARCH WITH THE MOON HIDDEN BEHIND THE PILLARS: nine pixels in ten to 4 levels (a 5-pixel lattice), and on average far closer than the march that never hides it", within >= n * 0.9 && errShadow < 0.4 * errFlat, `${within} of ${n} to 4 levels; mean error ${(errShadow / n).toFixed(2)} levels against ${(errFlat / n).toFixed(2)} unhidden`);
+    const e = fogCPU({ ...P0, ambient: [0.3, 0.2, 0.1] }, ray), f = fogCPU(P0, { ...ray, localOf: () => [0.29, 0.188, 0.082] });
+    ok("!! A SPOT'S IN-SCATTERING IS LIGHT ADDED AT EVERY STEP: a constant one is the same as that much more ambient", e.every((v, i) => Math.abs(v - f[i]) < 1e-12), `${e.map((v) => v.toFixed(4))}`);
+    const spot = { type: "spot", position: [0, 4, 0], direction: [0, -1, 0], range: 8, innerAngle: 0.3, outerAngle: 0.5, color: [1, 0.5, 0.25], intensity: 3 }, g = 0.5;
+    const inCone = CL.inScatterCPU(spot, [0, 1, 0], [1, 0, 0], g), outCone = CL.inScatterCPU(spot, [3, 1, 0], [1, 0, 0], g), toward = CL.inScatterCPU(spot, [0, 1, 0], [0, 1, 0], g), hid = CL.inScatterCPU(spot, [0, 1, 0], [1, 0, 0], g, { shadow: 0 });
+    const want = 3 * CL.window_(3, 8) * (1 - g * g) / Math.pow(1 + g * g, 1.5);
+    ok("!! inScatterCPU: on the axis, side-on, the light's radiance times 4 pi Henyey-Greenstein; none outside the cone or in its shadow; more looking toward it (g > 0)", Math.abs(inCone[0] - want) < 1e-12 && outCone.every((v) => v === 0) && hid.every((v) => v === 0) && toward[0] > 2 * inCone[0], `${inCone[0].toFixed(5)} against ${want.toFixed(5)}`);
 });
+console.log("5. THE WEBGL2 FOG");
+await shaftChecks("WEBGL2", "lights-demo.html", "__lights", ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"], true);
+console.log("6. THE WEBGPU FOG");
+await shaftChecks("WEBGPU", "lights-gpu.html", "__lightsGpu", [...PRESENT_ARGS], false);
 
 srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

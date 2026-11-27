@@ -1305,7 +1305,7 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "splatRendererGPU.SPLAT_WGSL", kind: "render pass, graded through the device", why: "the splat renderer's vertex and fragment pass over the sorted order; tools/ship/splatRendererGPU-selfcheck.mjs draws it on WebGPU and holds it to the WebGL2 renderer" }),
     Object.freeze({ id: "splatSH.SH_WGSL", kind: "render pass, graded through the device", why: "a function-body fragment (the SH colour) the splat renderer pastes into its vertex shader; graded through tools/ship/splatRendererGPU-selfcheck.mjs and tools/ship/splatSH-selfcheck.mjs against shRest" }),
     Object.freeze({ id: "volumetricFog.FOG_WGSL", kind: "render pass, graded through the device", why: "the fog's full-screen post pass; tools/ship/volumetricFog-selfcheck.mjs draws it on WebGPU and holds it to fogCPU" }),
-    Object.freeze({ id: "volumetricFog.fogWGSL", kind: "render pass, graded through the device", why: "the generator of FOG_WGSL and of its shafts variant (the sun's shadow sampled per step); tools/ship/softShadows-selfcheck.mjs holds the shafts to fogCPU's march with the shadow cast on the CPU" }),
+    Object.freeze({ id: "volumetricFog.fogWGSL", kind: "render pass, graded through the device", why: "the generator of FOG_WGSL and of its shafts variant (the sun's shadow sampled per step, and since 2026-11-27 each spot light's shadowed in-scattering, clusteredLights' clInScatter); tools/ship/softShadows-selfcheck.mjs holds the shafts and the beams to fogCPU's march with the shadows cast on the CPU, on WebGL2 and WebGPU alike" }),
 ]);
 
 /**

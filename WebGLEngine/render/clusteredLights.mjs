@@ -46,6 +46,8 @@
 //   CLUSTERED_GLSL (#define CLUSTERED_BRUTE, CLUSTERED_NO_SHADOWS before it)  /  clusteredWGSL({ group, brute, shadows })
 //      vec3 clusteredLight(vec3 p, vec3 n, vec3 v, vec3 albedo)  /  fn clusteredLight(p: vec3f, n: vec3f, v: vec3f, albedo: vec3f) -> vec3f
 //   shadeCPU(lights, clusters, p, n, v, albedo, { brute, shadowOf, cookies }) the same sum on the CPU
+//   FOR THE FOG (2026-11-27, Keith's "close the shadow gaps"): clInScatter(i, p, dir, g) -- light i's in-scattering at a point of a ray, shadowed, cone, cookie and all -- and
+//   clSunShadowAt(p), in both chunks; inScatterCPU(light, p, dir, g, { shadow, cookies }) on the CPU. render/volumetricFog.mjs marches them.
 // Held by tools/ship/clusteredLights-selfcheck.mjs (lights-demo.html and lights-gpu.html in headless Chromium).
 "use strict";
 
@@ -131,6 +133,12 @@ export function lightAt(l, p, cookies = null) {
     if (l.type === "spot") a *= smoothstep(Math.cos(l.outerAngle), Math.cos(l.innerAngle), dot([-L[0], -L[1], -L[2]], norm(l.direction)));
     if (l.type === "spot" && cookies && l.cookie != null && a > 0) tint = cookieAt(cookies, l, p);
     return { L, rad: l.color.map((c, k) => c * a * tint[k]) };
+}
+/** For the fog: a (non-sun) light's in-scattering at p for a ray going `dir`, per unit of scattering -- its radiance at p (lightAt: window, cone, cookie) times shadow (1 when
+ *  not given) times 4 pi Henyey-Greenstein(g), the angle between the ray and the way to the light. clInScatter in the shaders. */
+export function inScatterCPU(l, p, dir, g, { shadow = 1, cookies = null } = {}) {
+    const { L, rad } = lightAt(l, p, cookies), c = dot(dir, L), ph = (1 - g * g) / Math.pow(1 + g * g - 2 * g * c, 1.5);
+    return rad.map((r) => r * ph * shadow);
 }
 /** The shading sum on the CPU: the cell's lights plus the sun (or, `brute`, every light), each times shadowOf(i, p) (1 when not given). */
 export function shadeCPU(lights, C, p, n, v, albedo, { brute = false, shadowOf = null, cookies = null } = {}) {
@@ -334,6 +342,23 @@ vec3 clOne(int i, vec3 p, vec3 n, vec3 v, vec3 albedo) {
     float nl = max(dot(n, L), 0.0); vec3 h = normalize(L + v); float sp = nl > 0.0 ? pow(max(dot(n, h), 0.0), 32.0) * 0.25 : 0.0;
     return (albedo * rad * nl + rad * sp) * clShadow(p, n, L, a.xyz, sun, int(d.y), int(d.z));
 }
+// FOR THE FOG (render/volumetricFog.mjs's shafts): light i's in-scattering at p for a ray going dir, per unit of scattering -- its radiance (window, cone, cookie) times its
+// shadow times 4 pi Henyey-Greenstein(g) -- and the sun's shadow at p. No surface: the shadow's bias is along the light alone.
+vec3 clInScatter(int i, vec3 p, vec3 dir, float g) {
+    vec4 a = texelFetch(uClusterLights, ivec2(0, i), 0), b = texelFetch(uClusterLights, ivec2(1, i), 0), c = texelFetch(uClusterLights, ivec2(2, i), 0), d = texelFetch(uClusterLights, ivec2(3, i), 0);
+    vec3 dl = a.xyz - p; float dist = length(dl); vec3 L = dist > 0.0 ? dl / dist : vec3(0.0, 1.0, 0.0);
+    float att = clWindow(dist, a.w);
+    if (b.w > 0.5) { float t = clamp((dot(-L, c.xyz) - c.w) / max(d.x - c.w, 1e-6), 0.0, 1.0); att *= t * t * (3.0 - 2.0 * t); }
+    if (att <= 0.0) return vec3(0.0);
+    vec3 rad = b.rgb * att; if (d.w > 0.5) rad *= clCookie(i, p);
+    float cs = dot(dir, L), ph = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cs, 1.5);
+    return rad * ph * clShadow(p, vec3(0.0), L, a.xyz, false, int(d.y), int(d.z));
+}
+float clSunShadowAt(vec3 p) {
+    if (uSunIndex < 0) return 1.0;
+    vec4 c = texelFetch(uClusterLights, ivec2(2, uSunIndex), 0), d = texelFetch(uClusterLights, ivec2(3, uSunIndex), 0);
+    return clShadow(p, vec3(0.0), -c.xyz, vec3(0.0), true, int(d.y), int(d.z));
+}
 int clCell(vec3 p) {
     if (uClusterMode == 1) {
         vec4 vv = uClusterView * vec4(p, 1.0); float d = -vv.z;
@@ -471,6 +496,20 @@ fn clOne(i: u32, p: vec3f, n: vec3f, v: vec3f, albedo: vec3f) -> vec3f {
     var rad = l.colorType.rgb * att; if (l.cosInnerFaces.w > 0.5) { rad = rad * clCookie(l, p); }
     let nl = max(dot(n, L), 0.0); let hv = normalize(L + v); var sp = 0.0; if (nl > 0.0) { sp = pow(max(dot(n, hv), 0.0), 32.0) * 0.25; }
     return (albedo * rad * nl + rad * sp) * clShadow(p, n, L, l.posRange.xyz, sun, u32(l.cosInnerFaces.y), u32(l.cosInnerFaces.z));
+}
+fn clInScatter(i: u32, p: vec3f, dir: vec3f, g: f32) -> vec3f {   // for the fog: as CLUSTERED_GLSL's
+    let l = clLights[i]; let dl = l.posRange.xyz - p; let dist = length(dl); var L = vec3f(0.0, 1.0, 0.0); if (dist > 0.0) { L = dl / dist; }
+    var att = clWindow(dist, l.posRange.w);
+    if (l.colorType.w > 0.5) { let t = clamp((dot(-L, l.dirCosOuter.xyz) - l.dirCosOuter.w) / max(l.cosInnerFaces.x - l.dirCosOuter.w, 1e-6), 0.0, 1.0); att = att * t * t * (3.0 - 2.0 * t); }
+    if (att <= 0.0) { return vec3f(0.0); }
+    var rad = l.colorType.rgb * att; if (l.cosInnerFaces.w > 0.5) { rad = rad * clCookie(l, p); }
+    let cs = dot(dir, L); let ph = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cs, 1.5);
+    return rad * ph * clShadow(p, vec3f(0.0), L, l.posRange.xyz, false, u32(l.cosInnerFaces.y), u32(l.cosInnerFaces.z));
+}
+fn clSunShadowAt(p: vec3f) -> f32 {
+    if (clP.sun.x < 0.0) { return 1.0; }
+    let l = clLights[u32(clP.sun.x)];
+    return clShadow(p, vec3f(0.0), -l.dirCosOuter.xyz, vec3f(0.0), true, u32(l.cosInnerFaces.y), u32(l.cosInnerFaces.z));
 }
 fn clCell(p: vec3f) -> i32 {
     if (clP.sun.z > 0.5) {
