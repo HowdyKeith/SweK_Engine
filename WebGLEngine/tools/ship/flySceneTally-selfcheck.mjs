@@ -8,12 +8,16 @@
 //   1  THE ROUND'S NUMBERS      the flies, the audit, the scene; the scene-types and perfect-tally rounds' files by their hashes, passing their own checks; the registration says the same
 //   2  THE FLYING               the true way home in the plain scene is the perfect-tally round's at sigma 0 to the bit; in the 26-type scene it is another; a fly is its arm's committed weights
 //   3  THE RECORDS              48 flies and a second flight, made here; T26, Q and the broken sets
-//   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   4  THE COMMAND              it is this round's; no flight of the round's, no process (but the verdict's one fly)
+//   5  THE VERDICT              the committed results file by its hash; its checks, T26 and Q, the means, what was described after the reading; COURSE64 draw 12 re-flown to the bit; the note says it
 // SABOTAGE LOG (2026-11-27) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the
 // command as a process); every one red by name, none 0 (the number is the rows red):
 //   T1 the plain scene 2 | T2 the true way not shown 1 | T3 shown from the start 1 | T4 T26 against the own plain home 1 | T5 Q without the plain gap 2 | T6 the perfect tally at sigma 0.4 3 |
 //   T7 the weights not checked 1 | T8 the second flight not compared 1 | T9 the perfect-tally file's own checks skipped 1 | T10 the scene-types file's hash another 3 | T11 BETTER read as WORSE 3 |
 //   T12 every fly HOMEP's weights 1 | K1 the second flight's score not kept 1 | K2 the command's usage another 2 (voxelHome) | M1 an expectation moved 1
+//   THE VERDICT (after the reading, the same runner, this gate alone): V1 the results file's hash another 1 | V2 alpha 0.05 1 | V3 T26 against the own plain home 2 | V4 Q without the plain
+//   gap 4 | V5 a mean in the note's table 1 | V6 the note's share 24 above 1 | V7 an expectation in section 9 moved 1 | V8 the backlog row Q CANNOT 1 | V9 the re-flight compared to draw 11 1
+//   -- all red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -24,6 +28,7 @@ import * as S from "./flySceneTypes.mjs";
 import * as Q from "./flyHomeTrueTally.mjs";
 import * as N from "./flyHomeCompassNoise.mjs";
 import * as T from "./flyTrainedHome.mjs";
+import { signTest } from "./voxelHome.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -102,8 +107,34 @@ section(() => {
         /PF\.flyOne\(args\.arm, args\.s, committedFiles\(\)\)/.test(csrc) && /\{ kind: "recheck", arm, s, home: rec\.home \}/.test(csrc) && /todo\.splice\(Math\.min\(1, todo\.length\), 0, \["HOMEP", PF\.SEEDS\[0\], true\]\)/.test(csrc) &&
         /Object\.entries\(PF\.FILES\)\.map\(\(\[k, f\]\) => \[k, PF\.fileOf\(fs\.readFileSync\(path\.join\(ENG, f\)\)\)\]\)/.test(csrc) && /path\.join\(ENG, PF\.RESULTS\)/.test(csrc) && /usage: node tools\/ship\/takeFlySceneTally\.mjs run \[--jobs N\] \| read \| job ARM S/.test(csrc) && !/console\.log\([^)]*\.home\b/.test(csrc));
     const me = src("tools/ship/flySceneTally-selfcheck.mjs"), calls = [...me.matchAll(/E\.flyOne\(([^)]*)\)/g)].map((m) => m[1]);
-    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its one flyOne is on its own 2 lives; it starts no process; the file's size and time are what they were",
-        calls.length === 1 && /, TWO$/.test(calls[0]) && !TWO.some((x) => T.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S BUT THE VERDICT'S ONE FLY AND LEAVES ITS RESULTS FILE AS IT WAS: one flyOne on its own 2 lives, and section 5's COURSE64 draw 12 on the round's audit; it starts no process; the file's size and time are what they were",
+        calls.length === 2 && /, TWO$/.test(calls[0]) && calls[1] === '"COURSE64", 12, F' && !TWO.some((x) => T.AUDIT.includes(x)) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before, `the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the results file committed unread at 09062f15, then read once; COURSE64 draw 12 flown home again here with the true way shown, about a minute)");
+section(() => {
+    const RS = "95ee36184538cbd69b74eb4dfbbb60347a5d984f31256211cec0cbb93f40909a", L = E.fileOf(fs.readFileSync(path.join(ENG, E.RESULTS))), R = E.reading(L.lines, F), f4 = (x) => x.toFixed(4), m = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    ok("!! THE RESULTS FILE IS THE ONE COMMITTED UNREAD (sha256 95ee3618...), 49 records, and its checks hold", L.sha256 === RS && L.lines.length === 49 && R.checks.length === 0, R.checks.join("; "));
+    ok("!! T26: A PERFECT TALLY FINDS HOME BETTER IN THE 26-TYPE SCENE (48 above, none below, p 7.1e-15); Q: THE TALLY COSTS MORE THERE THAN IN THE PLAIN (40 above, 8 below, p 3.3e-6)",
+        R.T26.word === E.WORDS.T26[0] && R.T26.above === 48 && R.T26.below === 0 && R.T26.ties === 0 && R.T26.p.toExponential(3) === "7.105e-15" && R.Q.word === E.WORDS.Q[0] && R.Q.above === 40 && R.Q.below === 8 && R.Q.ties === 0 &&
+        R.Q.p.toExponential(3) === "3.305e-6" && f4(m(R.T26.diffs)) === "0.3789" && f4(m(R.Q.diffs)) === "0.0177");
+    const row = (a) => ["ownPlain", "ownType", "truePlain", "trueType"].map((k) => f4(R.arms[a][k])).join(" ");
+    ok("the means the note prints, each arm's own tally plain and 26-type, perfect tally plain and 26-type",
+        row("HOMEP") === "0.5501 0.5911 0.9164 0.9630" && row("COURSE64") === "0.5541 0.5761 0.9099 0.9630" && row("HOME16") === "0.5517 0.5900 0.9169 0.9623" && row("H16BYC") === "0.5548 0.5797 0.9123 0.9641");
+    const flies = L.lines.filter((r) => r.kind === "fly"), byArm = (a) => signTest(flies.map((r, i) => [r, R.Q.diffs[i]]).filter(([r]) => r.arm === a).map(([, d]) => d), 0);
+    const typ = (a, s) => F.types.lines.find((r) => r.kind === "fly" && r.arm === a && r.s === s).type.home, tp = (a, s) => F.tally.lines.find((r) => r.kind === "fly" && r.arm === a && r.s === s).levels.find((x) => x.sigma === 0).home;
+    const share = flies.map((r) => typ(r.arm, r.s) / r.home - N.committedOf(r.arm, r.s, F).home / tp(r.arm, r.s)), sh = signTest(share, 0), all = (k) => m(E.ARMS.map((a) => R.arms[a][k]));
+    ok("!! DESCRIBED AFTER THE READING: Q is the course-chosen flies' (COURSE64 and H16BYC 12 of 12 each; HOMEP and HOME16 8 of 12 each); as a share of the perfect tally's home the own tally keeps the same in both scenes (23 above, 25 below, p 0.89; 0.6048 plain, 0.6066 26-type)",
+        ["HOMEP", "COURSE64", "HOME16", "H16BYC"].map((a) => `${byArm(a).above}/${byArm(a).below}`).join(" ") === "8/4 12/0 8/4 12/0" && sh.above === 23 && sh.below === 25 && f4(sh.p) === "0.8854" &&
+        f4(all("ownPlain") / all("truePlain")) === "0.6048" && f4(all("ownType") / all("trueType")) === "0.6066");
+    const r12 = flies.find((r) => r.arm === "COURSE64" && r.s === 12), again = E.flyOne("COURSE64", 12, F);
+    ok("!! COURSE64 draw 12 flown again here: its home in the 26-type scene with the true way shown, over the homing round's 200 audit lives, is the record's to the bit", again.home === r12.home && again.weightsHash === r12.weightsHash);
+    const note = src("brain/FLY_SCENE_TALLY_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 9 says it: the file and its hash, both words, the means, both expectations came, what was described and what it does not mean; the backlog row DONE",
+        /## 9\. The result \(the whole results file committed unread at 09062f15, then read once\)/.test(note) && /sha256 95ee36184538cbd6/.test(note) && note.includes("**T26: " + E.WORDS.T26[0] + "**") && note.includes("**Q: " + E.WORDS.Q[0] + "**") &&
+        /\| HOMEP \| 0\.5501 \| 0\.5911 \| 0\.9164 \| 0\.9630 \|/.test(note) && /\| H16BYC \| 0\.5548 \| 0\.5797 \| 0\.9123 \| 0\.9641 \|/.test(note) && /\*\*Both expectations came\*\*: T26 BETTER \(99\) and Q BETTER \(80\)/.test(note) &&
+        note.includes("**Described after the reading, not registered (the gate recomputes it from the records):**") && /above 0 for 23 flies and below for 25 \(p 0\.89\)/.test(note) && note.includes("**What it does not mean.**") &&
+        /\| `fly-scene-tally` \|[^\n]*\*\*REGISTERED[^\n]*DONE 2026-11-27[^\n]*T26 BETTER \(48 of 48[^\n]*Q BETTER \(40 of 48/.test(back));
 });
 
 console.log(`\nflySceneTally-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
