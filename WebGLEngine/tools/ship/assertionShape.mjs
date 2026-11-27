@@ -988,8 +988,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4933 -- +106 gates, the round since v4932 (the PlayCanvas line's, the duel studies', the fly pathways') plus main's two restored at the ship (tools/ship/takeEvadeSeat-selfcheck.mjs and
     // tools/ship/gpuTimer-selfcheck.mjs, which this round's same-named gates had replaced and which were given back their names): every one defines and uses ok() name-first, so usesOk,
     // definesOk and nameFirst each rose by the same 106; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
-    gates: 2530, usesOk: 2509, definesOk: 2501, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2391, condFirst: 99, unknownSignature: 19,
+    // v4934 -- +79 gates, this branch's navigation and head-to-head rounds meeting main at the merge: every one defines and uses ok() name-first, so usesOk, definesOk and nameFirst each rose by the same 79; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
+    gates: 2609, usesOk: 2588, definesOk: 2580, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2470, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

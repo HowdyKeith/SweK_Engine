@@ -1,0 +1,168 @@
+{
+ "version": 1,
+ "prefix": "rig",
+ "about": "The order SweK peers take the rig's rounds (2026-11-23). One job per round, so free peers take different rounds at once; the priority IS the order (highest first). hours = rough cost on four workers. Reasons are the value of the answer per hour: cheap flights on stored networks first, then the redraws of the strongest earlier results, then the new prices, then the day-long searches, then the replication of H46.",
+ "jobs": [
+  {
+   "round": "72",
+   "priority": 9,
+   "hours": 1.5,
+   "why": "flight only: the twelve stored networks on compass windows they never trained on; cheap, and says whether any later win is brittle",
+   "note": "H72: flight only: the twelve stored networks on compass windows they never trained on; cheap, and says whether any later win is brittle"
+  },
+  {
+   "round": "73",
+   "priority": 8,
+   "hours": 2.5,
+   "why": "flight only: weight noise on the stored networks; cheap, the same question from the other side",
+   "note": "H73: flight only: weight noise on the stored networks; cheap, the same question from the other side"
+  },
+  {
+   "round": "68",
+   "priority": 7,
+   "hours": 1.0,
+   "why": "flight only: the stored networks at 80, 160 and 320 s horizons; cheap",
+   "note": "H68: flight only: the stored networks at 80, 160 and 320 s horizons; cheap"
+  },
+  {
+   "round": "86",
+   "priority": 7,
+   "hours": 2,
+   "why": "redraws H36's population search: cheap (about 1.6 h), runs early",
+   "note": "H86: redraws H36's population search on four new seeds: cheap (about 1.6 h), runs early"
+  },
+  {
+   "round": "74",
+   "priority": 6,
+   "hours": 6,
+   "why": "redraws the 0.02 baseline every other round is read against (H32's champion)",
+   "note": "H74: redraws the 0.02 baseline every other round is read against (H32's champion)"
+  },
+  {
+   "round": "76",
+   "priority": 5,
+   "hours": 6,
+   "why": "redraws H55 (0.08), the cleanest thrifty effect",
+   "note": "H76: redraws H55 (0.08), the cleanest thrifty effect"
+  },
+  {
+   "round": "77",
+   "priority": 4,
+   "hours": 6,
+   "why": "the new question: a network against the law of its own price (0.04)",
+   "note": "H77: the new question: a network against the law of its own price (0.04)"
+  },
+  {
+   "round": "78",
+   "priority": 3,
+   "hours": 6,
+   "why": "redraws H61 (0.16), the largest margin",
+   "note": "H78: redraws H61 (0.16), the largest margin"
+  },
+  {
+   "round": "80",
+   "priority": 2,
+   "hours": 6,
+   "why": "redraws H50 (0.01), the tie with c02 and the law of its price",
+   "note": "H80: redraws H50 (0.01), the tie with c02 and the law of its price"
+  },
+  {
+   "round": "79",
+   "priority": 1,
+   "hours": 6,
+   "why": "0.06, where the regime between 3 kW and 1.6 kW is chosen",
+   "note": "H79: 0.06, where the regime between 3 kW and 1.6 kW is chosen"
+  },
+  {
+   "round": "71",
+   "priority": 0,
+   "hours": 6,
+   "why": "0.03, between the laws of 0.02 and 0.04",
+   "note": "H71: 0.03, between the laws of 0.02 and 0.04"
+  },
+  {
+   "round": "81",
+   "priority": -1,
+   "hours": 6,
+   "why": "0.12, between the two flown thrifty searches: smooth descent in power or a step",
+   "note": "H81: 0.12, between the two flown thrifty searches: smooth descent in power or a step"
+  },
+  {
+   "round": "83",
+   "priority": -1,
+   "hours": 6,
+   "why": "0.24, where the one-kilowatt pilot meets its floor",
+   "note": "H83: 0.24, where the one-kilowatt pilot meets its floor"
+  },
+  {
+   "round": "82",
+   "priority": -2,
+   "hours": 9,
+   "why": "redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate",
+   "note": "H82: redraws H58 (price 0): does the 17 kW pilot and its lost subs replicate"
+  },
+  {
+   "round": "84",
+   "priority": -2,
+   "hours": 9,
+   "why": "redraws H38's two smaller networks on new seeds: does the pruned-versus-random reading replicate",
+   "note": "H84: redraws H38's two smaller networks on new seeds: does the pruned-versus-random reading replicate"
+  },
+  {
+   "round": "85",
+   "priority": -2,
+   "hours": 9,
+   "why": "a search at price 0.005, between the 17 kW pilot of price 0 and the tie of price 0.01",
+   "note": "H85: a search at price 0.005, between the 17 kW pilot of price 0 and the tie of price 0.01"
+  },
+  {
+   "round": "75",
+   "priority": -3,
+   "hours": 6,
+   "why": "0.32, where the descent in power ends",
+   "note": "H75: 0.32, where the descent in power ends"
+  },
+  {
+   "round": "65",
+   "priority": -4,
+   "hours": 20,
+   "why": "new seeds at 144 ids: does H41's tie replicate (about a day)",
+   "note": "H65: new seeds at 144 ids: does H41's tie replicate (about a day)"
+  },
+  {
+   "round": "69",
+   "priority": -5,
+   "hours": 24,
+   "why": "hard and easy train sets (two groups of searches, a day or more)",
+   "note": "H69: hard and easy train sets (two groups of searches, a day or more)"
+  },
+  {
+   "round": "67",
+   "priority": -6,
+   "hours": 24,
+   "why": "sigma 0.03 and 3.0 (two groups of searches, a day or more)",
+   "note": "H67: sigma 0.03 and 3.0 (two groups of searches, a day or more)"
+  },
+  {
+   "round": "64",
+   "priority": -7,
+   "hours": 30,
+   "why": "288 train ids (the dearest search)",
+   "note": "H64: 288 train ids (the dearest search)"
+  },
+  {
+   "round": "66",
+   "priority": -8,
+   "hours": 24,
+   "why": "0.005 at 144 ids (about a day)",
+   "note": "H66: 0.005 at 144 ids (about a day)"
+  },
+  {
+   "round": "70",
+   "priority": -9,
+   "hours": 3,
+   "why": "replicates H46 at 800 ids; last on purpose",
+   "note": "H70: replicates H46 at 800 ids; last on purpose"
+  }
+ ]
+}

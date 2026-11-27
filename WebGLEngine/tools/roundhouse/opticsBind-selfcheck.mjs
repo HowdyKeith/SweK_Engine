@@ -10,7 +10,7 @@
 // single-slit first minimum at exactly lambda/a, and the knife-edge shadow at exactly 0.25 from C(0)=S(0)=0.
 // THE FRESNEL HALF HAD NO KEY AT ALL -- which is the half that was unreachable. ***
 
-import { opticsDevice, OPTICS_OBSERVABLES, OPTICS_KNOB_CHOICES } from "./opticsBind.mjs";
+import { opticsDevice, OPTICS_OBSERVABLES, OPTICS_KNOB_CHOICES, CONVERGE_EVAL_BUDGET, convergeMethod } from "./opticsBind.mjs";
 import { AIRY_FIRST_RING, J1_FIRST_ZERO } from "../../physics/optics/airyRefined.mjs";
 
 let fails = 0;
@@ -93,6 +93,25 @@ console.log("\n2b. *** THE COST OF THE CONVERGE MODE IS EXACTLY 1/F, THE NUMBER 
         "and 2.32e9 evaluations. The mode is expensive in exactly the direction its key must travel, so any " +
         "ceiling low enough to protect a caller is low enough to cut off the physics. A COST POLICY DOES NOT " +
         "BELONG INSIDE A PHYSICS DEVICE: the bound is knobLiveness's, and what belongs here is the number.");
+}
+
+// ---- 2c. THE CONVERGE MODE IS BOUNDED (unnumbered, 2026-11-23) --------------------------------------------
+console.log("\n2c. THE CONVERGE MODE TAKES A BOUNDED PATH OVER ITS EVALUATION BUDGET");
+{
+    // The section above says a cost POLICY does not belong inside a physics device, and that stays true of REFUSING: nothing is refused here. What changed is the METHOD: over CONVERGE_EVAL_BUDGET
+    // nominal Simpson evaluations the mode computes the same Fresnel integrals by physics/optics/fresnel.js's fresnelCSFast (a series and a continued fraction, 1e-14 accurate, a cost that does not
+    // grow with the argument). quadratureEvals still REPORTS the nominal Simpson cost, so the 7200/F row above is unchanged, and the two paths agree to ~1e-9 on a profile (graded in fresnel-selfcheck).
+    ok("!! the budget is 5e7 nominal Simpson evaluations and the switch is exactly at it: at the budget the Simpson path, one evaluation over it the fast path",
+        CONVERGE_EVAL_BUDGET === 5e7 && convergeMethod(5e7) === "simpson" && convergeMethod(5e7 + 1) === "fast" && convergeMethod(0) === "simpson" && convergeMethod(2.33e8) === "fast" && convergeMethod(1.85e9) === "fast",
+        "the shipped default costs 2.33e8 nominal evaluations and v4488's 8x-lambda probe 1.85e9; both are over the budget, which is what lets the corroboration sweep finish");
+    const t0 = Date.now(), big = await build({ mode: "converge", config: { z: 20000 } }), ms = Date.now() - t0;
+    ok("!! a build at 2.3e9 nominal evaluations returns in under 20 s and still reports that nominal cost (it took 3.5 s at 2.3e8 and minutes above it before the bound)",
+        ms < 20000 && big.quadratureEvals === 2 * 161 * Math.max(64, Math.ceil(7200 / big.fresnelNumber)) && big.quadratureEvals > 2e9 && Number.isFinite(big.nearFarRms),
+        ms + " ms, quadratureEvals " + big.quadratureEvals.toExponential(3) + ", nearFarRms " + big.nearFarRms.toExponential(3));
+    const d = await build({ mode: "converge", config: {} });
+    ok("!! the default configuration is over the budget and takes the fast path in well under the 3.5 s the Simpson path cost, and its residual is the one section 2 grades",
+        convergeMethod(d.quadratureEvals) === "fast" && Number.isFinite(d.nearFarRms) && d.nearFarRms > 0 && d.nearFarRms < 0.05,
+        "nearFarRms " + d.nearFarRms.toExponential(4));
 }
 
 // ---- 3. THE FRAUNHOFER KEYS, AND WHERE THE CONSTANT COMES FROM --------------------------------------------

@@ -1,7 +1,7 @@
 // WebGLEngine/brain/learnedCourier-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time). Run: node brain/learnedCourier-selfcheck.mjs
 //
 // THE GATE OF brain/learnedCourier.mjs (round 11 of the submarine stations, brain/SUB_STATIONS_WIP.md section 27) and of breachCourierTask.run's `make`.
-//   1  the ten features and the constants as registered; 2 the two units on hand-made ticks; 3 ALL-ZERO WEIGHTS ARE THE HELM AND DAMAGE CONTROL, flown through round 7's own loop; 4 the ES, pinned on a stub; 5 the frozen file
+//   1  the ten features and the constants as registered; 2 the two units on hand-made ticks; 3 ALL-ZERO WEIGHTS ARE THE HELM AND DAMAGE CONTROL, flown through round 7's own loop; 4 the ES, pinned on a stub; 5 the frozen file; 6 round 15; 7 round 18
 // Flies no TRAIN, SELECTION or HELD seed of round 11 (its runs are round 7's DEV seeds).
 // SABOTAGED -- 12 mutants of brain/learnedCourier.mjs and breachCourierTask.mjs, each alone in place and restored, EVERY ONE RED BY NAME (final pass): M01 the need by the straight line always | M02 the need not less the charge |
 //   M03 a 10 s goal window | M04 a goal never noted | M05 charging counted as spent | M06 breached never latched | M07 DROP from the SURFACE weights | M08 the fitness without survival | M09 the seed 9010 |
@@ -9,6 +9,8 @@
 // 2026-11-20 -- ROUND 15 (section 6): 9 mutants of learnedCourier.mjs, every one red by name (final pass): P01 the price at 2 a boat | P02 the time left from 600 s | P03 a lost boat free | P04 a kept boat +2 | P05 round 11's
 //   fitness | P06 ES15 at 9009 | P07 24 generations | P08 HELD on round 11's | P09 no lostAt accepted; and round 15's verdict, 4 more, every one red: V01 the verdict on goals | V02 p 0.1 | V03 the value not computed | V04 the sides swapped. P05 WENT 0 RED FIRST (the row's 60 s run kept its boat, where the value IS the goals); a lost run (DEV 189001) is asked now.
 //   AND A ROW OF MINE CLAIMED TOO MUCH: it said the stub ES's best climbs. A (mu, lambda) ES keeps no parents, and on this stub the best falls after generation 0; the claim is gone and the comment says why.
+// 2026-11-25 -- ROUND 18 (section 7): 7 mutants of learnedCourier.mjs, every one red by name (final pass): R01 30 generations | R02 sigma halving every 7 | R03 the seed 9015 | R04 sigma0 1 | R05 16 TRAIN seeds |
+//   R06 HELD on round 15's 211001 | R07 SELECTION on round 15's 210501.
 "use strict";
 import fs from "node:fs";
 import * as L from "./learnedCourier.mjs";
@@ -133,6 +135,23 @@ await (async () => {
         const j = JSON.parse(fs.readFileSync(f, "utf8"));
         ok("the frozen PRICED captain is 20 finite weights, round 15's ES, price and sets, its fitness and 20 generations of history", j.round === 15 && j.theta.length === 20 && j.theta.every(Number.isFinite) && J(j.es) === J(L.ES15) && J(j.price) === J(L.PRICE) && j.train === 16 && j.selection === 16 && j.history.length === 20 && Number.isFinite(j.selFit));
     } catch (e) { ok("section 6 ran to the end", false, "THREW " + String(e && e.message)); }
+})();
+
+sec("7. ROUND 18 (section 35): round 15's learner and price with a bigger budget");
+await (async () => {
+    try {
+        ok("round 18's ES is round 11's with 40 generations, sigma halving every 14, seed 9018 -- nothing else changed", J({ ...L.ES18, generations: 20, halveEvery: 7, seed: 9009 }) === J(L.ES) && L.ES18.generations === 40 && L.ES18.halveEvery === 14 && L.ES18.seed === 9018 && Object.isFrozen(L.ES18), J(L.ES18));
+        const all = [L.TRAIN_SET, L.SELECTION_SET, L.HELD_SET, L.R15_TRAIN_SET, L.R15_SELECTION_SET, L.R15_HELD_SET];
+        ok("round 18's sets: TRAIN 214001-214032 (32), SELECTION 214501-214516, HELD 215001-215096, each consecutive and disjoint from rounds 11 and 15",
+            L.R18_TRAIN_SET.length === 32 && L.R18_TRAIN_SET[0] === 214001 && L.R18_TRAIN_SET[31] === 214032 && L.R18_SELECTION_SET.length === 16 && L.R18_SELECTION_SET[0] === 214501 && L.R18_SELECTION_SET[15] === 214516
+            && L.R18_HELD_SET.length === 96 && L.R18_HELD_SET[0] === 215001 && L.R18_HELD_SET[95] === 215096 && [L.R18_TRAIN_SET, L.R18_SELECTION_SET, L.R18_HELD_SET].every((S) => S.every((x, i) => i === 0 || x === S[i - 1] + 1))
+            && ![...L.R18_TRAIN_SET, ...L.R18_SELECTION_SET, ...L.R18_HELD_SET].some((x) => all.some((S) => S.includes(x))));
+        const f = new URL("./learnedCourierBudget.json", import.meta.url);
+        if (!fs.existsSync(f)) { console.log("  NOT YET  brain/learnedCourierBudget.json is written by the training (tools/ship/trainLearnedCourier.mjs --round 18 --write) and committed before HELD is flown"); return; }
+        const j = JSON.parse(fs.readFileSync(f, "utf8"));
+        ok("the frozen BUDGET captain is 20 finite weights, round 18's ES, round 15's price, 32 TRAIN and 16 SELECTION runs, its fitness and 40 generations of history",
+            j.round === 18 && j.theta.length === 20 && j.theta.every(Number.isFinite) && J(j.es) === J(L.ES18) && J(j.price) === J(L.PRICE) && j.train === 32 && j.selection === 16 && j.history.length === 40 && Number.isFinite(j.selFit) && Number.isFinite(j.trainFit), J({ trainFit: j.trainFit, selFit: j.selFit }));
+    } catch (e) { ok("section 7 ran to the end", false, "THREW " + String(e && e.message)); }
 })();
 
 finished = true;

@@ -265,6 +265,20 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
         // a body behind it cannot be pointed at. A person has a larger window; the row cannot assume one.
         // SABOTAGES (v4920): the page's pointer offset by 60 px -> 1 red, this row, "aimed at fonts at (660, 250), on the
         // canvas, 25 times"; the filter inverted, so only covered bodies are aimed at -> 1 red, this row.
+        // *** v4935 -- AND THE DEFAULT VIEW STOPPED LABELLING ANYTHING, WITH NO LINE OF THE PAGE OR THIS GATE CHANGED. *** The bodies are
+        // this repository's own git history, so their sizes move as the repository grows -- every checkout reads the same .git. The v4935
+        // rotation returned this row red, and so did v4925's and v4932's trees on the same day (measured in a worktree): at the default
+        // camera the largest body's metric was 0.00755 (three), under the label line of 0.00803 (lodTh.thresholds[1] at 800 px on webgl2),
+        // so labelsFor listed none and there was nothing to aim at. The same fault as v4534 and v4920, one layer further in: the row was
+        // measuring where the repository's sizes happened to sit against a fixed line. A person dollies in with the wheel to see names,
+        // so the gate does: over the canvas right of the panel, one notch at a time, until something is labelled (at most 12 notches).
+        // The claim is unchanged -- the HUD must name THE BODY AIMED AT; only the distance it is asked from moves.
+        // SABOTAGE (v4935, restored): the page's wheel handler made to dolly nothing -> 1 red, this row, "no window.__labelled after 12 notch(es)".
+        let dollies = 0;
+        for (; dollies < 12; dollies++) {
+            if (await pg.evaluate(() => (window.__labelled || []).length)) break;
+            await pg.mouse.move(700, 300); await pg.mouse.wheel(0, -120); await pg.waitForTimeout(250);
+        }
         let named = null, aimed = null, aimTries = 0, covered = 0, listed = 0;
         for (; aimTries < 25 && !named; aimTries++) {
             const all = await pg.evaluate(() => (window.__labelled || []).map((b) => { const e = document.elementFromPoint(b.x, b.y); return { ...b, reach: !!e && e.tagName === "CANVAS" }; }));
@@ -304,13 +318,13 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
         ok("*** the trade log fills and moves ***", st.log.length > 20 && st.log !== log1, st.log.slice(0, 120));
         ok("*** THE POINTER, AIMED AT A NAMED BODY, NAMES THAT BODY AND ITS PRICES ***",
            !!named && !!aimed && named.startsWith(aimed.name + " -- "),
-           named ? `aimed at ${aimed.name} (radius ${aimed.rpx.toFixed(1)} px) on try ${aimTries}, and the HUD ` +
+           named ? `aimed at ${aimed.name} (radius ${aimed.rpx.toFixed(1)} px) on try ${aimTries}${dollies ? ` after ${dollies} notch(es) of dolly` : ""}, and the HUD ` +
                    `reads: ${named} (${covered} of the ${listed} labelled bodies read were behind the HUD panel and passed over)`
                  : aimed ? `aimed at ${aimed.name} at (${Math.round(aimed.x)}, ${Math.round(aimed.y)}), on the canvas, 25 times ` +
                            "and the HUD never named it -- the pick and the projection disagree about where it is"
                  : listed ? `${covered} of ${listed} labelled bodies read over 25 tries were behind the HUD panel and none was ever on the ` +
                             "canvas where a pointer reaches it -- nothing was aimed at, so nothing is claimed"
-                         : "the page published no window.__labelled: no labelled body to aim at, so nothing " +
+                         : `the page published no window.__labelled after ${dollies} notch(es) of dolly: no labelled body to aim at, so nothing ` +
                            "here was pointed at. Not a pass and not a skip -- see #labelled on the HUD.");
         ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
     }

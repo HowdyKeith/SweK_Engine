@@ -1,9 +1,9 @@
 {
  "gate": "tools/ship/runtimeGap-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-11-25",
  "tables": [
   {
-   "title": "what 4625 runtime source files actually use",
+   "title": "what 6276 runtime source files actually use",
    "columns": [
     "capability",
     "files",
@@ -12,63 +12,63 @@
    "rows": [
     [
      "ES modules",
-     "4320",
-     "93.4%"
+     "5925",
+     "94.4%"
     ],
     [
      "closures as values",
-     "4166",
-     "90.1%"
+     "5688",
+     "90.6%"
     ],
     [
      "async/await",
-     "1735",
-     "37.5%"
+     "2500",
+     "39.8%"
     ],
     [
      "typed arrays",
-     "1274",
-     "27.5%"
+     "1812",
+     "28.9%"
     ],
     [
      "Promises",
-     "417",
-     "9.0%"
-    ],
-    [
-     "fetch/XHR",
-     "251",
-     "5.4%"
+     "683",
+     "10.9%"
     ],
     [
      "performance.now",
-     "245",
-     "5.3%"
+     "290",
+     "4.6%"
     ],
     [
-     "WebGL",
-     "200",
+     "fetch/XHR",
+     "268",
      "4.3%"
     ],
     [
+     "WebGL",
+     "216",
+     "3.4%"
+    ],
+    [
      "requestAnimationFrame",
-     "127",
-     "2.7%"
+     "141",
+     "2.2%"
     ],
     [
      "WebGPU",
-     "57",
-     "1.2%"
+     "98",
+     "1.6%"
     ],
     [
      "workers/threads",
-     "25",
+     "33",
      "0.5%"
     ],
     [
      "WebAssembly",
-     "24",
-     "0.5%"
+     "28",
+     "0.4%"
     ]
    ],
    "note": "The ORDERING is the finding: threads sit near the bottom of it, which is the premise #129 assumed the other way round. Vendor, node_modules and dist are excluded and the source is comment-stripped."

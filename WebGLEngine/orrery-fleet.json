@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "6773dcae5f507aa983c3178a00f897043d0acd8b",
+ "head": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -131,7 +131,7 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 24503,
+    "bytes": 25002,
     "sha": "171f3111e8f89d077853d5c1fa6e0cc93653b128"
    },
    {
@@ -375,8 +375,8 @@
    },
    {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 57753,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "bytes": 57854,
+    "sha": "aff6734bb19ca97f583da9bfd8ca8dd1bc189e78"
    },
    {
     "path": "render/switchboardView-selfcheck.mjs",
@@ -386,7 +386,7 @@
    {
     "path": "sub-aquarium.html",
     "bytes": 61813,
-    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "switchboard.html",
@@ -487,8 +487,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "clients.html",
@@ -497,8 +497,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 908174,
-    "sha": "94aa76bad72ddcf09ebf15b78422f4b37e9b1d00"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -597,8 +597,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    }
   ],
   "male-cns": [
@@ -793,8 +793,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -837,8 +837,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1502566,
-    "sha": "3e001593dd66c1c987818474dd31e189db32c84e"
+    "bytes": 1503704,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "aquarelle.html",
@@ -1047,8 +1047,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3829710,
-    "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
+    "bytes": 3831441,
+    "sha": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2"
    },
    {
     "path": "mpm3d.html",
@@ -1093,7 +1093,7 @@
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
     "bytes": 25349,
-    "sha": "9d7c554e63959eac23c065c75487a5280d51ed93"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "render/subAquarium3dDark-selfcheck.mjs",
@@ -1152,8 +1152,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 908174,
-    "sha": "94aa76bad72ddcf09ebf15b78422f4b37e9b1d00"
+    "bytes": 921421,
+    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
    },
    {
     "path": "shipavatar.html",
@@ -1193,7 +1193,7 @@
    {
     "path": "sub-aquarium.html",
     "bytes": 61813,
-    "sha": "4ac84d4419324874870f73b08d3ef082d305570b"
+    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
    },
    {
     "path": "svg-forge.html",
@@ -1247,8 +1247,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1721,8 +1721,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1780,8 +1780,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 43731,
-    "sha": "2d3bc6ec91529789a44a30173779cd31511e1a6c"
+    "bytes": 45095,
+    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",

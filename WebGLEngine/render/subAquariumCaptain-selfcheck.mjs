@@ -20,6 +20,9 @@
 // 2026-11-20 -- THE COND CAPTAIN (section 4c): 10 mutants, every one red by name: C01 cond not accepted | C02 cond flies FROZEN_TRIAGE | C03 no legs station | C04 the energy claim open | C05 cond without a courier |
 //   C06 the latch not in the snapshot | C07 the latch reading second as breached | C08 the view words lost | C09 the words for any captain | C10 no cond in the menu. C04 WENT GREEN FIRST, the same hole as R04: the
 //   120 s runs never take the charge under the energy rule, so a 900 s row was added that checks the charge fell to 0.17.
+// 2026-11-25 -- COND AS THE DEFAULT COURIER CAPTAIN (section 4d): 11 mutants, every one red by name: Q01 no default on setNav | Q02 none on setNeeds | Q03 the choice not marked | Q04 the choice not cleared with the needs |
+//   Q05 the advisor overridden | Q06 the default for any sub with needs | Q07 the default TRIAGE | Q08 byDefault always false | Q09 the default re-seating a captain already flying | Q10 the view dropping "(default)".
+//   Q09 WENT 0 RED FIRST (re-seating COND over a default COND looks the same in a snapshot) and got a row: a breached courier keeps its breach latch across a new arm.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -142,6 +145,31 @@ guarded("section 4c", () => {
     const big = courier("cond", 0.07).c; let sank = null;
     for (let i = 0; i < 18; i++) { run(big, 10); if (sank === null && snap(big).needs.captain.latch.latched) sank = (i + 1) * 10; }
     ok("A LEAK BIGGER THAN THE WEIGHT (7 %): the boat sinks AGAIN after the drop, the latch closes (second), and it goes up for good and is not lost", sank !== null && sank <= 90 && snap(big).needs.captain.latch.second && snap(big).depth < 5 && snap(big).lost === 0 && snap(big).needs.captain.con !== "mission", J({ sank, depth: snap(big).depth, con: snap(big).needs.captain.con }));
+});
+
+sec("4d. COND IS THE DEFAULT COURIER CAPTAIN (2026-11-25, backlog stations-cond-default-courier)");
+guarded("section 4d", () => {
+    const capOf = (t, id) => { const n = snap(t, id).needs; return n && n.captain ? n.captain.kind + (n.captain.byDefault ? " (default)" : "") : null; };
+    const t = tankWith(["a", "b", "c", "d", "e"]); t.setScene(7); run(t, 2);
+    t.setNeeds("a", "battery");
+    ok("a sub with needs that is NOT a courier gets no captain (the refill trip flies it, as before)", capOf(t, "a") === null);
+    t.setNav("a", "any+predict"); run(t, 1);
+    ok("...and when it becomes a courier it is seated under COND, marked as the default", capOf(t, "a") === "cond (default)", String(capOf(t, "a")));
+    t.setNav("b", "any+predict"); t.setNeeds("b", "battery"); run(t, 1);
+    ok("a courier that is given needs is seated under COND too, whichever order the two came in", capOf(t, "b") === "cond (default)", String(capOf(t, "b")));
+    t.setCaptain("b", null); t.setNav("b", "straight"); run(t, 1);
+    ok("an explicit OFF is a choice: a new arm (setNav again) does not put COND back", capOf(t, "b") === null, String(capOf(t, "b")));
+    t.breach("a", 0.03); run(t, 12); const before = snap(t, "a").needs.captain.latch; t.setNav("a", "straight"); run(t, 1); const after = snap(t, "a").needs.captain.latch;
+    ok("a default COND that is already flying is NOT re-seated by a new arm: a breached courier keeps its breach latch across setNav (a fresh captain would have forgotten it)", before && before.breached && after && after.breached && capOf(t, "a") === "cond (default)", JSON.stringify({ before, after }));
+    t.setNav("c", "any+predict"); t.setNeeds("c", "battery"); t.setCaptain("c", "route"); t.setNav("c", "straight"); run(t, 1);
+    ok("an explicit captain is kept across a new arm, and is not marked as the default", capOf(t, "c") === "route", String(capOf(t, "c")));
+    t.setNeeds("b", "battery"); run(t, 1);
+    ok("starting the needs again clears the captain and the choice (as it always cleared the captain), so the default applies again", capOf(t, "b") === "cond (default)", String(capOf(t, "b")));
+    t.setNav("d", "any+predict"); t.setNeeds("d", "battery"); t.setAdvisor("d", true); t.setNav("d", "straight"); run(t, 1);
+    ok("a courier with the ADVISOR on is not given a captain over it by a new arm", capOf(t, "d") === null && snap(t, "d").needs.advisor.on === true, String(capOf(t, "d")));
+    t.setNav("e", "any+predict"); t.setNeeds("e", "battery"); t.setCaptain("e", "cond");
+    ok("COND chosen explicitly reads as chosen, not as the default", capOf(t, "e") === "cond", String(capOf(t, "e")));
+    ok("the list line names the default", /CAPTAIN cond \(default\): /.test(needsLine({ needs: { cls: "battery", frac: 0.5, watts: 3000, strain: 0.1, collapseDepth: 60, damage: 0, flood: 0, advisor: { on: false }, leak: 0, captain: { kind: "cond", con: "mission", overrides: [], latch: null, byDefault: true } } })));
 });
 
 sec("5. the list line");

@@ -264,6 +264,7 @@
  },
  "records": {
   "brain/BACKLOG_2026-11-01.md": "a backlog snapshot of 2026-11-01, superseded by BACKLOG_PICKUPS_2026-11-05.md; nothing to run",
+  "brain/WINPATHLINT_WIN32_SKIP_2026-11-09.md": "a note and patch for the winPathLint win32 skip of 2026-11-09, since applied: tools/ship/winPathLint-selfcheck.mjs carries okPosixHost and its child-run row; nothing to run",
   "brain/SPACE_ITEMS_2026-11-18.md": "a record of the space items of 2026-11-18 (no round registered; nav-match parked; the space-approach-doctrine lead opened); nothing to run",
   "brain/SPACE_DOCTRINE_WIP.md": "the space approach doctrine round (backlog space-approach-doctrine): registration, then the DEV cap and the HELD89 result; run tools/ship/spaceDoctrineStudyCmd.mjs",
   "brain/BACKLOG_2026-11-04_BRAINS.md": "another chat's backlog; not edited or linked from this chat",

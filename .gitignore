@@ -172,6 +172,7 @@ WebGLEngine/ai-bridge/tasker-state.json
 # "left after a clean exit"): the bridge's APK folder and the loop-scope flag. Ignored, never reclaimed.
 WebGLEngine/ai-bridge/apks/
 WebGLEngine/ai-bridge/swek_loop_scope.flag
+WebGLEngine/rig-out/
 
 # a running search's checkpoint (tools/ship/trainTurretSeatBig.mjs, trainHelmSteer.mjs): transient; the record beside it is what is kept
 WebGLEngine/brain/rig-results/**/*.ckpt

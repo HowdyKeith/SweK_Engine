@@ -303,8 +303,12 @@ sec("6. *** THIRTY NOTES READ, THIRTEEN ALREADY SETTLED -- EACH HELD AGAINST A D
         missing.length ? "the work a marker points at is gone, so the marker is false: " + missing.join("; ")
                        : T.reduce((n, t) => n + t.decl.length, 0) + " declarations found: primeTrellis, STREAMED, readAngularVelocities in box3d and Jolt, taitB, " +
                          "STATE.drive, HoleFillGPU, makeLockLife, CSBomb, evaluateGuards in DungeonAI, the forceslate plant, chunkAudit and resumePlan, _dry, mountMiniAvatar");
-    ok("the tranche accounts for the record's move EXACTLY: satisfied +13 and undecided -13, from the counts v4906 left",
-        REC.satisfied - 8 === T.length && 217 - REC.undecided === T.length,
+    // v4934 MERGE: the branch's own adjudication pass (deferralLedger.json) marked 14 hits SETTLED while main marked the
+    // 13 above; 2 files are in both, so the merged record moves by 13 + 12 = 25 and not 26, and the 12 are named by their count here.
+    const LEDGER_PASS_NEW = 12;
+    const V4934_NEW_UNDECIDED = 3;   // the three ratchet-raise comments in definitionGates-selfcheck, filed as nextRounds entry name-branch-exports
+    ok("the tranche accounts for the record's move EXACTLY: satisfied +25 and undecided -25 (main's 13 plus the ledger pass's 12 not in it), from the counts v4906 left",
+        REC.satisfied - 8 === T.length + LEDGER_PASS_NEW && 217 - REC.undecided + V4934_NEW_UNDECIDED === T.length + LEDGER_PASS_NEW,
         `satisfied 8 -> ${REC.satisfied}, undecided 217 -> ${REC.undecided}. The other seventeen were read and are still open; ` +
         "they stay undecided because nothing structural decides them, and the ones no entry named were filed as backlog entries");
 }

@@ -59,6 +59,9 @@ export const runLearned = (seed, theta, opts = {}) => BC.run(seed, "LEARNED", { 
 export const PRICE = Object.freeze({ goals: 2.42, seconds: 1200, rate: 2.42 / 1200 });
 export const ES15 = Object.freeze({ ...ES, seed: 9015 });
 export const R15_TRAIN_SET = Object.freeze(Array.from({ length: 16 }, (_, i) => 210001 + i)), R15_SELECTION_SET = Object.freeze(Array.from({ length: 16 }, (_, i) => 210501 + i)), R15_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 211001 + i));
+/** ROUND 18 (section 35): round 15's learner and price with a bigger budget -- 40 generations, sigma halving every 14, seed 9018, 32 TRAIN seeds. */
+export const ES18 = Object.freeze({ ...ES, generations: 40, halveEvery: 14, seed: 9018 });
+export const R18_TRAIN_SET = Object.freeze(Array.from({ length: 32 }, (_, i) => 214001 + i)), R18_SELECTION_SET = Object.freeze(Array.from({ length: 16 }, (_, i) => 214501 + i)), R18_HELD_SET = Object.freeze(Array.from({ length: 96 }, (_, i) => 215001 + i));
 /** The mission value of one run record (breachCourierTask.run's): its goals, less PRICE.rate x the seconds left if the boat was lost. */
 export function missionValue(r) {
     if (!r || !Number.isFinite(r.goals) || typeof r.survived !== "boolean") throw new Error("learnedCourier.missionValue: a run record { goals, survived, lostAt } is needed");

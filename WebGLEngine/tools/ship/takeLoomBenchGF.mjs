@@ -65,7 +65,7 @@ export function decide(R) {
 }
 
 async function main() {
-    if (fs.existsSync(READING)) { console.error(`takeLoomBenchGF: ${path.relative(process.cwd(), READING)} exists -- the bench was read; a second read is refused.`); process.exit(2); }
+    if (fs.existsSync(READING)) { console.error(`takeLoomBenchGF: ${path.relative(process.cwd(), READING)} exists -- the bench was read; a second read is refused.`); process.exit(2); }   // win32-ok: a display string in a message, not compared to a posix name
     const P = { lc4: pathwayFor("lc4"), lplc2: pathwayFor("lplc2") }, R = {};
     for (const arm of ARMS) { const n = arm.split(":")[0]; R[arm] = B.armOf(P[n].p, P[n].types, arm, P[n].relay); }
     const D = decide(R);
