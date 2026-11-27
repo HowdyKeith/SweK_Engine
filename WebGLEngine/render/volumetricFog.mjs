@@ -179,13 +179,13 @@ export function createFogGPU(device, format, { lighting = null, fogLights = null
     const BU = globalThis.GPUBufferUsage, mod = device.createShaderModule({ code: lighting ? fogWGSL({ shafts: true }) : FOG_WGSL }), ubuf = device.createBuffer({ size: 208, usage: BU.UNIFORM | BU.COPY_DST });
     const pipe = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return {
-        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo" }) {
+        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo", timer = null }) {   // timer: render/gpuTimer.mjs's, the pass under "fog"
             const P = with_(params), u = new Float32Array(52), fl = lighting ? fogLightsOf(lighting.lights, fogLights) : [];
             u.set(invViewProj, 0); u.set([...eye, 0], 16); u.set([P.density, P.falloff, P.baseHeight, P.albedo], 20); u.set([P.g, P.maxDistance, P.up === "z" ? 1 : 0, P.jitter ? 1 : 0], 24);
             u.set([...P.ambient, 0], 28); u.set([...P.L, 0], 32); u.set([...P.lightColor, 0], 36); u.set([P.steps, zRange === "zo" ? 1 : 0, fl.length, 0], 40); u.set(fl, 44);
             device.queue.writeBuffer(ubuf, 0, u);
             const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }, { binding: 1, resource: colorView }, { binding: 2, resource: depthView }] });
-            const pass = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: "clear", clearValue: [0, 0, 0, 1], storeOp: "store" }] });
+            const pass = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: "clear", clearValue: [0, 0, 0, 1], storeOp: "store" }], ...(timer ? { timestampWrites: timer.writes("fog") } : {}) });
             pass.setPipeline(pipe); pass.setBindGroup(0, bg); if (lighting) pass.setBindGroup(1, lighting.bindGroupFor(pipe, 1)); pass.draw(3); pass.end();
         },
         destroy() { ubuf.destroy(); },

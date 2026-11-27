@@ -56,7 +56,8 @@ import { jitterProjection } from "/render/jitter.mjs";
 import { mat4Invert } from "/render/motionVectors.mjs";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
 import { createClusteredLightingGPU, clusteredWGSL, perspective as perspGL } from "/render/clusteredLights.mjs";   // 2026-11-22: ?lights=1 -- shots and explosions as clustered point lights, a sun with cascaded shadows on the ships
-import { createFogGPU } from "/render/volumetricFog.mjs";   // 2026-11-22: ?fog=1 -- a thin haze that thickens with distance
+import { createFogGPU } from "/render/volumetricFog.mjs";   // 2026-11-22: ?fog=1 -- a thin haze that thickens with distance; 2026-11-27: with ?lights=1, the sun's shafts in it (&shafts=0 without)
+import { createGpuTimer } from "/render/gpuTimer.mjs";   // 2026-11-27: with ?lights=1 or ?fog=1, each pass on the card's own clock (shadows, scene, fog) where the adapter offers timestamps (tools/lightingCost.mjs reads them); ?gputimer=0 none
 import { installRecorder } from "/ui/canvasRecorder.js";
 installRecorder();
 
@@ -323,13 +324,15 @@ fn disk(r: f32, pos: vec3f, rs: f32) -> vec3f {
 `;
 
 const AA_MODE = ["smaa", "t2x"].includes(new URLSearchParams(location.search).get("aa")) ? new URLSearchParams(location.search).get("aa") : null, AA_REPROJECT = new URLSearchParams(location.search).get("reproject") !== "0";
-const LIGHTS = new URLSearchParams(location.search).get("lights") === "1", FOG = new URLSearchParams(location.search).get("fog") === "1";
+const LIGHTS = new URLSearchParams(location.search).get("lights") === "1", FOG = new URLSearchParams(location.search).get("fog") === "1", SHAFTS = LIGHTS && FOG && new URLSearchParams(location.search).get("shafts") !== "0";
+const WANT_TIMER = (LIGHTS || FOG) && new URLSearchParams(location.search).get("gputimer") !== "0";
+let timer = null;
 // window.__flightLights (only with ?lights=1 or ?fog=1): what was lit this frame, and switches a gate turns -- sun, points, casters, fog, extra (lights added to the frame's), freeze (the sim and the orbit held), view ({ eye, center }: the camera, for a gate)
 const flightLights = window.__flightLights = LIGHTS || FOG ? { lights: LIGHTS, fog: FOG, sun: true, points: true, casters: true, fogOn: true, extra: [], freeze: false, view: null, frames: 0, stats: null, count: null, vp: null, eye: null, error: null, capture: null } : null;
 // the haze: uniform (no falloff with height -- this is space), 1 - e^-1 of the light gone by 4000 units, lit faintly by the sun and a blue ambient
 const FOG_PARAMS = { density: 0.00025, falloff: 0, albedo: 0.9, ambient: [0.05, 0.07, 0.12], lightDir: [0.75, 0.4, 0.53], lightColor: [0.12, 0.11, 0.1], g: 0.5, maxDistance: 12000, steps: 16, jitter: true };
 if (flightLights) flightLights.fogParams = FOG_PARAMS;
-let lighting = null, shipLitPipe = null, shipDepthPipe = null, litBG0 = null, litBG1 = null, litBGVersion = -1, faceBGs = null, fog = null, fogScene = false;
+let fogShafts = null, lighting = null, shipLitPipe = null, shipDepthPipe = null, litBG0 = null, litBG1 = null, litBGVersion = -1, faceBGs = null, fog = null, fogScene = false;
 const SUN = { type: "directional", direction: [-0.75, -0.4, -0.53], color: [1.0, 0.93, 0.82], intensity: 0.9, shadow: true };   // low (23 degrees): a ship's ridge, 27 units up, throws a shadow 60 units long -- onto a neighbour flying beside it
 // the frame's lights: the sun, the explosions and muzzle flashes (fx 36 units or larger: not the engine glow) and every shot, at most 250
 function buildLights() {
@@ -377,7 +380,7 @@ async function initGPU() {
   }
   let adapter; try { adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance")); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
   if (!adapter) { fallback("no GPU adapter."); return false; }
-  try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
+  try { device = await adapter.requestDevice(WANT_TIMER && adapter.features.has("timestamp-query") ? { requiredFeatures: ["timestamp-query"] } : undefined); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
   device.lost.then((i) => { if (i && i.reason !== "destroyed") fallback("GPU device lost: " + i.message); });
   // v3822 -- SURFACE RUNTIME WEBGPU ERRORS. The shaders below are checked for COMPILE errors, but a black
   // screen with the sim still running is the signature of a RENDER-TIME validation error (a bad bind group,
@@ -464,7 +467,10 @@ async function initGPU() {
     litBG0 = device.createBindGroup({ layout: shipLitPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uBuf } }] });
     faceBGs = lighting.faceBuffers.map((b) => device.createBindGroup({ layout: shipDepthPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }] }));
   }
-  if (FOG) fog = createFogGPU(device, sceneFormat);
+  // SHAFTS (2026-11-27): the fog marches the sun's cascaded shadow (its lightDir is the sun's, toward it), so the haze behind a ship, seen past it, is darker. At this
+  // page's own haze (density 0.00025, the sun's share 0.12) a ship's shadow takes under one colour level from the fog; a thicker haze (flightLights.fogParams, live) shows it
+  if (FOG) { fog = createFogGPU(device, sceneFormat); if (SHAFTS) fogShafts = createFogGPU(device, sceneFormat, { lighting }); }   // both: flightLights.shaftsOn switches them live
+  if (flightLights) { timer = createGpuTimer(device); flightLights.gpuTimer = timer.supported ? "on" : WANT_TIMER ? "this adapter has no timestamp-query" : "off"; const ai = adapter.info || {}; flightLights.adapter = [ai.vendor, ai.architecture, ai.description || ai.device].filter(Boolean).join(" ") || "unknown"; flightLights.software = !!adapter.isFallbackAdapter || /swiftshader|llvmpipe|warp|basic render/i.test(flightLights.adapter); flightLights.shafts = SHAFTS; flightLights.shaftsOn = SHAFTS; }
   if (AA_MODE) aa = createSmaaGPU(device, { width: 1, height: 1, outputFormat: format, temporal: AA_MODE === "t2x" });
   bind = device.createBindGroup({ layout: sceneBGL, entries: [{ binding: 0, resource: { buffer: uBuf } }] });
   bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -553,12 +559,13 @@ function render() {
     const pb = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
     pb.setPipeline(bhPipe); pb.setBindGroup(0, bhBind); pb.draw(3); pb.end();
   } else {
-    if (lit) lighting.renderShadows(enc, (pass, face) => { if (!nShip || !flightLights.casters) return; pass.setPipeline(shipDepthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); });
+    if (lit) lighting.renderShadows(enc, (pass, face) => { if (!nShip || !flightLights.casters) return; pass.setPipeline(shipDepthPipe); pass.setBindGroup(0, faceBGs[face.index]); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); }, { timer: timer && timer.supported ? timer : null });
     const fogged = fog && flightLights.fogOn;   // with the fog the scene is drawn into sceneTex, and the fog pass writes it on to where the scene went
     const sceneTarget = useAA ? aa.inputView : ctx.getCurrentTexture().createView();
     const pass = enc.beginRenderPass({
       colorAttachments: [{ view: fogged ? sceneView : sceneTarget, clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
       depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" },
+      ...(timer && timer.supported ? { timestampWrites: timer.writes("scene") } : {}),
     });
     pass.setBindGroup(0, bind);
     pass.setPipeline(gridPipe); pass.draw(6);
@@ -567,7 +574,7 @@ function render() {
     if (nShot) { pass.setPipeline(shotPipe); pass.setVertexBuffer(0, shotInst); pass.setVertexBuffer(1, shotCol); pass.draw(6, nShot); }
     if (nFx) { pass.setPipeline(fxPipe); pass.setVertexBuffer(0, fxInst); pass.setVertexBuffer(1, fxCol); pass.draw(6, nFx); }
     pass.end();
-    if (fogged) fog.encode(enc, sceneTarget, { colorView: sceneView, depthView, invViewProj: mat4Invert(drawVP), eye, zRange: "zo", params: FOG_PARAMS });
+    if (fogged) (fogShafts && flightLights.shaftsOn && lit ? fogShafts : fog).encode(enc, sceneTarget, { colorView: sceneView, depthView, invViewProj: mat4Invert(drawVP), eye, zRange: "zo", params: FOG_PARAMS, timer: timer && timer.supported ? timer : null });
     if (useAA) {   // the camera moves every frame here: the history is carried by this frame's depth buffer and last frame's matrix, or dropped (&reproject=0)
       const reproject = aa.temporal && AA_REPROJECT && aaPrevVP ? { invViewProj: mat4Invert(vp), prevViewProj: aaPrevVP, depth: depthView } : null;
       aa.encode(enc, ctx.getCurrentTexture().createView(), { moved: true, reproject });
@@ -577,7 +584,9 @@ function render() {
   aaPrevVP = useAA ? vp : null;   // the black hole's lensing pass draws without SMAA: the history starts again after it
   let rb = null;
   if (flightLights && flightLights._want) { const tex = ctx.getCurrentTexture(), row = 256 * Math.ceil(canvas.width * 4 / 256); rb = { buf: device.createBuffer({ size: row * canvas.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), row, w: canvas.width, h: canvas.height, res: flightLights._want }; flightLights._want = null; enc.copyTextureToBuffer({ texture: tex }, { buffer: rb.buf, bytesPerRow: row }, [rb.w, rb.h]); }
+  if (timer && timer.supported && !bhOn) timer.finish(enc);
   device.queue.submit([enc.finish()]);
+  if (timer && timer.supported) timer.collect().then((t) => { if (t.frames) { flightLights.gpuTimes = Object.fromEntries(Object.entries(t.labels).map(([k, v]) => [k, +v.ms.toFixed(4)])); flightLights.gpuTotal = +t.totalMs.toFixed(4); } });
   if (flightLights) flightLights.frames++;
   if (rb) rb.buf.mapAsync(GPUMapMode.READ).then(() => { const raw = new Uint8Array(rb.buf.getMappedRange().slice(0)), bgra = /^bgra/.test(format), px = new Uint8Array(rb.w * rb.h * 4); for (let y = 0; y < rb.h; y++) for (let x = 0; x < rb.w; x++) for (let c = 0; c < 4; c++) px[(y * rb.w + x) * 4 + c] = raw[y * rb.row + x * 4 + (bgra && c < 3 ? 2 - c : c)]; rb.buf.unmap(); rb.res({ w: rb.w, h: rb.h, b64: ((u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); })(px) }); });   // base64, not a 2.3-million-element array: the gate's capture was mostly JSON
 }

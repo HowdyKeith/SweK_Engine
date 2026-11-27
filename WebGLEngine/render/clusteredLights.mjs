@@ -557,11 +557,13 @@ export function createClusteredLightingGPU(device, opts = {}) {
         device.queue.writeBuffer(cells, 0, packCells(C, N, O.maxPerCell, Uint32Array)); device.queue.writeBuffer(lightsB, 0, packLights(lights, B.A, O.maxLights)); device.queue.writeBuffer(faces, 0, packFaces(B.A, maxFaces, zo));
         return { cells: N, overflow: C.overflow, faces: B.A.faces.length, unshadowed: B.A.unshadowed.length, cascades: B.cascades, space: O.space };
     };
-    self.renderShadows = (enc, drawDepth) => {
+    // `timer` (2026-11-27, render/gpuTimer.mjs createGpuTimer): every pass of the atlas timed under the label "shadows" (summed), for tools/lightingCost.mjs
+    self.renderShadows = (enc, drawDepth, { timer = null } = {}) => {
         if (!self.atlas) return;
-        enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" } }).end();
+        const ts = () => (timer ? { timestampWrites: timer.writes("shadows") } : {});
+        enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "clear", depthClearValue: 1, depthStoreOp: "store" }, ...ts() }).end();
         self.atlas.faces.forEach((f, k) => {
-            const [x, y, w, h] = f.rect.map((v) => Math.round(v * O.atlasSize)), pass = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "load", depthStoreOp: "store" } });
+            const [x, y, w, h] = f.rect.map((v) => Math.round(v * O.atlasSize)), pass = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: atlas.createView(), depthLoadOp: "load", depthStoreOp: "store" }, ...ts() });
             pass.setViewport(x, y, w, h, 0, 1); pass.setScissorRect(x, y, w, h); drawDepth(pass, { ...f, index: k, viewProj: zo(f.viewProj), buffer: faceBuffers[k] }); pass.end();
         });
     };
