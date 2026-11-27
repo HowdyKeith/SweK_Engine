@@ -22,6 +22,8 @@
 // 2026-11-27 -- FOLLOW-UP 12 (section 7): 8 mutants, every one red by name (final pass): L1 the last on a tie | L2 the MOST bad | L3 statics at SHIP_CLEAR | L4 obstacles passed beneath counted | L5 least never on |
 //   L6 HELD12 on subNavRoute's seeds | L7 the plan's own heading left out of the comparison | L8 the least arm without the edge. L7 WENT 0 RED FIRST (the stuck fixture's best was an offset); a fan where holding is
 //   least bad now pins it.
+// 2026-11-27 -- FOLLOW-UP 13 (section 8): 8 mutants, every one red by name, first pass: N1 the measure ignoring leastEdge | N2 a 0 m band | N3 the south side dropped | N4 the north side dropped |
+//   N5 the least arm also priced | N6 the new arm unpriced | N7 HELD13 on HELD12's seeds | N8 the edge priced at the arc's start only.
 import * as A from "./subAvoidNav.mjs";
 import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
