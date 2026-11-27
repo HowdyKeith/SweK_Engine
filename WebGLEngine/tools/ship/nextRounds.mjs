@@ -3183,9 +3183,16 @@ export const NEXT_ROUNDS = [
         why: "It is the one fallback that sees both losses at once.",
     },
     {
+        id: "nav-avoid-plan-edge",
+        blocker: "OPEN -- after nav-avoid-least-with-edge",
+        what: "The loss audit (brain/SUB_FIELD_NAV_WIP.md): 10 of the edge arm's 36 HELD10-12 losses are exits while the turn-away rule was QUIET. The plan's own heading, along the 35 m arc, left the 20 m band mid-turn. The rule tests the plan's heading for ships only, so no fallback change reaches them.",
+        how: "Register first one change: the rule also fires when the plan's own arc leaves the band, and takes the first candidate whose arc stays in, in the same order. Fresh seeds, the then-designated arm as the reference, a paired sign test on reached.",
+        why: "It is the second-largest loss class, and the only one the rule never sees.",
+    },
+    {
         id: "nav-avoid-loss-audit",
-        blocker: "OPEN",
-        what: "Across FOLLOW-UPS 10-12 (brain/SUB_FIELD_NAV_WIP.md) the turn-away rule moves about 11 losses in 60 between ships and the region's edge without shrinking them.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-27: DONE, post-hoc (brain/subAvoidLossAudit.mjs; brain/SUB_FIELD_NAV_WIP.md, THE LOSS AUDIT). The edge arm's 36 losses: 17 ship collisions with the rule stuck all of the last 10 s; 10 exits with the rule quiet while the plan's own arc left the band (mid-turn); 7 bergs; 2 mixed exits. Two levers named: nav-avoid-least-with-edge (the stuck class), then nav-avoid-plan-edge (the quiet class). Was: Across FOLLOW-UPS 10-12 (brain/SUB_FIELD_NAV_WIP.md) the turn-away rule moves about 11 losses in 60 between ships and the region's edge without shrinking them.",
         how: "A post-hoc reading of the 360 recorded HELD10-12 flights, labelled as such: every loss classed by what was hit or crossed, whether the rule was stuck or turning, the distance to the goal, and whether the plan's own heading was already in trouble; it names the lever for the next registered round.",
         why: "It decides which change is worth a round before one is registered.",
     },
