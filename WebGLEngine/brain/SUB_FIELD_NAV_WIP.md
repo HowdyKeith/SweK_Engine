@@ -1182,3 +1182,5 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **Verdict.** On REACHED, paired, the exact one-sided sign test at p at most 0.05 either way (LEAST BEATS EDGE / EDGE BEATS LEAST / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck.
 
 **Predictions.** **F1**: the designated arm's ship collisions are fewer than the reference's. 65 percent. **F2**: its exits are at most the reference's plus 3 (the least-bad heading ignores the edge). 60 percent. **F3**: NO DIFFERENCE SHOWN. 55 percent; LEAST BEATS EDGE 35.
+
+**CORRECTION TO FOLLOW-UP 12'S REGISTRATION (2026-11-27, written before any of its code and before any seed is flown).** Its set, 9301 to 9360, lies inside `brain/subNavRoute.mjs`'s range(9301, 9500); the seed check printed after the registration was written. **HELD12 is seeds 9701 to 9760** (no file uses them). Nothing else in the registration changes.
