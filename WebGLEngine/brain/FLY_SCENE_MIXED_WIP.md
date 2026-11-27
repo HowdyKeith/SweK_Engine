@@ -55,3 +55,35 @@ trainer finds in 12 draws. Which landmarks each ring type sees is invented. Noth
 `node tools/ship/takeFlySceneMixed.mjs run` -> `brain/flySceneMixedRound.jsonl`, committed byte for byte, whole, before it
 is read; `node tools/ship/takeFlySceneMixed.mjs read` prints the checks and the reading. The verdict will be section 10,
 "The result".
+
+## 10. The result (the whole results file committed unread at 608d47d2, then read once)
+One start, 280.0 minutes, beside three other rounds on four cores; 13 records (sha256 77c2543175f9f65e...). **The checks
+hold**: the scene-trained round's file as committed and passing its own checks; 12 HOMEM draws, each once, HOMEP's
+recipe on its own battery; draw 1 audited the same twice.
+* **M26: TRAINED IN BOTH SCENES THE FLY CANNOT BE TOLD APART IN THE 26-TYPE FROM ONE TRAINED THERE ALONE** (6 above,
+  6 below, p 1.0).
+* **MP: TRAINED IN BOTH SCENES THE FLY CANNOT BE TOLD APART IN THE PLAIN FROM ONE TRAINED THERE ALONE** (2 above,
+  10 below, p 0.039).
+
+| arm | home, 26-type scene | home, plain | course, 26-type scene |
+|---|---|---|---|
+| HOMEM | 0.5996 | 0.5483 | 0.7150 |
+| HOMET | 0.6000 | 0.5474 | 0.7135 |
+| HOMEP | 0.5911 | 0.5501 | 0.7130 |
+
+**Both expectations came**: M26 CANNOT (80) and MP CANNOT (80). With the scene-trained round's readings, as section 5
+put it, this trainer cannot tell the three flies apart in 12 draws by the registered readings.
+
+**Described after the reading, not registered (the gate recomputes it from the records):** **the fly trained in both
+scenes is the fly trained in the 26-type scene.** Against HOMET it is the same in the plain scene too (6 above, 6
+below, p 1.0; 0.0009 on average), its lift the same (7 above, 5 below), and its weights much the same (p_a, p_b, p_c
+1.018, -0.616, 2.098 against HOMET's 0.996, -0.604, 2.132 and HOMEP's 0.955, -0.760, 1.768; p_c against HOMET's 5
+above, 7 below). Against HOMEP in the 26-type scene it is above in 10 of 12 (p 0.039; 0.0086 on average), as HOMET was
+in the scene-trained round (10 of 12). Half its training lives in the plain scene moved it nowhere that 12 draws show:
+its p_c rose with HOMET's, and MP's 2 of 12 is HOMEP's small edge in the plain (0.0018 on average), which HOMET had too
+(4 of 12 there).
+
+**What it does not mean.** Section 7 holds. Both readings are CANNOT, which says what this trainer finds in 12 draws,
+not that the flies are the same. The comparison with HOMET in the plain, the weights and the lift are read after the
+results, so their p are not tests this round made. Which landmarks each ring type sees is invented here. Nothing here
+is of the animal.
