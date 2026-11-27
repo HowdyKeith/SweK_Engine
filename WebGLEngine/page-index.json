@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 506,
+ "count": 511,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1446,6 +1446,13 @@
    "p": 0
   },
   {
+   "f": "gizmo-demo.html",
+   "t": "gizmos",
+   "d": "",
+   "g": "recentnew",
+   "p": 0
+  },
+  {
    "f": "glb_viewer.html",
    "t": "Rigged GLB Viewer",
    "d": "Load a skinned/animated GLB (RigAnything output, Fox.glb, any rigged mesh). Plays skeletal + morph animations, shows the skeleton overlay.",
@@ -1863,6 +1870,20 @@
    "t": "LibreChat · SweK",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "lights-demo.html",
+   "t": "many lights",
+   "d": "",
+   "g": "recentnew",
+   "p": 0
+  },
+  {
+   "f": "lights-gpu.html",
+   "t": "many lights (WebGPU)",
+   "d": "",
+   "g": "recentnew",
    "p": 0
   },
   {
@@ -2944,6 +2965,13 @@
    "p": 0
   },
   {
+   "f": "space-duel.html",
+   "t": "SweK &middot; Space duel",
+   "d": "Space duel: a capital ship against a capital ship (brain/battleshipDuel.mjs) -- choose each side's gunners, helm and cannon, watch the fight a tick at a time, and see which gun seats are worked by a network and how many networks were asked each tick.",
+   "g": "spacecombat",
+   "p": 0
+  },
+  {
    "f": "spacedesk.html",
    "t": "spacedesk auto-launch",
    "d": "",
@@ -2976,6 +3004,13 @@
    "t": "Sphere impostor -- SweK",
    "d": "",
    "g": "renders",
+   "p": 0
+  },
+  {
+   "f": "splat-gpu.html",
+   "t": "Splats on the GPU",
+   "d": "",
+   "g": "recentnew",
    "p": 0
   },
   {
