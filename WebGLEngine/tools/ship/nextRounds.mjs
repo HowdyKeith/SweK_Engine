@@ -3163,7 +3163,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-lplc2-zhou-source",
-        blocker: "OPEN -- READ 2026-11-27 (brain/FLY_RETINOTOPY_RF_WIP.md Part 13): Zhou 2022 agrees on the subtractive form and adds that the inhibition spans the WHOLE receptive field (Part 9's covers only outside the disks); no strength in the text -- next, the trained weights in github.com/ClarkLabCode/LoomDetectionANN",
+        blocker: "OPEN (next: the trained weights, read-only from github.com/ClarkLabCode/LoomDetectionANN, for the inhibitory/excitatory weight ratio) -- READ 2026-11-27 (brain/FLY_RETINOTOPY_RF_WIP.md Part 13): Zhou 2022 agrees on the subtractive form and adds that the inhibition spans the WHOLE receptive field (Part 9's covers only outside the disks); no strength in the text -- next, the trained weights in github.com/ClarkLabCode/LoomDetectionANN",
         what: "fly-lplc2-surround-balance waits on a source for the inhibition's strength; Klapoetke 2017 gives the form only (Part 12).",
         how: "Read Zhou et al. 2022 (eLife, shallow networks trained to detect collisions recover features of loom-selective neurons) for an LPLC2-like model with fitted inhibitory weights; if it states a balance between excitation and inhibition that can be carried over, write it into brain/FLY_RETINOTOPY_RF_WIP.md and register the round on it.",
         why: "A weight chosen from a published model is a principle; one chosen now would be a fit.",
@@ -3181,6 +3181,13 @@ export const NEXT_ROUNDS = [
         what: "FOLLOW-UP 12: the least-bad fallback cut collisions 9 to 1 and raised exits 3 to 12, because its clearance measure leaves out the edge band. Over FOLLOW-UPS 10-12 the turn-away rule moves about 11 losses in 60 between ships and the edge.",
         how: "Register first one change: the least-bad measure also counts the edge -- the clearance to the region's boundary less the 20 m band, minimised with the obstacles' -- on fresh seeds, the least arm as the reference. The question is whether the loss budget shrinks or only splits.",
         why: "It is the one fallback that sees both losses at once.",
+    },
+    {
+        id: "nav-avoid-loss-audit",
+        blocker: "OPEN",
+        what: "Across FOLLOW-UPS 10-12 (brain/SUB_FIELD_NAV_WIP.md) the turn-away rule moves about 11 losses in 60 between ships and the region's edge without shrinking them.",
+        how: "A post-hoc reading of the 360 recorded HELD10-12 flights, labelled as such: every loss classed by what was hit or crossed, whether the rule was stuck or turning, the distance to the goal, and whether the plan's own heading was already in trouble; it names the lever for the next registered round.",
+        why: "It decides which change is worth a round before one is registered.",
     },
     {
         id: "fly-gf-input-signs",
