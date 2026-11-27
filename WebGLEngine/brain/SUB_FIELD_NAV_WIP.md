@@ -1216,3 +1216,17 @@ Checks 1 and 3 ran before any HELD88 flight, and all four passed: the reference 
 **What it names (two levers, each for its own registered round).**
 1. **The stuck-ship class (17 of 36):** FOLLOW-UP 12 moved it to exits because the least-bad heading ignored the band. **FOLLOW-UP 13 (`nav-avoid-least-with-edge`) is the lever as already backlogged:** price the band in the fallback.
 2. **The quiet plan-edge class (10 of 36, the same seeds in both edge arms):** no fallback change touches it, because the rule never fires. **A new lever:** fire also when the plan's own arc leaves the band, and take the first candidate whose arc stays in. Backlogged as `nav-avoid-plan-edge`, to come after FOLLOW-UP 13.
+
+## FOLLOW-UP 13 [SERIES B]: THE LEAST BAD HEADING, PRICING THE EDGE (backlog `nav-avoid-least-with-edge`; Keith, 2026-11-27: "start with 1 and 3, and then 2 and 4"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+**What is open.** FOLLOW-UP 12's least-bad fallback cut ship collisions from 7 to 1 and raised exits from 3 to 12. The loss audit above found 9 of those 12 exits came while the rule was stuck or mixed on a ship. The fallback chose its heading without the edge band.
+
+**One change, in `brain/subAvoidNav.mjs`.** A new arm, `any+predict+edge+avoid-arc-edge-least-edge`. It is FOLLOW-UP 12's least arm exactly, except in the least-bad measure. At each sample of the arc, the measure also takes the **edge clearance**: the distance from the sample to the nearest side of the region, less the 20 m band, i.e. min(px - (x0 + 20), (x1 - 20) - px, py - (y0 + 20), (y1 - 20) - py). This is minimised together with the obstacles' clearances, over the same whole seconds 0 to 25. The other parts stay as they are: the same candidates in the same order, the first in order wins a tie, and nothing changes when the rule is not stuck.
+
+**Arms flown:** `any+predict+edge+avoid-arc-edge-least` (FOLLOW-UP 12's designated arm, the REFERENCE) and `any+predict+edge+avoid-arc-edge-least-edge` (**designated**), in HELD5's world.
+
+**The set.** NEW: **HELD13, seeds 9901 to 9960 of hard-traffic, flown ONCE**, after the change and its gate rows are sabotaged. No file uses these seeds as seeds. (The seed check also found that `tools/ship/plannerChoose.mjs`'s selection ranges, 8801-9100, 9201-9500 and 9601-9900, cover HELD9-12's seeds. Those are needs-task dives from a different generator, so no world is shared. This is noted, not changed.) DEV (seeds 1 to 30) is flown once as a sanity run. The one amendment allowed: if DEV shows the change degenerate (it never picks a different heading from the reference), it is amended and written here.
+
+**Verdict.** On REACHED, paired: the exact one-sided sign test at p at most 0.05 either way (LEAST-EDGE BEATS LEAST / LEAST BEATS LEAST-EDGE / NO DIFFERENCE SHOWN). Reported: collisions by kind, exits, fires / turns / stuck, and how the designated arm's losses split under the audit's classes.
+
+**Predictions.** **G1**: the designated arm's exits are fewer than the reference's. 65 percent. **G2**: its ship collisions are at most the reference's plus 3. 60 percent. **G3**: NO DIFFERENCE SHOWN. 55 percent; LEAST-EDGE BEATS LEAST 35 percent. (The audit's quiet plan-edge exits are out of this change's reach by construction. They belong to `nav-avoid-plan-edge`.)
