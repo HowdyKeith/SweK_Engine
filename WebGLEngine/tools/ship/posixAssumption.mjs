@@ -315,7 +315,12 @@ export const POSIX_AT_V4485 = Object.freeze({
     // v4904 -- 193 callers / 136 normalising -> 198 / 137: five more files that join a path (this round's gates and tools: the needs gate, the brain panel's page rows, the compass and steer rows, the shallow-clone and ICD rows), one normalising and four not; calls 272 -> 281. Read off the gate, not typed.
     // 2026-11-08 -- 198 callers / 137 normalising -> 203 / 140, calls 281 -> 305 (never 61 -> 63), taken with the gate's own scan and skip list: this branch's new tools and gates that join a path (the round 7 to 11 readers and commands, the gputaskman bridge and client, the windows-path lint, the rotor, countermeasure and nav-3d commands), three normalising and two not -- the two being the path-using gates named in addedCorrect below. Read off the gate, not typed.
     // v4933 -- 203 callers / 140 normalising -> 208 / 142, calls 305 -> 311 (never 63 -> 66), taken with the gate's own scan and skip list at the ship of the round that built the PlayCanvas line, the fly studies and their command (tools/ship/studyCmd.mjs): 5 more files that join a path, 2 of them normalising. Nothing was un-normalised. Read off the gate, not typed.
-    separator: Object.freeze({ callers: 208, calls: 311, normalised: 142, never: 66 }),
+    // 2026-11-27 (the publish merge of the open branches) -- 208 / 142 -> 216 / 143, calls 311 -> 327 (never 66 -> 73), taken with the gate's own scan and skip list:
+    // main had moved to 209 / 143 since v4933, and the merge brought seven more callers, none normalising -- tools/lightingCost.mjs (claude/epic-cori-2hm1my),
+    // tools/ship/{adaptiveCap,rockNav,signalCap,strongGunners}StudyCmd.mjs and tools/ship/studyRunner.mjs (claude/code-review-nr3a0i) and tools/ship/takeLplc2Subunits.mjs.
+    // Read file by file: every one but studyRunner only PRINTS the relative path ("wrote ...", "REFUSED: ... exists"), and studyRunner hands it to its
+    // plan as the work directory its child commands are given in their argv, a path the child resolves on either separator. Nothing un-normalised: a re-take, not a tolerance.
+    separator: Object.freeze({ callers: 216, calls: 327, normalised: 143, never: 73 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

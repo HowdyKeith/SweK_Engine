@@ -10,7 +10,7 @@
 //   4  THE PAGE        voxel-home.html in Chromium: the default build, the canvas's colours, other builders and rounds, a results file that does not arrive
 // 2026-11-14, ROUND 4'S BUILDERS ADDED (the lean plus a network; brain/rl/leanStart.mjs), this gate run whole for each: R1 round 4's builders played without the lean 3 | R2 round 4 reads round 2's file 2
 //   R3 a round 4 MLP's output layer counted over 8 units 1 | R4 the page says some of the 80 beat the lean 1 | R5 round 3's builders played through the lean too 7 | R6' round 4's label says round 3 1
-//   ONE WENT 0 RED, AND IS A CLAUSE NOW: R6 -- the page's list was held to the module's labels and the labels to nothing; each must now begin with its own round's number. R6' is R6 again.
+//   ONE WENT 0 RED, AND IS A CLAUSE NOW: R6 -- the page's list was held to the module's labels and the labels to nothing; each must now begin with the number of the round it belongs to. R6' is R6 again.
 // 2026-11-15, ROUND 6'S BUILDERS ADDED, this gate run whole for each: U1 round 6 reads round 4's file 2 | U2 round 6's builders played without the lean 3 | U3 the page says about 150 houses 1
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows that went red:
 //   THE MODULE: H1 a round's plain net has one unit more 1 | H2 weights unpacked big-endian 12 | H3 a trained builder left untrained 12 | H4 any record will do for a trained builder 1
