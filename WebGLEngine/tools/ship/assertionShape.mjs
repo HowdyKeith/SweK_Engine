@@ -990,8 +990,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // definesOk and nameFirst each rose by the same 106; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
     // v4934 -- +79 gates, this branch's navigation and head-to-head rounds meeting main at the merge: every one defines and uses ok() name-first, so usesOk, definesOk and nameFirst each rose by the same 79; distinctDefinitions, condFirst and unknownSignature held. Read off the gate.
     // round 86 (section 192) on the merged tree -- one more, render/countDenoiser-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2345 -> 2346, usesOk 2324 -> 2325, definesOk 2316 -> 2317, nameFirst 2206 -> 2207, read off the code's own report.
-    gates: 2609, usesOk: 2588, definesOk: 2580, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2470, condFirst: 99, unknownSignature: 19,
+    // 2026-11-27 -- +72 gates, the publish merge of the open branches (the fly rounds, the space doctrine and rock nav rounds, series B's follow-ups 13-15, the
+    // denoiser's rounds 84-88, the sea lighting and USDZ export): usesOk +66, definesOk +68, nameFirst +66, and distinctDefinitions 49 -> 52 (three ok() bodies
+    // the tree had not written before); condFirst and unknownSignature held. Read off the gate's own census over the merged tree.
+    gates: 2681, usesOk: 2654, definesOk: 2648, importsOk: 0,
+    distinctDefinitions: 52, nameFirst: 2536, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
