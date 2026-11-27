@@ -89,11 +89,22 @@ async function timeOne(browser, port, c, { seconds, size }) {
         await page.waitForFunction((v) => window[v] && (window[v].ready || window[v].error || (window[v].frames || 0) >= 3), sv, { timeout: 120000 });
         const r = await page.evaluate(async ({ v, ms }) => {
             const s = window[v]; if (s.error) return { error: String(s.error) };
-            const f0 = s.frames, t0 = performance.now(); await new Promise((res) => setTimeout(res, ms)); const frames = s.frames - f0, dt = performance.now() - t0;
-            const g = window.__gpuTimerAuto, gl = document.querySelector("canvas")?.getContext("webgl2"), dbg = gl && gl.getExtension("WEBGL_debug_renderer_info");
+            // 2026-11-27 (the publish merge) -- THE CARD'S TIMES ARE AVERAGED OVER THE SETTLE, NOT READ OFF ITS LAST FRAME. A page publishes one frame's pass
+            // times (ocean-default's state.gpuTimes is the latest frame collected), so reading them once at the end measured a single frame: on SwiftShader the
+            // lit sea's water pass read anywhere from 138 to 252 ms run to run, and a fog row "cost more than its base" or not by the frame it happened to land on.
+            // Every distinct reading published during the settle is kept and each label is the mean of them; and a page that has published none when the settle
+            // ends is waited on for up to 10 s more (the fullest sea variant had answered no timer query within 0.8 s on SwiftShader), then reported as it is.
+            const g = window.__gpuTimerAuto, read = () => (s.gpuTimes ? s.gpuTimes : g && g.state === "on" ? g.labels : null), seen = [];
+            const sample = () => { const x = read(); if (x && x !== seen.at(-1)?.ref) seen.push({ ref: x, v: { ...x } }); };
+            const f0 = s.frames, t0 = performance.now();
+            await new Promise((res) => { const id = setInterval(sample, 25); setTimeout(() => { clearInterval(id); res(); }, ms); });
+            const frames = s.frames - f0, dt = performance.now() - t0;
+            for (let waited = 0; !seen.length && waited < 10000; waited += 50) { await new Promise((res) => setTimeout(res, 50)); sample(); }
+            const gl = document.querySelector("canvas")?.getContext("webgl2"), dbg = gl && gl.getExtension("WEBGL_debug_renderer_info");
             const glName = gl ? (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : null;
-            const gpu = s.gpuTimes ? { ...s.gpuTimes } : g && g.state === "on" ? { ...g.labels } : null;
-            return { gpu, timer: s.gpuTimer || (g ? g.state : "none"), adapter: s.adapter || glName, software: s.software ?? null, frameMs: frames > 0 ? dt / frames : null, frames };
+            const keys = [...new Set(seen.flatMap((x) => Object.keys(x.v)))];
+            const gpu = seen.length ? Object.fromEntries(keys.map((k) => { const v = seen.map((x) => x.v[k]).filter((n) => typeof n === "number"); return [k, v.reduce((a, b) => a + b, 0) / v.length]; })) : null;
+            return { gpu, samples: seen.length, timer: s.gpuTimer || (g ? g.state : "none"), adapter: s.adapter || glName, software: s.software ?? null, frameMs: frames > 0 ? dt / frames : null, frames };
         }, { v: sv, ms: seconds * 1000 });
         if (errors.length && !r.error) r.error = errors[0];
         return r;
