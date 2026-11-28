@@ -704,7 +704,11 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
         console.log(`[verify]   capped  ${c.gate}  killed at ${c.ms} ms alone -- last output before the cap:`);
         for (const l of (c.last && c.last.length ? c.last : ["(nothing on the tail: it printed nothing before the cap)"])) console.log(`[verify]      ${String(l).slice(0, 200)}`);
     }
-    check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
+    // UNNUMBERED (2026-11-28): a gate killed alone is evicted from THIS box's sweep by the reading that killed it (quickSweep.countCrossings), so the row says what to do next
+    // rather than leaving the person to time it by hand -- the rig's two clone-verifies of v4936 each failed on deviceReach-selfcheck alone.
+    check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.length
+        ? r.unmeasured.join(", ") + " -- each was killed ALONE, so this box's record now holds it over budget and the next verify on this box will not run it: run verify again"
+        : "");
     // *** v4832 -- WHAT THE SWEEP DID NOT RUN IS STATED, AND A RECORDED RED IN IT FAILS THE SHIP. *** The sweep skips the gates over budget (449 at v4831) and the rotation re-times 80 a ship, so a red in that pool
     // was visible only to whoever read the rotation's log: gfx/frontDoor-selfcheck.mjs sat red for at least three ships. tools/ship/poolWatch.mjs reads the record the sweep just wrote -- the shared one, and this
     // box's own when it is a foreign box (quickSweep's timingsTarget) -- and prints what is in the pool; an exit the register does not name fails here, with the command that re-runs the gate alone.

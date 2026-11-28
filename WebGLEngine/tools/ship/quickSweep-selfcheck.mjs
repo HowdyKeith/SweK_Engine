@@ -196,6 +196,17 @@ sec("1b. EVICTION TAKES TWO CROSSINGS, BECAUSE ONE IS A READING FROM ONE HOUR");
            "a decrement would take five sweeps under budget to undo five crossings; the reading that matters " +
            "is the most recent run of them");
     }
+    {   // UNNUMBERED (2026-11-28): a gate killed at the cap ALONE is evicted on that one reading; a loaded kill and an alone reading that finished keep the probation.
+        // SABOTAGED: K1 the rule switched off (killedAlone false) -> this row red by name; K2 widened to a LOADED kill -> this row red by name. Restored, sha256 identical.
+        const killedAlone = [{ gate: "k.mjs", serialMs: 20746, serialTimedOut: true }];
+        const killedLoaded = [{ gate: "k.mjs", parallelMs: 20746, parallelTimedOut: true }];
+        const slowAlone = [{ gate: "k.mjs", serialMs: 20746, serialTimedOut: false }];
+        const a = Q.countCrossings({}, killedAlone, 3000)["k.mjs"], b = Q.countCrossings({}, killedLoaded, 3000)["k.mjs"], c = Q.countCrossings({}, slowAlone, 3000)["k.mjs"];
+        const sel = Q.selectGates(["k.mjs"], { "k.mjs": 20746 }, 3000, { crossings: Q.countCrossings({}, killedAlone, 3000) });
+        ok(a === Q.MIN_CROSSINGS_TO_EVICT && b === 1 && c === 1 && sel.skipped.includes("k.mjs") && !sel.onProbation.includes("k.mjs"),
+           "!! *** FIXTURE: a gate KILLED AT THE CAP ALONE is evicted on that reading -- it is not put on probation and run again -- while a LOADED kill and an alone reading that finished over the line still count one ***",
+           `killed alone -> ${a} (skipped next sweep: ${sel.skipped.includes("k.mjs")}), killed loaded -> ${b}, finished alone over -> ${c}. The rig's second clone-verify of v4936 re-ran deviceReach on probation and the cap killed it again (20,746 then 21,267 ms)`);
+    }
     ok(Q.MIN_CROSSINGS_TO_EVICT === 2,
        "  the threshold is a named constant rather than a literal in the selection", `${Q.MIN_CROSSINGS_TO_EVICT}`);
     ok(Q.selectGates(all, timings, 3000, { crossings: { "over.mjs": 1 }, minCrossings: 1 }).skipped.includes("over.mjs"),

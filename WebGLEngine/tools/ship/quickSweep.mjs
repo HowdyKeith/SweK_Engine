@@ -541,11 +541,21 @@ export const MIN_CROSSINGS_TO_EVICT = 2;
  * a few sweeps while still calling itself corroboration. Pure and exported so the reset is driven on a
  * fixture: the first draft kept it inside the writer, where the only sabotage that mattered went 0 red.
  */
+// *** UNNUMBERED (2026-11-28) -- A GATE KILLED AT THE CAP ALONE IS EVICTED ON THAT READING, BECAUSE IT IS NOT THE
+// READING THIS RULE WAS WRITTEN FOR. *** The two-crossings rule protects a gate near the line from one hour's
+// drift, measured above at up to 1.36x. A gate the cap killed ALONE (its serial run timed out) read at least
+// capMs / budgetMs -- 6.7x at today's 20 s cap -- with nothing else running, which no drift explains. Left on
+// probation it was run again at the next verify and killed again: the rig's second clone-verify of v4936 (an
+// 8 GB 8-core Windows box choosing gates by the sandbox's record) failed on deviceReach-selfcheck exactly so, at
+// 20,746 ms and then 21,267 ms, each time "nothing timed out alone under the cap". So such a reading takes the
+// count straight to MIN_CROSSINGS_TO_EVICT. A LOADED kill, and an alone reading that finished over the line,
+// count one as before.
 export function countCrossings(prior, rows, budgetMs) {
     const out = { ...(prior || {}) };
     for (const r of rows) {
         const ms = r.serialMs ?? r.parallelMs;
-        if (ms > budgetMs) out[r.gate] = (out[r.gate] || 0) + 1;
+        const killedAlone = r.serialMs != null && r.serialTimedOut === true;
+        if (ms > budgetMs) out[r.gate] = killedAlone ? Math.max(MIN_CROSSINGS_TO_EVICT, (out[r.gate] || 0) + 1) : (out[r.gate] || 0) + 1;
         else delete out[r.gate];
     }
     return out;
