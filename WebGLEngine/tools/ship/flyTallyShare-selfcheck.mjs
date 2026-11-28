@@ -9,6 +9,9 @@
 //   2  THE FLYING               the four ways are the four committed rounds' scorers, each another number; a fly is its arm's committed weights; the reproduction flies the OLD audit lives
 //   3  THE RECORDS              48 flies, a reproduction and a second flight, made here; EQ (both one-sided tests), D, and the broken sets
 //   4  THE COMMAND              it is this round's; no flight of the round's, no process
+//   5  THE VERDICT              the committed results file by its hash; EQ and D, the means, what was described; COURSE64 draw 12 re-flown to the bit; the note and the backlog say it
+//   VERDICT SABOTAGES (2026-11-28, the same runner, this gate alone): V1 the results file's hash another 1 | V2 alpha 1e-7 1 | V3 a share in the note's table 1 | V4 the note's
+//   'share itself moved' sentence 1 | V5 the backlog row EQ NOT SHOWN 1 | V6 the re-flight compared to draw 11 1 -- all red.
 // SABOTAGE LOG (2026-11-28) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone; the number is the rows red:
 //   S1 own plain at sigma 0.4 1 | S2 own 26-type in the plain scene 2 | S3 perfect 26-type in the plain scene 3 | S4 the fresh lives the old audit 3 | S5 the margin 0.05 3 |
 //   S6 the upper side at twice the margin 2 | S7 ties counted FOR the claim below 0 -- A FINDING: the made tie was not exactly 0.02 in floating point; the row now gives ties exactly,
@@ -121,8 +124,28 @@ section(() => {
         /isRep = raw\[0\] === "job" && raw\[1\] === "REPRODUCE" && raw\[2\] === "1"/.test(csrc) && /PF\.flyOne\(args\.arm, args\.s, committedFiles\(\)\)/.test(csrc) &&
         /\{ kind: "recheck", arm, s, ownPlain: rec\.ownPlain, ownType: rec\.ownType, truePlain: rec\.truePlain, trueType: rec\.trueType \}/.test(csrc) && /no score is printed/.test(csrc) && !/flySceneTally\.mjs"/.test(csrc));
     const me = src("tools/ship/flyTallyShare-selfcheck.mjs"), calls = [...me.matchAll(/E\.flyOne\(([^)]*)\)/g)].map((m) => m[1]);
-    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: one flyOne on its own 2 lives (none a fresh or an audit life), no reproduceOne, no process",
-        calls.length === 1 && /, TWO$/.test(calls[0]) && !TWO.some((x) => T.AUDIT.includes(x) || E.FRESH.includes(x)) && !/E\.reproduceOne\(/.test(me.replace(/\/reproduceOne\\\(F\\\)[^/]*\//, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before);
+    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S BUT THE VERDICT'S ONE FLY AND LEAVES ITS RESULTS FILE AS IT WAS: one flyOne on its own 2 lives (none a fresh or an audit life) and section 5's COURSE64 draw 12, no reproduceOne, no process",
+        calls.length === 2 && /, TWO$/.test(calls[0]) && calls[1] === '"COURSE64", 12, F' && !TWO.some((x) => T.AUDIT.includes(x) || E.FRESH.includes(x)) && !/E\.reproduceOne\(/.test(me.replace(/\/reproduceOne\\\(F\\\)[^/]*\//, "")) && !/import[^;]*child_process/.test(me) && stateOf() === before);
+});
+
+console.log("\n5. THE VERDICT (the results file committed unread at 0bb1ccde, then read once; COURSE64 draw 12 flown four ways again here on the fresh lives, a few minutes)");
+section(() => {
+    const RS = "f910b138060cae35940b44b2390ca5586e486b8ca5857714a4ea3e3b3b3560cb", L = E.fileOf(fs.readFileSync(path.join(ENG, E.RESULTS))), R = E.reading(L.lines, F), f4 = (x) => x.toFixed(4);
+    ok("!! THE RESULTS FILE IS THE ONE COMMITTED UNREAD (sha256 f910b138...), 50 records, and its checks hold", L.sha256 === RS && L.lines.length === 50 && R.checks.length === 0, R.checks.join("; "));
+    ok("!! EQ: EQUIVALENT (48 of 48 below +0.02, one-sided p 3.553e-15; 43 of 48 above -0.02, one-sided p 6.840e-9); D: CANNOT (17 above, 31 below, p 5.946e-2)",
+        R.EQ.word === E.WORDS.EQ[0] && R.EQ.upper.k === 48 && R.EQ.upper.p.toExponential(3) === "3.553e-15" && R.EQ.lower.k === 43 && R.EQ.lower.p.toExponential(3) === "6.840e-9" &&
+        R.D.word === E.WORDS.D[2] && R.D.above === 17 && R.D.below === 31 && R.D.ties === 0 && R.D.p.toExponential(3) === "5.946e-2");
+    const row = (a) => ["ownPlain", "ownType", "truePlain", "trueType", "sharePlain", "shareType"].map((k) => f4(R.arms[a][k])).join(" ");
+    ok("the means the note prints, each arm's four homes and two shares", row("HOMEP") === "0.6051 0.6225 0.9181 0.9662 0.6591 0.6443" && row("COURSE64") === "0.5942 0.6194 0.9170 0.9527 0.6479 0.6502" &&
+        row("HOME16") === "0.6051 0.6247 0.9187 0.9656 0.6586 0.6470" && row("H16BYC") === "0.5969 0.6211 0.9182 0.9571 0.6501 0.6489");
+    ok("described: round E's T26 and Q on these lives (48 of 48, p 7.105e-15; 44 above, 4 below, p 1.514e-9)", R.T26.above === 48 && R.T26.p.toExponential(3) === "7.105e-15" && R.Q.above === 44 && R.Q.below === 4 && R.Q.p.toExponential(3) === "1.514e-9");
+    const r12 = L.lines.find((r) => r.kind === "fly" && r.arm === "COURSE64" && r.s === 12), again = E.flyOne("COURSE64", 12, F);
+    ok("!! COURSE64 draw 12 flown four ways again here on the 200 fresh lives: the record's four numbers to the bit", J(again) === J(r12));
+    const note = src("brain/FLY_TALLY_SHARE_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 9 says it: the file and its hash, both words, the table, both expectations came, the share moved with the lives; the backlog row DONE",
+        /## 9\. The result \(the whole results file committed unread at 0bb1ccde, then read once\)/.test(note) && /sha256 f910b138060cae35/.test(note) && note.includes("**EQ: " + E.WORDS.EQ[0] + "**") &&
+        note.includes("**D: " + E.WORDS.D[2] + "**") && /\| HOMEP \| 0\.6051 \| 0\.6225 \| 0\.9181 \| 0\.9662 \| 0\.6591 \| 0\.6443 \|/.test(note) && /\*\*Both expectations came\*\*: EQ EQUIVALENT \(85\) and D CANNOT \(75\)/.test(note) &&
+        /\*\*The share itself moved with the lives\*\*: about 0\.65 here against round E's 0\.60/.test(note) && /\| `fly-tally-share` \|[^\n]*DONE 2026-11-28[^\n]*EQ EQUIVALENT[^\n]*D CANNOT/.test(back));
 });
 
 console.log(`\nflyTallyShare-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
