@@ -4112,6 +4112,20 @@ export const NEXT_ROUNDS = [
         why: "Named here so the second note that defers it has an entry.",
     },
     {
+        id: "denoiser-r83-committed-unread",
+        blocker: "OPEN",
+        what: "v4936 (the publish merge of seven branches): round 83's verdict, render/learned-denoiser-preregistration.md section 189, was written twice from ONE results file (render/denoise-results-upscale-lights-r83.json) -- on main (2026-11-16) and on ccr-6c3eeb7c (2026-11-10) -- and the two disagree on whether that file was committed before it was read: main's text says committed unread, the branch's says read first and treats 'committed unread' as a sabotage. The merge kept main's text and the gate rows that match it. Which is true is the denoiser chat's to say; nothing in this merge settles it.",
+        how: "The denoiser chat reads both texts and the file's git history (the commit that first added the results file against the commit of each section 189), says which is true, and if main's is wrong corrects section 189 and the gate rows that assert it, with a correction line leading the next round's note.",
+        why: "A pre-registration that cannot say whether its own results were read before they were committed has lost the one property it exists for.",
+    },
+    {
+        id: "sea-lighting-gpu-cost",
+        blocker: "HARDWARE",
+        what: "v4936: the sea lighting (claude/epic-cori-2hm1my, merged for the publish) has its cost measured only on SwiftShader, which cannot make the comparison. tools/lightingCost.mjs averages the card's times over the settle and tools/ship/lightingCost-selfcheck.mjs REPORTS the fog's cost rather than asserting it, because a CPU rasteriser's numbers are not a graphics card's.",
+        how: "On the rig, with a real GPU: node tools/lightingCost.mjs (it refuses a software adapter, writes render/lighting-cost-<box>-<UTC stamp>.json and prints each feature's cost; the rig's commands are in docs/RIG_RUNS_2026-11-27.md); commit the report, and turn lightingCost-selfcheck's reported fog row into an asserted one with a bound from that reading.",
+        why: "The lighting was shipped on correctness gates; what it costs a player's frame has never been read on the hardware that pays it.",
+    },
+    {
         id: "lbm-perturbation-test",
         blocker: "OPEN",
         what: "Read after v4930: left undecided. simulation/lbm/onsetTrend-selfcheck.mjs l.81 deferred varying the perturbation to test whether the Zou-He inlet suppresses the instability behind the 'damping'. v3345 answered it by withdrawing the premise (the wake grows at yOffset 1.5), not by the test itself.",
