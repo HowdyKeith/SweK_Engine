@@ -26,7 +26,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as CL from "../../render/clusteredLights.mjs";
-import { fogCPU } from "../../render/volumetricFog.mjs";
+import { fogCPU, fogLightsOf, fogImportance, MAX_FOG_LIGHTS } from "../../render/volumetricFog.mjs";
 import { invert4 } from "../../render/gizmo.mjs";
 import { PRESENT_ARGS } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
@@ -173,6 +173,17 @@ await section(async () => {
     const inCone = CL.inScatterCPU(spot, [0, 1, 0], [1, 0, 0], g), outCone = CL.inScatterCPU(spot, [3, 1, 0], [1, 0, 0], g), toward = CL.inScatterCPU(spot, [0, 1, 0], [0, 1, 0], g), hid = CL.inScatterCPU(spot, [0, 1, 0], [1, 0, 0], g, { shadow: 0 });
     const want = 3 * CL.window_(3, 8) * (1 - g * g) / Math.pow(1 + g * g, 1.5);
     ok("!! inScatterCPU: on the axis, side-on, the light's radiance times 4 pi Henyey-Greenstein; none outside the cone or in its shadow; more looking toward it (g > 0)", Math.abs(inCone[0] - want) < 1e-12 && outCone.every((v) => v === 0) && hid.every((v) => v === 0) && toward[0] > 2 * inCone[0], `${inCone[0].toFixed(5)} against ${want.toFixed(5)}`);
+});
+console.log("4b. WHICH LIGHTS THE FOG MARCHES (2026-11-28)");
+await section(async () => {
+    const sun = { type: "directional", direction: [0, -1, 0], color: [1, 1, 1], intensity: 1 }, spot = (x) => ({ type: "spot", position: [x, 3, 0], direction: [0, -1, 0], range: 10, innerAngle: 0.2, outerAngle: 0.3, color: [1, 1, 1], intensity: 5 });
+    const pt = (x, i = 2, r = 5) => ({ type: "point", position: [x, 1, 0], range: r, color: [1, 0.5, 0.2], intensity: i }), L = [sun, spot(0), pt(1), pt(2), spot(3)];
+    ok("!! THE KINDS: spots by default, points, all but the sun, none; a list kept as given; a function asked", JSON.stringify(fogLightsOf(L)) === "[1,4]" && JSON.stringify(fogLightsOf(L, "points")) === "[2,3]" && JSON.stringify(fogLightsOf(L, "all")) === "[1,2,3,4]" && fogLightsOf(L, "none").length === 0 && JSON.stringify(fogLightsOf(L, [4, 0])) === "[4,0]" && JSON.stringify(fogLightsOf(L, (ls, e) => [e[0]], [3, 0, 0])) === "[3]");
+    let bad = false; try { fogLightsOf(L, "lamps"); } catch { bad = true; }
+    ok("!! a kind it does not know is refused", bad);
+    const many = [sun, ...Array.from({ length: 40 }, (_, k) => pt(k * 3, 1 + (k % 5), 4))], eye = [30, 2, 0], got = fogLightsOf(many, "points", eye);
+    const score = (i) => fogImportance(many[i], eye), best = many.map((_, i) => i).filter((i) => i > 0).sort((a, b) => score(b) - score(a)).slice(0, MAX_FOG_LIGHTS);
+    ok("!! FORTY POINT LIGHTS: the march takes the sixteen that could add the most at the eye (intensity x brightest channel x range^2 / (range^2 + distance^2)), most first", got.length === MAX_FOG_LIGHTS && JSON.stringify(got) === JSON.stringify(best) && got.every((i, k) => k === 0 || score(got[k - 1]) >= score(i)) && fogImportance(pt(30, 3, 4), eye) > fogImportance(pt(90, 3, 4), eye), `${got.slice(0, 6)}...`);
 });
 console.log("5. THE WEBGL2 FOG");
 await shaftChecks("WEBGL2", "lights-demo.html", "__lights", ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"], true);

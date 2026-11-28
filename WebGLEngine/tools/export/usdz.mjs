@@ -13,7 +13,12 @@
 //   meshesToUsdz(meshes, opts) -> { bytes, stats }            both
 //   glbToUsdz(glbBytes, opts) -> { bytes, stats, skipped }    any GLB the engine writes or loads (tools/export/glbConformance.mjs reads it): every node's
 //                                                             TRIANGLES primitives with the node's world transform baked in, base colour factor and texture
+//   splatsToMeshes(cloud, opts) -> meshes                     (2026-11-28) a Gaussian splat capture (engine/splatParser.js's cloud) as meshes Quick Look can draw
 //   readUsda(text) -> [{ name, points, faceVertexIndices, ... }]   the gate's reader for this file's own output (not a general USD parser)
+// SPLATS (2026-11-28, Keith: "lets do 3, 4, 5 and 6" -- 4 USDZ from the other exporters). AR Quick Look draws meshes, not Gaussians, so a capture goes as A COARSE LIKENESS:
+//   each kept splat an octahedron along its own three axes (its scale, times `size`, turned by its quaternion), in its base colour (spherical harmonics band 0), the splats
+//   kept those at least `minOpacity` opaque, the `budget` with the most opacity x volume (8 triangles each: 25,000 splats is 200,000 triangles). No view-dependent colour,
+//   no transparency, no blending: a solid hull of the capture's bigger blobs. `flip` turns the capture 180 degrees about x (y down to y up, as many captures need).
 //
 // A MESH: { name, positions (VEC3, Float32Array or array), indices? (else consecutive triangles), normals?, uvs? (glTF's: v down), colors? (per vertex,
 //   RGB or RGBA, 0..1, linear), color? ([r, g, b] linear, the whole mesh), texture? ({ name, bytes, mime: "image/png" | "image/jpeg" }) }
@@ -150,6 +155,7 @@ export function glbToUsdz(glb, opts = {}) {
     const image = (texIndex) => { const t = g.textures?.[texIndex], im = t && g.images?.[t.source]; if (!im || im.bufferView == null || !/^image\/(png|jpeg)$/.test(im.mimeType || "")) return null; const bv = g.bufferViews[im.bufferView]; return { name: im.name || `image${t.source}`, mime: im.mimeType, bytes: bin.slice(bv.byteOffset || 0, (bv.byteOffset || 0) + bv.byteLength) }; };
     const walk = (ni, parent) => {
         const n = g.nodes[ni], M = mat4Mul(parent, nodeMatrix(n));
+        if (n.camera != null) skipped.push(`${n.name || "node" + ni}: a camera (Quick Look places its own)`);
         if (n.mesh != null) (g.meshes[n.mesh].primitives || []).forEach((pr, pi) => {
             const label = `${g.meshes[n.mesh].name || "mesh" + n.mesh}${pi ? "_" + pi : ""}`;
             if ((pr.mode ?? 4) !== 4) return skipped.push(`${label}: mode ${pr.mode} (not triangles)`);
@@ -178,6 +184,32 @@ export function glbToUsdz(glb, opts = {}) {
     return { ...r, skipped };
 }
 
+// ---- splats ----
+const OCT_FACES = [[0, 2, 4], [2, 1, 4], [1, 3, 4], [3, 0, 4], [2, 0, 5], [1, 2, 5], [3, 1, 5], [0, 3, 5]];   // +x -x +y -y +z -z; counter-clockwise from outside
+/** A splat cloud as meshes of octahedra (see the header); { budget, minOpacity, size, flip, perMesh } */
+export function splatsToMeshes(cloud, { budget = 25000, minOpacity = 0.3, size = 1.2, flip = false, perMesh = 20000 } = {}) {
+    const n = cloud.count, sig = (x) => 1 / (1 + Math.exp(-x)), keep = [];
+    for (let i = 0; i < n; i++) { const a = sig(cloud.opacities[i]); if (a >= minOpacity) keep.push([i, a * Math.exp(cloud.scales[i * 3] + cloud.scales[i * 3 + 1] + cloud.scales[i * 3 + 2])]); }
+    keep.sort((p, q) => q[1] - p[1] || p[0] - q[0]);
+    const chosen = keep.slice(0, budget).map((k) => k[0]).sort((p, q) => p - q), meshes = [];
+    for (let m0 = 0; m0 < chosen.length; m0 += perMesh) {
+        const part = chosen.slice(m0, m0 + perMesh), P = new Float32Array(part.length * 18), N = new Float32Array(part.length * 18), C = new Float32Array(part.length * 18), I = new Uint32Array(part.length * 24);
+        part.forEach((i, j) => {
+            let [w, x, y, z] = cloud.quats.slice(i * 4, i * 4 + 4); const ql = Math.hypot(w, x, y, z) || 1; w /= ql; x /= ql; y /= ql; z /= ql;
+            const R = [1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y), 2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x), 2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)];   // columns: the splat's axes
+            const c = cloud.positions.slice(i * 3, i * 3 + 3), F = flip ? [1, -1, -1] : [1, 1, 1];
+            for (let a = 0; a < 3; a++) {
+                const r = Math.exp(cloud.scales[i * 3 + a]) * size, ax = [R[a * 3], R[a * 3 + 1], R[a * 3 + 2]];
+                for (const sgn of [1, -1]) { const v = j * 6 + a * 2 + (sgn > 0 ? 0 : 1); for (let k = 0; k < 3; k++) { P[v * 3 + k] = (c[k] + sgn * r * ax[k]) * F[k]; N[v * 3 + k] = sgn * ax[k] * F[k]; C[v * 3 + k] = cloud.colors[i * 3 + k]; } }
+            }
+            OCT_FACES.forEach((f, t) => { for (let k = 0; k < 3; k++) I[j * 24 + t * 3 + k] = j * 6 + f[k]; });
+            // the axes from a quaternion are right-handed, so these faces wind outward; a flip (two axes negated) keeps that
+        });
+        meshes.push({ name: `splats${meshes.length}`, positions: P, normals: N, colors: C, indices: I });
+    }
+    return Object.assign(meshes, { kept: chosen.length, eligible: keep.length, total: n });
+}
+
 // ---- the gate's reader: this file's own output, back into numbers ----
 const nums = (s) => (s.match(/-?[\d.]+(?:e[-+]?\d+)?/gi) || []).map(Number);
 export function readUsda(text) {
@@ -199,8 +231,13 @@ if (typeof process !== "undefined" && process.argv[1] && /usdz\.mjs$/.test(proce
             const { worldMeshes } = await import("../../world/worldGlbExport.js"), S = 16, H = 8;
             const chunk = (extra) => { const v = new Uint8Array(S * H * S); for (let z = 0; z < S; z++) for (let x = 0; x < S; x++) v[x + S * (z + S * 0)] = 3; if (extra) for (let y = 1; y < 4; y++) v[5 + S * (5 + S * y)] = 1; return { voxels: v }; };
             r = meshesToUsdz(worldMeshes({ chunkSize: S, chunks: new Map([["0,0", chunk(true)], ["1,0", chunk(false)]]) }), { name: "SweK_demo" });
+        } else if (a && b && /\.(ply|splat)$/i.test(a)) {
+            const { parseSplatFile } = await import("../../engine/splatParser.js"), rest = process.argv.slice(4), opt = (k, d) => { const i = rest.indexOf("--" + k); return i >= 0 ? Number(rest[i + 1]) : d; };
+            const buf = fs.readFileSync(a), cloud = parseSplatFile(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), a);
+            const meshes = splatsToMeshes(cloud, { budget: opt("budget", 25000), minOpacity: opt("min-opacity", 0.3), size: opt("size", 1.2), flip: rest.includes("--flip") });
+            r = meshesToUsdz(meshes, { name: "SweK_splats" }); console.log(`${meshes.kept} of ${meshes.total} splats kept (${meshes.eligible} opaque enough), as octahedra`);
         } else if (a && b) r = glbToUsdz(fs.readFileSync(a), { name: "SweK" });
-        else { console.error("usage: node tools/export/usdz.mjs <in.glb> <out.usdz>   |   node tools/export/usdz.mjs --demo <out.usdz>"); process.exit(2); }
+        else { console.error("usage: node tools/export/usdz.mjs <in.glb> <out.usdz>   |   <in.ply|in.splat> <out.usdz> [--budget 25000] [--min-opacity 0.3] [--size 1.2] [--flip]   |   --demo <out.usdz>"); process.exit(2); }
         fs.writeFileSync(b, r.bytes);
         console.log(`wrote ${b}: ${r.stats.meshes} meshes, ${r.stats.triangles} triangles, ${r.stats.materials} materials, ${r.stats.textures} textures, ${r.bytes.length} bytes${r.skipped && r.skipped.length ? "; skipped: " + r.skipped.join("; ") : ""}`);
     } catch (e) { console.error(e.message); process.exit(1); }

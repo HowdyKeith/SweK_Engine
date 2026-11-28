@@ -14,6 +14,8 @@
 //   3  A POINT LIGHT  a red light 40 units over a ship reddens that ship and nothing but ships within its range -- a ship framed at the left edge too; the same light 2000 units higher, outside its range, changes nothing at all
 //   4  THE FOG        where nothing wrote depth (all but the ships) the fogged pixel is render/volumetricFog.mjs fogCPU's closed form over the 12000-unit ray, to 2 levels; the
 //                     ships each by their own distance: (fogged - fog light) / (clear - fog light) is e^-(density x distance); without ?lights and ?fog the page has no __flightLights
+//   6  THE GLOW       (2026-11-28) the flashes and shots glow in the haze: switched live, only brighter; the chosen lights (at most 16) add the march's own sum.
+//                     The other sections open with &glow=0: on SwiftShader the glow (up to 16 lights at each fog step) slows the page several times over
 //   5  THE SHAFTS     (2026-11-27) on by default with lights and fog; in a thickened haze, looking past a ship toward the sun, switched live on one frozen frame, the ships' shadows only darken the fog, and with the
 //                     ships out of the atlas the switch changes nothing
 //
@@ -27,7 +29,8 @@ import { fileURLToPath } from "node:url";
 import { PRESENT_ARGS } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { mat4Invert } from "../../render/motionVectors.mjs";
-import { fogCPU } from "../../render/volumetricFog.mjs";
+import { fogCPU, fogLightsOf } from "../../render/volumetricFog.mjs";
+import { inScatterCPU } from "../../render/clusteredLights.mjs";
 
 const require = createRequire(import.meta.url), ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -59,7 +62,7 @@ const lum = (px, i) => 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
 
 console.log("1. IT RUNS");
 await section(async () => {
-    const { p, errors } = await open("?lights=1&fog=1", "L.frames > 40 && L.count && L.count.simShots > 3");
+    const { p, errors } = await open("?lights=1&fog=1&glow=0", "L.frames > 40 && L.count && L.count.simShots > 3");
     const R = await p.evaluate(() => { const L = window.__flightLights; return { stats: L.stats, count: L.count, error: L.error, frames: L.frames }; });
     await p.close();
     const c = R.count, wantShots = Math.min(c.simShots, 250 - 1 - Math.min(c.simFx, 249));
@@ -169,7 +172,7 @@ console.log("5. THE SUN'S SHAFTS IN THE HAZE (2026-11-27)");
 await section(async () => {
     // the page's own haze lets a ship's shadow take under a level from the fog; thickened (the same fogParams object the page draws with), the shafts show. One frozen frame,
     // the shafts switched live (flightLights.shaftsOn), and again with the ships' depth left out of the atlas (casters: false) -- then nothing may hide the sun
-    const { p, errors } = await open("?lights=1&fog=1");
+    const { p, errors } = await open("?lights=1&fog=1&glow=0");   // the glow is section 6's (on SwiftShader up to 16 lights a fog step slows the page several times over)
     // framed as shafts are seen: from 400 units behind a live ship, looking past it toward the sun, so the rays round its silhouette run inside its shadow (seen side-on from
     // the orbit, a ship's 50-unit shadow crosses a ray for 50 units of 12000 and takes under a level). The haze thick enough to show it, not so bright it saturates
     const info = await p.evaluate(() => { const L = window.__flightLights; L.freeze = true; Object.assign(L.fogParams, { density: 0.002, lightColor: [0.2, 0.19, 0.17], ambient: [0.01, 0.012, 0.02], steps: 48 });
@@ -183,6 +186,27 @@ await section(async () => {
     ok("!! THE SHAFTS ARE ON BY DEFAULT WITH ?lights=1&fog=1, and &shafts=0 is the plain haze", info.shafts === true && errors.length === 0 && !R.error, `${JSON.stringify(info)}${errors[0] ? "; " + errors[0] : ""}`);
     ok("!! LOOKING PAST A SHIP TOWARD THE SUN, IN A THICKER HAZE, ITS SHADOW TAKES LIGHT FROM IT: a fiftieth of the picture darker by over 3 levels, none brighter by over 1", darker > N * 0.02 && brighter === 0, `${darker} darker, ${brighter} brighter, of ${N}`);
     ok("!! AND IT IS THE SHIPS THAT DO IT: with their depth left out of the atlas, the shafts change nothing (to a level)", ncDiff <= N * 0.0005, `${ncDiff} pixels differ`);
+});
+
+console.log("6. THE FLASHES AND SHOTS GLOW IN THE HAZE (2026-11-28)");
+await section(async () => {
+    // the page's own haze, the battle frozen; the glow switched live. What it adds is the march's sum of the chosen lights' in-scattering (at most 16, the most important
+    // from the eye: render/volumetricFog.mjs fogLightsOf "points"), independent of the scene behind -- held where the ray meets no ship (a ship stops the ray short)
+    const { p, errors } = await open("?lights=1&fog=1");
+    const off = await shot(p, { freeze: true, glowOn: false }), on = await shot(p, { freeze: true, glowOn: true }), noShip = await shot(p, { freeze: true, glowOn: false, fogOn: false });
+    const S = await p.evaluate(() => { const L = window.__flightLights; return { lights: L.lightList, eye: L.eye, vp: L.vp, P: L.fogParams, error: L.error }; }); await p.close();
+    const N = on.w * on.h, inv = mat4Invert(S.vp), chosen = fogLightsOf(S.lights, "points", S.eye).map((i) => S.lights[i]);
+    let up = 0, down = 0, n = 0, good = 0;
+    for (let y = 0; y < on.h; y++) for (let x = 0; x < on.w; x++) {
+        const k = (y * on.w + x) * 4, d = lum(on.px, k) - lum(off.px, k); if (d < -1) down++; if (d <= 3) continue; up++;
+        if ((x + y) % 3 || Math.max(on.px[k], on.px[k + 1], on.px[k + 2]) >= 250) continue;
+        const nx = ((x + 0.5) / on.w) * 2 - 1, ny = 1 - ((y + 0.5) / on.h) * 2, f = [0, 1, 2, 3].map((r) => inv[r] * nx + inv[4 + r] * ny + inv[8 + r] + inv[12 + r]), q = [f[0] / f[3] - S.eye[0], f[1] / f[3] - S.eye[1], f[2] / f[3] - S.eye[2]], l = Math.hypot(...q), dir = q.map((v) => v / l);
+        const base = { origin: S.eye, dir, distance: 1e9, color: [0, 0, 0], px: x, py: y };
+        const w = fogCPU(S.P, { ...base, localOf: (pt) => chosen.reduce((a, li) => { const v = inScatterCPU(li, pt, dir, S.P.g); return a.map((z, i) => z + v[i]); }, [0, 0, 0]) }), z0 = fogCPU(S.P, { ...base, localOf: () => [0, 0, 0] });
+        const e = Math.max(...[0, 1, 2].map((i) => Math.abs((w[i] - z0[i]) * 255 - (on.px[k + i] - off.px[k + i])))); n++; if (e <= 4) good++;
+    }
+    void noShip;
+    ok("!! THE FLASHES AND SHOTS GLOW: switched on, only brighter (over 3 levels somewhere, darker nowhere); at most 16 lights chosen, and what they add is the march's sum of their in-scattering to 4 levels, nine pixels in ten (a third of them read)", up > 300 && down === 0 && chosen.length > 0 && chosen.length <= 16 && n > 50 && good >= 0.9 * n && errors.length === 0 && !S.error, `${up} brighter, ${down} darker; ${chosen.length} of ${S.lights.length} lights chosen; ${good} of ${n} to 4 levels`);
 });
 
 await browser.close(); srv.close();

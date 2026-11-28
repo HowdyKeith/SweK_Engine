@@ -245,7 +245,7 @@ export function cookieAt(A, l, p) {
 }
 
 /** The light rows both backends read: 9 vec4s a light. */
-function packLights(lights, A, maxLights) {
+export function packLights(lights, A, maxLights) {
     const ld = new Float32Array(36 * maxLights);
     lights.forEach((l, i) => {
         const o = i * 36, sun = isSun(l), spot = l.type === "spot", d = sun || spot ? norm(l.direction) : [0, 0, 0], s = A.byLight.get(i) || [0, 0], cookie = spot && l.cookie != null;
@@ -255,13 +255,14 @@ function packLights(lights, A, maxLights) {
     return ld;
 }
 /** The face rows: 6 vec4s a face (the view-projection, the tile's rect, (world bias, penumbra scale, near, far) -- near 0 for the sun's orthographic cascades). */
-function packFaces(A, maxFaces, transform = (m) => m) {
+export function packFaces(A, maxFaces, transform = (m) => m) {
     const fd = new Float32Array(24 * maxFaces);
     A.faces.forEach((f, k) => { fd.set(transform(f.viewProj), k * 24); fd.set(f.rect, k * 24 + 16); fd.set([f.worldBias, f.penumbra || 0, f.depthNear || 0, f.depthFar || 0], k * 24 + 20); });
     return fd;
 }
-const packCells = (C, N, maxPerCell, Typed) => { const cd = new Typed(N * (maxPerCell + 1)); for (let c = 0; c < N; c++) { cd[c * (maxPerCell + 1)] = C.counts[c]; for (let k = 0; k < C.counts[c]; k++) cd[c * (maxPerCell + 1) + 1 + k] = C.lists[c * maxPerCell + k]; } return cd; };
-const build = (O, lights, camera) => {
+export const packCells = (C, N, maxPerCell, Typed) => { const cd = new Typed(N * (maxPerCell + 1)); for (let c = 0; c < N; c++) { cd[c * (maxPerCell + 1)] = C.counts[c]; for (let k = 0; k < C.counts[c]; k++) cd[c * (maxPerCell + 1) + 1 + k] = C.lists[c * maxPerCell + k]; } return cd; };
+/** Clusters, atlas, sun and splits for a frame (exported 2026-11-28 for render/clusteredLightsThree.mjs, which uploads the very same rows through three.js). */
+export const build = (O, lights, camera) => {
     const C = O.space === "view" ? buildViewClusters(lights, camera, O) : buildClusters(lights, O), A = allocateAtlas(lights, { ...O, camera });
     const sun = sunIndexOf(lights), sunFaces = sun >= 0 ? A.byLight.get(sun) : null, splits = [0, 0, 0, 0]; if (sunFaces) for (let k = 0; k < sunFaces[1]; k++) splits[k] = A.faces[sunFaces[0] + k].splitFar;
     return { C, A, sun, cascades: sunFaces ? sunFaces[1] : 0, splits };

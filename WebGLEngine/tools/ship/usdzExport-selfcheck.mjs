@@ -14,6 +14,10 @@
 //                       normals, a texture and a line primitive: points and normals transformed, the mirror's faces wound back, st = (u, 1 - v), the PNG in the archive
 //                       byte for byte and named by the material, the lines skipped and said so
 //   5  THE WORLD        a hand-built voxel world through world/worldGlbExport.js worldMeshes, as swekExport.usdz() does (main.js)
+//   6  THE SCENE        (2026-11-28) the scene export's GLB (props placed twice, a camera) as swekExport.scene({ usdz: true }) converts it: each placement where it is put,
+//                       the camera left out and said so
+//   7  SPLATS           (2026-11-28) a .splat capture through splatsToMeshes: the opacity floor, the budget by opacity x volume, each splat an octahedron along its own axes,
+//                       every face outward, turned or flipped
 //
 // What is NOT held here: that Quick Look shows it. Pixar's checker (usdchecker --arkit) is not in this sandbox; docs/RIG_RUNS_2026-11-27.md has the rig's command.
 // SABOTAGE LOG: see the bottom of this file.
@@ -25,7 +29,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as U from "../export/usdz.mjs";
 import { writeGlb, packGlb } from "../export/voxelGlb.mjs";
-import { worldMeshes } from "../../world/worldGlbExport.js";
+import { worldMeshes, exportSceneGlb } from "../../world/worldGlbExport.js";
+import { parseSplatFile } from "../../engine/splatParser.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -132,6 +137,39 @@ section(() => {
     ok("!! A VOXEL WORLD (worldMeshes, as swekExport.usdz() exports it): every chunk a mesh, every triangle written, the palette as materials, a valid archive", back.length === meshes.length && r.stats.triangles === tri && back.every((m) => m.faceVertexCounts.length * 3 === m.faceVertexIndices.length) && r.stats.materials >= 2 && z.local[0].dataOffset % 64 === 0, `${meshes.length} meshes, ${tri} triangles, ${r.stats.materials} materials, ${r.bytes.length} bytes`);
     const main = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
     ok("!! main.js's swekExport.usdz() exports those meshes through meshesToUsdz", /async usdz\(o = \{\}\)[\s\S]{0,600}worldMeshes\(world, o\)[\s\S]{0,200}meshesToUsdz\(meshes/.test(main));
+});
+
+console.log("6. THE SCENE EXPORT (2026-11-28)");
+section(() => {
+    // the scene export: chunks, a prop placed twice (turned and moved), a camera -- as swekExport.scene({ usdz: true }) converts it
+    const S = 16, H = 8, chunk = () => { const v = new Uint8Array(S * H * S); for (let z = 0; z < S; z++) for (let x = 0; x < S; x++) v[x + S * (z + S * 0)] = 3; return { voxels: v }; };
+    const prop = { name: "crate", positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), colors: new Float32Array([0.9, 0.5, 0.1, 0.9, 0.5, 0.1, 0.9, 0.5, 0.1]) };
+    const s2 = Math.SQRT1_2, r = exportSceneGlb({ chunkSize: S, chunks: new Map([["0,0", chunk()]]) }, { props: [{ mesh: prop, placements: [{ translation: [5, 2, 5] }, { translation: [8, 2, 3], rotation: [0, s2, 0, s2] }] }], camera: { position: [0, 10, 20], forward: [0, -0.4, -1], yfov: 0.9, znear: 0.1, zfar: 500 } });
+    const chunkTris = worldMeshes({ chunkSize: S, chunks: new Map([["0,0", chunk()]]) }).reduce((a, m) => a + m.positions.length / 9, 0);
+    const u = U.glbToUsdz(r.bytes, { name: "SweK_scene" }), ms = U.readUsda(u.usda), crates = ms.filter((m) => /crate/.test(m.name));
+    ok("!! THE SCENE'S GLB BECOMES A USDZ: every chunk triangle and each prop placement once, the prop where its placement puts it (moved; turned a quarter about y), the camera left out and said so", u.stats.triangles === chunkTris + 2 && crates.length === 2 && close(crates[0].points, [5, 2, 5, 6, 2, 5, 5, 3, 5], 1e-5) && close(crates[1].points, [8, 2, 3, 8, 2, 2, 8, 3, 3], 1e-5) && u.skipped.length === 1 && /camera/.test(u.skipped[0]), `${u.stats.triangles} triangles (${chunkTris} + 2); ${crates.map((c) => c.points.map((v) => +v.toFixed(3)).join(",")).join(" | ")}; ${JSON.stringify(u.skipped)}`);
+    const main = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    ok("!! main.js's swekExport.scene({ usdz: true }) sends that scene's GLB through glbToUsdz", /if \(o\.usdz\) \{[\s\S]{0,200}glbToUsdz\(r\.bytes/.test(main));
+});
+
+console.log("7. SPLAT CAPTURES (2026-11-28)");
+section(() => {
+    // four splats in a .splat file (32 bytes each: position, linear scale, RGBA, quaternion as (q + 1) x 128): one big and opaque turned a quarter about z, one small,
+    // one faint (under the opacity floor), one big and opaque but further down the list
+    const rows = [[[0, 0, 0], [0.5, 0.2, 0.1], [255, 0, 0, 250], [s2q(Math.SQRT1_2), 128, 128, s2q(Math.SQRT1_2)]], [[3, 0, 0], [0.05, 0.05, 0.05], [0, 255, 0, 250], [255, 128, 128, 128]], [[0, 3, 0], [1, 1, 1], [0, 0, 255, 20], [255, 128, 128, 128]], [[0, 0, 3], [0.3, 0.3, 0.3], [255, 255, 0, 230], [255, 128, 128, 128]]];
+    function s2q(v) { return Math.round((v + 1) * 128); }
+    const buf = new ArrayBuffer(32 * rows.length), dv = new DataView(buf);
+    rows.forEach(([p, sc, c, q], i) => { const b = i * 32; p.forEach((v, k) => dv.setFloat32(b + k * 4, v, true)); sc.forEach((v, k) => dv.setFloat32(b + 12 + k * 4, v, true)); c.forEach((v, k) => dv.setUint8(b + 24 + k, v)); q.forEach((v, k) => dv.setUint8(b + 28 + k, Math.min(255, v))); });
+    const cloud = parseSplatFile(buf, "probe.splat"), all = U.splatsToMeshes(cloud, { budget: 10, size: 1 }), two = U.splatsToMeshes(cloud, { budget: 2, size: 1 }), flip = U.splatsToMeshes(cloud, { budget: 10, size: 1, flip: true });
+    const m = all[0], verts = (mm, j) => Array.from({ length: 6 }, (_, k) => [0, 1, 2].map((a) => mm.positions[(j * 6 + k) * 3 + a]));
+    ok("!! THE OPACITY FLOOR AND THE BUDGET: the faint splat dropped; with a budget of two, the two with the most opacity x volume kept (the big red and the yellow), in file order", all.kept === 3 && all.eligible === 3 && all.total === 4 && two.kept === 2 && close(Array.from(two[0].colors.slice(0, 3)), [1, 0, 0], 0.01) && close(Array.from(two[0].colors.slice(18, 21)), [1, 1, 0], 0.01), `${all.kept} of ${all.total}; budget 2: ${Array.from(two[0].colors.filter((_, i) => i % 18 < 3)).map((v) => v.toFixed(2))}`);
+    const v0 = verts(m, 0), axes = v0.map((v) => Math.hypot(...v));
+    ok("!! EACH SPLAT AN OCTAHEDRON ALONG ITS OWN AXES: the first (scale 0.5, 0.2, 0.1, turned a quarter about z) reaches 0.5 along y, 0.2 along x, 0.1 along z", close(v0[0], [0, 0.5, 0], 0.02) && close(v0[2], [-0.2, 0, 0], 0.02) && close(v0[4], [0, 0, 0.1], 0.02), JSON.stringify(v0.map((v) => v.map((x) => +x.toFixed(3)))) + " " + axes.map((x) => x.toFixed(2)));
+    const outward = (mm) => { let good = 0, n = 0; for (let t = 0; t < mm.indices.length / 3; t++) { const [a, b, c] = [0, 1, 2].map((k) => Array.from(mm.positions.slice(mm.indices[t * 3 + k] * 3, mm.indices[t * 3 + k] * 3 + 3))), j = Math.floor(mm.indices[t * 3] / 6), cen = [0, 1, 2].map((k) => verts(mm, j).reduce((s, v) => s + v[k], 0) / 6), u = b.map((x, k) => x - a[k]), w = c.map((x, k) => x - a[k]), nrm = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]], mid = [0, 1, 2].map((k) => (a[k] + b[k] + c[k]) / 3 - cen[k]); n++; if (nrm[0] * mid[0] + nrm[1] * mid[1] + nrm[2] * mid[2] > 0) good++; } return [good, n]; };
+    const [g1, n1] = outward(m), [g2, n2] = outward(flip[0]);
+    ok("!! EVERY FACE WINDS OUTWARD (counter-clockwise from outside), turned or flipped; the flip puts y up (the splat at y 3 would go to -3; the one at z 3 to -3)", g1 === n1 && g2 === n2 && n1 === 24 && close(verts(flip[0], 2).reduce((s, v) => s.map((x, k) => x + v[k] / 6), [0, 0, 0]), [0, 0, -3], 1e-5), `${g1}/${n1}, flipped ${g2}/${n2}`);
+    const z = U.meshesToUsdz(all, { name: "SweK_splats" }), back = U.readUsda(z.usda)[0];
+    ok("!! AND THEY GO OUT AS A USDZ LIKE ANY MESH: 24 triangles, three colours as three materials", z.stats.triangles === 24 && z.stats.materials === 3 && back.faceVertexIndices.length === 72, `${z.stats.triangles} triangles, ${z.stats.materials} materials`);
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

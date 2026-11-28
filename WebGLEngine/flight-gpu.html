@@ -469,8 +469,9 @@ async function initGPU() {
   }
   // SHAFTS (2026-11-27): the fog marches the sun's cascaded shadow (its lightDir is the sun's, toward it), so the haze behind a ship, seen past it, is darker. At this
   // page's own haze (density 0.00025, the sun's share 0.12) a ship's shadow takes under one colour level from the fog; a thicker haze (flightLights.fogParams, live) shows it
-  if (FOG) { fog = createFogGPU(device, sceneFormat); if (SHAFTS) fogShafts = createFogGPU(device, sceneFormat, { lighting }); }   // both: flightLights.shaftsOn switches them live
-  if (flightLights) { timer = createGpuTimer(device); flightLights.gpuTimer = timer.supported ? "on" : WANT_TIMER ? "this adapter has no timestamp-query" : "off"; const ai = adapter.info || {}; flightLights.adapter = [ai.vendor, ai.architecture, ai.description || ai.device].filter(Boolean).join(" ") || "unknown"; flightLights.software = !!adapter.isFallbackAdapter || /swiftshader|llvmpipe|warp|basic render/i.test(flightLights.adapter); flightLights.shafts = SHAFTS; flightLights.shaftsOn = SHAFTS; }
+  if (FOG) { fog = createFogGPU(device, sceneFormat); if (SHAFTS) fogShafts = createFogGPU(device, sceneFormat, { lighting }); }
+  // 2026-11-28 -- THE GLOW: the flashes and shots that matter most from the camera (render/volumetricFog.mjs fogImportance, at most 16) light the haze round them too; &glow=0 none   // both: flightLights.shaftsOn switches them live
+  if (flightLights) { timer = createGpuTimer(device); flightLights.gpuTimer = timer.supported ? "on" : WANT_TIMER ? "this adapter has no timestamp-query" : "off"; const ai = adapter.info || {}; flightLights.adapter = [ai.vendor, ai.architecture, ai.description || ai.device].filter(Boolean).join(" ") || "unknown"; flightLights.software = !!adapter.isFallbackAdapter || /swiftshader|llvmpipe|warp|basic render/i.test(flightLights.adapter); flightLights.shafts = SHAFTS; flightLights.shaftsOn = SHAFTS; flightLights.glowOn = SHAFTS && new URLSearchParams(location.search).get("glow") !== "0"; }
   if (AA_MODE) aa = createSmaaGPU(device, { width: 1, height: 1, outputFormat: format, temporal: AA_MODE === "t2x" });
   bind = device.createBindGroup({ layout: sceneBGL, entries: [{ binding: 0, resource: { buffer: uBuf } }] });
   bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -530,6 +531,7 @@ function render() {
   if (lit) {
     const L = buildLights();
     flightLights.stats = lighting.update(L, { view: Array.from(view), proj: Array.from(perspGL(52 * Math.PI / 180, canvas.width / canvas.height, 12, 12000)), near: 12, far: 12000 });
+    flightLights.lightList = L;   // the frame's lights, for a gate's CPU twin of the glow
     flightLights.count = { lights: L.length, sun: L.filter((l) => l.type === "directional").length, shots: L.filter((l) => l.range === 200).length, fx: L.filter((l) => l.type === "point" && l.range !== 200).length - flightLights.extra.length, simShots: shots.length, simFx: fx.filter((p) => p.size >= 36).length };
     if (lighting.cookieVersion !== litBGVersion) { litBG1 = lighting.bindGroupFor(shipLitPipe, 1); litBGVersion = lighting.cookieVersion; }
   }
@@ -574,7 +576,7 @@ function render() {
     if (nShot) { pass.setPipeline(shotPipe); pass.setVertexBuffer(0, shotInst); pass.setVertexBuffer(1, shotCol); pass.draw(6, nShot); }
     if (nFx) { pass.setPipeline(fxPipe); pass.setVertexBuffer(0, fxInst); pass.setVertexBuffer(1, fxCol); pass.draw(6, nFx); }
     pass.end();
-    if (fogged) (fogShafts && flightLights.shaftsOn && lit ? fogShafts : fog).encode(enc, sceneTarget, { colorView: sceneView, depthView, invViewProj: mat4Invert(drawVP), eye, zRange: "zo", params: FOG_PARAMS, timer: timer && timer.supported ? timer : null });
+    if (fogged) (fogShafts && flightLights.shaftsOn && lit ? fogShafts : fog).encode(enc, sceneTarget, { colorView: sceneView, depthView, invViewProj: mat4Invert(drawVP), eye, zRange: "zo", params: FOG_PARAMS, timer: timer && timer.supported ? timer : null, fogLights: flightLights.glowOn ? "points" : "none" });
     if (useAA) {   // the camera moves every frame here: the history is carried by this frame's depth buffer and last frame's matrix, or dropped (&reproject=0)
       const reproject = aa.temporal && AA_REPROJECT && aaPrevVP ? { invViewProj: mat4Invert(vp), prevViewProj: aaPrevVP, depth: depthView } : null;
       aa.encode(enc, ctx.getCurrentTexture().createView(), { moved: true, reproject });

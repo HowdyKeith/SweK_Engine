@@ -12,7 +12,7 @@
        - NOT LIT LIKE THE ENGINE, BY DEFAULT. A one-pass WebGL2 shader (sky tint by Fresnel, a sun glint, foam where the particles bunch). 2026-11-27 (Keith: "lets do 1 through 6",
          1 being the sea pages' many lights and fog at sea level): ?lights=1 lights it with the engine's render/clusteredLights.mjs instead -- dusk, a low sun with three cascades
          of buoy shadow, a navigation lamp over each buoy, three searchlights on masts sweeping the water -- and &fog=1 lays render/volumetricFog.mjs's sea-level haze over it,
-         with the sun's shafts and the searchlights' beams in it (&shafts=0 neither, &beams=0 no beams). ?t=12 holds the sea and the lights at that time. Held by
+         with the sun's shafts and the searchlights' beams in it (&shafts=0 neither, &beams=0 no beams); 2026-11-28: and a halo round each lamp (&glow=0 none). ?t=12 holds the sea and the lights at that time. Held by
          tools/ship/oceanLit-selfcheck.mjs; without ?lights the page draws exactly as before.
        - NOT YET READ BY ANYTHING ELSE. The submarine and the boats take their water height from the physics surface when a later slice wires them.
      Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
@@ -175,9 +175,9 @@
       lit.lighting = createClusteredLighting(gl, { maxLights: 16, space: "view", viewCells: [16, 9, 24], maxPerCell: 16, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 260, casterReach: 60 });
       // the sea-level haze: thick at the water, thinning over 6 m; lit by the low sun (its lightDir toward the sun) and a dusk ambient
       lit.fogParams = { density: 0.018, falloff: 6, baseHeight: 0, albedo: 0.9, ambient: [0.025, 0.03, 0.05], lightDir: [0.8, 0.25, 0.55], lightColor: [0.5, 0.36, 0.26], g: 0.55, maxDistance: 420, steps: 48, jitter: true };
-      if (FOG) { const shafts = Q.get("shafts") !== "0"; lit.fogFlat = createFogGL(gl); lit.fogLit = shafts ? createFogGL(gl, { lighting: lit.lighting }) : null; lit.fogNoBeams = shafts ? createFogGL(gl, { lighting: lit.lighting, fogLights: [] }) : null; lit.beamsDefault = shafts && Q.get("beams") !== "0"; }
+      if (FOG) { const shafts = Q.get("shafts") !== "0"; lit.fogFlat = createFogGL(gl); lit.fogLit = shafts ? createFogGL(gl, { lighting: lit.lighting }) : null; lit.beamsDefault = shafts && Q.get("beams") !== "0"; lit.glowDefault = shafts && Q.get("glow") !== "0"; }
       // what a gate switches, live: the sun, the lamps, the searchlights, the buoys' shadows, the fog, its shafts and its beams
-      state.lit = { sun: true, lamps: true, searchlights: true, casters: true, fogOn: FOG, shaftsOn: FOG && Q.get("shafts") !== "0", beamsOn: !!lit.beamsDefault, extra: [], fog: FOG, fogParams: lit.fogParams, lights: null, stats: null, vp: null, eye: null };
+      state.lit = { sun: true, lamps: true, searchlights: true, casters: true, fogOn: FOG, shaftsOn: FOG && Q.get("shafts") !== "0", beamsOn: !!lit.beamsDefault, glowOn: !!lit.glowDefault, extra: [], fog: FOG, fogParams: lit.fogParams, lights: null, stats: null, vp: null, eye: null };
     }
 
     // ---- the water: buffers sized for the largest grid, filled every frame ----
@@ -290,9 +290,10 @@
       gl.bindVertexArray(vao); gpuTimer.begin("water"); gl.uniform1i(gl.getUniformLocation(P, "uMode"), 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0); gpuTimer.end();
       gpuTimer.begin("buoys"); drawBuoys(P); gpuTimer.end();
       if (fogged) {
-        const S = state.lit, f = S.shaftsOn && lit.fogLit ? (S.beamsOn ? lit.fogLit : lit.fogNoBeams) : lit.fogFlat;
+        // which lights glow in the haze (render/volumetricFog.mjs fogLights): the searchlights' beams, the lamps' halos (2026-11-28), both, or neither
+        const S = state.lit, f = S.shaftsOn && lit.fogLit ? lit.fogLit : lit.fogFlat, kind = S.beamsOn ? (S.glowOn ? "all" : "spots") : S.glowOn ? "points" : "none";
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.disable(gl.DEPTH_TEST);
-        gpuTimer.begin("fog"); f.draw({ colorTex: fbColor, depthTex: fbDepth, invViewProj: inv4(vp), eye, params: lit.fogParams, zRange: "gl" }); gpuTimer.end(); gl.enable(gl.DEPTH_TEST);
+        gpuTimer.begin("fog"); f.draw({ colorTex: fbColor, depthTex: fbDepth, invViewProj: inv4(vp), eye, params: lit.fogParams, zRange: "gl", fogLights: kind }); gpuTimer.end(); gl.enable(gl.DEPTH_TEST);
       }
       if (state._want) { const px = new Uint8Array(cv.width * cv.height * 4); gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = state._want; state._want = null; let b64 = ""; for (let i = 0; i < px.length; i += 0x8000) b64 += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000)); r({ w: cv.width, h: cv.height, b64: btoa(b64), topDown: false }); }
       gpuTimer.finish(); const gst = gpuTimer.collect(); if (gst.frames) state.gpuTimes = Object.fromEntries(Object.entries(gst.labels).map(([k, v]) => [k, v.ms]));

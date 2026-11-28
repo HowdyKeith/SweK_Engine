@@ -18,6 +18,7 @@
 //                       over the water, the closed form at the water's distance over the unfogged picture, to 4 levels
 //   6  THE BEAMS        switched on: they only add light, and what they light is a ray that passes through a searchlight's cone within its range
 //   7  THE SHAFTS       the sun's shadow in the haze only takes light away
+//   8  THE HALOS        (2026-11-28) the lamps' glow in the haze only adds light, and it is the march's own sum of their in-scattering (render/clusteredLights.mjs inScatterCPU)
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -27,7 +28,8 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, HEADLESS_SHELL, WEBGL_DEFAULT_ARGS } from "./playwrightResolve.mjs";
-import { fogCPU } from "../../render/volumetricFog.mjs";
+import { fogCPU, fogLightsOf } from "../../render/volumetricFog.mjs";
+import { inScatterCPU } from "../../render/clusteredLights.mjs";
 import { invert4 } from "../../render/gizmo.mjs";
 
 const require = createRequire(import.meta.url), { chromium } = resolvePlaywright(require), ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -98,10 +100,10 @@ await section(async () => {
     ok("!! THE BUOYS CAST SHADOWS: a searchlight aimed past the middle buoy, the buoys left out of the atlas -- brighter (over 3 levels) where the water lay beyond the buoy in that cone or on a buoy (9 in 10: the waves stand off the flat level the rays are met at), darker nowhere (over 1)", brighter.length > 30 && behind >= 0.9 * brighter.length && darker === 0, `${brighter.length} brighter (${behind} beyond the buoy in the cone, or on a buoy), ${darker} darker`);
 });
 
-console.log("5. THE HAZE, 6. THE BEAMS, 7. THE SHAFTS");
+console.log("5. THE HAZE, 6. THE BEAMS, 7. THE SHAFTS, 8. THE HALOS");
 await section(async () => {
     const { p, errors } = await open("&lights=1&fog=1");
-    const clearPic = await shot(p, { fogOn: false }), flat = await shot(p, { fogOn: true, shaftsOn: false }), flatDark = await shot(p, { searchlights: false }), shafts = await shot(p, { searchlights: true, shaftsOn: true, beamsOn: false }), beams = await shot(p, { beamsOn: true }); await p.close();
+    const clearPic = await shot(p, { fogOn: false }), flat = await shot(p, { fogOn: true, shaftsOn: false }), flatDark = await shot(p, { searchlights: false }), shafts = await shot(p, { searchlights: true, shaftsOn: true, beamsOn: false, glowOn: false }), beams = await shot(p, { beamsOn: true }), glow = await shot(p, { glowOn: true }); await p.close();
     const inv = invert4(flat.vp), P = flat.fogParams, clear = [0.05, 0.06, 0.1], spots = flat.lights.filter((l) => l.type === "spot");
     // where no water was drawn: the ray rises, or meets the sea's level beyond the 300 m square (a band either side of its edge left out)
     let sky = 0, match = 0, worst = 0;
@@ -127,6 +129,18 @@ await section(async () => {
     ok("!! THE SEARCHLIGHTS' BEAMS ONLY ADD LIGHT, AND WHAT THEY LIGHT IS A RAY THROUGH A CONE: switched on, nothing darker; of the pixels brighter by over 3 levels, 19 in 20 rays pass through a searchlight's cone within its range", bd.length > 200 && bd.every((c) => c.d > 0) && through >= 0.95 * sample.length, `${bd.length} brighter, ${bd.filter((c) => c.d < 0).length} darker; ${through} of ${sample.length} sampled rays through a cone`);
     const sd = diffs(flat, shafts, 1), darker = sd.filter((c) => c.d < -1).length, brighter = sd.filter((c) => c.d > 1).length;
     ok("!! THE SUN'S SHADOW IN THE HAZE ONLY TAKES LIGHT AWAY", brighter === 0, `${darker} darker by over a level, ${brighter} brighter`);
+    // THE LAMPS' HALOS (2026-11-28): switched on, they only add light, and what they add is the march's own -- the lamps' in-scattering (inScatterCPU) summed along the ray,
+    // which does not depend on the scene behind or the sun's shadow (both cancel in the difference), to 4 levels, nine pixels in ten of those it changes
+    const gd = diffs(beams, glow, 3), lampIdx = fogLightsOf(glow.lights, "points", glow.eye), lamps = lampIdx.map((i) => glow.lights[i]);
+    let gn = 0, gok = 0, gNo = 0;
+    for (const c of gd) {
+        const k = (c.y * glow.w + c.x) * 4; if (Math.max(glow.px[k], glow.px[k + 1], glow.px[k + 2]) >= 250) continue;
+        const d = rayOf(glow, inv, c.x, c.y), h = seaHit(glow, d), dist = h ? Math.hypot(...h.map((v, i) => v - glow.eye[i])) : 1e9, base = { origin: glow.eye, dir: d, distance: dist, color: [0, 0, 0], px: c.x, py: glow.h - 1 - c.y };
+        const with_ = fogCPU(P, { ...base, localOf: (q) => lamps.reduce((a, l) => { const v = inScatterCPU(l, q, d, P.g); return a.map((x, i) => x + v[i]); }, [0, 0, 0]) }), none = fogCPU(P, { ...base, localOf: () => [0, 0, 0] });
+        const want = [0, 1, 2].map((i) => (with_[i] - none[i]) * 255), got = [0, 1, 2].map((i) => glow.px[k + i] - beams.px[k + i]), e = Math.max(...want.map((w, i) => Math.abs(w - got[i])));
+        gn++; if (e <= 4) gok++; gNo += Math.max(...got.map(Math.abs));
+    }
+    ok("!! THE LAMPS GLOW IN THE HAZE: switched on, nothing darker; what they add is the march's (each lamp's in-scattering summed along the ray) to 4 levels, nine pixels in ten", gd.length > 200 && gd.every((c) => c.d > 0) && lamps.length === 5 && gn > 100 && gok >= 0.9 * gn, `${gd.length} brighter, ${gd.filter((c) => c.d < 0).length} darker; ${gok} of ${gn} to 4 levels (mean change ${(gNo / Math.max(1, gn)).toFixed(1)})`);
 });
 
 await browser.close(); srv.close();

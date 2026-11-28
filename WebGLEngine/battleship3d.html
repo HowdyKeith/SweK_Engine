@@ -142,6 +142,14 @@ try { if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; } catch 
 // v4205 -- real shell ballistics. This page is already a module, so the physics is a plain import rather
 // than a window shim. See fireCannon() for what it replaced.
 import * as BALLISTICS from "/physics/ballistics.mjs";
+// 2026-11-28 (Keith: "lets do 3, 4, 5 and 6" -- 5 the engine's lighting on the three.js pages): ?lights=1 lights the battle's flashes with render/clusteredLightsThree.mjs --
+// every explosion, splash and shell in flight a clustered point light on the ships and the sea, on top of the page's own three.js lights -- and &fog=1 puts the engine's
+// fog (render/volumetricFog.mjs, its sun the page's) in place of three's FogExp2, the flashes glowing in it (&glow=0 not). Without ?lights the page is as it was.
+// window.__battleLit (with ?lights=1) reports { frames, lights, stats, patched, capture(), addFlash(pos, color, intensity, range, ttl) } for tools/ship/clusteredLightsThree-selfcheck.mjs.
+import { createClusteredLightingThree } from "/render/clusteredLightsThree.mjs";
+const LQ = new URLSearchParams(location.search), LIT = LQ.get("lights") === "1", LFOG = LIT && LQ.get("fog") === "1";
+const flashes = [], liveShells = new Set();
+let lit = null, litFog = null, litTarget = null;
 // v4895 -- the water is the physics sea (physics/ocean/oceanSurface.mjs) drawn by render/seaThree.mjs: the same surface a hull floats on, on every GPU. The old page-local wave sum is gone.
 import { createSeaMesh, CALM_OPTIONS } from "/render/seaThree.mjs";
 import { createSurface, defaultComponents } from "/physics/ocean/oceanSurface.mjs";
@@ -451,9 +459,9 @@ function burst(pos, color, n, opts={}){
       if(t>=ttl){ scene.remove(m); return true;} return false; }});
   }
 }
-function splash(pos){ burst(pos, 0xcfeefc, 16, {spread:2.4,up:5,ttl:0.8,size:0.35}); }
+function splash(pos){ burst(pos, 0xcfeefc, 16, {spread:2.4,up:5,ttl:0.8,size:0.35}); if (LIT) flashes.push({ pos:[pos.x, pos.y + 1, pos.z], color:[0.75, 0.9, 1], intensity:40, range:9, ttl:0.5, t:0 }); }
 function explode(pos){ burst(pos, 0xffb43f, 22, {spread:3.4,up:6,ttl:1.0,size:0.5});
-  burst(pos, 0xff4d4d, 14, {spread:2,up:4,ttl:0.8,size:0.4}); }
+  burst(pos, 0xff4d4d, 14, {spread:2,up:4,ttl:0.8,size:0.4}); if (LIT) flashes.push({ pos:[pos.x, pos.y + 1.5, pos.z], color:[1, 0.62, 0.25], intensity:160, range:16, ttl:1.1, t:0 }); }
 
 // ============================================================ weapons
 // v4205 -- A REAL SHELL. This used to be `lerpVectors(from,target,u)` with `Math.sin(u*Math.PI)*peak`
@@ -471,7 +479,7 @@ function fireCannon(board, r, c, onArrive, arc){
   const from=new THREE.Vector3(target.x*0.2, 1.0, BOARD.you.oz - 6); // from your side
   const shell=new THREE.Mesh(new THREE.SphereGeometry(0.28,10,10),
     new THREE.MeshStandardMaterial({color:0x222,emissive:0x554422,emissiveIntensity:0.4}));
-  scene.add(shell);
+  scene.add(shell); liveShells.add(shell);
 
   // Solve in the vertical plane containing gun and target: horizontal range and the rise to the target.
   const dx=target.x-from.x, dz=target.z-from.z;
@@ -491,8 +499,8 @@ function fireCannon(board, r, c, onArrive, arc){
     const H=1/240; let left=Math.min(dt,0.05);
     while(left>0){ const h=Math.min(H,left); sh=BALLISTICS.stepShell(sh,h,{gravity:GUN_G}); left-=h; }
     shell.position.set(sh.x,sh.y,sh.z);
-    if(sh.y<=target.y && sh.vy<0){ scene.remove(shell); onArrive(); return true; }
-    if(sh.t>12){ scene.remove(shell); onArrive(); return true; }   // safety net, never reached in practice
+    if(sh.y<=target.y && sh.vy<0){ scene.remove(shell); liveShells.delete(shell); onArrive(); return true; }
+    if(sh.t>12){ scene.remove(shell); liveShells.delete(shell); onArrive(); return true; }   // safety net, never reached in practice
     return false;
   }});
 }
@@ -956,13 +964,41 @@ function animate(){
   requestAnimationFrame(animate);
   const now=performance.now(); const dt=Math.min(0.05,(now-last)/1000); last=now;
   const t=now/1000;
-  updateOcean(t); updateFish(t,dt);
-  for(let i=animators.length-1;i>=0;i--){ if(animators[i].update(dt)) animators.splice(i,1); }
+  const held = LIT && window.__battleLit && window.__battleLit.freeze;   // a gate holds the sea, the fish and every animation still (?lights=1 only)
+  if (!held) { updateOcean(t); updateFish(t,dt);
+  for(let i=animators.length-1;i>=0;i--){ if(animators[i].update(dt)) animators.splice(i,1); } }
   applyCam();
-  renderer.render(scene,camera);
+  if (LIT) renderLit(dt); else renderer.render(scene,camera);
   updateStatus(dt);
   if(statusRenderer) statusRenderer.render(statusScene,statusCam);
 }
+// ?lights=1: the flashes as clustered lights (fading over their ttl), every standard material patched once as it appears, then the scene -- through the engine's fog with &fog=1
+function renderLit(dt){
+  const S = window.__battleLit;
+  if (!lit) {
+    lit = createClusteredLightingThree(THREE, renderer, { maxLights: 64, space: "view", viewCells: [16, 9, 24], maxPerCell: 32, atlasSize: 1024, slots: 2, cascades: 0 });
+    if (LFOG) { scene.fog = null; litFog = lit.createFog({ lighting: true }); }
+  }
+  scene.traverse((o) => { const m = o.material; if (o.isMesh && m && !Array.isArray(m) && !m.userData.swekClustered && (m.isMeshStandardMaterial || m.isMeshPhongMaterial || m.isMeshLambertMaterial)) { lit.patch(m); S.patched++; } });
+  for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += S.freeze ? 0 : dt; if (flashes[i].t >= flashes[i].ttl) flashes.splice(i, 1); }
+  const L = flashes.map((f) => ({ type: "point", position: f.pos, range: f.range, color: f.color, intensity: f.intensity * (1 - f.t / f.ttl), shadow: false }));
+  for (const sh of liveShells) L.push({ type: "point", position: [sh.position.x, sh.position.y, sh.position.z], range: 7, color: [1, 0.78, 0.45], intensity: 25, shadow: false });
+  S.lights = L.slice(0, 64); S.stats = lit.update(S.lights, lit.cameraOf(camera));
+  if (LFOG) {
+    const w = renderer.domElement.width, h = renderer.domElement.height;
+    if (!litTarget || litTarget.width !== w || litTarget.height !== h) { if (litTarget) litTarget.dispose(); litTarget = new THREE.WebGLRenderTarget(w, h, { depthTexture: new THREE.DepthTexture(w, h, THREE.UnsignedIntType), minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); }
+    renderer.setRenderTarget(litTarget); renderer.render(scene, camera); renderer.setRenderTarget(null);
+    litFog.render(litTarget, camera, S.fogParams, { fogLights: S.glowOn ? "points" : "none" });
+  } else renderer.render(scene, camera);
+  if (S._want) { const gl = renderer.getContext(), W = renderer.domElement.width, H = renderer.domElement.height, px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = S._want; S._want = null; let b = ""; for (let i = 0; i < px.length; i += 0x8000) b += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000)); r({ w: W, h: H, b64: btoa(b), vp: new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).toArray(), eye: camera.position.toArray() }); }
+  S.frames++;
+}
+if (LIT) window.__battleLit = { frames: 0, lights: [], stats: null, patched: 0, freeze: false, glowOn: LQ.get("glow") !== "0", fog: LFOG,
+  // the deep-water haze: what FogExp2(0x06161f, 0.011) was, lit faintly by the page's sun (40, 70, 20) and a sea-blue ambient
+  fogParams: { density: 0.011, falloff: 0, albedo: 0.9, ambient: [0.022, 0.08, 0.11], lightDir: [40, 70, 20], lightColor: [0.06, 0.06, 0.05], g: 0.4, maxDistance: 300, steps: 32, jitter: true },
+  capture() { return new Promise((res) => { this._want = res; }); },
+  addFlash(pos, color = [1, 0.62, 0.25], intensity = 160, range = 16, ttl = 1e9) { flashes.push({ pos, color, intensity, range, ttl, t: 0 }); },
+  clearFlashes() { flashes.length = 0; } };
 function onResize(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight); }
 

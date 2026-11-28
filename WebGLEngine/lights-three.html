@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · many lights (three.js)</title>
+<!--
+  THE ENGINE'S LIGHTING THROUGH THREE.JS (render/clusteredLightsThree.mjs; 2026-11-28, Keith: "lets do 3, 4, 5 and 6" -- 5 the lighting on the three.js pages). The same
+  scene as lights-demo.html (render/lightsDemoScene.mjs: ground, pillars, 64 moving lights, two spots and a point light casting shadows, a moon with three cascades, a
+  stained-glass cookie) drawn by three.js: MeshLambertMaterials patched with the clustered chunk, the shadow atlas drawn by three, three's own lights none but a 0.04
+  ambient, Reinhard tone mapping -- the very sum lights-demo.html's shader makes, so tools/ship/clusteredLightsThree-selfcheck.mjs holds the two pictures together.
+  ?fog=1 the moonlit haze over a canopy (&shafts=0 without its shafts); ?t=3.5 holds the lights still. window.__lightsThree reports { ready, frames, stats, lights,
+  pillars, boards, viewProj, eye, fogParams, capture() }.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #07090e; color: #cfd8e6; font: 13px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: absolute; left: 10px; top: 10px; z-index: 6; background: rgba(10,14,22,.78); border: 1px solid #22304a; border-radius: 8px; padding: 8px 10px; max-width: 560px; }
+  .dim { color: #8494ad; }
+</style></head>
+<body><canvas id="cv"></canvas><div id="hud"><b>Many lights · three.js</b> <span id="stats" class="dim">starting...</span></div>
+<script type="module">
+import * as THREE from "./vendor/three/three.module.js";
+import { createCameraControls, bindCameraControls } from "./render/cameraControls.mjs";
+import { perspective, lookAt } from "./render/gpuDriven.mjs";
+import { makeCookieAtlas } from "./render/clusteredLights.mjs";
+import { createClusteredLightingThree } from "./render/clusteredLightsThree.mjs";
+import { sceneOf } from "./render/lightsDemoScene.mjs";
+
+const Q = new URLSearchParams(location.search), cv = document.getElementById("cv"), FOV = 0.9, state = window.__lightsThree = { ready: false, frames: 0, error: null };
+try { THREE.ColorManagement.enabled = false; } catch {}
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: false, preserveDrawingBuffer: true });
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.toneMapping = THREE.ReinhardToneMapping; renderer.toneMappingExposure = 1;
+const FOG = Q.get("fog") === "1", SHAFTS = FOG && Q.get("shafts") !== "0";
+const SCENE = sceneOf(Number(Q.get("n")) || 64, { canopy: FOG || Q.get("canopy") === "1" }), { GROUND, pillars, boards, N, lightsAt } = SCENE; state.pillars = pillars; state.boards = boards;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0.027, 0.035, 0.055);
+scene.add(new THREE.AmbientLight(0xffffff, 0.04 * Math.PI));   // lights-demo.html's albedo x 0.04 (three's Lambert takes ambient through BRDF_Lambert, which divides by pi)
+const lighting = state.lighting = createClusteredLightingThree(THREE, renderer, { maxLights: Math.max(80, N + 8), cells: [16, 6, 16], viewCells: [16, 9, 24], space: Q.get("clusters") === "world" ? "world" : "view", maxPerCell: 48, atlasSize: 2048, slots: 4, cascades: 3, shadowDistance: 28 });
+const box = new THREE.BoxGeometry(1, 1, 1);
+for (const [b, alb] of [[GROUND, [0.55, 0.55, 0.58]], ...pillars.map((q) => [q, [0.7, 0.68, 0.64]]), ...boards.map((q) => [q, [0.5, 0.48, 0.46]])]) {
+    const m = new THREE.Mesh(box, lighting.patch(new THREE.MeshLambertMaterial({ color: new THREE.Color(...alb) }))); m.position.fromArray(b.position); m.scale.fromArray(b.size); scene.add(m);
+}
+const COOKIES = makeCookieAtlas(256), OPTS = { sun: Q.get("sun") !== "0", cookie: Q.get("cookie") !== "0" };
+const FOG_PARAMS = state.fogParams = { density: 0.05, falloff: 0, albedo: 0.9, ambient: [0.01, 0.012, 0.018], lightDir: [0.45, 1, 0.35], lightColor: [1.2, 1.3, 1.7], g: 0.5, maxDistance: 40, steps: 48, jitter: true };
+const fog = FOG ? lighting.createFog({ lighting: SHAFTS }) : null;
+let sceneTarget = null, toned = null;
+// three tone-maps only what it draws to the screen, and lights-three.html's fog must see what lights-demo.html's sees -- the tone-mapped scene -- so with ?fog=1 the scene goes
+// to a half-float target, this pass makes Reinhard's c / (1 + c) of it into an 8-bit one, and the fog reads that and the first target's depth
+const toneMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, uniforms: { uSrc: { value: null } }, depthTest: false, depthWrite: false,
+    vertexShader: "out vec2 vUv; void main() { vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }",
+    fragmentShader: "precision highp float; uniform sampler2D uSrc; in vec2 vUv; out vec4 o; void main() { vec3 c = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0).rgb; o = vec4(c / (1.0 + c), 1.0); }" });
+const toneGeo = new THREE.BufferGeometry(); toneGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3)); toneGeo.setDrawRange(0, 3);
+const toneQuad = new THREE.Mesh(toneGeo, toneMat); toneQuad.frustumCulled = false; const toneScene = new THREE.Scene(); toneScene.add(toneQuad); const toneCam = new THREE.Camera();
+const camera = new THREE.PerspectiveCamera(FOV * 180 / Math.PI, 1, 0.05, 100); camera.matrixAutoUpdate = false;
+const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pitch: 0.55, distance: 13, target: [0, 0.4, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
+const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0, 0.5, 0], radius: 6 }) });
+state.capture = () => new Promise((res) => { state._want = res; });
+const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now(); let last = performance.now();
+function frame() {
+    try {
+        const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;
+        const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+        renderer.setPixelRatio(d); renderer.setSize(w, h, false);
+        if (FOG && (!sceneTarget || sceneTarget.width !== cv.width || sceneTarget.height !== cv.height)) { if (sceneTarget) { sceneTarget.dispose(); toned.dispose(); } sceneTarget = new THREE.WebGLRenderTarget(cv.width, cv.height, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(cv.width, cv.height, THREE.UnsignedIntType), minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); toned = new THREE.WebGLRenderTarget(cv.width, cv.height, { depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); }
+        // the camera exactly as lights-demo.html makes it (render/gpuDriven.mjs perspective and lookAt), handed to three as its matrices
+        const pose = controls.pose(), projGL = perspective(FOV, w / h, 0.05, 100), viewM = lookAt(pose.eye, pose.target);
+        camera.projectionMatrix.fromArray(projGL); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert(); camera.matrixWorld.fromArray(viewM).invert(); camera.matrixWorldInverse.fromArray(viewM);
+        const t = T0 ?? (now - start) / 1000, lights = state.lights = lightsAt(t, OPTS), stats = state.stats = lighting.update(lights, { view: Array.from(viewM), proj: Array.from(projGL), near: 0.05, far: 100 }, COOKIES);
+        lighting.renderShadows(scene);
+        const vp = new THREE.Matrix4().fromArray(projGL).multiply(new THREE.Matrix4().fromArray(viewM)); state.viewProj = vp.toArray(); state.eye = pose.eye;
+        if (FOG) { renderer.setRenderTarget(sceneTarget); renderer.render(scene, camera); toneMat.uniforms.uSrc.value = sceneTarget.texture; renderer.setRenderTarget(toned); renderer.render(toneScene, toneCam); renderer.setRenderTarget(null); const tm = renderer.toneMapping; renderer.toneMapping = THREE.NoToneMapping; fog.render(sceneTarget, camera, FOG_PARAMS, { colorTexture: toned.texture }); renderer.toneMapping = tm; }
+        else renderer.render(scene, camera);
+        if (state._want) { const gl = renderer.getContext(), px = new Uint8Array(cv.width * cv.height * 4); gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = state._want; state._want = null; let b = ""; for (let i = 0; i < px.length; i += 0x8000) b += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000)); r({ w: cv.width, h: cv.height, b64: btoa(b), topDown: false }); }
+        if (state.frames % 20 === 0) document.getElementById("stats").textContent = `· ${lights.length} lights · ${stats.faces} atlas tiles (the moon's ${stats.cascades} cascades among them) · three.js r${THREE.REVISION}`;
+        state.frames++; if (state.frames >= 2) state.ready = true;
+    } catch (e) { state.error = String(e && e.message || e); document.getElementById("stats").textContent = "· " + state.error; return; }
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

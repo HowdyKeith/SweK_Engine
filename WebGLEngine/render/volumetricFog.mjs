@@ -31,10 +31,27 @@
 "use strict";
 import { clusteredWGSL, CLUSTERED_GLSL } from "./clusteredLights.mjs";
 
-export const MAX_FOG_LIGHTS = 8;
-/** The lights the fog marches: `fogLights` as given, else every spot light, at most MAX_FOG_LIGHTS. */
-export function fogLightsOf(lights, fogLights = null) {
-    const idx = fogLights ?? lights.map((l, i) => (l.type === "spot" ? i : -1)).filter((i) => i >= 0);
+// POINT LIGHTS IN THE FOG (2026-11-28, Keith: "lets do 3, 4, 5 and 6" -- 3 the flight page's flashes and the buoy lamps glowing in the haze): `fogLights` may now be
+//   "spots" (the default: the searchlight beams), "points", "all" (every light but the sun) or "none", besides a list of indices or a function (lights, eye) -> indices.
+//   A frame may hold far more lights than the march can take (the flight page: up to 250 shots and flashes), so the named kinds are RANKED by what each could add at the
+//   eye -- fogImportance: intensity x its brightest channel x range^2 / (range^2 + distance^2) -- and the first MAX_FOG_LIGHTS kept. The rest still light every surface
+//   through the clusters; they only add no glow to the haze. Per frame, draw()/encode() take { fogLights } to override what the fog was made with.
+export const MAX_FOG_LIGHTS = 16;
+export const FOG_LIGHT_KINDS = Object.freeze(["spots", "points", "all", "none"]);
+/** What a light could add to the haze, seen from `eye`: brighter and nearer first. Pure. */
+export function fogImportance(l, eye) {
+    const d2 = eye ? (l.position[0] - eye[0]) ** 2 + (l.position[1] - eye[1]) ** 2 + (l.position[2] - eye[2]) ** 2 : 0, r2 = (l.range || 1) ** 2;
+    return l.intensity * Math.max(...l.color) * r2 / (r2 + d2);
+}
+/** The lights the fog marches, by index: `fogLights` as given (a list, a function, or a kind -- default "spots"), at most MAX_FOG_LIGHTS, the most important first. */
+export function fogLightsOf(lights, fogLights = null, eye = null) {
+    if (Array.isArray(fogLights)) return fogLights.slice(0, MAX_FOG_LIGHTS);
+    if (typeof fogLights === "function") return [...fogLights(lights, eye)].slice(0, MAX_FOG_LIGHTS);
+    const kind = fogLights ?? "spots";
+    if (!FOG_LIGHT_KINDS.includes(kind)) throw new Error(`volumetricFog: fogLights is a list, a function, or one of ${FOG_LIGHT_KINDS.join(", ")} (got ${kind})`);
+    const want = (l) => l.type !== "directional" && (kind === "all" || (kind === "spots" && l.type === "spot") || (kind === "points" && l.type === "point"));
+    const idx = kind === "none" ? [] : lights.map((l, i) => (want(l) ? i : -1)).filter((i) => i >= 0);
+    if (idx.length > MAX_FOG_LIGHTS) idx.sort((a, b) => fogImportance(lights[b], eye) - fogImportance(lights[a], eye) || a - b);
     return idx.slice(0, MAX_FOG_LIGHTS);
 }
 
@@ -113,13 +130,13 @@ uniform int uFogLights[${MAX_FOG_LIGHTS}]; uniform int uFogLightCount;`).replace
         for (int k = 0; k < ${MAX_FOG_LIGHTS}; k++) { if (k >= uFogLightCount) break; loc += clInScatter(uFogLights[k], q, dir, g); }
         acc += T * (sunC * clSunShadowAt(q) + uAmbient + loc) * (1.0 - a); T *= a; }
     outColor = vec4(scene * T + uFog.w * acc, 1.0);`).replace("    for (int i = 0; i < 256; i++) { if (i >= n) break; tau += sigmaAt(h0 + v * (float(i) + j) * dt) * dt; }\n", "");   // the march below takes the transmittance
-export function createFogGL(gl, { lighting = null, fogLights = null } = {}) {
+export function createFogGL(gl, { lighting = null, fogLights: fogLights0 = null } = {}) {
     const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error("volumetricFog: " + gl.getShaderInfoLog(o)); return o; };
     const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, FOG_VS_GLSL)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, lighting ? FOG_SHAFTS_FS_GLSL : FOG_FS_GLSL)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("volumetricFog: " + gl.getProgramInfoLog(prog));
     const U = Object.fromEntries(UNIFORMS.map((n) => [n, gl.getUniformLocation(prog, n)])), vao = gl.createVertexArray(), uFL = gl.getUniformLocation(prog, "uFogLights"), uFLN = gl.getUniformLocation(prog, "uFogLightCount");
     return {
-        draw({ colorTex, depthTex, invViewProj, eye, params = {}, zRange = "gl" }) {
+        draw({ colorTex, depthTex, invViewProj, eye, params = {}, zRange = "gl", fogLights = fogLights0 }) {
             const P = with_(params);
             if (!(P.steps >= 1 && P.steps <= 256)) throw new Error("volumetricFog: steps is 1 to 256");
             gl.useProgram(prog); gl.bindVertexArray(vao);
@@ -129,7 +146,7 @@ export function createFogGL(gl, { lighting = null, fogLights = null } = {}) {
             gl.uniform4f(U.uFog, P.density, P.falloff, P.baseHeight, P.albedo); gl.uniform4f(U.uFog2, P.g, P.maxDistance, P.up === "z" ? 1 : 0, P.jitter ? 1 : 0);
             gl.uniform3fv(U.uAmbient, Float32Array.from(P.ambient)); gl.uniform3fv(U.uLightDir, Float32Array.from(P.L)); gl.uniform3fv(U.uLightColor, Float32Array.from(P.lightColor));   // the phase in the shader is 4 pi times Henyey-Greenstein's (isotropic is 1), as sourceOf's
             gl.uniform2f(U.uSteps, P.steps, zRange === "zo" ? 1 : 0);
-            if (lighting) { lighting.bind(prog, 2); const fl = fogLightsOf(lighting.lights, fogLights), a = new Int32Array(MAX_FOG_LIGHTS); a.set(fl); gl.uniform1iv(uFL, a); gl.uniform1i(uFLN, fl.length); }
+            if (lighting) { lighting.bind(prog, 2); const fl = fogLightsOf(lighting.lights, fogLights, eye), a = new Int32Array(MAX_FOG_LIGHTS); a.set(fl); gl.uniform1iv(uFL, a); gl.uniform1i(uFLN, fl.length); }
             gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null); gl.activeTexture(gl.TEXTURE0);
         },
         destroy() { gl.deleteProgram(prog); gl.deleteVertexArray(vao); },
@@ -145,10 +162,10 @@ fn fogSun(p: vec3f) -> f32 {
 }
 fn fogSpots(p: vec3f, dir: vec3f, g: f32) -> vec3f {
     var loc = vec3f(0.0);
-    for (var k = 0; k < i32(U.steps.z); k++) { let v4 = select(U.fogLightsB, U.fogLightsA, k < 4); loc += clInScatter(u32(v4[k & 3]), p, dir, g); }
+    for (var k = 0; k < i32(U.steps.z); k++) { loc += clInScatter(u32(U.fogLights[k >> 2][k & 3]), p, dir, g); }
     return loc;
 }` : ""}
-struct FU { invViewProj: mat4x4f, eye: vec4f, fog: vec4f, fog2: vec4f, ambient: vec4f, lightDir: vec4f, lightColor: vec4f, steps: vec4f, fogLightsA: vec4f, fogLightsB: vec4f };   // steps = (steps, zo, fog light count, 0); then the fog lights' indices
+struct FU { invViewProj: mat4x4f, eye: vec4f, fog: vec4f, fog2: vec4f, ambient: vec4f, lightDir: vec4f, lightColor: vec4f, steps: vec4f, fogLights: array<vec4f, ${MAX_FOG_LIGHTS / 4}> };   // steps = (steps, zo, fog light count, 0); then the fog lights' indices
 @group(0) @binding(0) var<uniform> U: FU;
 @group(0) @binding(1) var colorTex: texture_2d<f32>;
 @group(0) @binding(2) var depthTex: texture_depth_2d;
@@ -175,12 +192,12 @@ ${shafts ? `    let c = dot(dir, U.lightDir.xyz); let g = U.fog2.x; let ph = (1.
     return vec4f(scene * T + U.fog.w * S * (1.0 - T), 1.0);`}
 }`; }
 
-export function createFogGPU(device, format, { lighting = null, fogLights = null } = {}) {
-    const BU = globalThis.GPUBufferUsage, mod = device.createShaderModule({ code: lighting ? fogWGSL({ shafts: true }) : FOG_WGSL }), ubuf = device.createBuffer({ size: 208, usage: BU.UNIFORM | BU.COPY_DST });
+export function createFogGPU(device, format, { lighting = null, fogLights: fogLights0 = null } = {}) {
+    const BU = globalThis.GPUBufferUsage, mod = device.createShaderModule({ code: lighting ? fogWGSL({ shafts: true }) : FOG_WGSL }), ubuf = device.createBuffer({ size: 176 + 4 * MAX_FOG_LIGHTS, usage: BU.UNIFORM | BU.COPY_DST });
     const pipe = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return {
-        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo", timer = null }) {   // timer: render/gpuTimer.mjs's, the pass under "fog"
-            const P = with_(params), u = new Float32Array(52), fl = lighting ? fogLightsOf(lighting.lights, fogLights) : [];
+        encode(enc, target, { colorView, depthView, invViewProj, eye, params = {}, zRange = "zo", timer = null, fogLights = fogLights0 }) {   // timer: render/gpuTimer.mjs's, the pass under "fog"
+            const P = with_(params), u = new Float32Array(44 + MAX_FOG_LIGHTS), fl = lighting ? fogLightsOf(lighting.lights, fogLights, eye) : [];
             u.set(invViewProj, 0); u.set([...eye, 0], 16); u.set([P.density, P.falloff, P.baseHeight, P.albedo], 20); u.set([P.g, P.maxDistance, P.up === "z" ? 1 : 0, P.jitter ? 1 : 0], 24);
             u.set([...P.ambient, 0], 28); u.set([...P.L, 0], 32); u.set([...P.lightColor, 0], 36); u.set([P.steps, zRange === "zo" ? 1 : 0, fl.length, 0], 40); u.set(fl, 44);
             device.queue.writeBuffer(ubuf, 0, u);

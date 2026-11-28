@@ -22545,6 +22545,15 @@ window.swekExport = {
         const r = exportSceneGlb(world, { ...o, camera: cam, environment: env });
         if (!r.ok) { console.warn("[swekExport]", r.error); return r; }
         if (o.build) return r;                       // bytes + stats, no download
+        // 2026-11-28 -- swekExport.scene({ usdz: true }): the same scene as a .usdz for AR Quick Look (tools/export/usdz.mjs glbToUsdz: every prop placement's transform
+        // baked in; the camera and the environment recipe are left out -- Quick Look places its own camera and has no fog or sun to set)
+        if (o.usdz) {
+            const { glbToUsdz } = await import("./tools/export/usdz.mjs"), u = glbToUsdz(r.bytes, { name: o.name || "SweK_scene" }), uname = (o.name || "swek-scene") + ".usdz";
+            try { const url = URL.createObjectURL(new Blob([u.bytes], { type: "model/vnd.usdz+zip" })), a = document.createElement("a"); a.href = url; a.download = uname; a.style.display = "none"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 10000); }
+            catch (e) { console.warn("[swekExport] save failed:", e?.message || e); return { ok: false, error: String(e?.message || e) }; }
+            console.log("[swekExport] " + uname + " -- " + u.stats.triangles.toLocaleString() + " triangles, " + u.stats.materials + " colours" + (u.skipped.length ? "; left out: " + u.skipped.join("; ") : ""));
+            return { ok: true, name: uname, stats: u.stats, skipped: u.skipped };
+        }
         const name = (o.name || "swek-scene") + ".glb";
         try {
             const blob = new Blob([r.bytes], { type: "model/gltf-binary" });

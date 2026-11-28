@@ -39,12 +39,14 @@ export const CONFIGS = Object.freeze([
     { id: "gpu.beams", page: "lights-gpu.html", query: "&fog=1", backend: "webgpu", base: "gpu.shafts", feature: "two spot lights' beams (each a lookup a step)" },
     { id: "flight.lit", page: "flight-gpu.html", query: "&lights=1", backend: "webgpu", base: null, feature: "the flight page lit: shots and flashes as clustered lights, sun cascades" },
     { id: "flight.fog", page: "flight-gpu.html", query: "&lights=1&fog=1&shafts=0", backend: "webgpu", base: "flight.lit", feature: "its haze (16 steps)" },
-    { id: "flight.shafts", page: "flight-gpu.html", query: "&lights=1&fog=1", backend: "webgpu", base: "flight.fog", feature: "the sun's shafts between the ships" },
+    { id: "flight.shafts", page: "flight-gpu.html", query: "&lights=1&fog=1&glow=0", backend: "webgpu", base: "flight.fog", feature: "the sun's shafts between the ships" },
+    { id: "flight.glow", page: "flight-gpu.html", query: "&lights=1&fog=1", backend: "webgpu", base: "flight.shafts", feature: "the flashes and shots glowing in the haze (up to 16 lights a step)" },
     { id: "sea.plain", page: "ocean-default.html", query: "", backend: "webgl2", base: null, feature: "the physics sea as it always was (one pass, no engine lighting)" },
     { id: "sea.lit", page: "ocean-default.html", query: "&lights=1", backend: "webgl2", base: "sea.plain", feature: "the sea lit: buoy lamps, three searchlights, sun cascades" },
     { id: "sea.fog", page: "ocean-default.html", query: "&lights=1&fog=1&shafts=0", backend: "webgl2", base: "sea.lit", feature: "sea-level haze (48 steps)" },
-    { id: "sea.shafts", page: "ocean-default.html", query: "&lights=1&fog=1&beams=0", backend: "webgl2", base: "sea.fog", feature: "the sun's shafts in it" },
-    { id: "sea.beams", page: "ocean-default.html", query: "&lights=1&fog=1", backend: "webgl2", base: "sea.shafts", feature: "the three searchlights' beams" },
+    { id: "sea.shafts", page: "ocean-default.html", query: "&lights=1&fog=1&beams=0&glow=0", backend: "webgl2", base: "sea.fog", feature: "the sun's shafts in it" },
+    { id: "sea.beams", page: "ocean-default.html", query: "&lights=1&fog=1&glow=0", backend: "webgl2", base: "sea.shafts", feature: "the three searchlights' beams" },
+    { id: "sea.glow", page: "ocean-default.html", query: "&lights=1&fog=1", backend: "webgl2", base: "sea.beams", feature: "the five lamps' halos" },
 ]);
 export const STATE_VAR = Object.freeze({ "lights-demo.html": "__lights", "lights-gpu.html": "__lightsGpu", "flight-gpu.html": "__flightLights", "ocean-default.html": "__ocean" });
 export const SOFTWARE = /swiftshader|llvmpipe|softpipe|basic render|warp|software/i;
@@ -94,12 +96,19 @@ async function timeOne(browser, port, c, { seconds, size }) {
             // lit sea's water pass read anywhere from 138 to 252 ms run to run, and a fog row "cost more than its base" or not by the frame it happened to land on.
             // Every distinct reading published during the settle is kept and each label is the mean of them; and a page that has published none when the settle
             // ends is waited on for up to 10 s more (the fullest sea variant had answered no timer query within 0.8 s on SwiftShader), then reported as it is.
-            const g = window.__gpuTimerAuto, read = () => (s.gpuTimes ? s.gpuTimes : g && g.state === "on" ? g.labels : null), seen = [];
+            const g = window.__gpuTimerAuto, read = () => (s.gpuTimes ? s.gpuTimes : g && g.state === "on" ? (g.lastLabels || g.labels) : null), seen = [];
+            // 2026-11-28 -- the auto timer's per-frame object (lastLabels, a new one each frame), not its smoothed `labels`: that one is ONE object updated in place,
+            // so the "a new reading?" test above kept only the first sample -- and a first sample taken before the fog's first timed frame had no fog label (the
+            // lightingCost gate's WebGL2 row red on one run in two)
             const sample = () => { const x = read(); if (x && x !== seen.at(-1)?.ref) seen.push({ ref: x, v: { ...x } }); };
             const f0 = s.frames, t0 = performance.now();
             await new Promise((res) => { const id = setInterval(sample, 25); setTimeout(() => { clearInterval(id); res(); }, ms); });
             const frames = s.frames - f0, dt = performance.now() - t0;
-            for (let waited = 0; !seen.length && waited < 10000; waited += 50) { await new Promise((res) => setTimeout(res, 50)); sample(); }
+            // a reading with only "the rest" is a frame the page drew none of its named passes in (on SwiftShader the fullest variant draws a frame in some 400 ms, so a
+            // 0.8 s settle can hold just such a one): wait, as for none at all, up to 10 s more for a frame with named passes, then average only over those (2026-11-28)
+            const named = (x) => Object.keys(x.v).some((k) => k !== "the rest");
+            for (let waited = 0; !seen.some(named) && waited < 10000; waited += 50) { await new Promise((res) => setTimeout(res, 50)); sample(); }
+            if (seen.some(named)) for (let i = seen.length - 1; i >= 0; i--) if (!named(seen[i])) seen.splice(i, 1);
             const gl = document.querySelector("canvas")?.getContext("webgl2"), dbg = gl && gl.getExtension("WEBGL_debug_renderer_info");
             const glName = gl ? (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : null;
             const keys = [...new Set(seen.flatMap((x) => Object.keys(x.v)))];
