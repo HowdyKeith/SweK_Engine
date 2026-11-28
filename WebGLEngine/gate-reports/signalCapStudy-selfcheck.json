@@ -1,0 +1,64 @@
+{
+ "gate": "tools/ship/signalCapStudy-selfcheck.mjs",
+ "at": "2026-11-27",
+ "tables": [
+  {
+   "title": "the rows this gate ran",
+   "columns": [
+    "row",
+    "verdict",
+    "detail"
+   ],
+   "rows": [
+    [
+     "1 THE SETS AND THE RULE'S CONSTANTS: Round 4's presets and caps; DECIDE_T 4 s, THRESHOLD 20; HELD 120 seeds; DEV and HELD new (not Rounds 3-4's, rock nav's, the doctrine round's or the gates')",
+     "PASS",
+     "none"
+    ],
+    [
+     "2 THE SIGNAL: 20 or more damage chooses cap 20, less keeps 12",
+     "PASS",
+     "none"
+    ],
+    [
+     "3 THE ARMS FLY: the cap holds in every arm; the signal decides once at 4 s by the damage it read; it chooses 20 against ace and 12 against regular on this seed; a SIGNAL fight that keeps 12 IS the FIXED12 fight",
+     "PASS",
+     "ace FIXED12 R 0 chose null at null (damage null); ace FIXED20 R 0 chose null at null (damage null); ace SIGNAL R 0 chose 20 at 120 (damage 140); regular FIXED12 R 1592 chose null at null (damage null); regular FIXED20 R 900 chose null at null (damage null); regular SIGNAL R 1592 chose 12 at 120 (damage 10)"
+    ],
+    [
+     "4 THE BOTTOM LINE IS ROUND 4's WITH SIGNAL READ AS ADAPT: HAS BOTH / PAYS ON THE WEAK SIDE / MISSES THE STRONG SIDE / HAS NEITHER",
+     "PASS",
+     "THE SIGNAL CAP HAS BOTH / THE SIGNAL CAP PAYS ON THE WEAK SIDE (regular) / THE SIGNAL CAP MISSES THE STRONG SIDE (perfect) / THE SIGNAL CAP HAS NEITHER (green, ace, perfect)"
+    ],
+    [
+     "5 THE SIGNAL'S CHOICES ARE COUNTED PER PRESET, AND ITS ACCURACY IS RIGHT WHEN 20 IS CHOSEN AGAINST THE STRONG AND 12 AGAINST THE WEAK",
+     "PASS",
+     "accuracy 0.95"
+    ],
+    [
+     "6 DEV'S CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT (a choice against the damage; a decision off 4 s; no 20 under a strong preset; thrust over the cap; a kept-12 fight unlike FIXED12's; a fight that does not end)",
+     "PASS",
+     "good true,true,true; faults pass: false,false,false,false,false,false"
+    ],
+    [
+     "7 THE COMMAND: export-free; HELD refused before DEV passes; an unknown option refused; a part never flown twice",
+     "PASS",
+     "no DEV 2, twice 2, unknown 2"
+    ],
+    [
+     "8 reportLines NAMES THE SIGNAL'S NUMBERS AND THE SETS",
+     "PASS",
+     "none"
+    ],
+    [
+     "signalCapStudy: SPENT is the design survey's throwaway seeds 9990061-9990072 the registration names (brain/SPACE_DOCTRINE_WIP.md), in neither DEV nor HELD; scenariosOf crosses every seed with the four kinds, seed by seed",
+     "PASS",
+     "survey 9990061-9990072; scenariosOf([7, 9]) 7b 7b 7s 7s 9b 9b 9s 9s"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

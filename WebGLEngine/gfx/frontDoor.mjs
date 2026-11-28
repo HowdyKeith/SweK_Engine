@@ -401,6 +401,8 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     Object.freeze({ module: "vendor/smaa/smaaLookup.mjs", why: "v4933 -- reached through render/smaaPass.js: the vendored SMAA area and search lookup textures the pass binds." }),
     Object.freeze({ module: "render/splatSH.mjs", why: "v4933 -- reached through engine/SplatRenderer.js: the spherical-harmonic colour table and its WGSL/GLSL function bodies, which the splat renderer pastes into its vertex shader." }),
     Object.freeze({ module: "ui/tvOut.js", why: "v4933 -- reached through ui/dockedGauges.js and ui/svgGaugeSet.js: the TV-out display module the docked gauge set imports." }),
+    Object.freeze({ module: "tools/export/usdz.mjs", why: "v4936 -- reached only through swekExport.usdz()'s lazy import in main.js (claude/epic-cori-2hm1my's USDZ export, merged for this publish): loaded on the console call, not at boot." }),
+    Object.freeze({ module: "tools/export/glbConformance.mjs", why: "v4936 -- reached through tools/export/usdz.mjs, which imports its GLB reader (splitGlb, readAccessor) to turn a .glb into USDZ; lazy, as above." }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

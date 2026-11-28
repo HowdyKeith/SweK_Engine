@@ -1426,7 +1426,7 @@
    "name": "male-cns",
    "arrived": "2026-09-21",
    "sha": "46cc1d5c67c2adc6cd937124cb8f65eac41cfddc",
-   "bytes": 5592183,
+   "bytes": 8137530,
    "files": [
     {
      "path": "cx-steering-circuit.json",
@@ -1501,8 +1501,20 @@
      "bytes": 18447
     },
     {
+     "path": "mushroom-body-circuit.json",
+     "bytes": 1769086
+    },
+    {
+     "path": "pn-kc-circuit.json",
+     "bytes": 634376
+    },
+    {
      "path": "PROVENANCE.md",
-     "bytes": 15967
+     "bytes": 22618
+    },
+    {
+     "path": "ring-compass-circuit.json",
+     "bytes": 135234
     }
    ]
   },
@@ -1555,6 +1567,22 @@
    ]
   },
   {
+   "name": "santon2025",
+   "arrived": "2026-11-26",
+   "sha": "a5c162abd8f9e690d4afc1f40618b75f996863fe",
+   "bytes": 24680,
+   "files": [
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 1490
+    },
+    {
+     "path": "Treadmill_data.csv",
+     "bytes": 23190
+    }
+   ]
+  },
+  {
    "name": "slug",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
@@ -1574,15 +1602,15 @@
    "name": "smaa",
    "arrived": "2026-11-22",
    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a",
-   "bytes": 39424,
+   "bytes": 39838,
    "files": [
     {
      "path": "LICENSE",
-     "bytes": 1293
+     "bytes": 1064
     },
     {
      "path": "PROVENANCE.md",
-     "bytes": 1069
+     "bytes": 1712
     },
     {
      "path": "smaaLookup.mjs",

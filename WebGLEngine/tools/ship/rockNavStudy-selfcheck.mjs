@@ -35,6 +35,7 @@ import * as BF from "../../brain/battleshipFight.mjs";
 import * as SA from "../../brain/spaceArena.mjs";
 import * as NV from "../../brain/spaceNav.mjs";
 import { rOf } from "./spaceDoctrineStudy.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const rows = [];
@@ -302,4 +303,7 @@ row("reportLines names the round and prints its sets as the module holds them", 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[rockNavStudy-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);
+// v4936 -- the rows this gate ran, kept as its report (gateReport-selfcheck: a gate that argues in numbers emits them, so they outlive the terminal). Written only under SWEK_GATE_REPORT=1.
+{ const GR = gateReport("tools/ship/rockNavStudy-selfcheck.mjs");
+  GR.table("the rows this gate ran", ["row", "verdict", "detail"], rows.map((r) => [r.name, r.ok ? "PASS" : "FAIL", r.detail || ""])); GR.write(); }
 process.exit(red ? 1 : 0);

@@ -330,6 +330,11 @@ export const RECORDED = Object.freeze({
         "tools/ship/takeTankDropout.mjs",
         "tools/ship/tankNavRun.mjs",
         "tools/tankFlyCxBench.mjs",
+        // v4936 -- ARRIVED through the publish merge of the seven open branches: series B's FOLLOW-UP 13 and 14 commands (brain/SUB_FIELD_NAV_WIP.md), each run as the command its registration names and called by nothing but its own gate, and the fly line's two topology bakers, run once to write the brain modules' topology and named by those modules' headers as where it came from. RECORDED by name, a rise said as one; glbConformance, takeTankDropout and tankFlyCxBench left the census in the same merge and stay listed (a departure is never asserted on).
+        "tools/ship/subReconcileStudy.mjs",
+        "tools/ship/subNoiseStudy.mjs",
+        "tools/bakeCompassRingTopology.mjs",
+        "tools/bakeGfVisualTopology.mjs",
     ]),
     // referenceKind-selfcheck: no resolved non-gate importer, held off the census by a MENTION somewhere.
     proseRescued: Object.freeze([

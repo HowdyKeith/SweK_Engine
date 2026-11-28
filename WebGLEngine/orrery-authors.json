@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-11-20",
+ "built": "2026-11-27",
  "bodies": [
   {
    "name": "box3d",
@@ -125,7 +125,7 @@
     "owner": null,
     "repo": null
    },
-   "bytes": 115350
+   "bytes": 250582
   },
   {
    "name": "htmx",
@@ -229,7 +229,7 @@
     "owner": null,
     "repo": null
    },
-   "bytes": 4337635
+   "bytes": 8137530
   },
   {
    "name": "mikktspace",
@@ -264,6 +264,22 @@
    "bytes": 34884
   },
   {
+   "name": "santon2025",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "PROVENANCE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://doi.org/10.5061/dryad.jh9w0vtkq",
+    "owner": null,
+    "repo": null
+   },
+   "bytes": 24680
+  },
+  {
    "name": "slug",
    "kind": "person",
    "who": "Eric Lengyel",
@@ -278,6 +294,22 @@
     "repo": "Slug"
    },
    "bytes": 3821
+  },
+  {
+   "name": "smaa",
+   "kind": "collective",
+   "who": "PlayCanvas Ltd",
+   "line": "Copyright (c) 2011-2026 PlayCanvas Ltd.",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/playcanvas/engine",
+    "owner": "playcanvas",
+    "repo": "engine"
+   },
+   "bytes": 39838
   },
   {
    "name": "snowflow",
@@ -433,7 +465,7 @@
     "owner": null,
     "repo": null
    },
-   "bytes": 26027
+   "bytes": 41872
   },
   {
    "name": "zebrafish-vestibular",
@@ -570,6 +602,14 @@
    "bytes": 68630
   },
   {
+   "author": "PlayCanvas Ltd",
+   "kind": "collective",
+   "bodies": [
+    "smaa"
+   ],
+   "bytes": 39838
+  },
+  {
    "author": "Guillermo",
    "kind": "person",
    "bodies": [
@@ -624,6 +664,11 @@
    "licenceFile": "PROVENANCE.md"
   },
   {
+   "name": "santon2025",
+   "kind": "disclaimed",
+   "licenceFile": "PROVENANCE.md"
+  },
+  {
    "name": "zebrafish",
    "kind": "disclaimed",
    "licenceFile": "PROVENANCE.md"
@@ -635,15 +680,15 @@
   }
  ],
  "counts": {
-  "bodies": 28,
-  "attributed": 22,
-  "authors": 18,
-  "covered": 22,
-  "missing": 6,
-  "withUpstream": 21,
+  "bodies": 30,
+  "attributed": 23,
+  "authors": 19,
+  "covered": 23,
+  "missing": 7,
+  "withUpstream": 22,
   "person": 17,
-  "collective": 5,
-  "disclaimed": 5,
+  "collective": 6,
+  "disclaimed": 6,
   "prose": 1,
   "none": 0,
   "unread": 0

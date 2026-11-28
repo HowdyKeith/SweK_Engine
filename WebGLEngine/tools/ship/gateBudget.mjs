@@ -121,7 +121,13 @@
 // not used. The LARGER of the two alone readings is the basis, 369,178 ms, above tacticsTrain's 336,419, and gateBudget-selfcheck went red on
 // the same line. It stays in the general population: sixteen fights and their sweeps, not a fixture cost. The default moves 1009.3 s -> 1107.5 s
 // with this line. SABOTAGED (below the pin, restored): the pin back at 336,419 -> 1 RED (gateBudget-selfcheck's slowest row).
-export const SLOWEST_GENERAL = { gate: "brain/battleshipFight-selfcheck.mjs", ms: 369178 };
+//
+// *** v4936 -- RE-PINNED TO trainDogfightLeague, THE SAME WAY, AND KEITH CHOSE IT. *** The durable timing run of this round (selfchecks.mjs --resume-since,
+// serial, the 85 gates with no gate-timings entry) recorded tools/ship/trainDogfightLeague-selfcheck.mjs at 662,471 ms, above battleshipFight's 369,178, and
+// gateBudget-selfcheck went red on the same line. Timed a second time, alone: 592,495 ms, exit 0. The LARGER is the basis. It stays in the general population:
+// one league training search, the shape tacticsTrain's was. The default moves 1107.5 s -> 1987.4 s with this line, which is a raised limit, so it was put to
+// Keith in the session rather than taken ("Re-pin, as practice says"). SABOTAGED (below the pin, restored): the pin back at 369,178 -> gateBudget-selfcheck's slowest row red.
+export const SLOWEST_GENERAL = { gate: "tools/ship/trainDogfightLeague-selfcheck.mjs", ms: 662471 };
 
 // *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
 //

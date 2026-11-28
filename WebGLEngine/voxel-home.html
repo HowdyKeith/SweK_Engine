@@ -16,7 +16,7 @@
   select,input,button { background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
   input { width:84px; } button { cursor:pointer; } select:disabled,input:disabled { opacity:.4; }
   main { display:flex; flex-wrap:wrap; gap:16px; padding:12px; align-items:flex-start; }
-  #pad { background:#05070b; border:1px solid var(--edge); border-radius:8px; width:min(720px, calc(100vw - 26px)); height:auto; aspect-ratio:720/560; }
+  #pad { background:#05070b; border:1px solid var(--edge); border-radius:8px; width:100%; max-width:min(720px, calc(100vw - 26px)); height:auto; aspect-ratio:720/560; }
   aside { flex:1 1 280px; max-width:440px; color:var(--dim); line-height:1.5; }
   aside p { margin:0 0 9px; }
   #stats, #end { font:12px ui-monospace,monospace; color:var(--ink); }

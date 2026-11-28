@@ -692,6 +692,26 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "brain/helmSteerPolicy-selfcheck.mjs",
         "brain/maleCnsCircuits-selfcheck.mjs",
         "brain/seatTrackGunner-selfcheck.mjs",
+        // v4936 -- ELEVEN ARRIVED with the fly line shipped in the publish merge (named by orreryEjecta-selfcheck): the compass and mushroom body rounds' two topology bakers,
+        // their gates and commands, and the three male-cns circuit gates (compass ring, mushroom body, projection neurons onto Kenyon cells), each reading a vendored circuit file.
+        "tools/bakeCompassRingTopology.mjs",
+        "tools/bakeGfVisualTopology.mjs",
+        "tools/ship/flyCompass-selfcheck.mjs",
+        "tools/ship/flyEscapeVision-selfcheck.mjs",
+        "tools/ship/flyMushroom-selfcheck.mjs",
+        "tools/ship/flyMushroom.mjs",
+        "tools/ship/flyMushroomOdours-selfcheck.mjs",
+        "tools/ship/flyMushroomOdours.mjs",
+        "tools/ship/maleCnsCompassRing-selfcheck.mjs",
+        "tools/ship/maleCnsMushroomBody-selfcheck.mjs",
+        "tools/ship/maleCnsPnKc-selfcheck.mjs",
+    ]),
+    // v4936 -- vendor/santon2025 (Santon et al. 2025's crab treadmill data) arrived with no entry, which importPosition-selfcheck's "every vendored body has an entry"
+    // turned red on. dependantsOf run, not typed: the stealth line's three crab aggregation scripts read Treadmill_data.csv.
+    "santon2025": Object.freeze([
+        "brain/crabGain32Agg.mjs",
+        "brain/crabReadout31Agg.mjs",
+        "brain/crabTexture33Agg.mjs",
     ]),
     // UNNUMBERED (the fish round) -- vendor/zebrafish arrived (the Fish1 TEN-analysis core, baked circuit JSON) with no entry, which importPosition-selfcheck's "every vendored body has an entry" turned red on. The list is dependantsOf() over
     // engineSources(), run, not typed: the command that writes it (tools/fishCircuit.mjs) and three files that read it (the fish circuit's gate, the fish pilot's gate, the aquarium bridge's gate, which writes a temp tree with a vendor/zebrafish/ in it).

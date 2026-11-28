@@ -1,0 +1,139 @@
+{
+ "gate": "brain/spaceNav-selfcheck.mjs",
+ "at": "2026-11-27",
+ "tables": [
+  {
+   "title": "the rows this gate ran",
+   "columns": [
+    "row",
+    "verdict",
+    "detail"
+   ],
+   "rows": [
+    [
+     "1 THE DISTANCES ARE 64-BIT (32-bit made the stale-entry skip fail and the search run without end)",
+     "PASS",
+     "none"
+    ],
+    [
+     "2 THE ROCK BLOCKS ITS REACH, AND NO FURTHER (rock radius + fighter radius + margin + 0.87 cell)",
+     "PASS",
+     "0 cells inside the reach free, 0 outside it blocked"
+    ],
+    [
+     "3 THE GOAL IS EVERY FREE CELL WITHIN goalR OF THE ORIGIN, AT DISTANCE 0",
+     "PASS",
+     "56 goal cells, 0 wrong"
+    ],
+    [
+     "4 THE DISTANCES ARE THE 26-NEIGHBOUR SHORTEST PATHS (against a plain O(n^2) Dijkstra here)",
+     "PASS",
+     "worst difference 0"
+    ],
+    [
+     "5 A SEGMENT THROUGH A ROCK IS NOT CLEAR; ONE WIDE OF IT IS",
+     "PASS",
+     "none"
+    ],
+    [
+     "6 BESIDE THE ROCK, WITH THE WAY HOME HIDDEN, THE AIM IS IN CLEAR SIGHT, FREE, AND BEYOND THE FIRST STEP",
+     "PASS",
+     "aim 104,56,-8"
+    ],
+    [
+     "6b DIRECTLY BEHIND IT, WHERE EVERY LINE CLIPS THE BLOCKED CORNER, THE AIM IS THE ADJACENT DESCENT CELL, MARKED NEAR -- NEVER NULL (the 2026-11-25 amendment)",
+     "PASS",
+     "aim 136,24,24, near true"
+    ],
+    [
+     "7 IN OPEN SPACE THE AIM IS THE FARTHEST CELL IN SIGHT: A GOAL CELL",
+     "PASS",
+     "aim 8,8,8"
+    ],
+    [
+     "8 THE HAND-BACK: INSIDE THE STRAFE RANGE THE PILOT IS AP.decide(body, target, opts), EXACTLY",
+     "PASS",
+     "none"
+    ],
+    [
+     "9 OUTSIDE IT THE PILOT FLIES AP.decide TOWARD THE AIM, AT REST (with a weapon speed and a moving target, so the aim's velocity is read)",
+     "PASS",
+     "the fixture tells the velocities apart: true"
+    ],
+    [
+     "10 THE STRAFE RANGE IS MEASURED TO THE SHIP'S CURRENT CENTRE, NOT THE FIELD'S ORIGIN",
+     "PASS",
+     "none"
+    ],
+    [
+     "11 THE AIM IS CACHED FOR `every` TICKS, THEN RECOMPUTED",
+     "PASS",
+     "cached true, fresh null"
+    ],
+    [
+     "12 ON A REAL FIELD EVERY ROCK'S CENTRE CELL IS BLOCKED AND THE SHIP'S IS A GOAL CELL",
+     "PASS",
+     "none"
+    ],
+    [
+     "13 PURE: NO Math.random, NO CLOCK, NO I/O IN THE MODULE",
+     "PASS",
+     "none"
+    ],
+    [
+     "14 THE LANE: every lane goal cell is free, within goalR, and has a clear line to the origin",
+     "PASS",
+     "2595 lane goal cells, 0 bad"
+    ],
+    [
+     "15 THE LANE REACHES THE FIELD: the plain field has goal cells with the line blocked, and the lane field drops exactly those",
+     "PASS",
+     "plain 2780, hidden 185, lane 2595"
+    ],
+    [
+     "16 THE LANE IS OFF BY DEFAULT: Round A's field, to the bit",
+     "PASS",
+     "none"
+    ],
+    [
+     "17 THE FOLLOWING FIELD: built at the first call round the ship, the same field until `every` ticks have passed, then rebuilt round where the ship is NOW",
+     "PASS",
+     "builds at 0,10,20"
+    ],
+    [
+     "18 THE PILOT TAKES A FIELD-GIVING FUNCTION, AND NEVER REUSES AN AIM CACHED UNDER ANOTHER FIELD",
+     "PASS",
+     "first true, second null"
+    ],
+    [
+     "19 THE CAP: the wrapped pilot's thrust is 0 at or over the cap's closing speed to the nearest foe, untouched below it and with no foe, and nothing else changes",
+     "PASS",
+     "at 0, below 5, over 0, alone 5, probe {\"overCap\":2,\"cut\":2}"
+    ],
+    [
+     "20 AN EMPTY LANE FALLS BACK TO THE PLAIN GOAL (the origin's own cell blocked) and says so; a lane that is not empty is untouched and does not say so",
+     "PASS",
+     "origin blocked true, laneEmpty true, goal cells 188 (plain 188); the fixture of rows 14-16 laneEmpty false"
+    ],
+    [
+     "NAV_DEFAULTS are the registration's settings: cells of 16 in a cube of half-width 560 (70 a side), margin 20, re-aimed every 15 ticks, no lane (brain/ROCK_NAV_WIP.md)",
+     "PASS",
+     "{\"cell\":16,\"half\":560,\"margin\":20,\"every\":15,\"lane\":false}"
+    ],
+    [
+     "shipOf finds the arena's capital ship, not the first craft, and nothing in an arena without one",
+     "PASS",
+     "the real arena's ship is craft 1"
+    ],
+    [
+     "reportLines says what the layer is and prints the defaults it flies with",
+     "PASS",
+     "  cell 16, half-width 560, margin 20, re-aim every 15 ticks"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

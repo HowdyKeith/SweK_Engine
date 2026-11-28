@@ -2831,6 +2831,14 @@ export const INSTRUMENTS = [
       measures: "does a cap chosen at 4 s by the damage the team has taken (20 or more: cap 20, else 12) keep cap 12's win against weak gunners and take cap 20's against strong ones? R per preset by the exact sign test, Round 4's verdict word for word",
       key: "the signal's numbers fixed from a survey on throwaway seeds (98.4% right at 4 s); DEV (space seeds 4701-4730 x 4 kinds x 4 presets) is checks only; HELD (4801-4920, doubled after Round 4's floor) is flown ONCE",
       gate: "tools/ship/signalCapStudy-selfcheck.mjs" },
+    { id: "space-nav", page: "instrument-bench.html", name: "THE NAVIGATION LAYER FOR THE ROCK FIELD (brain/spaceNav.mjs; brain/ROCK_NAV_WIP.md)", area: "brain",
+      measures: "the 3-D flow field the rock nav rounds fly: a cube of cells around the capital ship, a cell blocked within rock radius + fighter radius + margin of a rock, 26-neighbour Dijkstra toward the strafe sphere, and the aim the farthest descent cell still in clear line of sight; flown outside the strafe range only, today's pilot exactly inside it (the hand-back)",
+      key: "cell 16, half-width 560, margin 20, re-aim every 15 ticks; pure (no I/O, no clock, no Math.random)",
+      gate: "brain/spaceNav-selfcheck.mjs" },
+    { id: "study-jobs", page: "instrument-bench.html", name: "THE STUDIES A PEER MAY RUN (tools/ship/studyJobs.mjs)", area: "ship",
+      measures: "the closed registry a `study` job for the Brain Job Repo Report Runner names one entry of: each replay entry flies a registered set again into a scratch folder and compares it row for row with the files committed for it (IDENTICAL, or DIFFERS with the first differing row named)",
+      key: "2 entries today (rock nav Round A's and Round C's DEV, 4 parts each); a job carries a study NAME only, and a name this registry does not hold at the job's commit is refused; every command line is built from the entry and the part number (tools/ship/studyRunner.mjs runs it)",
+      gate: "tools/ship/studyJobs-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

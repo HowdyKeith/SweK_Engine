@@ -295,8 +295,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4932.movedSince4475;   // v4932: the newest record (v4912's moves, hemibrain's arrival extended at v4929, male-cns's and zebrafish's at v4932)
-    const arrived = F.COMMIT_BELT_DRIFT_V4932.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4936.movedSince4475;   // v4936: the newest record (v4932's with male-cns, smaa and santon2025); v4932: the newest record (v4912's moves, hemibrain's arrival extended at v4929, male-cns's and zebrafish's at v4932)
+    const arrived = F.COMMIT_BELT_DRIFT_V4936.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -398,7 +398,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4932;   // v4933: the newest record (v4932's object taken again in place: smaa arrived, male-cns carries the fly pathways line); v4778's is graded below as history
+    const D = F.COMMIT_BELT_DRIFT_V4936;   // v4936: the newest record (male-cns, smaa and santon2025 changed); v4933: the newest record (v4932's object taken again in place: smaa arrived, male-cns carries the fly pathways line); v4778's is graded below as history
     // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
     // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
     // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
@@ -517,6 +517,19 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            N.arrivedSince4475.zebrafish.now[0] === "68c43c85" && N.arrivedSince4475.zebrafish.now.slice(1).join() === O.arrivedSince4475.zebrafish.now.join(),
            `arrived ${changed.join(", ")}`);
     }
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4932, N = F.COMMIT_BELT_DRIFT_V4936;
+        const changed = Object.keys(N.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]).sort();
+        const mc = N.arrivedSince4475["male-cns"].now, oc = O.arrivedSince4475["male-cns"].now;
+        ok("!! the v4936 belt record is v4932's with THREE arrived bodies changed (male-cns: every commit it had, in order, with the merge of main in front and the fly line's four vendoring commits between; smaa: 2deff1d8 in front of what it had; santon2025: the new body) and the fleet 30 bodies; its moves are v4932's own object",
+           changed.join(",") === "male-cns,santon2025,smaa" && O.at === "v4933" && N.at === "v4936" && N.bodiesNow === 30 && O.bodiesNow === 29 && N.movedSince4475 === O.movedSince4475 &&
+           mc[0] === "fb21434a" && mc.filter((h) => oc.includes(h)).join() === oc.join() && mc.filter((h) => !oc.includes(h)).sort().join() === "05defa7f,0ae35c4f,1b4cf990,9a4adaec,fb21434a" &&
+           N.arrivedSince4475.smaa.now[0] === "2deff1d8" && N.arrivedSince4475.smaa.now.slice(1).join() === O.arrivedSince4475.smaa.now.join() &&
+           N.arrivedSince4475.santon2025.now.join() === "a5c162ab" && !O.arrivedSince4475.santon2025,
+           `arrived ${changed.join(", ")}; male-cns ${oc.length} -> ${mc.length} commits`);
+    }
+    // SABOTAGES (v4936, full clone): F1 9a4adaec dropped from the record's male-cns list -> 2 red by name (BY HASH, and the v4936 belt row). F2 santon2025's
+    // entry renamed -> 3 red by name (BY HASH, the v4936 belt row, and THE WHOLE FLEET, santon2025 unaccounted). Restored, sha256 identical.
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still
     // "differs" by whatever the boundary swallowed: this read 0 unchanged of 15 and the true figure is 11.

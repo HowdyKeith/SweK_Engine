@@ -1,0 +1,69 @@
+{
+ "gate": "tools/ship/strongGunnersStudy-selfcheck.mjs",
+ "at": "2026-11-27",
+ "tables": [
+  {
+   "title": "the rows this gate ran",
+   "columns": [
+    "row",
+    "verdict",
+    "detail"
+   ],
+   "rows": [
+    [
+     "1 THE SETS: ace and perfect only; the grid holds 12 and caps above it; DEV and HELD are new (not the doctrine round's, not rock nav's 3101-4290, not the gates' 1-50); CAP_STRONG unset or on the grid",
+     "PASS",
+     "none"
+    ],
+    [
+     "2 THE CHOICE: the grid cap with the highest mean R pooled over both presets; a tie goes to the larger cap",
+     "PASS",
+     "20, tie 30"
+    ],
+    [
+     "3 THE SIGN VERDICT: FLOOR under 20 non-tied pairs; CAP BETTER and DOCTRINE BETTER need the sign test (the median of the NON-TIED differences always follows the majority, so its clause adds nothing and is not claimed here); a split count is NO DIFFERENCE; misaligned arms are refused",
+     "PASS",
+     "CAP BETTER / DOCTRINE BETTER / FLOOR / CAP BETTER / NO DIFFERENCE SHOWN / true"
+    ],
+    [
+     "4 THE BOTTOM LINE: CAP BEATS (both presets) / THE DOCTRINE BEATS (either, named) / NO CAP SHOWN (the per-preset verdicts named)",
+     "PASS",
+     "CAP 20 BEATS THE DOCTRINE AGAINST STRONG GUNNERS / THE DOCTRINE BEATS CAP 20 AGAINST STRONG GUNNERS (perfect) / NO CAP SHOWN BETTER OR WORSE THAN THE DOCTRINE AGAINST STRONG GUNNERS (ace FLOOR, perfect FLOOR)"
+    ],
+    [
+     "5 THE FIRST QUESTION (cap 12): YES when the doctrine is better on R under either preset, or the cap-12 fighters strafe less under BOTH; otherwise NOT SHOWN",
+     "PASS",
+     "YES: A CAPPED FIGHTER AT 12 LOSES TO STRONG GUNNERS / YES: A CAPPED FIGHTER AT 12 LOSES TO STRONG GUNNERS / NOT SHOWN"
+    ],
+    [
+     "6 THE ARMS ARE spaceDoctrineStudy's, flown on a gate seed: D and a capped arm on the same fight, the cap applied with no thrust over it, the foe the arena's, the arms differing",
+     "PASS",
+     "D strafe 0.0 R 0; cap 20 strafe 0.0 R 0, 744 over"
+    ],
+    [
+     "7 DEV'S CHECKS ARE ROUND 2's AT THE CHOSEN CAP",
+     "PASS",
+     "none"
+    ],
+    [
+     "8 THE COMMAND: export-free; HELD refused before DEV passes, and refused while the library's cap is not DEV's choice; an unknown option refused; a part never flown twice",
+     "PASS",
+     "no DEV 2, wrong cap 2, twice 2, unknown 2"
+    ],
+    [
+     "9 reportLines NAMES THE GRID, THE SETS AND THE CAP'S STATE",
+     "PASS",
+     "none"
+    ],
+    [
+     "strongGunnersStudy: SPENT is the design survey's throwaway seeds 9990037-9990048 the registration names (brain/SPACE_DOCTRINE_WIP.md), in neither DEV nor HELD; scenariosOf crosses every seed with the four kinds, seed by seed",
+     "PASS",
+     "survey 9990037-9990048; scenariosOf([7, 9]) 7b 7b 7s 7s 9b 9b 9s 9s"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

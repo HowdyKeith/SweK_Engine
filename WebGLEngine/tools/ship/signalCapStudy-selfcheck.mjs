@@ -15,6 +15,7 @@ import * as A from "./signalCapStudy.mjs";
 import * as R4 from "./adaptiveCapStudy.mjs";
 import * as G from "./strongGunnersStudy.mjs";
 import * as RN from "./rockNavStudy.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const rows = [];
@@ -78,4 +79,7 @@ row("signalCapStudy: SPENT is the design survey's throwaway seeds 9990061-999007
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[signalCapStudy-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);
+// v4936 -- the rows this gate ran, kept as its report (gateReport-selfcheck: a gate that argues in numbers emits them, so they outlive the terminal). Written only under SWEK_GATE_REPORT=1.
+{ const GR = gateReport("tools/ship/signalCapStudy-selfcheck.mjs");
+  GR.table("the rows this gate ran", ["row", "verdict", "detail"], rows.map((r) => [r.name, r.ok ? "PASS" : "FAIL", r.detail || ""])); GR.write(); }
 process.exit(red ? 1 : 0);

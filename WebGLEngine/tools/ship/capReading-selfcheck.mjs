@@ -286,9 +286,14 @@ export const LET_FINISH_V4573 = Object.freeze({
         // each filed by `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 11,728 / 11,820 / 12,056 (median 11,820, filed 12,056 -- 2.0% from it). The v4870 minute is kept in earlierRuns.
         // v4899 -- RE-TAKEN: the 80-slot rotation on this box filed 13,705 (the box is slower today: staleness 1,118 ms against a recorded 659); three alone runs, each filed by
         // `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 13,955 / 13,812 / 14,353 (median 13,955, filed 14,353 -- 2.9% from it). The v4880 minute is kept in earlierRuns.
-        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 10139,
-            runs: Object.freeze([10098, 9790, 10139]),
-            earlierRuns: Object.freeze([Object.freeze([13955, 13812, 14353]), Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753]), Object.freeze([10720, 11092, 11610]), Object.freeze([11728, 11820, 12056])]),
+        // v4936 -- RE-TAKEN, UP: the publish merge of seven branches grew the tree to 2,681 gates and this gate walks the selection over all of them; three alone runs,
+        // each filed by `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 16,094 / 17,223 / 19,442 (median 17,223, filed 19,442 --
+        // 12.9% from it, the widest spread this entry has held, and the reason is not known). The v4899+ minute is kept in earlierRuns.
+        // SABOTAGES (v4936): C1 `now` put back at 10,139 -> 0 red, A FINDING: the rows read the FILED reading against `runs`, not `now`; C2 `runs` put back at v4899's -> 2 red by name
+        // (the population row, gateSelection DISAGREEING AND UNNAMED, and the filed-inside-the-range row). Restored, sha256 identical.
+        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 19442,
+            runs: Object.freeze([16094, 17223, 19442]),
+            earlierRuns: Object.freeze([Object.freeze([10098, 9790, 10139]), Object.freeze([13955, 13812, 14353]), Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753]), Object.freeze([10720, 11092, 11610]), Object.freeze([11728, 11820, 12056])]),
             why: "67,823 at the cap pass, a LOADED reading (a 2026-09-09 sweep filed 69,346 the same way, and it stood as the gate's " +
                  "only reading until v4838); 13,997-14,413 alone straight after v4838's handover, and 12,538-12,865 across three " +
                  "quiet runs, the alone reading filed 12,753 -- the median; 10,720-11,610 at v4870, filed 11,610; and 11,728-12,056 at v4880, filed 12,056; and 13,812-14,353 at v4899, filed 14,353. Its header's ~14s was right all along.",

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/droneTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/droneTask-selfcheck.mjs      (~30 s: it flies the eight sets, 346 flights)
+// Run: node brain/droneTask-selfcheck.mjs      (~11 s alone on a 4-core box, 10,559 ms in the shared record at v4936 -- it was ~30 s when this line was written: it flies the eight sets, 346 flights)
 //
 // THE SIBLING GATE OF brain/droneTask.mjs: the job every quadrotor pilot -- the hand pilot, the fruit fly's network, the GPU network -- is given and graded on. A score is only worth training on if it means what it says, so each row is a thing the score is SUPPOSED
 // to do, asked of it with a pilot whose answer is known (brain/rotorTask-selfcheck.mjs is the helicopter's, and the discipline is the same):

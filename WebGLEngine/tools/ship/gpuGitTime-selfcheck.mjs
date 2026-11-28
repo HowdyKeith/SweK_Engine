@@ -91,7 +91,10 @@ else {
         for (const b of ["webgpu", "webgl2"]) {
             const R = r.result[b];
             ok(`*** ${b} (${R.path}): on each day the device's counts are 1 + the markets open that day ***`, R.backend === b && R.perDay.every((d) => d.total === openOn(d.day)), R.perDay.map((d) => `day ${d.day}: ${d.total}/${openOn(d.day)}`).join(", "));
-            ok(`  ${b}: the last body to arrive (${late.name}, day ${late.opens}) is NOT under the pointer before its day and IS on it`, R.perDay.filter((d) => d.day < (late.opens || 0)).every((d) => d.lateHit == null) && R.perDay.filter((d) => d.day >= (late.opens || 0)).every((d) => d.lateHit === late.id || (d.near.includes(d.lateHit) && d.hitDist < 12)), R.perDay.map((d) => `day ${d.day}: ${d.lateHit == null ? "nothing" : "record " + d.lateHit + (d.lateHit === late.id ? "" : ` (${late.name} is ${late.id}; the picked centre is ${d.hitDist} px away, ${d.near.length} open centre(s) within 12 px: ${d.near.join(",")})`)}`).join(", "));
+            // v4936 -- BEFORE ITS DAY, AN OVERLAPPING OPEN BODY MAY WIN THE PICK, AS IT ALREADY MAY AFTER. santon2025 (day 99) arrived in the merge and is the
+            // latest body; its centre lies within 12 px of bodies 4 and 12, and 12 is open on day 49, so the nearest quad at that pixel is 12's (4.28 px away).
+            // "Nothing under the pointer" was a stand-in for "the late body is not under it"; the row now asserts that, and that any pick is an open body near it.
+            ok(`  ${b}: the last body to arrive (${late.name}, day ${late.opens}) is NOT under the pointer before its day and IS on it`, R.perDay.filter((d) => d.day < (late.opens || 0)).every((d) => d.lateHit == null || (d.lateHit !== late.id && d.near.includes(d.lateHit) && d.hitDist < 12)) && R.perDay.filter((d) => d.day >= (late.opens || 0)).every((d) => d.lateHit === late.id || (d.near.includes(d.lateHit) && d.hitDist < 12)), R.perDay.map((d) => `day ${d.day}: ${d.lateHit == null ? "nothing" : "record " + d.lateHit + (d.lateHit === late.id ? "" : ` (${late.name} is ${late.id}; the picked centre is ${d.hitDist} px away, ${d.near.length} open centre(s) within 12 px: ${d.near.join(",")})`)}`).join(", "));
         }
         ok("both backends report the same counts on every day (the compute pass and the twin agree)", JSON.stringify(r.result.webgpu.perDay.map((d) => [d.day, d.total])) === JSON.stringify(r.result.webgl2.perDay.map((d) => [d.day, d.total])));
     }
@@ -105,6 +108,8 @@ else {
 //      the two backends part -- WebGPU still right.
 //   C  the WGSL reading extra.x (the heading) for the day -> exit=1, 4 red: WebGPU keeps 1/3/5/15 (the golden-angle headings
 //      compared to a day), the twin keeps 10/11/15/15, and the backends disagree.
+//   G1 (v4936) the late body opened from day 0 in the harness -> exit=1, 4 red: both backends count one more body on every day before day 99, and both pick
+//      record 8 (santon2025) on days 0 and 49 -- the relaxed pre-day rule still refuses the late body itself.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the TRADERS' scene (a hauler joins on its market's day already, by the sim, so its record never exists before; the " +
     "clock is only wired to the bodies); and orbits before a body's day -- the orbit pass still computes a closed body's position, the cull " +

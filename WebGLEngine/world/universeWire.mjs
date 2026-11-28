@@ -298,18 +298,27 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "hemibrain, male-cns and zebrafish gained data files (stockOfFiles turns every file into cargo at max(1, round(bytes / 4096))) and vendor/smaa arrived as a new body with its own files and arrival date; " +
                    "`sha` and a body's top-level `bytes` reach nothing, as recorded",
             control: "on today's tree, main's bake with ONLY hemibrain's current form gives 5e9fa610, only male-cns's 6a6ad5a4, only smaa's 5455f533 and only zebrafish's fde3cee0; putting each one back into today's gives eac8bd5a, faadafb1, caf8f577 and 6a0eee99 -- none is the previous key f51215a5, so all four move it together" }),
+        // v4936 -- TWO BODIES, ONE OF THEM NEW. The fly line shipped in the publish merge baked three more circuit files into vendor/male-cns (the ring neurons onto the compass neurons, the mushroom body,
+        // the projection neurons onto the Kenyon cells), and vendor/santon2025 (Santon et al. 2025's crab treadmill data) arrived as a new body with its own files and arrival date. MEASURED (world/orrery.mjs
+        // through makeGitEconomy, seed 7, 400 ticks, against the committed v4935 bake), not read off the diff.
+        Object.freeze({ version: "v4936", commit: "ship", hash: "d4ce9a58", file: "orrery.json",
+            field: "files", bodiesTouched: 2,
+            cause: "male-cns gained three baked circuit files (cargo at max(1, round(bytes / 4096)) each) and santon2025 arrived as a new body with its files and arrival date; smaa's `files` and `bytes` moved too " +
+                   "(its LICENSE is PlayCanvas's file again and SMAA's notice moved into PROVENANCE.md) and reach nothing, as `bytes` never has",
+            control: "on the v4935 bake (75d804b9), ONLY today's male-cns gives 96d4da60 and ONLY santon2025 added gives bff892fc; putting male-cns's v4935 form back into today's gives bff892fc and taking santon2025 out gives 96d4da60 -- " +
+                     "so the two move it together; ONLY today's smaa gives 75d804b9 and putting smaa's v4935 form back into today's leaves d4ce9a58" }),
     ]),
-    current: "75d804b9",
+    current: "d4ce9a58",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 29, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 30, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
-              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880; snowflow made it 25 at v4895 and hemibrain, zebrafish and zebrafish-vestibular made it 28 at v4898 and smaa made it 29 at v4933, and the probe is re-run rather than the count adjusted" }),
+              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880; snowflow made it 25 at v4895 and hemibrain, zebrafish and zebrafish-vestibular made it 28 at v4898 and smaa made it 29 at v4933 and santon2025 made it 30 at v4936, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in

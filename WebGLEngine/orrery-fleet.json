@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2",
+ "head": "d824a56d4b78b4f3e85051e3899a037d477b7c3f",
  "bodies": {
   "box3d": [
    {
@@ -132,7 +132,7 @@
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
     "bytes": 25002,
-    "sha": "171f3111e8f89d077853d5c1fa6e0cc93653b128"
+    "sha": "c0fb036c294759260c98452f822159f2183a688c"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
@@ -385,8 +385,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 61813,
-    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
+    "bytes": 62320,
+    "sha": "3fdb746741105ea3920d4a50d1caeb87f3e86d19"
    },
    {
     "path": "switchboard.html",
@@ -497,8 +497,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 921421,
-    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
+    "bytes": 923986,
+    "sha": "7b266878900247690349d6f6223751f4f210e279"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -507,8 +507,8 @@
    },
    {
     "path": "tools/ship/vendoredLicences-selfcheck.mjs",
-    "bytes": 15289,
-    "sha": "894bd65159b001c770ad2dced7582dc8cab4342b"
+    "bytes": 15498,
+    "sha": "a5c162abd8f9e690d4afc1f40618b75f996863fe"
    }
   ],
   "jolt": [
@@ -597,8 +597,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 45095,
-    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
+    "bytes": 46585,
+    "sha": "d34013f2a95992241194eab0c1e00e1a6b90b46f"
    }
   ],
   "male-cns": [
@@ -668,6 +668,16 @@
     "sha": "802a72ee7a839074f4e416284c4ecfdac938962e"
    },
    {
+    "path": "tools/bakeCompassRingTopology.mjs",
+    "bytes": 4618,
+    "sha": "eb4afa887b8056245804d567b580065deca4e6f8"
+   },
+   {
+    "path": "tools/bakeGfVisualTopology.mjs",
+    "bytes": 4467,
+    "sha": "e1d14e37670cd14433da76f91be460f9d62503ca"
+   },
+   {
     "path": "tools/bakeGfcTopology.mjs",
     "bytes": 5199,
     "sha": "8a7bc6c4d2a0467a65c22198fae276725f70c4d0"
@@ -693,9 +703,54 @@
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
+    "path": "tools/ship/flyCompass-selfcheck.mjs",
+    "bytes": 40133,
+    "sha": "a888353aa2df95e392ab2c0fdd2f8e22fe11c473"
+   },
+   {
     "path": "tools/ship/flyConnectomePage-selfcheck.mjs",
     "bytes": 21121,
     "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
+   },
+   {
+    "path": "tools/ship/flyEscapeVision-selfcheck.mjs",
+    "bytes": 41611,
+    "sha": "b43eeac3daf3800ae63bab6aa4c869c868ee6895"
+   },
+   {
+    "path": "tools/ship/flyMushroom-selfcheck.mjs",
+    "bytes": 40159,
+    "sha": "83c23ec44dfcf8785e7138a6461de2cce11cd8e2"
+   },
+   {
+    "path": "tools/ship/flyMushroom.mjs",
+    "bytes": 17193,
+    "sha": "531b7f426210489dc4c800ab735cb2df81017ae1"
+   },
+   {
+    "path": "tools/ship/flyMushroomOdours-selfcheck.mjs",
+    "bytes": 39258,
+    "sha": "aaef7be24280d2c002163752c47044f76aaa10a5"
+   },
+   {
+    "path": "tools/ship/flyMushroomOdours.mjs",
+    "bytes": 17663,
+    "sha": "f098718fc084982ca574e78197538d2df9d1df7e"
+   },
+   {
+    "path": "tools/ship/maleCnsCompassRing-selfcheck.mjs",
+    "bytes": 10338,
+    "sha": "05defa7f9bed138d9a3d7e7b3583396270b5d584"
+   },
+   {
+    "path": "tools/ship/maleCnsMushroomBody-selfcheck.mjs",
+    "bytes": 12737,
+    "sha": "05defa7f9bed138d9a3d7e7b3583396270b5d584"
+   },
+   {
+    "path": "tools/ship/maleCnsPnKc-selfcheck.mjs",
+    "bytes": 10383,
+    "sha": "9a4adaecdae90beefab3d85f934e11ebc6102027"
    },
    {
     "path": "tools/ship/pilotPolicy-selfcheck.mjs",
@@ -717,6 +772,23 @@
     "sha": "891cc90f02dacc7263daa04a4864a84966342e1d"
    }
   ],
+  "santon2025": [
+   {
+    "path": "brain/crabGain32Agg.mjs",
+    "bytes": 5284,
+    "sha": "5796736a177cf5e642cf09072dbd9771c874b3f8"
+   },
+   {
+    "path": "brain/crabReadout31Agg.mjs",
+    "bytes": 4647,
+    "sha": "3d7144a9026d7ef2d60bdaf8b4ae79a433dbf041"
+   },
+   {
+    "path": "brain/crabTexture33Agg.mjs",
+    "bytes": 5575,
+    "sha": "1aecb4fe03d21a9b9c3617f0863d6656e1f3199f"
+   }
+  ],
   "slug": [],
   "smaa": [
    {
@@ -731,8 +803,8 @@
    },
    {
     "path": "tools/ship/smaaPass-selfcheck.mjs",
-    "bytes": 14251,
-    "sha": "aa0325431963a50b62a9432bbe8eed507d9f0d4a"
+    "bytes": 14818,
+    "sha": "2deff1d8f03324359a7abf7be45842106e9f1e95"
    }
   ],
   "snowflow": [
@@ -793,8 +865,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 45095,
-    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
+    "bytes": 46585,
+    "sha": "d34013f2a95992241194eab0c1e00e1a6b90b46f"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -803,8 +875,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 164897,
-    "sha": "ca358ce122bc5c4c48a31c9d4cc32de3b494ce0e"
+    "bytes": 165913,
+    "sha": "cfe6c4b998743c7bd7029775bb667e04ff33205d"
    }
   ],
   "taichi-js": [
@@ -1047,8 +1119,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3831441,
-    "sha": "4494333a478de5b3a8ca25e8210c5cc271e7c4c2"
+    "bytes": 3835318,
+    "sha": "6c62304454e95e7f61baeb5efaf9f2bd04493f73"
    },
    {
     "path": "mpm3d.html",
@@ -1152,8 +1224,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 921421,
-    "sha": "bf268abc679b2f26911dcbf2198abf331517b8c1"
+    "bytes": 923986,
+    "sha": "7b266878900247690349d6f6223751f4f210e279"
    },
    {
     "path": "shipavatar.html",
@@ -1177,8 +1249,8 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 85912,
-    "sha": "23c03b0360cab54c19ec66b7b2e669211fe1714c"
+    "bytes": 89870,
+    "sha": "3676f841479647286bbead3e91668baa21a4bd7b"
    },
    {
     "path": "space-duel.html",
@@ -1192,8 +1264,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 61813,
-    "sha": "bbd504b618d435ef660a584ebb995bb02848a4ec"
+    "bytes": 62320,
+    "sha": "3fdb746741105ea3920d4a50d1caeb87f3e86d19"
    },
    {
     "path": "svg-forge.html",
@@ -1247,8 +1319,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 45095,
-    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
+    "bytes": 46585,
+    "sha": "d34013f2a95992241194eab0c1e00e1a6b90b46f"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1272,8 +1344,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 92940,
-    "sha": "71773ec7b9b1da541fab39ab3007389a76aacf64"
+    "bytes": 96829,
+    "sha": "fae8c5f1975b868640578b43832b7002ed2f31b6"
    },
    {
     "path": "toroidal-wave.html",
@@ -1694,8 +1766,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 92940,
-    "sha": "71773ec7b9b1da541fab39ab3007389a76aacf64"
+    "bytes": 96829,
+    "sha": "fae8c5f1975b868640578b43832b7002ed2f31b6"
    },
    {
     "path": "tsl-probe.html",
@@ -1721,8 +1793,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 45095,
-    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
+    "bytes": 46585,
+    "sha": "d34013f2a95992241194eab0c1e00e1a6b90b46f"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1780,8 +1852,8 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 45095,
-    "sha": "bbe3a81ae17ffabbed3b9ad34f4ed0b31b7102d0"
+    "bytes": 46585,
+    "sha": "d34013f2a95992241194eab0c1e00e1a6b90b46f"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",

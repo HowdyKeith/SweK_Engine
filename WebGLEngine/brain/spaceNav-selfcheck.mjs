@@ -24,6 +24,7 @@ import * as SA from "./spaceArena.mjs";
 import * as AP from "./autopilot6dof.mjs";
 import * as BF from "./battleshipFight.mjs";
 import * as SR from "./spaceRocks.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
 const rows = [];
 const row = (name, fn) => { let ok = false, detail = ""; try { const r = fn(); ok = r === true || (r && r.ok === true); detail = r && r.detail ? r.detail : ""; } catch (e) { ok = false; detail = "threw: " + e.message; } rows.push({ name, ok, detail }); };
@@ -199,4 +200,7 @@ row("reportLines says what the layer is and prints the defaults it flies with", 
 for (const r of rows) console.log(`  ${r.ok ? "PASS" : "FAIL"} ${r.name}${r.detail ? " -- " + r.detail : ""}`);
 const red = rows.filter((r) => !r.ok).length;
 console.log(`[spaceNav-selfcheck] ${red ? red + " of " + rows.length + " checks FAIL" : "all " + rows.length + " checks pass"}`);
+// v4936 -- the rows this gate ran, kept as its report (gateReport-selfcheck: a gate that argues in numbers emits them, so they outlive the terminal). Written only under SWEK_GATE_REPORT=1.
+{ const GR = gateReport("brain/spaceNav-selfcheck.mjs");
+  GR.table("the rows this gate ran", ["row", "verdict", "detail"], rows.map((r) => [r.name, r.ok ? "PASS" : "FAIL", r.detail || ""])); GR.write(); }
 process.exit(red ? 1 : 0);

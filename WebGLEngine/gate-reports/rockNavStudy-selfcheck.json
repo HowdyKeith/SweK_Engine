@@ -1,0 +1,194 @@
+{
+ "gate": "tools/ship/rockNavStudy-selfcheck.mjs",
+ "at": "2026-11-27",
+ "tables": [
+  {
+   "title": "the rows this gate ran",
+   "columns": [
+    "row",
+    "verdict",
+    "detail"
+   ],
+   "rows": [
+    [
+     "1 EVERY FIGHTER IS ACCOUNTED FOR ONCE: approach struck + shot + arrived (+ still out) = 8; struck = approach + combat; one arrival time per arrival",
+     "PASS",
+     "D 1/1/6/1; N 1/0/7/0; D 0/0/8/0; N 0/0/8/0"
+    ],
+    [
+     "2 BOTH ARMS FLY THE SAME FIELD AND THE SAME STARTS (fieldKey), AND THE KEY SEES THE ROCKS",
+     "PASS",
+     "ae4992c2 ae4992c2"
+    ],
+    [
+     "3 ARM D IS THE PLAIN FIGHT: stepping it here changes nothing against battleshipFight + runSpaceArena",
+     "PASS",
+     "none"
+    ],
+    [
+     "4 ARM N FLIES THE LAYER: aimed calls > 0, the hand-back exact, no aim in a blocked cell, every rock centre blocked",
+     "PASS",
+     "aimed 3795, hand-back 1582, mismatch 0, near 38, fallback 18; aimed 5384, hand-back 2158, mismatch 0, near 88, fallback 204"
+    ],
+    [
+     "4b THE FIELD IS BUILT ROUND THE SHIP'S START, TOWARD THE STRAFE SPHERE (goal radius SA.STRAFE_RANGE)",
+     "PASS",
+     "origin 0,0,0, goal 220"
+    ],
+    [
+     "5 THE ARMS DIFFER (the pilot reaches the fight)",
+     "PASS",
+     "none"
+    ],
+    [
+     "6 THE SIGN VERDICT: FLOOR under 20, LAYER BETTER and DOCTRINE BETTER need the sign test AND the totals, else NO DIFFERENCE",
+     "PASS",
+     "FLOOR / LAYER BETTER / DOCTRINE BETTER / NO DIFFERENCE SHOWN / NO DIFFERENCE SHOWN"
+    ],
+    [
+     "7 THE BOTTOM LINE: WINS THE APPROACH / AVOIDS ROCKS BY NOT ARRIVING / DOES NOT WIN",
+     "PASS",
+     "THE LAYER WINS THE APPROACH / THE LAYER AVOIDS ROCKS BY NOT ARRIVING / THE LAYER DOES NOT WIN THE APPROACH (FLOOR)"
+    ],
+    [
+     "8 PAIRS ARE (seed, kind) IN ORDER: misaligned arms are refused",
+     "PASS",
+     "none"
+    ],
+    [
+     "9 DEV'S CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT",
+     "PASS",
+     "good true; faults pass: false,false,false,false,false,false"
+    ],
+    [
+     "10 THE SETS ARE DISJOINT: DEV, HELD, Round B's reservation, the gate seeds, and the space-doctrine round's sets",
+     "PASS",
+     "none"
+    ],
+    [
+     "11 THE COMMAND: export-free, refuses HELD before DEV passes, refuses a part flown twice, refuses an unknown option",
+     "PASS",
+     "held 2, twice 2, unknown 2"
+    ],
+    [
+     "12 ARM L FLIES THE LANE FIELD, N THE PLAIN ONE: L's goal cells all have a clear line, N's do not, same rocks and starts",
+     "PASS",
+     "L 10122 goal cells (0 blocked); N 10284 (162 blocked)"
+    ],
+    [
+     "13 ROUND B'S BOTTOM LINE: WINS THE STRAFE / SAVES FIGHTERS AND HURTS THE SHIP LESS / DOES NOT WIN",
+     "PASS",
+     "THE LANE WINS THE STRAFE / THE LANE SAVES FIGHTERS AND HURTS THE SHIP LESS / THE LANE DOES NOT WIN THE STRAFE (FLOOR) / N BETTER"
+    ],
+    [
+     "14 ROUND B'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT",
+     "PASS",
+     "faults pass: false,false,false,false,false,false,false"
+    ],
+    [
+     "15 THE COMMAND REFUSES ROUND B'S HELD BEFORE ITS DEV PASSES, AND THE ROUND B SETS ARE THE RESERVED ONES",
+     "PASS",
+     "heldB exit 2"
+    ],
+    [
+     "16 ARM F FOLLOWS THE SHIP: at least 2 builds, every one centred on the ship at its tick, the hand-back exact, every build sound, the same field as L",
+     "PASS",
+     "28 builds over 54.5 s (28 checked, 0 rock-builds off the grid), worst distance 0"
+    ],
+    [
+     "16b CHECK 4 HOLDS THE ROCKS INSIDE EACH BUILD'S GRID AND COUNTS, NOT FAILS, THE ROCKS OUTSIDE IT",
+     "PASS",
+     "in-grid ok true, off-grid 1, an unblocked build ok false"
+    ],
+    [
+     "17 ROUND C'S BOTTOM LINE (V1 reads ALL strikes): WINS / SAVES FIGHTERS AND HURTS THE SHIP LESS / LOSES MORE FIGHTERS / DOES NOT WIN",
+     "PASS",
+     "THE FOLLOWING FIELD WINS / THE FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS / THE FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS / THE FOLLOWING FIELD DOES NOT WIN (FLOOR)"
+    ],
+    [
+     "18 ROUND C'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT",
+     "PASS",
+     "faults pass: false,false,false,false,false,false,false,false"
+    ],
+    [
+     "19 THE COMMAND REFUSES ROUND C'S HELD BEFORE ITS DEV PASSES; ROUND C'S SETS ARE NEW",
+     "PASS",
+     "heldC exit 2"
+    ],
+    [
+     "20 ARM LC IS L WITH THE CAP: the same field and starts; the hand-back exact before the cap; calls over 12 cut and none left with thrust; L cuts nothing and has over-cap calls with thrust",
+     "PASS",
+     "LC 3213 over, 2424 cut, 0 with thrust; L 0 cut, 1557 over with thrust"
+    ],
+    [
+     "21 ROUND D'S BOTTOM LINE (V1 strikes after arriving, V2 R with higher better): SAVES FIGHTERS / SAVES FIGHTERS BUT HITS LESS / LOSES MORE / DOES NOT WIN",
+     "PASS",
+     "THE CAP SAVES FIGHTERS IN THE STRAFE / THE CAP SAVES FIGHTERS BUT HITS THE SHIP LESS / THE CAP LOSES MORE FIGHTERS TO THE ROCKS / THE CAP DOES NOT WIN THE STRAFE (FLOOR)"
+    ],
+    [
+     "22 ROUND D'S DEV CHECKS PASS ON GOOD ROWS AND EACH FAILS ON ITS OWN FAULT",
+     "PASS",
+     "faults pass: false,false,false,false,false,false,false,false"
+    ],
+    [
+     "23 THE COMMAND REFUSES ROUND D'S HELD BEFORE ITS DEV PASSES; ROUND D'S SETS ARE NEW",
+     "PASS",
+     "heldD exit 2"
+    ],
+    [
+     "24 ARM FX IS ROUND C'S ARM F ON THE FIXED LIBRARY: it follows (builds >= 2, centred on the ship), no build is without a goal, every build is counted for an empty lane, the same field and starts as L",
+     "PASS",
+     "28 builds, 0 empty-lane, 0 without a goal; the same fight as arm F on this fixture"
+    ],
+    [
+     "24b A BUILD WITH NO GOAL IS COUNTED: goallessBuilds counts a field whose distances are all infinite, and not one with a goal",
+     "PASS",
+     "2 of 3"
+    ],
+    [
+     "25 ROUND E READS AS ROUND C, WORD FOR WORD, OF THE FIXED FIELD: the four bottom lines, FX's totals, the empty-lane builds counted",
+     "PASS",
+     "THE FIXED FOLLOWING FIELD WINS / THE FIXED FOLLOWING FIELD LOSES MORE FIGHTERS TO THE ROCKS / THE FIXED FOLLOWING FIELD SAVES FIGHTERS AND HURTS THE SHIP LESS / THE FIXED FOLLOWING FIELD DOES NOT WIN (FLOOR)"
+    ],
+    [
+     "26 ROUND E'S DEV CHECKS: Round C's five, and THE FIX REACHES THE FIELD fails when no build fell back from an empty lane or a build has no goal",
+     "PASS",
+     "checks sameField,handBack,follows,fieldSound,allEnd,fixReaches; faults pass: false,false,false,false"
+    ],
+    [
+     "27 THE COMMAND REFUSES ROUND E'S HELD BEFORE ITS DEV PASSES; ROUND E'S SETS ARE NEW",
+     "PASS",
+     "heldE exit 2"
+    ],
+    [
+     "28 ROUND F READS AS ROUND E, WORD FOR WORD, AND ADDS THE REPLICATION LINE: REPLICATES only on FOLLOW BETTER with V2 not L BETTER",
+     "PASS",
+     "ROUND E REPLICATES / ROUND E DOES NOT REPLICATE (FOLLOW BETTER) / ROUND E DOES NOT REPLICATE (FLOOR) / ROUND E DOES NOT REPLICATE (L BETTER)"
+    ],
+    [
+     "29 THE COMMAND REFUSES ROUND F'S HELD BEFORE ITS DEV PASSES; ROUND F'S SETS ARE NEW",
+     "PASS",
+     "heldF exit 2"
+    ],
+    [
+     "THE CONSTANTS ARE THE REGISTRATION'S (brain/ROCK_NAV_WIP.md): the four kinds; 120 s fights; the sign test at alpha 0.05 with a floor of 20 non-tied pairs; the arms of Rounds B (N, L), C (L, F) and D (L, LC); the following field rebuilt every 60 ticks",
+     "PASS",
+     "kinds bow,beam,stern,swarm; 120 s; alpha 0.05, floor 20; B N,L C L,F D L,LC; every 60"
+    ],
+    [
+     "scenariosOf crosses every seed with the four kinds, seed by seed; median is the middle value (the mean of the two middle ones for an even count, null for none) and leaves its input unsorted",
+     "PASS",
+     "median([9,1,5,3]) 4"
+    ],
+    [
+     "reportLines names the round and prints its sets as the module holds them",
+     "PASS",
+     "  DEV 3101-3130 x 4 kinds (checks only); HELD 3201-3290 x 4 kinds; regular gunners, 24 rocks"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

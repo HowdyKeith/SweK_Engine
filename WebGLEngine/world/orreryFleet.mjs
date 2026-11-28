@@ -785,3 +785,25 @@ export const COMMIT_BELT_DRIFT_V4932 = Object.freeze({
             why: COMMIT_BELT_DRIFT_V4929.arrivedSince4475["zebrafish"].why + "; v4932 then merged the Fish1 read of the two Mauthner candidates' inputs and its signed top-30 circuit file" }),
     }),
 });
+
+/**
+ * v4936 -- THREE BODIES CHANGED WITH THE PUBLISH MERGE OF THE SEVEN OPEN BRANCHES, read off git on a FULL clone (the earlier records were read through a shallow one,
+ * where the graft hid the fly line's vendoring). male-cns gained the fly line's four vendoring commits (1b4cf990, the Giant Fiber registration; 0ae35c4f, the mushroom
+ * body; 05defa7f, the ring neurons onto the compass neurons; 9a4adaec, the projection neurons onto the Kenyon cells) between what it had, and the merge of main into
+ * this branch (fb21434a, which joined both sides' vendor/male-cns/PROVENANCE.md) in front. smaa gained 2deff1d8 (its LICENSE made PlayCanvas's file again). santon2025
+ * arrived (a5c162ab, Santon et al. 2025's treadmill data), so the fleet is 30 bodies. Everything else is v4932's own object.
+ */
+export const COMMIT_BELT_DRIFT_V4936 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4932,
+    at: "v4936",
+    bodiesNow: 30,
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4932.arrivedSince4475,
+        "male-cns": Object.freeze({ now: Object.freeze(["fb21434a", "daa9b8af", "bea9121f", "46164bcb", "1cb4414b", "402a8817", "70394eb3", "5badcb88", "796d2849", "9a4adaec", "05defa7f", "0ae35c4f", "889ddb7d", "1b4cf990", "a1ecad48", "e5b750b6", "133bdc88", "bb90f832", "bb162233", "46cc1d5c"]),
+            why: COMMIT_BELT_DRIFT_V4932.arrivedSince4475["male-cns"].why + "; v4936 then carried the fly line's four vendoring commits (the Giant Fiber registration, the mushroom body, the compass ring, the projection neurons onto the Kenyon cells) and the merge of main that joined both sides' PROVENANCE.md" }),
+        smaa: Object.freeze({ now: Object.freeze(["2deff1d8", ...COMMIT_BELT_DRIFT_V4932.arrivedSince4475.smaa.now]),
+            why: COMMIT_BELT_DRIFT_V4932.arrivedSince4475.smaa.why + "; v4936 made vendor/smaa/LICENSE PlayCanvas's file again and moved SMAA's notice into PROVENANCE.md" }),
+        santon2025: Object.freeze({ now: Object.freeze(["a5c162ab"]),
+            why: "Santon et al. 2025's crab treadmill data (Science Advances 11(13): eadr3686), Keith's download from the authors' Dryad deposit, read by the stealth line's three crab aggregation scripts" }),
+    }),
+});

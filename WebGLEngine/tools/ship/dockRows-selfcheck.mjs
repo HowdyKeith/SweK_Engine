@@ -69,8 +69,16 @@ let DEFAULTS = [];
     // agree with itself forever (v3527, met more times this week than any other rule).
     const block = (SRC.match(/const DEFAULT_GAUGES = \[([\s\S]*?)\n\];/) || ["", ""])[1];
     DEFAULTS = [...block.matchAll(/\{\s*(?:source|action):\s*"([^"]+)"/g)].map((m) => m[1]);
-    ok("!! the default set is 12 cells -- four rows of three", DEFAULTS.length === 12,
+    // v4936 -- 12 -> 18, BECAUSE TWO ROUNDS ADDED A ROW EACH AND NEITHER TOLD THIS GATE. ec6c22545 (2026-11-21, "Dock: AI usage-limit gauges") added row 5
+    // (claude5h, claudeweek, codex5h; Keith: "add the AI usage limits gauge to the dock") and 3e001593d (2026-11-21, "Dock: TO TV, LIVE TV and TV OFF") added row 6
+    // (tv, tvlive, tvoff; ui/tvOut.js). Both were asked for and both sit AFTER the actions row on purpose (readGaugeConfig pads a saved dock with the defaults past
+    // its end). This row read 12 against 18 on main from then on; it now holds the six rows by name, so a seventh still has to be said here.
+    // SABOTAGE D1 (v4936): the tvoff cell removed from DEFAULT_GAUGES -> 4 red by name (18 cells, rows 5 and 6, the live eighteen, six buttons). Restored, sha256 identical.
+    ok("!! the default set is 18 cells -- six rows of three", DEFAULTS.length === 18,
         DEFAULTS.length + " cells: " + DEFAULTS.join(", "));
+    ok("!! row 5 is the AI USAGE row and row 6 the TV row, after the actions",
+        DEFAULTS.slice(12, 15).join(",") === "claude5h,claudeweek,codex5h" && DEFAULTS.slice(15, 18).join(",") === "tv,tvlive,tvoff",
+        "row 5 = " + DEFAULTS.slice(12, 15).join(", ") + "; row 6 = " + DEFAULTS.slice(15, 18).join(", "));
     ok("!! row 3 is the FLEET: brains, then how many are working",
         DEFAULTS[6] === "brains" && DEFAULTS[7] === "solving",
         "row 3 = " + DEFAULTS.slice(6, 9).join(", "));
@@ -141,7 +149,7 @@ console.log("\n5. *** AND IT ACTUALLY RENDERS FOUR ROWS IN A REAL BROWSER ***");
     if (skip) {
         report("live half SKIPPED -- " + skip);
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-4 read the source, and source cannot show that " +
-               "twelve cells actually lay out as four rows or that a dial reads 3 instead of a dash.");
+               "eighteen cells actually lay out as six rows or that a dial reads 3 instead of a dash.");
     } else {
         let health = { registeredBrains: 3, brainsBusy: 2 };
         const srv = http.createServer((rq, rs) => {
@@ -179,10 +187,10 @@ console.log("\n5. *** AND IT ACTUALLY RENDERS FOUR ROWS IN A REAL BROWSER ***");
             return { cells: cells.length, buttons: cells.filter((c) => c.querySelector("button")).length,
                      cols: getComputedStyle(grid).gridTemplateColumns.split(" ").length };
         });
-        ok("!! *** TWELVE CELLS IN A THREE-COLUMN GRID -- FOUR ROWS ***",
-            shape.cells === 12 && shape.cols === 3,
+        ok("!! *** EIGHTEEN CELLS IN A THREE-COLUMN GRID -- SIX ROWS ***",
+            shape.cells === 18 && shape.cols === 3,
             shape.cells + " cells, " + shape.cols + " columns => " + Math.ceil(shape.cells / 3) + " rows");
-        ok("!! ...and three of them are real buttons", shape.buttons === 3, shape.buttons + " buttons");
+        ok("!! ...and six of them are real buttons (record, mp4, clip; to TV, live TV, TV off)", shape.buttons === 6, shape.buttons + " buttons");
 
         const live = await page.evaluate(() =>
             [...document.querySelectorAll("#h > div > div")].map((c) => c.textContent.trim()).slice(6, 8));

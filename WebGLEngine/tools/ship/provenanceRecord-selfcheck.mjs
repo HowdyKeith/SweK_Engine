@@ -59,8 +59,12 @@ const NO_UPSTREAM_AT_V4416 = Object.freeze([
 const NON_GITHUB_UPSTREAM_AT_V4778 = Object.freeze([
     "hemibrain", // v4898: the hemibrain v1.2 adjacency export on Google Cloud Storage (storage.googleapis.com/hemibrain), a data release and not a repository.
     "male-cns",  // PROVENANCE.md: Janelia FlyEM's male-cns connectome through the Neuprint server, not a repository.
+    "santon2025", // v4936: Santon et al. 2025's treadmill data from the authors' Dryad deposit (doi.org/10.5061/dryad.jh9w0vtkq), a data release and not a repository; its PROVENANCE.md named the DOI without a link until v4936.
     "zebrafish", // v4898: the Fish1 release bucket (fish1-release.storage.googleapis.com), a data release and not a repository.
 ]);
+// SABOTAGES (v4936): P1 santon2025 taken off this list -> 1 red by name ("a body whose record names a URL with no GitHub owner is named too"). P2 its record's
+// EVIDENCE word taken out -> 0 red, A FINDING: the same line says NOT ESTABLISHED, which the rule also reads. P2b the whole line removed -> 1 red by name
+// ("every PROVENANCE record says what it rests on"). All restored, sha256 identical.
 
 console.log("\n1. every body either records where it came from, or is named here with why");
 {
