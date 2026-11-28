@@ -36,3 +36,25 @@ that choice would carry into the richer scene is not tested here. Nothing here i
 ## 6. The run
 Nothing to run: `node tools/ship/takeFlyCourseLift.mjs read` reads the tally-share round's committed file. The verdict
 will be section 7, "The result".
+
+## 7. The result (read once, from the tally-share round's results file committed unread at 0bb1ccde)
+**The checks hold**: the tally-share round's file passes that round's own checks.
+* **L: THE HOME-CHOSEN FLIES GAIN LESS FROM THE RICHER SCENE THAN THEIR COURSE-CHOSEN PAIRS** (2 above, 22 below of
+  24, p 3.6e-5). Described: each pair alone, 1 above and 11 below of 12 (p 0.0063 each).
+
+| arm | lift (own tally, 26-type less plain, on the fresh lives) |
+|---|---|
+| HOMEP | 0.0174 |
+| COURSE64 | 0.0253 |
+| HOME16 | 0.0196 |
+| H16BYC | 0.0241 |
+
+**The expectation did not come, and the answer is the other way**: BELOW, given 5. Round E's pattern -- the course-chosen
+flies lifted least, 0.022 and 0.025 against 0.041 and 0.038 -- is REVERSED on fresh lives, as strongly: here they are
+lifted most. **The same 48 flies give a strong pattern one way on round E's 200 lives and the other way on these 200.**
+So which arm the richer scene lifts more is a property of the set of lives, and not of how the flies were chosen; a
+pattern described after one round's reading, on one set of lives, was not a property of the flies.
+
+**What it does not mean.** It does not show the course-chosen flies gain more in general: a third set of lives could go
+either way, which is the point. Round E's lifts came from two committed files flown at different times on the same old
+audit lives; these from one round on fresh lives. Nothing here is of the animal.

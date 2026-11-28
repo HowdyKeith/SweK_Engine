@@ -7,6 +7,9 @@
 //
 //   1  THE ROUND'S NUMBERS      the pairs by draw, alpha, the data (the tally-share round's file, read and not flown); the registration says the same and was committed before that file
 //   2  THE RECORDS              made here on the tally-share round's shape: the lift, the 24 pair differences, L; its checks first; the command reads only
+//   3  THE VERDICT              the tally-share file by its hash; L, each pair, the lifts; the note and the backlog say it
+//   VERDICT SABOTAGES (2026-11-28): W1 the file's hash another 1 | W2 alpha 0.00001 2 | W3 COURSE64's lift in the note's table 0 -- A FINDING: the row read two of the four rows; it reads all four, W3b 1 |
+//   W4 the expectation in section 7 moved 1 | W5 the backlog row ABOVE 1.
 // SABOTAGE LOG (2026-11-28) -- byte-safe runner, this gate alone, rows red: H1 the lift as a share 2 | H2 the second pair turned round 5 | H3 each fly against the next draw's pair 0 --
 //   A FINDING: the made lifts were constant within an arm; a draw-dependent fixture now holds it, H3b 1 | H4 the tally-share round's checks skipped 1 | H5 alpha 0.05 0 -- A FINDING: no made
 //   reading fell between 0.01 and 0.05; 18 of 24 now does, H5b 1 | H6 the command takes any word 1 | M1 an expectation moved 1.
@@ -68,6 +71,20 @@ section(() => {
     const csrc = src("tools/ship/takeFlyCourseLift.mjs"), me = src("tools/ship/flyCourseLift-selfcheck.mjs");
     ok("!! the command only reads: its one word is `read`, it reads the tally-share round's results file, and nothing in it flies or spawns", /argv\.length === 1 && argv\[0\] === "read"/.test(csrc) && /path\.join\(ENG, FS\.RESULTS\)/.test(csrc) &&
         !/flyOne|reproduceOne|fourOf|spawn|child_process/.test(csrc) && !/FS\.(flyOne|reproduceOne|fourOf)\(/.test(me));
+});
+
+console.log("\n3. THE VERDICT (read once from the tally-share round's results file committed unread at 0bb1ccde)");
+section(() => {
+    const L = FS.fileOf(fs.readFileSync(path.join(ENG, FS.RESULTS))), R = E.reading(L.lines, F), f4 = (x) => x.toFixed(4);
+    ok("!! the tally-share round's results file is the one committed (sha256 f910b138...), and its checks hold", L.sha256 === "f910b138060cae35940b44b2390ca5586e486b8ca5857714a4ea3e3b3b3560cb" && R.checks.length === 0, R.checks.join("; "));
+    ok("!! L: THE HOME-CHOSEN FLIES GAIN LESS (2 above, 22 below of 24, p 3.588e-5); each pair alone 1 above, 11 below (p 6.348e-3)", R.L.word === E.WORDS[1] && R.L.above === 2 && R.L.below === 22 && R.L.ties === 0 &&
+        R.L.p.toExponential(3) === "3.588e-5" && ["HOMEP-COURSE64", "HOME16-H16BYC"].every((k) => R.byPair[k].above === 1 && R.byPair[k].below === 11 && R.byPair[k].p.toExponential(3) === "6.348e-3"));
+    ok("each arm's mean lift as the note prints it", ["HOMEP", "COURSE64", "HOME16", "H16BYC"].map((a) => f4(R.arms[a])).join(" ") === "0.0174 0.0253 0.0196 0.0241");
+    const note = src("brain/FLY_COURSE_LIFT_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 7 says it: L's word, the table, the expectation did not come and the answer is the other way, the pattern belonged to the lives; the backlog row DONE",
+        /## 7\. The result \(read once, from the tally-share round's results file committed unread at 0bb1ccde\)/.test(note) && note.includes("**L: " + E.WORDS[1] + "**") &&
+        ["| HOMEP | 0.0174 |", "| COURSE64 | 0.0253 |", "| HOME16 | 0.0196 |", "| H16BYC | 0.0241 |"].every((row) => note.includes(row)) && /\*\*The expectation did not come, and the answer is the other way\*\*: BELOW, given 5/.test(note) &&
+        /is a property of the set of lives, and not of how the flies were chosen/.test(note) && /\| `fly-course-lift` \|[^\n]*DONE 2026-11-28[^\n]*L BELOW \(2 above, 22 below of 24/.test(back));
 });
 
 console.log(`\nflyCourseLift-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
