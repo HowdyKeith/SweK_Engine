@@ -93,4 +93,7 @@ await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 8 mutants of render/subAquarium3d.mjs. 7 RED -- the lamp at the boat's centre (inside its own hull), pointing astern, the lamps or the casters switch
+// ignored, the floor not patched, the haze's beams none; and the subs not patched, GREEN at first (no row looked at a hull: the floor was what brightened) -- now red by the row
+// that the light over a sub falls on its own hull. GREEN AND SAID SO: the sea surface casting -- every lamp is under the surface, so the sea is never between a lamp and what
+// it lights. BEFORE THE SABOTAGE this gate's probe found the first lamp INSIDE its hull (buildSub draws 32 m for HULL_LENGTH 16): every beam was its own boat's shadow.

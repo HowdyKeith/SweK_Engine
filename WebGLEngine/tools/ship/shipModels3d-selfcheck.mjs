@@ -45,4 +45,5 @@ ok("!! an unknown class is refused", refused);
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 3 mutants of render/shipModels3d.mjs. ALL 3 RED -- the bow left toward -x, the keel at the waterline, a turret one barrel short (the move held to the
+// page's own fingerprints).

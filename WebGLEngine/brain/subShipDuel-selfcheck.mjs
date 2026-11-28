@@ -44,4 +44,6 @@ console.log("2. THE DUEL, 3. THE HELM MATTERS");
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 4 mutants. ALL 4 RED -- torpedoes aimed at the ship's position on the surface (they broach: the ceiling row), the helm never consulted, the lane's
+// CPA not applied; and the ship deaf to torpedoes, GREEN at first (a deaf evade is a zigzag, and zigzag alone saved one destroyer of eight, so "fewer than steady" held) -- now red
+// by the row that the evading destroyer must beat the zigzagging one.

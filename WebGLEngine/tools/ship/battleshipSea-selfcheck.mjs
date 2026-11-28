@@ -79,4 +79,6 @@ await ctx.close(); await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 5 mutants of battleship3d.html. ALL 5 RED -- a style's waves ignored, ?sea= ignored, the choice not remembered, the picker's change ignored; and the GPU
+// ocean never falling back, GREEN at first twice (once the row took "no WebGPU" for an answer; then this browser's GPU ocean went live, so nothing needed a fallback) -- now red
+// by the row that refuses the frame's page and requires the fallback.

@@ -75,4 +75,5 @@ console.log("4. THE TORPEDO");
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 6 mutants. ALL 6 RED -- the turn limit or the accel ignored, no floor under the torpedo's ceiling, one keel point only, no louder than a boat; and the
+// forward vector with +sin, GREEN at first (the straight-course row took its expected path from forwardOf itself) -- now red by the row holding the ship to the torpedo's motion.

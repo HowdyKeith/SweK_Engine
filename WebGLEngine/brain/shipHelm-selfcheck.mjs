@@ -30,4 +30,4 @@ ok("!! an unknown helm is refused; the seat lists its three", refused && H.HELMS
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 4 mutants. ALL 4 RED -- evade turning toward the torpedo, evade not held, at cruise, zigzag legs that never alternate.
