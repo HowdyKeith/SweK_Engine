@@ -1121,7 +1121,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": 215,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": 1704,
   "tools/roundhouse/report-selfcheck.mjs": 197,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000124,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 3548698,
   "tools/roundhouse/rmt-selfcheck.mjs": 960,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": 205,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": 408,
@@ -3808,7 +3808,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": 0,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": 0,
   "tools/roundhouse/report-selfcheck.mjs": 0,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": "timeout/signal",
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 0,
   "tools/roundhouse/rmt-selfcheck.mjs": 0,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": 0,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": 0,
@@ -6495,7 +6495,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/report-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
-  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T14:30:08.493Z",
+  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T18:06:46.861Z",
   "tools/roundhouse/rmt-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/roleDecompose-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
@@ -9178,7 +9178,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": 20000,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": 20000,
   "tools/roundhouse/report-selfcheck.mjs": 20000,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000000,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 7000000,
   "tools/roundhouse/rmt-selfcheck.mjs": 20000,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": 20000,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": 20000,
@@ -11842,7 +11842,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": true,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": true,
   "tools/roundhouse/report-selfcheck.mjs": true,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": false,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": true,
   "tools/roundhouse/rmt-selfcheck.mjs": true,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": true,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": true,
@@ -16471,7 +16471,7 @@
   "tools/ship/usdzExport-selfcheck.mjs": 191,
   "tools/ship/voxelHomeMore-selfcheck.mjs": 2681,
   "tools/roundhouse/libmSensitivity-selfcheck.mjs": 2000112,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000124
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 3548698
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-28T03:23:20.690Z",
@@ -19051,7 +19051,7 @@
   "tools/ship/usdzExport-selfcheck.mjs": "2026-11-27T12:09:10.059Z",
   "tools/ship/voxelHomeMore-selfcheck.mjs": "2026-11-28T03:23:20.690Z",
   "tools/roundhouse/libmSensitivity-selfcheck.mjs": "2026-11-28T13:56:48.107Z",
-  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T14:30:08.493Z"
+  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T18:06:46.861Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -31647,7 +31647,8 @@
    2000112
   ],
   "tools/roundhouse/responseCensus-selfcheck.mjs": [
-   2000124
+   2000124,
+   3548698
   ]
  },
  "contended": {
@@ -35228,7 +35229,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": "loaded",
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": "loaded",
   "tools/roundhouse/report-selfcheck.mjs": "loaded",
-  "tools/roundhouse/responseCensus-selfcheck.mjs": "capped",
+  "tools/roundhouse/responseCensus-selfcheck.mjs": "alone",
   "tools/roundhouse/rmt-selfcheck.mjs": "loaded",
   "tools/roundhouse/roleDecompose-selfcheck.mjs": "loaded",
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": "loaded",
