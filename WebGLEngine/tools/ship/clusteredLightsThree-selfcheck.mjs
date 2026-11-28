@@ -9,7 +9,8 @@
 //                         ?fog=1 (the moon's shafts through the canopy, the spots' beams), the same
 //   2  THE GAME PAGE      battleship3d.html ?lights=1: no page error and no GL error (a patched draw that fails says so in the console), its standard materials patched;
 //                         a flash added on the water under the screen's middle, the scene held still -- only brighter, and what brightens lies within the flash's range of it;
-//                         with &fog=1, the flash's glow in the haze only adds light; without ?lights, no __battleLit
+//                         with &fog=1, the flash's glow in the haze only adds light; without ?lights, no __battleLit; (2026-11-28) the two searchlights' SHADOWS: the
+//                         fleet deployed as a player deploys it, left out of the atlas -- only brighter, inside the cones; in the haze, pixels in the air brighten too (the cut beams)
 //
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
@@ -70,7 +71,7 @@ await section(async () => {
     let upClear = 0;
     for (const fog of [false, true]) {
         const { p, errors } = await open(`?lights=1${fog ? "&fog=1" : ""}`);
-        const before = await shot(p, "S.freeze = true; S.clearFlashes();"), m = middle(before), RANGE = 22;
+        const before = await shot(p, "S.freeze = true; S.searchlights = false; S.clearFlashes();"), m = middle(before), RANGE = 22;
         const after = await shot(p, `S.addFlash([${m[0]}, 2, ${m[2]}], [1, 0.62, 0.25], 300, ${RANGE});`);
         const info = await p.evaluate(() => ({ patched: window.__battleLit.patched, n: window.__battleLit.lights.length })); await p.close();
         const inv = invert4(before.vp); let up = 0, down = 0, near = 0, sea = 0;
@@ -79,6 +80,25 @@ await section(async () => {
         ok(fog ? "!! WITH &fog=1 (the engine's haze in three's FogExp2's place) THE FLASH ALSO GLOWS IN IT: only brighter, more pixels than without the haze, no GL error" : "!! A FLASH ON THE WATER (the scene held still) ONLY BRIGHTENS, AND WHAT IT BRIGHTENS IS WITHIN ITS RANGE OF IT (19 in 20, the water's level met by each ray, 10 units' grace for the seabed under it)",
             up > 2000 && down === 0 && info.n === 1 && errors.length === 0 && (fog ? up > upClear : near >= 0.95 * sea), `${up} brighter${fog ? ` (${upClear} without the haze)` : ""}, ${down} darker; ${near} of ${sea} within range${errors[0] ? "; " + errors[0] : ""}`);
         if (!fog) upClear = up;
+    }
+    // THE SEARCHLIGHTS' SHADOWS (2026-11-28): the fleet placed as a player places it (Randomize, then Deploy), the scene held still; the ships and pegs left out of the
+    // atlas -- nothing darker, and what brightens is water inside a searchlight's cone (the ships themselves too: one ship's shadow falls on another); with &fog=1, the beams
+    // the shadows had cut fill in, so more brightens than without the haze
+    {
+        // one page, one layout: the switch thrown with the haze off (S.fogOn) and on
+        const { p, errors } = await open("?lights=1&fog=1");
+        await p.evaluate(() => { document.getElementById("rand").click(); document.getElementById("deploy").click(); });
+        await p.addStyleTag({ content: "body > *:not(canvas#c) { display: none !important; }" }); await p.waitForTimeout(1500);
+        const on = await shot(p, "S.freeze = true; S.clearFlashes(); S.searchlights = true; S.casters = true; S.fogOn = false;"), off = await shot(p, "S.casters = false;");
+        const onF = await shot(p, "S.casters = true; S.fogOn = true;"), offF = await shot(p, "S.casters = false;");
+        const spots = await p.evaluate(() => window.__battleLit.lights.filter((l) => l.type === "spot")); await p.close();
+        const inv = invert4(on.vp), inCone = (l, q, mg) => { const v = q.map((x, i) => x - l.position[i]), d = Math.hypot(...v), dl = Math.hypot(...l.direction), c = (v[0] * l.direction[0] + v[1] * l.direction[1] + v[2] * l.direction[2]) / (d * dl); return d < l.range && Math.acos(Math.min(1, c)) < l.outerAngle + mg; };
+        const count = (a, b, cones) => { let up = 0, down = 0, cone = 0, sea = 0; for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) { const k = (y * a.w + x) * 4, d = lum(b.px, k) - lum(a.px, k); if (d < -1) down++; if (d <= 3) continue; up++; if (!cones) continue; const h = seaOf(a, inv, x, y); if (!h) continue; sea++; if (spots.some((l) => inCone(l, h, 0.25))) cone++; } return { up, down, cone, sea }; };
+        const c = count(on, off, true), f = count(onF, offF, false);
+        // the beams' own shadows: pixels the switch changes with the haze on that it did not change with it off -- the air behind a ship, not the water under it
+        let airOnly = 0; for (let k = 0; k < on.px.length; k += 4) if (lum(offF.px, k) - lum(onF.px, k) > 3 && Math.abs(lum(off.px, k) - lum(on.px, k)) <= 1) airOnly++;
+        ok("!! THE FLEET THROWS THE SEARCHLIGHTS' SHADOWS: deployed and held still, left out of the atlas -- nothing darker, and what brightens lies in a searchlight's cone (9 in 10; each ray met at the water's level, 0.25 rad of grace for a ship's height)", spots.length === 2 && c.up > 100 && c.down === 0 && c.cone >= 0.9 * c.sea && errors.length === 0, `${c.up} brighter, ${c.down} darker; ${c.cone} of ${c.sea} in a cone${errors[0] ? "; " + errors[0] : ""}`);
+        ok("!! AND IN THE HAZE THE BEAMS ARE CUT BY THEM: the same fleet, the same switch, the haze on -- nothing darkens, and pixels brighten that did not without the haze (the air behind the ships: the beams' shadows, over 50)", airOnly > 50 && f.down === 0, `${airOnly} brighten only in the haze; ${f.up} brighter with it (${c.up} without, the haze dimming the water's shadows behind it), ${f.down} darker`);
     }
     const plain = await open(""), none = await plain.p.evaluate(() => window.__battleLit === undefined); await plain.p.close();
     ok("!! without ?lights the page has no __battleLit (and draws as it always did)", none && plain.errors.length === 0, plain.errors[0] || "");

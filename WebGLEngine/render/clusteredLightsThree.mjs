@@ -64,7 +64,8 @@ export function createClusteredLightingThree(THREE, renderer, opts = {}) {
     const depthMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
     self.renderShadows = (scene) => {
         if (!self.atlas) return;
-        const prevTarget = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevOverride = scene.overrideMaterial, prevBg = scene.background, hidden = [];
+        const prevTarget = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevOverride = scene.overrideMaterial, prevBg = scene.background, hidden = [], prevSM = renderer.shadowMap.autoUpdate;
+        renderer.shadowMap.autoUpdate = false;   // three's own shadow maps are not drawn again for every atlas face (a page may use both)
         scene.traverse((o) => { if (o.userData && o.userData.noShadow && o.visible) { o.visible = false; hidden.push(o); } });
         renderer.autoClear = false; scene.overrideMaterial = depthMat; scene.background = null;
         renderer.setRenderTarget(atlas); atlas.scissorTest = false; atlas.viewport.set(0, 0, O.atlasSize, O.atlasSize); renderer.setRenderTarget(atlas); renderer.clear(false, true, false);
@@ -76,7 +77,7 @@ export function createClusteredLightingThree(THREE, renderer, opts = {}) {
         }
         atlas.scissorTest = false; atlas.viewport.set(0, 0, O.atlasSize, O.atlasSize);
         for (const o of hidden) o.visible = true;
-        scene.overrideMaterial = prevOverride; scene.background = prevBg; renderer.autoClear = prevAuto; renderer.setRenderTarget(prevTarget);
+        scene.overrideMaterial = prevOverride; scene.background = prevBg; renderer.autoClear = prevAuto; renderer.setRenderTarget(prevTarget); renderer.shadowMap.autoUpdate = prevSM;
     };
     /** Light a three material by the clusters too: its direct diffuse gains clusteredLight(world position, world normal, view, its diffuse colour). */
     self.patch = (material) => {
