@@ -153,3 +153,4 @@ process.exit(fails === 0 ? 0 : 1);
 // put in the wrong place was consistent with itself -- now each lamp must hang over a buoy and each pool lie near its mast), and the plain haze given the lighting (the beams
 // were 0.3% of the water, inside a 9-in-10 bar -- now switching the searchlights under the plain haze may change only the water in their pools). BEFORE THE SABOTAGE the gate
 // found the buoys' sun shadows on dusk water worth about a level (albedo 0.04), so the shadows are held under a searchlight aimed past a buoy.
+// 2026-11-28, THE HALOS (section 8): the lamps' glow -- the per-frame override ignored on WebGL2, "points" taking the searchlights, the glow kind wrong, the glow never on: all red here.

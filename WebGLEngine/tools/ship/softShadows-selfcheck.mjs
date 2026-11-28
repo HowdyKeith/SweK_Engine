@@ -207,3 +207,7 @@ process.exit(fails === 0 ? 0 : 1);
 // bound over the depth's texture unit, the moon never hidden in the WebGL2 fog, the spots' light not dimmed by the fog in front, the spots sampled at the eye. THE COOKIE was
 // green at first: the beam bound (a quarter of the march without the spots) let a 1.7-level mean error through; the bound is now under a level, and a check holds the
 // stained-glass spot's beam to the march through its cookie, not the bare light.
+// 2026-11-28, THE FOG'S LIGHTS (section 4b, with oceanLit and flightLights): 10 mutants of render/volumetricFog.mjs and the two pages. ALL RED somewhere -- the ranking reversed and
+// the importance blind to distance (this gate's forty-light row), "points" taking spots (4b; oceanLit's halos), the WebGL2 per-frame override ignored (oceanLit: green here), the
+// WebGPU override ignored (flightLights 6), the sea's glow kind wrong or never on (oceanLit). The WGSL light index scrambled went red only by the flight page timing out, not on
+// a row; the flight glow given every kind is EQUIVALENT there (the flight page has no spot light: "all" and "points" pick the same lights) and went red only by timeouts.

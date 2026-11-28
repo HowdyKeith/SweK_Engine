@@ -53,7 +53,8 @@ const camera = new THREE.PerspectiveCamera(FOV * 180 / Math.PI, 1, 0.05, 100); c
 const controls = state.controls = createCameraControls({ up: "y", yaw: 0.75, pitch: 0.55, distance: 13, target: [0, 0.4, 0], fovY: FOV, damping: Q.get("ease") === "0" ? 0 : 0.98 });
 const camInput = bindCameraControls(cv, controls, { focusOn: () => ({ center: [0, 0.5, 0], radius: 6 }) });
 state.capture = () => new Promise((res) => { state._want = res; });
-const T0 = Q.has("t") ? Number(Q.get("t")) : null, start = performance.now(); let last = performance.now();
+let T0 = Q.has("t") ? Number(Q.get("t")) : null; const start = performance.now(); let last = performance.now();
+state.setTime = (t) => { T0 = t; };   // a gate moves the held time live (the lights move: the clusters must be uploaded again)
 function frame() {
     try {
         const now = performance.now(); camInput.tick(Math.min(0.1, (now - last) / 1000)); last = now;

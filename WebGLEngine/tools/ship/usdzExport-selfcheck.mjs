@@ -179,3 +179,5 @@ process.exit(fails === 0 ? 0 : 1);
 // a mirror's normals left inward, subsets overlapping, the texture's factor dropped, colours never merged, node transforms in the wrong order, metres not stated, a stage
 // not required first, a face's colour from its first vertex only. BEFORE THE SABOTAGE the gate found a real bug: a mirroring node's normals came out turned inward (the
 // cofactor matrix is det times the inverse transpose), and its 1000-colour row had only 256 distinct colours.
+// 2026-11-28, SECTIONS 6-7: 7 more mutants. ALL 7 RED -- the splat budget or the opacity floor ignored, the axes not scaled, the quaternion ignored, the faces wound inward, a flip
+// on y alone (a mirror), the scene's camera not reported.

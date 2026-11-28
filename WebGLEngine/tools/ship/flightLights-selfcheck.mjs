@@ -223,3 +223,5 @@ process.exit(fails === 0 ? 0 : 1);
 // 2026-11-27, THE SHAFTS (section 5): 4 mutants of flight-gpu.html. ALL 4 RED -- the shafts' fog made without the lighting, the live switch ignored, the switch inverted,
 // the shafts off by default. BEFORE THE SABOTAGE the section found the first framing wrong: from the orbit a ship's 50-unit shadow crosses a ray for 50 units of 12000 and
 // changes nothing; looking past a ship toward the sun its shadow runs along the rays, and the shafts show.
+// 2026-11-28, THE GLOW (section 6): the glow never on -> red on its row (run alone; under a loaded sweep every section timed out instead). The glow given every light kind is
+// EQUIVALENT on this page (no spot lights): said so, not counted.

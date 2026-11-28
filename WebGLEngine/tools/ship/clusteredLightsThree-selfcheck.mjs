@@ -55,6 +55,16 @@ await section(async () => {
     }
 });
 
+await section(async () => {
+    // loaded at t = 1, then moved to t = 3.5 live: the lights have moved, so the clusters, lights and faces must all be uploaded again -- the picture is the raw page's at 3.5
+    const p = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 }), errors = []; p.on("pageerror", (e) => errors.push(e.message));
+    await p.goto(`http://127.0.0.1:${srv.address().port}/lights-three.html?ease=0&t=1&gputimer=0`);
+    await p.waitForFunction(() => window.__lightsThree && window.__lightsThree.ready, null, { timeout: 120000 });
+    const c = await p.evaluate(async () => { const s = window.__lightsThree; s.setTime(3.5); const f0 = s.frames; await new Promise((r) => { const t = () => (s.frames >= f0 + 3 ? r() : requestAnimationFrame(t)); t(); }); return s.capture(); }); await p.close();
+    const t = { ...c, px: Buffer.from(c.b64, "base64") }, raw = await grab("lights-demo.html", "__lights", ""), P = parity(t, raw);
+    ok("!! AND WHEN THE LIGHTS MOVE: loaded at t = 1 and moved to 3.5 live, three.js draws the raw page's 3.5 (every frame's clusters, lights and faces uploaded again), 999 in 1000 to 2 levels", P.within >= 0.999 * P.n && errors.length === 0, `${P.within} of ${P.n}; mean ${P.mean.toFixed(3)}`);
+});
+
 console.log("2. THE GAME PAGE");
 await section(async () => {
     const open = async (q) => {
@@ -100,6 +110,10 @@ await section(async () => {
         ok("!! THE FLEET THROWS THE SEARCHLIGHTS' SHADOWS: deployed and held still, left out of the atlas -- nothing darker, and what brightens lies in a searchlight's cone (9 in 10; each ray met at the water's level, 0.25 rad of grace for a ship's height)", spots.length === 2 && c.up > 100 && c.down === 0 && c.cone >= 0.9 * c.sea && errors.length === 0, `${c.up} brighter, ${c.down} darker; ${c.cone} of ${c.sea} in a cone${errors[0] ? "; " + errors[0] : ""}`);
         ok("!! AND IN THE HAZE THE BEAMS ARE CUT BY THEM: the same fleet, the same switch, the haze on -- nothing darkens, and pixels brighten that did not without the haze (the air behind the ships: the beams' shadows, over 50)", airOnly > 50 && f.down === 0, `${airOnly} brighten only in the haze; ${f.up} brighter with it (${c.up} without, the haze dimming the water's shadows behind it), ${f.down} darker`);
     }
+    // no shadowed light from the first frame (&search=0): the atlas is never drawn, and the shadow sampler must still meet a depth texture (three gives one storage only when
+    // its target is bound -- before that fix every patched draw failed with "mismatch between texture format and sampler type")
+    { const { p, errors } = await open("?lights=1&search=0"); const n = await p.evaluate(() => window.__battleLit.lights.length); await p.close();
+      ok("!! WITH NO SHADOWED LIGHT FROM THE START (&search=0, the atlas never drawn) THERE IS STILL NO GL ERROR", n === 0 && errors.length === 0, errors[0] || `${n} lights`); }
     const plain = await open(""), none = await plain.p.evaluate(() => window.__battleLit === undefined); await plain.p.close();
     ok("!! without ?lights the page has no __battleLit (and draws as it always did)", none && plain.errors.length === 0, plain.errors[0] || "");
 });
@@ -108,4 +122,9 @@ await browser.close(); srv.close();
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
 
-// SABOTAGE LOG: (filled in after the sweep)
+// SABOTAGE LOG (2026-11-28): 10 mutants of render/clusteredLightsThree.mjs, each in a hard-linked copy of the tree. 9 RED -- the patch adding nothing, the world position without the
+// model matrix, the normal left in view space, the atlas faces not drawn, the faces' viewports misplaced, the cluster view not set, the fog's eye at the origin, the fog's colour
+// override ignored; and the cells not uploaded again, GREEN at first (the gate's scene was frozen: cells never refreshed still held the first frame's, which were right) -- now
+// red by the row that moves the lights live. GREEN AND SAID SO: the atlas not allocated up front -- renderShadows binds (and so allocates) the atlas on every call, even with
+// no face to draw, and every page that uses the module calls it each frame; the up-front allocation stays as the guard for a page that never does (battleship3d before its
+// searchlights: every patched draw failed). The &search=0 row holds that page without a shadowed light from its first frame.
