@@ -155,7 +155,10 @@ const tank = createTank({ length: SIZES[sizeKey][0], width: SIZES[sizeKey][1] })
 let view3d = null;
 try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     const THREE = await import("/vendor/three/three.module.js"), cv = $("view3d");
-    view3d = createView3d(THREE, cv, { length: tank.length, width: tank.width, depthMax: 50 });
+    // 2026-11-28: ?lights=1 -- the deep water dark and every sub's searchlight (render/subAquarium3d.mjs `lights`); &fog=1 the engine's haze under the surface
+    const LQ = new URLSearchParams(location.search), LIGHTS = LQ.get("lights") === "1" ? { fog: LQ.get("fog") === "1" } : null;
+    view3d = createView3d(THREE, cv, { length: tank.length, width: tank.width, depthMax: 50, lights: LIGHTS });
+    if (LIGHTS) { window.__aquaLit = view3d.lit; window.__aquaView = view3d; }   // for tools/ship/subAquariumLit-selfcheck.mjs: its switches (lamps, casters, fogOn, freeze, extra), lights, capture()
     const fit = () => { const r = cv.parentElement.getBoundingClientRect(); view3d.resize(Math.max(2, Math.round(r.width)), Math.max(2, Math.round(r.height))); };   // the canvas is as big as its panel
     fit(); new ResizeObserver(fit).observe(cv.parentElement);
     let drag = null; const V = () => view3d.getView();
@@ -418,13 +421,13 @@ function render() {
     sg.strokeStyle = c; sg.lineWidth = 2; sg.beginPath(); sg.arc(q.x * dx, q.depth * dz, 4, 0, 6.2832); sg.stroke();
   }
   drawCompass(snap); drawBrain();
-  if (view3d) { view3d.setObstacles(tank.sceneNow()); view3d.render(snap, performance.now() / 1000); }   // UNNUMBERED (tank-nav-3d, survey-3d-markers): the obstacles; goals and stations come with the snapshot
+  if (view3d) { view3d.setObstacles(tank.sceneNow()); view3d.render(snap, view3d.lit && view3d.lit.state.freeze ? (view3d.lit.heldT ??= performance.now() / 1000) : ((view3d.lit && (view3d.lit.heldT = null)), performance.now() / 1000)); }   // UNNUMBERED (tank-nav-3d, survey-3d-markers): the obstacles; goals and stations come with the snapshot
   updateStats(snap);
 }
 function frame(now) {
   const dt = lastFrame ? (now - lastFrame) / 1000 : 0; lastFrame = now;
   const k = Number($("speedSel").value) || 1;
-  for (let i = 0; i < k; i++) tank.step(dt);   // MAX_STEP clips each call, so a hidden tab does not fast-forward the sea
+  if (!(view3d && view3d.lit && view3d.lit.state.freeze)) for (let i = 0; i < k; i++) tank.step(dt);   // MAX_STEP clips each call, so a hidden tab does not fast-forward the sea (a gate's freeze, with ?lights=1, holds the tank)
   render(); requestAnimationFrame(frame);
 }
 refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 5000); requestAnimationFrame(frame);

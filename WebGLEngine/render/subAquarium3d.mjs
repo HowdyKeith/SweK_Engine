@@ -15,7 +15,8 @@ import { createSurface, defaultComponents } from "../physics/ocean/oceanSurface.
 import { applyDepthTint } from "../ui/seaDepthTint.mjs";
 import { EXPLORER } from "../physics/mechanics/subModel6dof.mjs";
 import { attachCues, poseCues, bubbleStep, dropStep, BUBBLE_MAX } from "./subBallastCues.mjs";
-import { createMarks } from "./subAquarium3dMarks.mjs";   // UNNUMBERED (backlog tank-nav-3d, survey-3d-markers): obstacles, goal buoys and survey stations
+import { createMarks } from "./subAquarium3dMarks.mjs";
+import { createClusteredLightingThree } from "./clusteredLightsThree.mjs";   // 2026-11-28: `lights` -- each sub's searchlight, the deep water dark, the engine's fog   // UNNUMBERED (backlog tank-nav-3d, survey-3d-markers): obstacles, goal buoys and survey stations
 
 export const HULL_LENGTH = 16;     // metres on screen: a sub is drawn larger than life so a 500 m tank can be read
 export const WATER_COLOUR = 0x0a3b46;
@@ -108,21 +109,34 @@ export function followStep(centre, target, k = 0.18) {
 }
 
 /**
- * @returns { render(snapshot, t, pov), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
+ * @returns { render(snapshot, t, pov), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, lit, dispose() }
+ * LIGHTS (2026-11-28, Keith: "lets do the aquarium lighting"): `lights: { fog }` makes the tank deep water -- the page's ambient and sun turned down to a glimmer -- and
+ * gives every sub a SEARCHLIGHT from its nose, slightly down (render/clusteredLightsThree.mjs: a clustered spot with its own shadow tile, so the floor and the other boats
+ * catch the beam and each other's shadows); `fog` lays the engine's haze (render/volumetricFog.mjs) under the surface only -- thick below 0 m, gone above it, the camera
+ * looking down through the water -- with the beams standing in it. `lit` then answers { state (switches: lamps, casters, fogOn, freeze, extra), lights, stats, capture() }.
  */
-export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1, models = null } = {}) {
+// the lamp sits `ahead` metres before the drawn bow (measured from the built hull: buildSub draws a 32 m boat for HULL_LENGTH 16 -- a lamp placed by HULL_LENGTH sat inside
+// the hull and every beam was its own boat's shadow, found 2026-11-28)
+export const SUB_LAMP = Object.freeze({ range: 140, innerAngle: 0.2, outerAngle: 0.32, intensity: 4000, color: [1, 0.95, 0.85], down: 0.35, ahead: 0.6 });
+export const UNDERWATER_FOG = Object.freeze({ density: 0.014, falloff: 0.6, baseHeight: 0, albedo: 0.9, ambient: [0.006, 0.03, 0.045], lightDir: [-200, 300, 100], lightColor: [0.05, 0.07, 0.08], g: 0.6, maxDistance: 1600, steps: 48, jitter: true });
+export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1, models = null, lights = null } = {}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(1); renderer.setClearColor(0x03121c, 1);   // the vendored three.js makes the drawing buffer's alpha either way (measured: getContextAttributes().alpha is true with `alpha: false`), so the backdrop needs only a transparent CLEAR; it stays opaque until setBackdrop
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03121c);
-    scene.add(new THREE.AmbientLight(0x88aacc, 0.8)); const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-200, 300, 100); scene.add(sun);
+    const ambient = new THREE.AmbientLight(0x88aacc, lights ? 0.1 : 0.8), sun = new THREE.DirectionalLight(0xffffff, lights ? 0.18 : 1.1); scene.add(ambient); sun.position.set(-200, 300, 100); scene.add(sun);
+    const lighting = lights ? createClusteredLightingThree(THREE, renderer, { maxLights: 40, space: "view", viewCells: [16, 9, 24], maxPerCell: 24, atlasSize: 2048, slots: 4, cascades: 0 }) : null;
+    const litState = { lamps: true, casters: true, fogOn: !!(lights && lights.fog), freeze: false, extra: [] }, lit = lights ? { state: litState, lights: [], stats: null, capture: null, frames: 0 } : null;
+    let litFog = lights && lights.fog ? lighting.createFog({ lighting: true }) : null, litTarget = null, want = null; const emptyScene = new THREE.Scene();
+    if (lit) lit.capture = () => new Promise((res) => { want = res; });
     const makeSea = (style) => { const q = createSeaMesh(THREE, createSurface({ components: defaultComponents(seed, STYLES[style]) }), { half: Math.max(length, width) * 0.55, n: 64, color: WATER_COLOUR, opacity: 0.55 }); q.mesh.position.set(length / 2, 0, width / 2); return q; };
-    let seaStyle = DEFAULT_STYLE, sea = makeSea(seaStyle); scene.add(sea.mesh);
+    let seaStyle = DEFAULT_STYLE, sea = makeSea(seaStyle); scene.add(sea.mesh); if (lights) sea.mesh.userData.noShadow = true;   // the translucent roof would shadow the whole tank
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(length, width), new THREE.MeshStandardMaterial({ color: 0x1d2a25, roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.set(length / 2, -depthMax, width / 2); scene.add(floor);
+    if (lighting) lighting.patch(floor.material);
     // v4901 -- the GPU sea as a backdrop: a same-origin frame (sea-host.html) sits BEHIND this canvas, which goes transparent; each frame the sea's camera is set to this camera's pose (ui/seaFrame.mjs). The physics sea and the floor are hidden
     // (the floor is opaque and would cover the sea). It is the documented approximation: the subs are drawn in front of all the water, the depth tint is what puts them under it.
     let backdrop = null;
     const backdropApi = () => { try { return backdrop && backdrop.contentWindow && backdrop.contentWindow.seaApi || null; } catch { return null; } };
-    const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(length, depthMax, width)), new THREE.LineBasicMaterial({ color: 0x1c2c44 })); box.position.set(length / 2, -depthMax / 2, width / 2); scene.add(box);
+    const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(length, depthMax, width)), new THREE.LineBasicMaterial({ color: 0x1c2c44 })); box.position.set(length / 2, -depthMax / 2, width / 2); scene.add(box); box.userData.noShadow = true;
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
@@ -132,7 +146,8 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     let bubbles = { list: [], counter: 0 }, weights = [], lastT = null; const wasReleased = new Map();
     const bubbleGeo = new THREE.BufferGeometry(); bubbleGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(BUBBLE_MAX * 3), 3)); bubbleGeo.setDrawRange(0, 0);
     const bubblePts = new THREE.Points(bubbleGeo, new THREE.PointsMaterial({ color: 0xcdf2ff, size: 1.4, transparent: true, opacity: 0.8, depthWrite: false })); bubblePts.frustumCulled = false; scene.add(bubblePts);
-    const weightMat = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.8, metalness: 0.4 });
+    const weightMat = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.8, metalness: 0.4 }); if (lighting) lighting.patch(weightMat);
+    bubblePts.userData.noShadow = true;
     const dark = darkStore(THREE); scene.add(dark.group);   // 2026-11-17: the dark-compass ring and ghost line (the obstacles, goals and stations are `marks`, above)
     // v4899 -- FOLLOW: the camera orbits a centre, and the centre is the tank's middle unless a sub is being followed, when it eases toward that sub (and eases back when it is not).
     const home = { x: length / 2, y: -15, z: width / 2 };
@@ -143,7 +158,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
         /** The physics sea's style (a key of render/seaStyles.mjs STYLES): rebuilds the surface and puts the mesh where the old one was. An unknown name throws and changes nothing. Returns the style now drawn. */
         setSeaStyle(name) {
             if (!Object.prototype.hasOwnProperty.call(STYLES, name)) throw new Error(`subAquarium3d.setSeaStyle: unknown style "${name}" (${Object.keys(STYLES).join(", ")})`);
-            const vis = sea.mesh.visible, next = makeSea(name); scene.remove(sea.mesh); sea.dispose(); sea = next; sea.mesh.visible = vis; scene.add(sea.mesh); seaStyle = name; return seaStyle;
+            const vis = sea.mesh.visible, next = makeSea(name); scene.remove(sea.mesh); sea.dispose(); sea = next; sea.mesh.visible = vis; scene.add(sea.mesh); seaStyle = name; if (lights) sea.mesh.userData.noShadow = true; return seaStyle;
         },
         getSeaStyle: () => seaStyle,
         /** Turn the GPU sea backdrop on with its frame element (or off with null). On: the canvas clears transparent, the physics sea and the floor are hidden. Returns "on" or "off". */
@@ -185,7 +200,8 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 if (!m) {
                     const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((s.hue % 360) / 360, 0.7, 0.55), roughness: 0.5, metalness: 0.2 });
                     applyDepthTint(THREE, mat, { level: 0, density: TINT_DENSITY, color: WATER_COLOUR });
-                    m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.scale.setScalar(subScale); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
+                    if (lighting) lighting.patch(mat);
+                    m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.userData.bowX = new THREE.Box3().setFromObject(m).max.x; m.scale.setScalar(subScale); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
                 }
                 const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd); poseCues(m, s);
                 if (modelHost) modelHost.sync(m, s);
@@ -210,8 +226,23 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             place();
             if (pov) { camera.position.set(pov.pos[0], pov.pos[1], pov.pos[2]); camera.lookAt(pov.look[0], pov.look[1], pov.look[2]); }
             if (backdrop) { const a = backdropApi(); if (a && a.ready) { const d = new THREE.Vector3(); camera.getWorldDirection(d); a.camera = seaCameraFromView([camera.position.x, camera.position.y, camera.position.z], [d.x, d.y, d.z], camera.fov); } }
-            renderer.render(scene, camera);
+            if (!lighting) { renderer.render(scene, camera); return; }
+            // the searchlights: from each hull's nose, down a little, taken from the drawn hull's own transform (so the beam points where the model points)
+            scene.traverse((o) => { if ((o.isLine || o.isLineSegments || o.isPoints) && !o.userData.noShadow) o.userData.noShadow = true; });
+            const L = [];
+            if (litState.lamps) for (const [, m] of subs) { if (L.length >= 16) break; m.updateMatrixWorld(true); const nose = new THREE.Vector3(m.userData.bowX + SUB_LAMP.ahead / subScale, 0, 0).applyMatrix4(m.matrixWorld), d = new THREE.Vector3(1, -SUB_LAMP.down, 0).transformDirection(m.matrixWorld);
+                L.push({ type: "spot", position: nose.toArray(), direction: d.toArray(), range: SUB_LAMP.range, innerAngle: SUB_LAMP.innerAngle, outerAngle: SUB_LAMP.outerAngle, color: SUB_LAMP.color, intensity: SUB_LAMP.intensity, shadow: true, priority: 1 }); }
+            for (const l of litState.extra) L.push(l);
+            lit.lights = L; lit.stats = lighting.update(L, lighting.cameraOf(camera)); lighting.renderShadows(litState.casters ? scene : emptyScene);
+            if (litFog && litState.fogOn && !backdrop) {
+                const w = renderer.domElement.width, h = renderer.domElement.height;
+                if (!litTarget || litTarget.width !== w || litTarget.height !== h) { if (litTarget) litTarget.dispose(); litTarget = new THREE.WebGLRenderTarget(w, h, { depthTexture: new THREE.DepthTexture(w, h, THREE.UnsignedIntType), minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); }
+                renderer.setRenderTarget(litTarget); renderer.render(scene, camera); renderer.setRenderTarget(null); litFog.render(litTarget, camera, UNDERWATER_FOG, { fogLights: "spots" });
+            } else renderer.render(scene, camera);
+            if (want) { const gl = renderer.getContext(), W = renderer.domElement.width, H = renderer.domElement.height, px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); const r = want; want = null; let b = ""; for (let i = 0; i < px.length; i += 0x8000) b += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000)); camera.updateMatrixWorld(); r({ w: W, h: H, b64: btoa(b), vp: new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).toArray(), eye: camera.position.toArray() }); }
+            lit.frames++;
         },
+        lit,
         /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
         /** For a gate: how many dark-compass marks the view holds right now. */
         darkCount() { return dark.dark.size; },
