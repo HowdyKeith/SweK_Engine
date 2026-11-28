@@ -56,7 +56,6 @@
   "tools/roundhouse/labResults-selfcheck.mjs",
   "tools/roundhouse/laneEmdenBind-selfcheck.mjs",
   "tools/roundhouse/libmControl-selfcheck.mjs",
-  "tools/roundhouse/libmSensitivity-selfcheck.mjs",
   "tools/roundhouse/menuScope-selfcheck.mjs",
   "tools/roundhouse/modeDistinct-selfcheck.mjs",
   "tools/roundhouse/observableFinite-selfcheck.mjs",
@@ -67,7 +66,6 @@
   "tools/roundhouse/plantDirection-selfcheck.mjs",
   "tools/roundhouse/plantedCoverage-selfcheck.mjs",
   "tools/roundhouse/rayleighOnset-selfcheck.mjs",
-  "tools/roundhouse/responseCensus-selfcheck.mjs",
   "tools/roundhouse/sensitivity-selfcheck.mjs",
   "tools/roundhouse/stabilityBind-selfcheck.mjs",
   "tools/roundhouse/thermalScaling-selfcheck.mjs",
@@ -1044,7 +1042,7 @@
   "tools/roundhouse/lensRawTrig-selfcheck.mjs": 1050,
   "tools/roundhouse/lensTidal-selfcheck.mjs": 2065,
   "tools/roundhouse/libmControl-selfcheck.mjs": 24145,
-  "tools/roundhouse/libmSensitivity-selfcheck.mjs": 90101,
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": 2000112,
   "tools/roundhouse/liftedIdeas-selfcheck.mjs": 147,
   "tools/roundhouse/lighthouse-selfcheck.mjs": 211,
   "tools/roundhouse/limitReduction-selfcheck.mjs": 172,
@@ -1123,7 +1121,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": 215,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": 1704,
   "tools/roundhouse/report-selfcheck.mjs": 197,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": 90083,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000124,
   "tools/roundhouse/rmt-selfcheck.mjs": 960,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": 205,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": 408,
@@ -6418,7 +6416,7 @@
   "tools/roundhouse/lensRawTrig-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/lensTidal-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/libmControl-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "tools/roundhouse/libmSensitivity-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": "2026-11-28T13:56:48.107Z",
   "tools/roundhouse/liftedIdeas-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/lighthouse-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/limitReduction-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
@@ -6497,7 +6495,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/report-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
-  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
+  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T14:30:08.493Z",
   "tools/roundhouse/rmt-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/roleDecompose-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": "2026-11-28T03:23:36.081Z",
@@ -9101,7 +9099,7 @@
   "tools/roundhouse/lensRawTrig-selfcheck.mjs": 20000,
   "tools/roundhouse/lensTidal-selfcheck.mjs": 20000,
   "tools/roundhouse/libmControl-selfcheck.mjs": 90000,
-  "tools/roundhouse/libmSensitivity-selfcheck.mjs": 90000,
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": 2000000,
   "tools/roundhouse/liftedIdeas-selfcheck.mjs": 20000,
   "tools/roundhouse/lighthouse-selfcheck.mjs": 20000,
   "tools/roundhouse/limitReduction-selfcheck.mjs": 20000,
@@ -9180,7 +9178,7 @@
   "tools/roundhouse/releaseSigning-selfcheck.mjs": 20000,
   "tools/roundhouse/renderBounceBind-selfcheck.mjs": 20000,
   "tools/roundhouse/report-selfcheck.mjs": 20000,
-  "tools/roundhouse/responseCensus-selfcheck.mjs": 90000,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000000,
   "tools/roundhouse/rmt-selfcheck.mjs": 20000,
   "tools/roundhouse/roleDecompose-selfcheck.mjs": 20000,
   "tools/roundhouse/rotationSchedule-selfcheck.mjs": 20000,
@@ -16471,7 +16469,9 @@
   "tools/ship/strongGunnersStudy-selfcheck.mjs": 1160,
   "tools/ship/studyJobs-selfcheck.mjs": 325,
   "tools/ship/usdzExport-selfcheck.mjs": 191,
-  "tools/ship/voxelHomeMore-selfcheck.mjs": 2681
+  "tools/ship/voxelHomeMore-selfcheck.mjs": 2681,
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": 2000112,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": 2000124
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-28T03:23:20.690Z",
@@ -19049,7 +19049,9 @@
   "tools/ship/strongGunnersStudy-selfcheck.mjs": "2026-11-28T03:23:20.690Z",
   "tools/ship/studyJobs-selfcheck.mjs": "2026-11-27T12:09:10.059Z",
   "tools/ship/usdzExport-selfcheck.mjs": "2026-11-27T12:09:10.059Z",
-  "tools/ship/voxelHomeMore-selfcheck.mjs": "2026-11-28T03:23:20.690Z"
+  "tools/ship/voxelHomeMore-selfcheck.mjs": "2026-11-28T03:23:20.690Z",
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": "2026-11-28T13:56:48.107Z",
+  "tools/roundhouse/responseCensus-selfcheck.mjs": "2026-11-28T14:30:08.493Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -31640,6 +31642,12 @@
    3049,
    2311,
    2681
+  ],
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": [
+   2000112
+  ],
+  "tools/roundhouse/responseCensus-selfcheck.mjs": [
+   2000124
   ]
  },
  "contended": {
@@ -34218,7 +34226,9 @@
   "tools/ship/voxelHomeLong-selfcheck.mjs": false,
   "tools/ship/voxelHomeMore-selfcheck.mjs": false,
   "tools/ship/voxelHomeShow-selfcheck.mjs": false,
-  "tools/ship/voxelHomeSteps-selfcheck.mjs": false
+  "tools/ship/voxelHomeSteps-selfcheck.mjs": false,
+  "tools/roundhouse/libmSensitivity-selfcheck.mjs": false,
+  "tools/roundhouse/responseCensus-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",

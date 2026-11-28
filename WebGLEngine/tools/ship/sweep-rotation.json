@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-27T23:18:30.664Z",
+ "at": "2026-11-28T14:30:08.493Z",
  "poolAt": "2026-11-27T19:57:44.612Z",
  "poolHorizon": "2026-11-18T14:23:41.881Z",
  "budgetMs": 3000,
@@ -3332,10 +3332,10 @@
   },
   {
    "gate": "tools/roundhouse/libmSensitivity-selfcheck.mjs",
-   "ms": 90101,
+   "ms": 2000112,
    "code": "timeout/signal",
-   "priorMs": 20022,
-   "at": "2026-09-09T17:59:42.840Z"
+   "priorMs": 90101,
+   "at": "2026-11-28T13:56:48.107Z"
   },
   {
    "gate": "tools/roundhouse/magmapAndroid-selfcheck.mjs",
@@ -3556,10 +3556,10 @@
   },
   {
    "gate": "tools/roundhouse/responseCensus-selfcheck.mjs",
-   "ms": 90083,
+   "ms": 2000124,
    "code": "timeout/signal",
-   "priorMs": 20043,
-   "at": "2026-09-09T17:59:42.840Z"
+   "priorMs": 90083,
+   "at": "2026-11-28T14:30:08.493Z"
   },
   {
    "gate": "tools/roundhouse/runtimeBench-selfcheck.mjs",
