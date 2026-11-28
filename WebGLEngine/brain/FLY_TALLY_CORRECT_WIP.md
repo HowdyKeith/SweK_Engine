@@ -67,3 +67,29 @@ scene, the perfect in the 26-type) x 200 lives, about 40 minutes; four at a time
 committed; then `node tools/ship/takeFlyTallyCorrect.mjs run` -> `brain/flyTallyCorrectRound.jsonl`, committed byte for
 byte, whole, before it is read; `node tools/ship/takeFlyTallyCorrect.mjs read` prints the checks and the reading. The
 verdict will be section 10, "The result".
+
+## 10. The result (the DEV file committed at 7ecd8eb0, then the whole HELD file committed unread at 3c4aab71, then read once)
+DEV: one start, 48 flies at the 20 settings on the 50 DEV lives; **chosen g 2, tau 175** (mean home 0.6030; the 20 means
+run from 0.5603 at g 2, tau 500 to 0.6030). HELD: one start, 38.1 minutes on four processes, 51 records (sha256
+8dc77b3423b6d666...). **The checks hold**: the scene-tally round's file as committed; DEV's 48 flies once each with a home
+per setting and its choice the highest of the 20; HELD's 48 flies once each at that choice, their arms' committed weights;
+g 0 is today's tally to the bit in both scenes; HOMEP draw 1 the same twice.
+* **C26: IN THE 26-TYPE SCENE THE CORRECTED TALLY FINDS HOME BETTER THAN TODAY'S** (47 above, 1 below, p 3.5e-13).
+* **CP: IN THE PLAIN SCENE THE CORRECTED TALLY CANNOT BE TOLD APART FROM TODAY'S** (31 above, 17 below, p 0.059).
+
+| arm | today's: 26-type | corrected: 26-type | today's: plain | corrected: plain | perfect: 26-type |
+|---|---|---|---|---|---|
+| HOMEP | 0.6114 | 0.6414 | 0.5878 | 0.5861 | 0.9662 |
+| COURSE64 | 0.6063 | 0.6349 | 0.5809 | 0.5895 | 0.9586 |
+| HOME16 | 0.6124 | 0.6429 | 0.5893 | 0.5873 | 0.9663 |
+| H16BYC | 0.6106 | 0.6385 | 0.5833 | 0.5902 | 0.9632 |
+
+**C26's expectation came** (BETTER, 80); **CP's did not** (BETTER 65, given CANNOT 30). In the 26-type scene the compass's
+corrections carry something the tally lacks: re-laid by them, the tally comes home about 0.03 better on every arm. Described,
+not registered: that is **0.0827 of the gap** to the perfect tally (the registration's "about a tenth"). In the plain scene,
+where the flies were trained, the same setting does about nothing on average (two arms a little above, two a little below).
+
+**What it does not mean.** Section 7 holds. **The setting is at the grid's edge** (g 2, the largest tried), so a larger g
+might do better and this round does not say how much. One setting for 48 flies, chosen on the 26-type scene, is why the
+plain scene is no test of the best setting there. The correction is the fly's own -- its belief and its own turn -- and
+nothing is shown it from outside. Nothing here is of the animal.

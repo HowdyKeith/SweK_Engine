@@ -9,6 +9,9 @@
 //   2  THE TALLY                at g 0 it is HomingFly to the bit; the correction is the belief's move less the fly's turn; it turns the memory and the home vector; the steering is untouched
 //   3  THE RECORDS              DEV, its choice, HELD, g 0 and a second flight, made here; the choice rule; C26, CP; the broken sets
 //   4  THE COMMAND              it is this round's; DEV once, HELD only at a committed choice; no flight of the round's, no process
+//   5  THE VERDICT              the HELD file by its hash, DEV's choice; C26 and CP, the means, the gap closed; COURSE64 draw 12 re-flown to the bit; the note and the backlog say it
+//   VERDICT SABOTAGES (2026-11-28): V1 the HELD file's hash another 1 | V2 alpha 1e-14 2 | V3 COURSE64's perfect home in the note's table 0 -- A FINDING: the row read two of the four rows;
+//   it reads all four, V3b 1 | V4 the grid's-edge sentence 1 | V5 the backlog row CP BETTER 1 | V6 the re-flight compared to draw 11 1 | V7 the note's gap closed 1.
 // SABOTAGE LOG (2026-11-28) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked); this gate alone; the number is the rows red:
 //   G1 the correction without the fly's turn taken out 2 | G2 the home vector not turned 2 | G3 no memory (each step alone) 1 | G4 the g-0 shortcut removed 0 -- an EQUIVALENT MUTANT:
 //   at g 0 the turn is the identity, so the shortcut changes no number | G5 the home vector shown a tick early 2 | G6 DEV the HELD lives 1 | G7 a tie to the higher setting 1 |
@@ -142,8 +145,31 @@ section(() => {
         /\{ kind: "held", g: at\.g, tau: at\.tau \}/.test(csrc) && /\[\["zerojob"\], null\]/.test(csrc) && /kind: "recheck", arm: rec\.arm, s: rec\.s, ownType: rec\.ownType, corrType: rec\.corrType, ownPlain: rec\.ownPlain, corrPlain: rec\.corrPlain, trueType: rec\.trueType/.test(csrc) &&
         /\{ kind: "choice", g: ch\.g, tau: ch\.tau, means: ch\.means \}/.test(csrc) && /no score is printed/.test(csrc));
     const me = src("tools/ship/flyTallyCorrect-selfcheck.mjs");
-    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S AND LEAVES ITS FILES AS THEY WERE: no devOne or zeroOne call, one heldOne on its own 2 lives (none of DEV or HELD), no process",
-        !/E\.(devOne|zeroOne)\(/.test(me) && [...me.matchAll(/E\.heldOne\(([^)]*)\)/g)].every((m) => /, TWO$/.test(m[1])) && !TWO.some((x) => E.DEV.includes(x) || E.HELD.includes(x)) && !/import[^;]*child_process/.test(me) && [st(E.RESULTS), st(E.DEV_RESULTS)].join(" ") === before);
+    ok("!! THIS GATE FLIES NOTHING OF THE ROUND'S AND LEAVES ITS FILES AS THEY WERE: no devOne or zeroOne call, one heldOne on its own 2 lives and section 5's COURSE64 draw 12 on HELD (none of DEV or HELD), no process",
+        !/E\.(devOne|zeroOne)\(/.test(me) && [...me.matchAll(/E\.heldOne\(([^)]*)\)/g)].every((m) => /, TWO$/.test(m[1]) || m[1] === '"COURSE64", 12, F, { g: R.at.g, tau: R.at.tau }, E.HELD') && !TWO.some((x) => E.DEV.includes(x) || E.HELD.includes(x)) && !/import[^;]*child_process/.test(me) && [st(E.RESULTS), st(E.DEV_RESULTS)].join(" ") === before);
+});
+
+console.log("\n5. THE VERDICT (DEV committed at 7ecd8eb0, HELD committed unread at 3c4aab71, then read once; COURSE64 draw 12 flown five ways again here on HELD, a few minutes)");
+section(() => {
+    const HS = "8dc77b3423b6d66686765ccd414a26f6a8cccec6189d3c8aa39fefedd4394f61", D = E.fileOf(fs.readFileSync(path.join(ENG, E.DEV_RESULTS))), L = E.fileOf(fs.readFileSync(path.join(ENG, E.RESULTS)));
+    const R = E.reading(L.lines, D.lines, F), f4 = (x) => x.toFixed(4);
+    ok("!! THE HELD FILE IS THE ONE COMMITTED UNREAD (sha256 8dc77b34...), 51 records; DEV holds 48 flies and its choice; the checks hold", L.sha256 === HS && L.lines.length === 51 && D.lines.length === 49 && R.checks.length === 0, R.checks.join("; "));
+    ok("!! DEV CHOSE g 2, tau 175, the highest of the 20 means (0.6030); the lowest was g 2, tau 500 (0.5603)", R.at.g === 2 && R.at.tau === 175 && f4(Math.max(...R.at.means)) === "0.6030" && f4(Math.min(...R.at.means)) === "0.5603" &&
+        R.at.means.indexOf(Math.max(...R.at.means)) === 16);
+    ok("!! C26: THE CORRECTED TALLY FINDS HOME BETTER IN THE 26-TYPE SCENE (47 above, 1 below, p 3.482e-13); CP: CANNOT IN THE PLAIN (31 above, 17 below, p 5.946e-2); 0.0827 of the gap closed",
+        R.C26.word === E.WORDS.C26[0] && R.C26.above === 47 && R.C26.below === 1 && R.C26.p.toExponential(3) === "3.482e-13" && R.CP.word === E.WORDS.CP[2] && R.CP.above === 31 && R.CP.below === 17 &&
+        R.CP.p.toExponential(3) === "5.946e-2" && f4(R.closed) === "0.0827");
+    const row = (a) => ["ownType", "corrType", "ownPlain", "corrPlain", "trueType"].map((k) => f4(R.arms[a][k])).join(" ");
+    ok("the means the note prints, each arm's five homes", row("HOMEP") === "0.6114 0.6414 0.5878 0.5861 0.9662" && row("COURSE64") === "0.6063 0.6349 0.5809 0.5895 0.9586" &&
+        row("HOME16") === "0.6124 0.6429 0.5893 0.5873 0.9663" && row("H16BYC") === "0.6106 0.6385 0.5833 0.5902 0.9632");
+    const r12 = L.lines.find((r) => r.kind === "fly" && r.arm === "COURSE64" && r.s === 12), again = E.heldOne("COURSE64", 12, F, { g: R.at.g, tau: R.at.tau }, E.HELD);
+    ok("!! COURSE64 draw 12 flown five ways again here on the 200 HELD lives at the chosen setting: the record's five numbers to the bit", J(again) === J(r12));
+    const note = src("brain/FLY_TALLY_CORRECT_WIP.md").replace(/\s+/g, " "), back = src("brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md");
+    ok("!! the note's section 10 says it: the files and the HELD hash, the choice, both words, the table, which expectation came, the gap closed, the setting at the grid's edge; the backlog row DONE",
+        /## 10\. The result \(the DEV file committed at 7ecd8eb0, then the whole HELD file committed unread at 3c4aab71, then read once\)/.test(note) && /sha256 8dc77b3423b6d666/.test(note) && /\*\*chosen g 2, tau 175\*\*/.test(note) &&
+        note.includes("**C26: " + E.WORDS.C26[0] + "**") && note.includes("**CP: " + E.WORDS.CP[2] + "**") && ["| HOMEP | 0.6114 | 0.6414 | 0.5878 | 0.5861 | 0.9662 |", "| COURSE64 | 0.6063 | 0.6349 | 0.5809 | 0.5895 | 0.9586 |", "| HOME16 | 0.6124 | 0.6429 | 0.5893 | 0.5873 | 0.9663 |",
+         "| H16BYC | 0.6106 | 0.6385 | 0.5833 | 0.5902 | 0.9632 |"].every((row) => note.includes(row)) && /\*\*C26's expectation came\*\* \(BETTER, 80\); \*\*CP's did not\*\*/.test(note) && /\*\*0\.0827 of the gap\*\*/.test(note) &&
+        /\*\*The setting is at the grid's edge\*\*/.test(note) && /\| `fly-tally-correct` \|[^\n]*DONE 2026-11-28[^\n]*C26 BETTER \(47 of 48[^\n]*CP CANNOT/.test(back));
 });
 
 console.log(`\nflyTallyCorrect-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
