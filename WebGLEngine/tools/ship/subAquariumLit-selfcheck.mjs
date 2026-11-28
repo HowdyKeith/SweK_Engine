@@ -68,9 +68,13 @@ await section(async () => {
     ok("!! THE LAMPS ONLY BRIGHTEN, AND WHAT THEY BRIGHTEN IS SEEN THROUGH A LAMP'S CONE (19 in 20 of a fifth of the pixels, each ray walked from the eye to the floor)", dd.up.length > 1500 && dd.down.length === 0 && through >= 0.95 * sample.length, `${dd.up.length} brighter, ${dd.down.length} darker; ${through} of ${sample.length} through a cone`);
     // a light straight over the first sub, 45 m up: its hull's shadow on the floor
     const b = bows[0], over = { type: "spot", position: [b.pos[0], b.pos[1] + 45, b.pos[2]], direction: [0, -1, 0], range: 120, innerAngle: 0.25, outerAngle: 0.35, color: [1, 1, 1], intensity: 9000, shadow: true, priority: 3 };
-    const withC = await shot(p, { lamps: false, extra: [over], casters: true }), noC = await shot(p, { casters: false });
+    const dark = await shot(p, { lamps: false, extra: [], casters: true }), withC = await shot(p, { extra: [over] }), noC = await shot(p, { casters: false });
     await p.close();
     const sd = diffs(withC, noC), s2 = sd.up.filter((_, i) => i % 3 === 0), inOver = s2.filter(([x, y]) => throughCone(withC, inv, x, y, [over], 0.05)).length;
+    // the light falls on the boat itself: the middle of the sub under it (its centre projected, a 5 x 5 block) brightens -- the hulls are lit by the clusters, not only the floor
+    const q = T4(withC.vp, [b.pos[0], b.pos[1], b.pos[2], 1]), cx = Math.round((q[0] / q[3] * 0.5 + 0.5) * withC.w), cy = Math.round((0.5 - q[1] / q[3] * 0.5) * withC.h); let lit = 0, n = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const k = ((cy + dy) * withC.w + cx + dx) * 4; n++; if (lum(withC.px, k) - lum(dark.px, k) > 3) lit++; }
+    ok("!! THE LIGHT FALLS ON THE BOAT TOO: the middle of the sub under it brightens (its centre on screen, 5 x 5 pixels, 20 of 25) -- the hulls are lit by the clusters, not only the floor", lit >= 20, `${lit} of ${n} at (${cx}, ${cy})`);
     ok("!! THE BOATS CAST SHADOWS: a light straight over a sub, the boats left out of the atlas -- only brighter, and inside that light's cone (9 in 10)", sd.up.length > 50 && sd.down.length === 0 && inOver >= 0.9 * s2.length, `${sd.up.length} brighter, ${sd.down.length} darker; ${inOver} of ${s2.length} in its cone`);
 });
 

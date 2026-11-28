@@ -83,3 +83,17 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, model = duelModel()
     return { score, winner: sunk && !lost ? "sub" : lost && !sunk ? "ship" : "draw", shipHp: ship.hp, subHp: sub.hp, subFate: sub.fate, fired: sub.fired, hits: sub.hits, ticks: flown, events, ship, sub: { pos: sub.state.pos.slice() },
         torpedoes: torps.map((t) => ({ id: t.id, status: t.status, depth: -t.pos[2] })) };
 }
+
+// ---- the command line: node brain/subShipDuel.mjs [--seeds 8] [--cls freighter,corvette,destroyer] [--helm steady,zigzag,evade] (or node tools/ship/studyCmd.mjs subShipDuel ...) ----
+// the hand tactician (brain/subTactics.mjs) against every class and helm asked, on seeds 1..n: how many ships it sank, torpedoes fired and hits. NOT a registered study: a look at the arena.
+if (typeof process !== "undefined" && process.argv && /subShipDuel\.mjs$/.test(process.argv[1] || "")) {   // no node import: a page may import this module
+    const rest = process.argv.slice(2), opt = (k, d) => { const i = rest.indexOf("--" + k); return i >= 0 ? rest[i + 1] : d; };
+    const n = Number(opt("seeds", 8)), classes = opt("cls", Object.keys(SH.SHIP_CLASSES).join(",")).split(","), helms = opt("helm", HELM.HELMS.join(",")).split(",");
+    const TA = await import("./subTactics.mjs");
+    console.log(`[subShipDuel] the hand tactician against each ship, seeds 1..${n} (not a registered study)`);
+    for (const cls of classes) for (const helm of helms) {
+        let sunk = 0, fired = 0, hits = 0;
+        for (let seed = 1; seed <= n; seed++) { const r = duel({ tactics: TA.makeTactician(), pilot: AS.pilot() }, scenario(seed, { cls, helm })); if (r.winner === "sub") sunk++; fired += r.fired; hits += r.hits; }
+        console.log(`  ${cls.padEnd(10)} ${helm.padEnd(7)} sunk ${sunk} of ${n}   ${hits} hits of ${fired} torpedoes`);
+    }
+}

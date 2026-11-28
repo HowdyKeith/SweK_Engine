@@ -9,7 +9,7 @@
 //   2  THE PHYSICS   ?sea=rough loads the rough sea (8 waves, the longest 90 m) and the picker says so; choosing default through the picker rebuilds the surface in place
 //                    (6 waves, 60 m); the rough surface's drawn height range is wider than the calm one's; no page error
 //   3  THE GPU SEA   chosen, either it goes live (its frame shown behind a cleared canvas) or, when this browser's frame has no adapter, the page says so within 15 s and goes
-//                    back to the calm sea with the frame hidden -- never a frame left showing over nothing
+//                    back to the calm sea with the frame hidden -- never a frame left showing over nothing; and with its frame's page refused, it falls back by itself
 //   4  REMEMBERED    a sea chosen in the picker is the one the next visit opens with; ?sea= wins over it
 //   5  LIT           with ?lights=1 on the rough sea, no GL error (the new surface is patched and kept out of the shadow atlas)
 //
@@ -53,9 +53,16 @@ await section(async () => {
     const a = await open("");
     await a.p.selectOption("#seaSel", "gpu");
     await a.p.waitForFunction(() => /live|did not start|GPU ocean: (this|no)/.test(window.__battleSea.state), null, { timeout: 20000 }).catch(() => {});
-    const g = await sea(a.p); await a.p.close();
-    const live = /live/.test(g.state), fellBack = g.style === "calm" && g.frame === "none" && /did not start|GPU ocean:/.test(g.state);
-    ok("!! THE GPU OCEAN, CHOSEN: live with its frame shown, or -- this browser's frame without an adapter -- said so, and back on the calm sea with the frame hidden", (live && g.frame === "block" && g.style === "gpu") || fellBack, `${g.style}; ${g.state}; frame ${g.frame}`);
+    const g = await sea(a.p), hasGpu = await a.p.evaluate(() => !!navigator.gpu); await a.p.close();
+    // with navigator.gpu present the frame is TRIED: it goes live, or the page falls back when it does not start -- "unavailable" is an answer only without navigator.gpu
+    const live = /live/.test(g.state), fellBack = g.style === "calm" && g.frame === "none" && (hasGpu ? /did not start/.test(g.state) : /GPU ocean:/.test(g.state));
+    ok("!! THE GPU OCEAN, CHOSEN: live with its frame shown, or -- this browser's frame without an adapter -- said so, and back on the calm sea with the frame hidden (with navigator.gpu present it must have been tried)", (live && g.frame === "block" && g.style === "gpu") || fellBack, `${g.style}; ${g.state}; frame ${g.frame}; navigator.gpu ${hasGpu}`);
+    // and when the GPU ocean CANNOT start (its frame's page refused), the page must fall back on its own: the calm sea, the frame hidden, and it says so
+    { const p = await ctx.newPage(), errors = []; p.on("pageerror", (e) => errors.push(e.message)); await p.route("**/sea-host.html*", (r) => r.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>refused</title>" }));
+      await p.goto(`http://127.0.0.1:${srv.address().port}/battleship3d.html`); await p.waitForFunction(() => window.__battleSea, null, { timeout: 60000 }); const hasGpu = await p.evaluate(() => !!navigator.gpu);
+      await p.selectOption("#seaSel", "gpu"); await p.waitForFunction(() => /did not start|GPU ocean: (this|no)/.test(window.__battleSea.state), null, { timeout: 20000 }).catch(() => {});
+      const f = await sea(p); await p.unroute("**/sea-host.html*"); await p.close();
+      ok("!! WHEN THE GPU OCEAN CANNOT START (its frame refused), THE PAGE FALLS BACK BY ITSELF within 15 s: the calm sea, the frame hidden, the reason said", f.style === "calm" && f.frame === "none" && (hasGpu ? /did not start/.test(f.state) : /GPU ocean:/.test(f.state)), `${f.style}; ${f.state}; frame ${f.frame}`); }
     const b = await open(""); await b.p.selectOption("#seaSel", "rough"); await b.p.waitForTimeout(300); await b.p.close();
     const c = await open(""), again = await sea(c.p); await c.p.close();
     const d = await open("?sea=default"), url = await sea(d.p); await d.p.close();

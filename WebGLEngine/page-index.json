@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 511,
+ "count": 512,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1884,6 +1884,13 @@
    "t": "many lights (WebGPU)",
    "d": "",
    "g": "recentnew",
+   "p": 0
+  },
+  {
+   "f": "lights-three.html",
+   "t": "many lights (three.js)",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {

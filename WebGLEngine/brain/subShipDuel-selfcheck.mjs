@@ -6,7 +6,7 @@
 //   1  THE SCENARIO   a ship starts 500 to 900 m back along a lane that passes 100 to 300 m from the sub, its speed the helm's cruise; the same seed, the same scenario
 //   2  THE DUEL       deterministic; the hand tactician of brain/subTactics.mjs, unchanged, hunts a ship as it hunts a boat -- it sinks a steady freighter on most seeds;
 //                     NO TORPEDO IS EVER LOST AT ITS CEILING against any class (the surface rule)
-//   3  THE HELM MATTERS  on the same seeds the evading destroyer is sunk less often than the steady one; the score is the duel formula (damage / hp, +0.5 for a kill)
+//   3  THE HELM MATTERS  on the same seeds the evading destroyer (it turns on hearing a torpedo) is sunk less often than the zigzagging one, at most 2 of 8; the score is the duel formula (damage / hp, +0.5 for a kill)
 // SABOTAGE LOG: see the bottom of this file.
 "use strict";
 import * as D from "./subShipDuel.mjs";
@@ -30,13 +30,13 @@ console.log("2. THE DUEL, 3. THE HELM MATTERS");
     const a = D.duel(side(), D.scenario(4, { cls: "corvette", helm: "zigzag" })), b = D.duel(side(), D.scenario(4, { cls: "corvette", helm: "zigzag" }));
     ok("!! DETERMINISTIC: the same seed, the same duel, event for event", JSON.stringify(a.events) === JSON.stringify(b.events) && a.score === b.score);
     const res = {}; let ceiling = 0, torps = 0;
-    for (const cls of Object.keys(SH.SHIP_CLASSES)) for (const helm of ["steady", "evade"]) {
+    for (const cls of Object.keys(SH.SHIP_CLASSES)) for (const helm of ["steady", "zigzag", "evade"]) {
         res[`${cls}.${helm}`] = SEEDS.map((s) => { const r = D.duel(side(), D.scenario(s, { cls, helm })); for (const t of r.torpedoes) { torps++; if (t.status === "lost" && t.depth < 3.2) ceiling++; } return r; });
     }
     const sunk = (k) => res[k].filter((r) => r.winner === "sub").length;
     ok("!! THE HAND TACTICIAN, UNCHANGED, HUNTS A SHIP: it sinks a steady freighter on most seeds (6 of 8 or more)", sunk("freighter.steady") >= 6, `${sunk("freighter.steady")} of 8`);
     ok("!! NO TORPEDO IS EVER LOST AT ITS CEILING, against any class or helm (the surface rule: the ship offered below 3.5 m)", ceiling === 0 && torps > 50, `${ceiling} of ${torps} torpedoes lost at the ceiling`);
-    ok("!! THE HELM MATTERS: on the same seeds the evading destroyer is sunk less often than the steady one", sunk("destroyer.evade") < sunk("destroyer.steady"), `evade ${sunk("destroyer.evade")}, steady ${sunk("destroyer.steady")} of 8`);
+    ok("!! THE HELM MATTERS, AND SO DOES HEARING: on the same seeds the evading destroyer -- which turns when its sonar hears a torpedo -- is sunk less often than the zigzagging one (the same legs, deaf to torpedoes) and on at most 2 of 8", sunk("destroyer.evade") < sunk("destroyer.zigzag") && sunk("destroyer.evade") <= 2 && sunk("destroyer.zigzag") <= sunk("destroyer.steady"), `evade ${sunk("destroyer.evade")}, zigzag ${sunk("destroyer.zigzag")}, steady ${sunk("destroyer.steady")} of 8`);
     const r = res["freighter.steady"][0], C = SH.SHIP_CLASSES.freighter;
     ok("!! THE SCORE IS THE DUEL'S FORMULA: damage over the ship's hit points, +0.5 for a kill, + up to 0.5 for an early one", Math.abs(r.score - ((C.hp - r.shipHp) / C.hp + (r.winner === "sub" ? 0.5 + 0.5 * (1 - r.ticks / Math.round(D.SECONDS / D.DT)) : 0))) < 1e-9, r.score.toFixed(4));
     console.log("  ....  sunk of 8: " + Object.keys(res).map((k) => `${k} ${sunk(k)}`).join(", "));

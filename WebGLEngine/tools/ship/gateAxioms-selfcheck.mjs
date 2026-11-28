@@ -136,6 +136,8 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
     // its pixels, webcodecsFramesToMp4 paints the frames it hands the encoder -- and both SKIP BY NAME on a box
     // without that optional dependency of ai-bridge/, so the context is assumed only where it exists.
     const GPU_GATES = Object.freeze([
+        // 2026-11-28: tools/ship/battleshipSea-selfcheck.mjs opens battleship3d.html (three.js, WebGL) in headless Chromium to switch its seas, the GPU ocean's frame among them (WebGPU)
+        "tools/ship/battleshipSea-selfcheck.mjs",
         // v4926: tools/ship/subAquariumGpuSwitch-selfcheck.mjs opens sub-aquarium.html in headless Chromium with WebGPU on its software adapter and ticks the page's "fly circuit on the GPU" switch, which asks for a device: the switch's whole job is a GPU context
         "tools/ship/subAquariumGpuSwitch-selfcheck.mjs",
         // v4895: render/seaThree-selfcheck.mjs and ui/seaDepthTint-selfcheck.mjs and render/subAquarium3d-selfcheck.mjs build a three.js scene (WebGL through the headless browser) to draw the sea; tools/ship/snowDeformPage-selfcheck.mjs draws snow-deform.html in one; tools/ship/zoomBlurWiring-selfcheck.mjs reads a post-process pass on a context

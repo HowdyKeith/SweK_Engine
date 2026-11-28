@@ -73,7 +73,8 @@ const TOOLS = {
     bakeDendritePlaces: () => import("../bakeDendritePlaces.mjs"),
     denoiseKernelRound: () => import("../denoiseKernelRound.mjs"),
     denoiseLayers: () => import("../denoiseLayers.mjs"),
-    lightingCost: () => import("../lightingCost.mjs"),   // 2026-11-27: what the new lighting costs on the rig's card
+    lightingCost: () => import("../lightingCost.mjs"),
+    subShipDuel: () => import("../../brain/subShipDuel.mjs"),   // 2026-11-28: the sub-against-ship arena, the hand tactician against each class and helm   // 2026-11-27: what the new lighting costs on the rig's card
     splatPack: () => import("../splatPack.mjs"),
 };
 const FILE = (name) => { const t = String(TOOLS[name]).match(/import\("([^"]+)"\)/)[1]; return path.resolve(HERE, t); };

@@ -32,6 +32,9 @@ console.log("2. THE HULL");
     let s = SH.createShip({ cls: "freighter", heading: 0.4, speed: 2 }); for (let i = 0; i < 300; i++) s = SH.stepShip(s, { heading: 0.4, speed: 2 });
     const f = SH.forwardOf(0.4), d = 2 * 300 * SH.DT;
     ok("!! a held course runs straight at its speed (10 s at 2 m/s: 20 m along the heading)", Math.abs(s.pos[0] - f[0] * d) < 1e-6 && Math.abs(s.pos[1] - f[1] * d) < 1e-6, s.pos.map((v) => v.toFixed(3)).join(", "));
+    // the arena's own convention, not this module's word for it: a torpedo launched on a heading moves where forwardOf says a ship on that heading moves
+    const conv = [0.4, 1.9, -2.6].every((hd) => { let tp = Tp.launch(1, { pos: [0, 0, -20], heading: hd, pitch: 0 }); const p0 = tp.pos; tp = Tp.stepTorpedo(tp, [], { seeker: false }).torpedo; const d = [tp.pos[0] - p0[0], tp.pos[1] - p0[1]], l = Math.hypot(...d), f = SH.forwardOf(hd); return Math.abs(d[0] / l - f[0]) < 1e-6 && Math.abs(d[1] / l - f[1]) < 1e-6; });
+    ok("!! THE SHIP STEERS IN THE ARENA'S CONVENTION: on any heading it moves where physics/mechanics/subTorpedo.mjs's torpedo on that heading moves", conv);
     let t = SH.createShip({ cls: "corvette", heading: 0, speed: 4 }), worst = 0; for (let i = 0; i < 60; i++) { const n = SH.stepShip(t, { heading: 3, speed: 4 }); worst = Math.max(worst, Math.abs(n.heading - t.heading) / SH.DT / SH.turnRateOf("corvette", t.speed)); t = n; }
     ok("!! a turn is never faster than speed / turn radius (the rudder's limit)", worst <= 1 + 1e-9, `at most ${worst.toFixed(4)} of the limit`);
     // exactly two laps (2 x 2 pi R / v), sampled evenly: a part lap would pull the samples' centre off the circle's
