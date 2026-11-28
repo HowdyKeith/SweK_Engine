@@ -97,6 +97,9 @@ await section(async () => {
     ok("!! A DRAW DONE ONCE, ON A TIMER (not in any animation frame), IS TIMED; then the page is idle and the overlay says how long the frame that drew took", a.busy > 0.05 && a.last < 0.01 && /idle; the last frame that drew took/.test(a.box) && pe.length === 0, JSON.stringify({ busy: a.busy, last: a.last, box: a.box, pe: pe.slice(0, 1) }));
     ok("!! the page's requestAnimationFrame is the browser's own, untouched (getContext is the one function wrapped)", a.raf === true && a.get === false);
     await p.evaluate(() => window.__labelled()); await p.waitForTimeout(3000);
+    // 2026-11-28 -- then until the overlay lists the named pass, for at most 10 s more: on a loaded box (two other browser gates beside it) the fixed 3 s read the overlay
+    // while it still said "idle" (the ratio was right, 2.64). The row below is unchanged: an overlay that never lists heavy still fails it.
+    await p.waitForFunction(() => /^heavy /m.test((document.getElementById("gpuTimerAuto") || {}).textContent || "") && window.__gpuTimerAuto.lastLabels && window.__gpuTimerAuto.lastLabels.heavy > 0, null, { timeout: 10000 }).catch(() => {});
     const L = await p.evaluate(() => ({ last: window.__gpuTimerAuto.lastLabels, ret: window.__timeReturns, box: (document.getElementById("gpuTimerAuto") || {}).textContent }));
     await p.evaluate(() => { window.__labelling = false; }); await p.waitForTimeout(800);
     const ratio = L.last && L.last["the rest"] > 0 ? L.last.heavy / L.last["the rest"] : Infinity;
@@ -129,6 +132,10 @@ await section(async () => {
             // SABOTAGED, restored byte for byte: P1 raymarch-live asked for a pass it does not have -> 1 red; P2 the wait demanding a pass name no page has -> 1 red (the wait times out, the row reads).
             await p.waitForFunction(() => { const t = window.__gpuTimerAuto, b = (document.getElementById("gpuTimerAuto") || {}).textContent || "";
                 return Object.entries((t && t.labels) || {}).filter(([, v]) => v > 0).every(([l]) => new RegExp("^" + l + " ", "m").test(b)); }, null, { timeout: 10000 }).catch(() => {});
+            // 2026-11-28 -- AND, ON A PAGE THAT DRAWS, UNTIL IT HAS TIMED A FRAME THAT DREW, for at most 10 s more: the same race as the overlay's above. Run beside other
+            // gates (a loaded box), pom-demo's redraw on the resize had not reached the timer inside 2.5 s and the "timed a frame that drew" row went red on it; alone, three
+            // runs in three were green. The row below is unchanged: a page that never times a drawn frame still fails.
+            if (DRAWS.includes(pg)) await p.waitForFunction(() => window.__gpuTimerAuto && window.__gpuTimerAuto.busy >= 0.01, null, { timeout: 10000 }).catch(() => {});
         } else await p.waitForTimeout(3000);
         const r = await p.evaluate(() => ({ ...window.__gpuTimerAuto, time: undefined, box: (document.getElementById("gpuTimerAuto") || {}).textContent || null })).catch((e) => ({ state: "page gone: " + e.message.slice(0, 40) }));
         await p.close(); return { ...r, errs };
