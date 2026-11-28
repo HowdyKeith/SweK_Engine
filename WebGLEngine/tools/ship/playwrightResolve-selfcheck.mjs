@@ -500,15 +500,17 @@ console.log("\nTHE FRAME HOLD -- frameHold() against a fake window and a clock t
 
 {   // section 196: playwrightVersion, which realGpuRun's reports now carry beside Chromium's own version
     // SABOTAGED, restored byte-identical: B3 the package name misread -> red here and in realGpuRun-selfcheck's live row.
+    // v4936: W1 the directory start removed from playwrightVersion -> 1 red by name (this row, the package-directory fixture), restored sha256-identical. Found by the rig's clone-verify of v4936, red there only.
     const os = await import("node:os"), pw = resolvePlaywright(), v = playwrightVersion(pw.from);
     const d = fs.mkdtempSync(path.join(os.tmpdir(), "swek-pwv-")), sub = path.join(d, "node_modules", "playwright-core", "lib");
     fs.mkdirSync(sub, { recursive: true }); fs.writeFileSync(path.join(d, "node_modules", "playwright-core", "package.json"), JSON.stringify({ name: "playwright-core", version: "9.8.7" }));
     fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ name: "not-playwright", version: "1.0.0" }));
     const nested = playwrightVersion(path.join(sub, "index.js")), none = playwrightVersion(path.join(d, "x.js")), blank = playwrightVersion("");
+    const asDir = playwrightVersion(path.join(d, "node_modules", "playwright-core"));   // v4936: the package DIRECTORY itself, as resolvePlaywright returns a directory entry
     fs.rmSync(d, { recursive: true, force: true });
-    let want = null; if (pw.from) { let dir = path.dirname(pw.from); for (let i = 0; i < 8 && !want; i++) { try { const q = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); if (/^playwright(-core)?$/.test(q.name)) want = q.version; } catch {} dir = path.dirname(dir); } }
-    ok("!! playwrightVersion: the nearest package.json above a file that names playwright or playwright-core (9.8.7 found two levels up, past nothing else); another package's is not taken; no path, null; this box's resolved package read as it is",
-        nested === "9.8.7" && none === null && blank === null && (pw.from ? v === want && /^\d+\.\d+/.test(v || "") : v === null), `here: ${v}`);
+    let want = null; if (pw.from) { let dir = path.dirname(pw.from); try { if (fs.statSync(pw.from).isDirectory()) dir = pw.from; } catch { /* a file */ } for (let i = 0; i < 8 && !want; i++) { try { const q = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); if (/^playwright(-core)?$/.test(q.name)) want = q.version; } catch {} dir = path.dirname(dir); } }
+    ok("!! playwrightVersion: the nearest package.json above a file that names playwright or playwright-core (9.8.7 found two levels up, past nothing else, and in the package directory itself when that is what was resolved); another package's is not taken; no path, null; this box's resolved package read as it is",
+        nested === "9.8.7" && asDir === "9.8.7" && none === null && blank === null && (pw.from ? v === want && /^\d+\.\d+/.test(v || "") : v === null), `here: ${v}`);
 }
 
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

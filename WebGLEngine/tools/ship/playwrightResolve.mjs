@@ -253,7 +253,12 @@ export function resolvePlaywright(requireFn) {
  */
 export function playwrightVersion(from) {
     if (!from) return null;
+    // v4936 -- A DIRECTORY `from` STARTS AT ITSELF. resolvePlaywright returns an absolute PLAYWRIGHT_PATHS entry as given, and the
+    // tools/render-qa, ../node_modules, global-npm and sibling entries are package DIRECTORIES: dirname() of one stepped straight past
+    // its own package.json, so the version read null on the rig (win32, playwright found through one of them) and the sandbox, which
+    // resolves the bare name to index.js, never saw it.
     let dir = path.dirname(from);
+    try { if (fs.statSync(from).isDirectory()) dir = from; } catch { /* not on disk: the walk from dirname is all there is */ }
     for (let i = 0; i < 8; i++) {
         const f = path.join(dir, "package.json");
         try { const p = JSON.parse(fs.readFileSync(f, "utf8")); if (p.name === "playwright" || p.name === "playwright-core") return p.version || null; } catch { /* not here */ }
