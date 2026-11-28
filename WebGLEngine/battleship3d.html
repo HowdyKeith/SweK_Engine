@@ -92,7 +92,10 @@
 </style>
 </head>
 <body>
+<iframe id="seaFrame" title="GPU ocean (web-ocean), behind the 3D view" aria-hidden="true" tabindex="-1" style="display:none;position:fixed;inset:0;width:100%;height:100%;border:0;z-index:0"></iframe>
 <canvas id="c"></canvas>
+<!-- 2026-11-28 (Keith: "the battleship sea picker"): the sea, as the sub aquarium offers it (render/seaStyles.mjs) -->
+<label id="seaPick" style="position:fixed;right:10px;bottom:10px;z-index:60;font:12px 'Share Tech Mono',monospace;color:#bfe9e6;background:rgba(6,16,24,.82);border:1px solid #0c2230;border-radius:6px;padding:4px 8px">sea <select id="seaSel" style="background:#06101a;color:#bfe9e6;border:1px solid #1c6b66;font:inherit"></select> <span id="seaState" style="color:#5f8f8c"></span></label>
 <div id="scan"></div><div id="vig"></div>
 
 <div class="hud" id="top"><h1>A B Y S S</h1><div class="sub">3D · NAVAL COMMAND</div></div>
@@ -159,6 +162,11 @@ function searchlightsAt(t){ return SEARCH.map((s) => { const a = s.phase + s.rat
   return { type: "spot", position: pos, direction: tgt.map((v, i) => v - pos[i]), range: 45, innerAngle: 0.22, outerAngle: 0.32, color: [0.9, 0.95, 1], intensity: 420, shadow: true, priority: 2 }; }); }
 // v4895 -- the water is the physics sea (physics/ocean/oceanSurface.mjs) drawn by render/seaThree.mjs: the same surface a hull floats on, on every GPU. The old page-local wave sum is gone.
 import { createSeaMesh, CALM_OPTIONS } from "/render/seaThree.mjs";
+// 2026-11-28 -- THE SEA PICKER (Keith: "the battleship sea picker"): the three physics seas (render/seaStyles.mjs: calm, what this page always drew; default; rough -- the same
+// Gerstner surface the fleet rides) and the GPU ocean (the vendored web-ocean sea in sea-host.html, in a frame behind the transparent canvas, its camera following this one:
+// ui/seaFrame.mjs), as sub-aquarium.html offers them. ?sea=<name> chooses at load; the choice is remembered. window.__battleSea reports { style, longest, waves, state }.
+import { STYLES as SEA_STYLES, LABELS as SEA_LABELS, GPU as SEA_GPU, DEFAULT_STYLE as SEA_DEFAULT, isStyle as isSeaStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
+import { hostUrl as seaHostUrl, seaCameraFromView } from "/ui/seaFrame.mjs";
 import { createSurface, defaultComponents } from "/physics/ocean/oceanSurface.mjs";
 import { applyDepthTint } from "/ui/seaDepthTint.mjs";
 /* ============================================================
@@ -250,6 +258,7 @@ function init(){
   scene.add(hoverMesh);
 
   initStatus();
+  initSeaPicker();
   newGame();
   initOrbit();
   addEventListener("resize", onResize);
@@ -264,9 +273,44 @@ function init(){
 }
 
 // ============================================================ ocean + seabed
-function buildOcean(){
-  sea = createSeaMesh(THREE, createSurface({ components: defaultComponents(1, CALM_OPTIONS) }), { half:CFG.SEA/2, n:48, color:COL.water, foamColor:COL.miss, opacity:0.64 });
-  water = sea.mesh; scene.add(water);
+function buildOcean(style = SEA_DEFAULT){
+  const opts = SEA_STYLES[style] || CALM_OPTIONS;
+  sea = createSeaMesh(THREE, createSurface({ components: defaultComponents(1, opts) }), { half:CFG.SEA/2, n:48, color:COL.water, foamColor:COL.miss, opacity:0.64 });
+  water = sea.mesh; scene.add(water); sea.style = style; sea.longest = opts.longest; sea.waves = opts.n;
+}
+// the picker: a physics style rebuilds the surface in place (the fleet rides the new one at the next frame); the GPU ocean puts sea-host.html behind the canvas
+let seaBackdrop = null, seaWatch = null;
+function setSeaStyle(name){ if (!SEA_STYLES[name]) return false; const vis = water.visible; scene.remove(water); sea.dispose(); buildOcean(name); water.visible = vis; return true; }
+function seaBackdropApi(){ try { return seaBackdrop && seaBackdrop.contentWindow && seaBackdrop.contentWindow.seaApi || null; } catch { return null; } }
+function seaReport(state){ window.__battleSea = { style: seaBackdrop ? SEA_GPU : sea.style, longest: sea.longest, waves: sea.waves, state,
+  /** the drawn surface's height range now (highest less lowest vertex), for a gate */ span() { const a = water.geometry.attributes.position.array; let lo = Infinity, hi = -Infinity; for (let i = 1; i < a.length; i += 3) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); } return hi - lo; } }; const el = document.getElementById("seaState"); if (el) el.textContent = state && state !== "physics" ? state : ""; }
+function chooseSea(name, remember = true){
+  const sel = document.getElementById("seaSel"), frame = document.getElementById("seaFrame");
+  if (!isSeaStyle(name)) return false;
+  if (name === SEA_GPU) {
+    const a = gpuSeaAvailable(navigator, window.isSecureContext);
+    if (!a.ok) { sel.value = window.__battleSea ? window.__battleSea.style : SEA_DEFAULT; seaReport("GPU ocean: " + a.reason); return false; }
+    frame.style.display = "block"; frame.src = seaHostUrl({}); seaBackdrop = frame;
+    scene.background = null; renderer.setClearColor(0x05121a, 0); water.visible = false; if (seabed) seabed.visible = false; scene.fog = null;
+    const t0 = performance.now(); clearInterval(seaWatch);
+    seaWatch = setInterval(() => { const api = seaBackdropApi(); if (api && api.ready) { seaReport("GPU ocean: live"); return; } seaReport("GPU ocean: waiting");
+      if (performance.now() - t0 > 12000) { clearInterval(seaWatch); chooseSea(SEA_DEFAULT, false); seaReport("the GPU ocean did not start; back to the calm sea"); } }, 500);
+  } else {
+    clearInterval(seaWatch); frame.style.display = "none"; frame.src = "about:blank"; seaBackdrop = null;
+    scene.background = new THREE.Color(0x05121a); renderer.setClearColor(0x05121a, 1); water.visible = true; if (seabed) seabed.visible = true;
+    if (!(typeof LFOG !== "undefined" && LFOG)) scene.fog = new THREE.FogExp2(0x06161f, 0.011);
+    setSeaStyle(name); seaReport("physics");
+  }
+  sel.value = name;
+  if (remember) { try { localStorage.setItem("battleship3d.sea", name); } catch {} }
+  return true;
+}
+function initSeaPicker(){
+  const sel = document.getElementById("seaSel");
+  for (const [name, label] of Object.entries(SEA_LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
+  sel.value = SEA_DEFAULT; sel.addEventListener("change", () => chooseSea(sel.value)); seaReport("physics");
+  let want = new URLSearchParams(location.search).get("sea"); if (!want) { try { want = localStorage.getItem("battleship3d.sea"); } catch {} }
+  if (want && want !== SEA_DEFAULT && isSeaStyle(want)) chooseSea(want, false);
 }
 function buildSeabed(){
   const g = new THREE.PlaneGeometry(CFG.SEA, CFG.SEA, 1, 1); g.rotateX(-Math.PI/2);
@@ -975,6 +1019,7 @@ function animate(){
   if (!held) { updateOcean(t); updateFish(t,dt);
   for(let i=animators.length-1;i>=0;i--){ if(animators[i].update(dt)) animators.splice(i,1); } }
   applyCam();
+  if (seaBackdrop) { const api = seaBackdropApi(); if (api && api.ready) { const d = new THREE.Vector3(); camera.getWorldDirection(d); api.camera = seaCameraFromView(camera.position.toArray(), d.toArray(), camera.fov); } }
   if (LIT) renderLit(dt); else renderer.render(scene,camera);
   updateStatus(dt);
   if(statusRenderer) statusRenderer.render(statusScene,statusCam);
@@ -984,18 +1029,19 @@ function renderLit(dt){
   const S = window.__battleLit;
   if (!lit) {
     lit = createClusteredLightingThree(THREE, renderer, { maxLights: 64, space: "view", viewCells: [16, 9, 24], maxPerCell: 32, atlasSize: 1024, slots: 2, cascades: 0 });
-    if (sea && sea.mesh) sea.mesh.userData.noShadow = true;   // the translucent surface would shadow everything under it
+
     if (LFOG) { scene.fog = null; litFog = lit.createFog({ lighting: true }); }
   }
   scene.traverse((o) => { const m = o.material; if (o.isMesh && m && !Array.isArray(m) && !m.userData.swekClustered && (m.isMeshStandardMaterial || m.isMeshPhongMaterial || m.isMeshLambertMaterial)) { lit.patch(m); S.patched++; } });
   if (!S.freeze) litTime += dt;
+  if (sea && sea.mesh) sea.mesh.userData.noShadow = true;   // the translucent surface would shadow everything under it (every frame: the picker may have built a new one)
   scene.traverse((o) => { if ((o.isLine || o.isLineSegments) && !o.userData.noShadow) o.userData.noShadow = true; });   // the board's grid lines cast nothing
   for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += S.freeze ? 0 : dt; if (flashes[i].t >= flashes[i].ttl) flashes.splice(i, 1); }
   const L = (S.searchlights ? searchlightsAt(litTime) : []).concat(flashes.map((f) => ({ type: "point", position: f.pos, range: f.range, color: f.color, intensity: f.intensity * (1 - f.t / f.ttl), shadow: false })));
   for (const sh of liveShells) L.push({ type: "point", position: [sh.position.x, sh.position.y, sh.position.z], range: 7, color: [1, 0.78, 0.45], intensity: 25, shadow: false });
   S.lights = L.slice(0, 64); S.stats = lit.update(S.lights, lit.cameraOf(camera));
   lit.renderShadows(S.casters ? scene : emptyScene);   // the searchlights' tiles (casters: false draws nothing into them: a gate's switch)
-  if (LFOG && S.fogOn) {
+  if (LFOG && S.fogOn && !seaBackdrop) {
     const w = renderer.domElement.width, h = renderer.domElement.height;
     if (!litTarget || litTarget.width !== w || litTarget.height !== h) { if (litTarget) litTarget.dispose(); litTarget = new THREE.WebGLRenderTarget(w, h, { depthTexture: new THREE.DepthTexture(w, h, THREE.UnsignedIntType), minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); }
     renderer.setRenderTarget(litTarget); renderer.render(scene, camera); renderer.setRenderTarget(null);
