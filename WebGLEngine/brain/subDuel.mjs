@@ -44,7 +44,7 @@ export function scenario(seed, kind = "patrol") {
 }
 
 let MODEL = null;
-const duelModel = () => MODEL || (MODEL = S.createSubModel());
+export const duelModel = () => MODEL || (MODEL = S.createSubModel());   // exported 2026-11-28 for brain/subShipDuel.mjs (the same boat)
 
 /**
  * Fight one duel. `side` is { tactics: (obs) -> { depth, heading, speed, fire, ping } (a FRESH one: it has memory), pilot: (state, target, current) -> controls } for A; B is the scenario's scripted drone flown by the
